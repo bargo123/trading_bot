@@ -1,0 +1,7 @@
+symbol,algo,trades,win_rate,profit_factor,max_dd_pct,expectancy_r,net_pnl,final_equity,pyramid_adds
+BTC-USD,breakout_adx,122,54.92,0.951,9.63,0.098,-291.59,9708.41,0
+BTC-USD,fabris_ntz,64,37.5,0.66,15.62,-0.04,-1282.27,8717.73,0
+BTC-USD,fabris_ntz_pyramid,29,6.9,0.109,20.27,-0.559,-2027.36,7972.64,9
+EURUSD=X,fabris_ntz,40,52.5,1.071,3.34,0.209,129.34,10129.34,0
+EURUSD=X,fabris_ntz_pyramid,40,40.0,0.783,16.19,-0.122,-548.94,9451.06,17
+EURUSD=X,breakout_adx,79,48.1,0.545,20.8,-0.038,-2080.27,7919.73,0

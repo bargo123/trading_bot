@@ -1,0 +1,12 @@
+id,name,book_basis,trades,win_rate,profit_factor,max_dd_pct,expectancy_r,net_pnl,final_equity,score
+aegis_range_hw,Aegis Range HW (BB+RSI),Optimized mean reversion / TA oscillators,29,96.55,2.882,0.56,0.159,105.04,10105.04,1153.87
+rsi_pure,RSI Pure MR,Schwager oscillators / mean reversion,193,72.54,0.552,12.05,-0.042,-1205.03,8794.97,59.27
+bb_mr,Bollinger Fade,Bollinger mean reversion,142,72.54,0.397,12.47,-0.072,-1247.28,8752.72,55.18
+stoch_mr,Stochastic MR,Stochastic mean reversion,95,66.32,0.322,12.29,-0.151,-1132.93,8867.07,47.42
+ema_cross,EMA 50/200 Cross,Edwards & Magee / classic trend,61,37.7,0.587,6.07,-0.082,-484.71,9515.29,36.89
+macd_cross,MACD Cross,Classic momentum cross,157,33.76,0.723,12.33,-0.015,-1030.69,8969.31,23.48
+donch20,Donchian 20 Breakout,Shorter-channel breakout (Turtle variant),106,35.85,0.585,12.07,-0.104,-1102.44,8897.56,22.89
+elder_impulse,Elder Impulse Proxy,Elder impulse / MACD+EMA alignment,130,33.08,0.665,12.41,-0.044,-1038.34,8961.66,21.34
+atr_breakout,ATR Channel Breakout,Volatility channel breakout,79,34.18,0.434,12.07,-0.202,-1197.27,8802.73,17.71
+bb_squeeze,BB Squeeze Breakout,Compression → expansion breakout,80,30.0,0.461,12.05,-0.187,-1205.0,8795.0,14.18
+donch55,Donchian 55 Trend,Clenow / Turtle / Carver trend following,66,22.73,0.344,12.2,-0.261,-1129.96,8870.04,3.91

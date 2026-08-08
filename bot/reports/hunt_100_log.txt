@@ -1,0 +1,47 @@
+/Users/zaid.barghouthi/trading-llm/bot/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+Loaded EURUSD=X 1h lb=400 bars=9469
+Loaded EURUSD=X 1h lb=120 bars=2839
+Loaded EURUSD=X 15m lb=45 bars=4237
+Loaded BTC-USD 1h lb=400 bars=9402
+Loaded BTC-USD 15m lb=45 bars=4193
+Loaded BTC-USD 5m lb=30 bars=8258
+Search EURUSD=X 1h hw_range n=8640
+FULL100 trades=5 EURUSD=X 1h hw_range pnl=7.33
+FULL100 trades=5 EURUSD=X 1h hw_range pnl=7.33
+FULL100 trades=6 EURUSD=X 1h hw_range pnl=5.97
+STREAK100 n=8 pnl=10.38 EURUSD=X 1h hw_range
+STREAK100 n=9 pnl=9.00 EURUSD=X 1h hw_range
+STREAK100 n=8 pnl=7.55 EURUSD=X 1h hw_range
+STREAK100 n=9 pnl=9.01 EURUSD=X 1h hw_range
+STREAK100 n=8 pnl=7.55 EURUSD=X 1h hw_range
+STREAK100 n=9 pnl=9.01 EURUSD=X 1h hw_range
+STREAK100 n=8 pnl=7.55 EURUSD=X 1h hw_range
+STREAK100 n=11 pnl=12.15 EURUSD=X 1h hw_range
+STREAK100 n=9 pnl=8.12 EURUSD=X 1h hw_range
+STREAK100 n=10 pnl=9.79 EURUSD=X 1h hw_range
+STREAK100 n=9 pnl=8.38 EURUSD=X 1h hw_range
+STREAK100 n=10 pnl=9.79 EURUSD=X 1h hw_range
+STREAK100 n=9 pnl=8.38 EURUSD=X 1h hw_range
+STREAK100 n=12 pnl=10.87 EURUSD=X 1h hw_range
+STREAK100 n=10 pnl=8.49 EURUSD=X 1h hw_range
+FULL100 trades=7 EURUSD=X 1h hw_range pnl=20.98
+FULL100 trades=5 EURUSD=X 1h hw_range pnl=13.81
+STREAK100 n=14 pnl=13.97 EURUSD=X 1h hw_range
+STREAK100 n=11 pnl=9.05 EURUSD=X 1h hw_range
+STREAK100 n=8 pnl=16.70 EURUSD=X 1h hw_range
+FULL100 trades=6 EURUSD=X 1h hw_range pnl=12.20
+FULL100 trades=6 EURUSD=X 1h hw_range pnl=12.20
+FULL100 trades=7 EURUSD=X 1h hw_range pnl=18.78
+FULL100 trades=6 EURUSD=X 1h hw_range pnl=12.20
+FULL100 trades=7 EURUSD=X 1h hw_range pnl=18.78
+FULL100 trades=6 EURUSD=X 1h hw_range pnl=12.20
+FULL100 trades=8 EURUSD=X 1h hw_range pnl=19.43
+STREAK100 n=8 pnl=19.43 EURUSD=X 1h hw_range
+FULL100 trades=5 EURUSD=X 1h hw_range pnl=13.35
+STREAK100 n=12 pnl=23.84 EURUSD=X 1h hw_range
+STREAK100 n=12 pnl=23.81 EURUSD=X 1h hw_range
+STREAK100 n=12 pnl=23.86 EURUSD=X 1h hw_range
+STREAK100 n=12 pnl=23.81 EURUSD=X 1h hw_range
+STREAK100 n=12 pnl=23.86 EURUSD=X 1h hw_range
+STREAK100 n=12 pnl=23.81 EURUSD=X 1h hw_range

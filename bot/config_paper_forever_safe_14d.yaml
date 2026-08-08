@@ -1,0 +1,54 @@
+# REAL TEST — Mode A paper + forever_safe · $100 · 14 days
+# Do not change rules mid-test.
+symbol: EURUSD=X
+timeframe: 1h
+lookback_days: 120
+adx_period: 14
+adx_trend_threshold: 99
+adx_range_max: 24
+ema_fast: 50
+ema_slow: 200
+donchian_period: 55
+atr_period: 14
+atr_trail_mult: 3.0
+bb_period: 30
+bb_std: 1.8
+rsi_period: 14
+rsi_oversold: 35
+rsi_overbought: 70
+atr_sl_mult: 3.5
+atr_tp_mult: 0.4
+min_atr_pct: 0.0004
+
+starting_equity: 100
+high_risk_mode: forever_safe
+high_risk_safe: true
+allow_unsafe_high_risk: false
+risk_percent: 20.0
+hr_use_risk_bankroll: true
+hr_risk_bankroll_frac: 0.20
+hr_house_money_frac: 0.50
+hr_seed_risk_percent: 20.0
+hr_halt_on_first_loss: true
+hr_risk_min: 0.0
+hr_risk_max_cap: 100.0
+hr_max_consecutive_losses: 1
+hr_equity_floor_frac: 0.80
+
+max_daily_loss_percent: 100.0
+max_total_drawdown_percent: 100.0
+max_positions: 1
+kill_switch: false
+spread_bps: 0.8
+slippage_bps: 0.4
+session_start_utc: 0
+session_end_utc: 21
+mode: paper
+poll_seconds: 300
+signal_mode: hw_range
+algo: hw_range
+min_rr: 0.01
+cost_buffer: 1.0
+pyramid_enabled: false
+test_name: real_14d_forever_safe
+test_days: 14

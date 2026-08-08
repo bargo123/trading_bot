@@ -1,0 +1,15 @@
+{
+  "trades": 11,
+  "wr": 100.0,
+  "pnl": 21.264198755089733,
+  "dd": -0.0,
+  "exp_r": 0.11428571428571926,
+  "atr_sl_mult": 3.5,
+  "atr_tp_mult": 0.4,
+  "adx_range_max": 24,
+  "rsi_oversold": 35,
+  "rsi_overbought": 70,
+  "session_start_utc": 0,
+  "session_end_utc": 21,
+  "lookback_days": 45
+}
