@@ -18,25 +18,62 @@ def cost_ok(row: pd.Series, cfg: dict[str, Any], tp_dist: float) -> bool:
 
 
 def sig_hw_range(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
+    """
+    BB+RSI mean reversion (high-hit range entries).
+
+    tp_mode:
+      - atr (default): ATR take-profit. Books (Tharp/Ponsi): use min_rr / larger TP so E[R]>0;
+        tiny high-WR scalps often lose after costs.
+      - bb_mid / box: optional Elder-style fade toward BB mid (congestion midpoint).
+    """
     if pd.isna(row.get("atr")) or float(row["atr"]) <= 0:
         return None
     if not in_session(row["time"], cfg.get("session_start_utc"), cfg.get("session_end_utc")):
         return None
     if float(row.get("adx") or 0) > float(cfg.get("adx_range_max", 22)):
         return None
-    if pd.isna(row.get("bb_lower")):
+    if pd.isna(row.get("bb_lower")) or pd.isna(row.get("bb_mid")):
         return None
     close, atr_v, rsi_v = float(row["close"]), float(row["atr"]), float(row["rsi"])
+    bb_mid = float(row["bb_mid"])
     os_, ob_ = float(cfg.get("rsi_oversold", 30)), float(cfg.get("rsi_overbought", 70))
     sl_m, tp_m = float(cfg.get("atr_sl_mult", 2.5)), float(cfg.get("atr_tp_mult", 0.8))
+    tp_mode = str(cfg.get("tp_mode", "atr")).lower()
+    use_box = tp_mode in {"bb_mid", "box", "bb_box", "mid"}
+
     if close < float(row["bb_lower"]) and rsi_v < os_:
-        sl, tp = close - sl_m * atr_v, close + tp_m * atr_v
+        sl = close - sl_m * atr_v
+        if use_box:
+            # Partial/full path to BB mid (box center). frac=1 → full mid.
+            frac = float(cfg.get("tp_box_frac", 1.0))
+            frac = max(0.05, min(1.0, frac))
+            tp = close + frac * (bb_mid - close)
+            if tp - close < tp_m * atr_v:
+                tp = close + tp_m * atr_v
+        else:
+            tp = close + tp_m * atr_v
         if tp <= close or not cost_ok(row, cfg, abs(tp - close)):
+            return None
+        risk = abs(close - sl)
+        reward = abs(tp - close)
+        if risk <= 0 or reward / risk < float(cfg.get("min_rr", 0.0)):
             return None
         return Signal("buy", "range", close, sl, tp, None, row["time"], "hw_range")
     if close > float(row["bb_upper"]) and rsi_v > ob_:
-        sl, tp = close + sl_m * atr_v, close - tp_m * atr_v
+        sl = close + sl_m * atr_v
+        if use_box:
+            frac = float(cfg.get("tp_box_frac", 1.0))
+            frac = max(0.05, min(1.0, frac))
+            tp = close - frac * (close - bb_mid)
+            if close - tp < tp_m * atr_v:
+                tp = close - tp_m * atr_v
+        else:
+            tp = close - tp_m * atr_v
         if tp >= close or not cost_ok(row, cfg, abs(close - tp)):
+            return None
+        risk = abs(close - sl)
+        reward = abs(tp - close)
+        if risk <= 0 or reward / risk < float(cfg.get("min_rr", 0.0)):
             return None
         return Signal("sell", "range", close, sl, tp, None, row["time"], "hw_range")
     return None
@@ -591,6 +628,80 @@ def sig_ensemble(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
     return Signal(side, "ensemble", close, sl, tp, trail, row["time"], reason)
 
 
+def sig_volman_scalp(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
+    """
+    Bob Volman — Forex Price Action Scalping (approx on OHLC):
+    - Setups revolve around 20 EMA
+    - Double-doji / micro-range then break (DD / First Break spirit)
+    - Tight pip TP/SL (spread must stay tiny — Volman)
+    """
+    need = ["ema_20", "volman_box_high", "volman_box_low", "close", "high", "low"]
+    if any(pd.isna(row.get(k)) for k in need):
+        return None
+    if not in_session(row["time"], cfg.get("session_start_utc"), cfg.get("session_end_utc")):
+        return None
+    # Prefer DD; allow FB-style break of prior 2-bar box even without doji if enabled
+    require_dd = bool(cfg.get("volman_require_dd", True))
+    if require_dd and not bool(row.get("volman_dd")):
+        return None
+
+    close = float(row["close"])
+    ema20 = float(row["ema_20"])
+    box_h, box_l = float(row["volman_box_high"]), float(row["volman_box_low"])
+    pip = float(cfg.get("volman_pip_size", 0.0001))
+    tp_pips = float(cfg.get("volman_tp_pips", 5.0))
+    sl_pips = float(cfg.get("volman_sl_pips", 10.0))
+    # Trend filter: only long above 20ema, short below
+    if close > box_h and close > ema20:
+        sl = close - sl_pips * pip
+        tp = close + tp_pips * pip
+        if not cost_ok(row, cfg, abs(tp - close)):
+            return None
+        return Signal("buy", "volman", close, sl, tp, None, row["time"], "volman_dd_break_up")
+    if close < box_l and close < ema20:
+        sl = close + sl_pips * pip
+        tp = close - tp_pips * pip
+        if not cost_ok(row, cfg, abs(close - tp)):
+            return None
+        return Signal("sell", "volman", close, sl, tp, None, row["time"], "volman_dd_break_dn")
+    return None
+
+
+def sig_chan_bb_scalp(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
+    """
+    Ernie Chan — Algorithmic Trading (2013): simple Bollinger mean-reversion prototype.
+    Time-series MR; basket use = run this on each liquid FX pair (cross-sectional book spirit).
+    """
+    if pd.isna(row.get("bb_mid")) or pd.isna(row.get("atr")) or float(row["atr"]) <= 0:
+        return None
+    if not in_session(row["time"], cfg.get("session_start_utc"), cfg.get("session_end_utc")):
+        return None
+    close = float(row["close"])
+    mid, up, lo = float(row["bb_mid"]), float(row["bb_upper"]), float(row["bb_lower"])
+    atr_v = float(row["atr"])
+    sl_m = float(cfg.get("atr_sl_mult", 1.5))
+    # Exit toward mid (Chan BB MR); optional partial atr floor for costs
+    if close < lo:
+        sl = close - sl_m * atr_v
+        tp = mid
+        if tp <= close or not cost_ok(row, cfg, abs(tp - close)):
+            return None
+        risk = abs(close - sl)
+        if risk <= 0 or abs(tp - close) / risk < float(cfg.get("min_rr", 0.0)):
+            return None
+        return Signal("buy", "chan_bb", close, sl, tp, None, row["time"], "chan_bb_long")
+    if close > up:
+        sl = close + sl_m * atr_v
+        tp = mid
+        if tp >= close or not cost_ok(row, cfg, abs(close - tp)):
+            return None
+        risk = abs(close - sl)
+        if risk <= 0 or abs(tp - close) / risk < float(cfg.get("min_rr", 0.0)):
+            return None
+        return Signal("sell", "chan_bb", close, sl, tp, None, row["time"], "chan_bb_short")
+    return None
+
+
 # Registry filled after all sig_* defs; ensemble looks up via _ALGO_TABLE
 _ALGO_TABLE: dict[str, SignalFn] = {}
 
@@ -608,6 +719,8 @@ ALGOS: dict[str, SignalFn] = {
     "fabris_ntz": sig_fabris_ntz,
     "book_optimal": sig_book_optimal,
     "thomas_10r": sig_thomas_10r,
+    "volman_scalp": sig_volman_scalp,
+    "chan_bb_scalp": sig_chan_bb_scalp,
     "ensemble": sig_ensemble,
     "ensemble_optimal": sig_ensemble,
     "all_books": sig_ensemble,

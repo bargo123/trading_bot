@@ -73,7 +73,8 @@ def signal_from_row(row: pd.Series, cfg: dict[str, Any]) -> Signal | None:
         return signal_scalper_2h(row, cfg)
     if mode in {"hw_range", "trend_pullback", "breakout_adx", "rsi_cross", "squeeze_bo",
                 "aziz_orb", "aziz_vwap", "steidl_ib_break", "steidl_ib_fade", "fabris_ntz",
-                "book_optimal"}:
+                "book_optimal", "hw_runner", "thomas_10r", "volman_scalp", "chan_bb_scalp",
+                "ensemble", "ensemble_optimal", "all_books"}:
         from aegis.session_algos import ALGOS
 
         return ALGOS[mode](row, cfg)
@@ -145,7 +146,8 @@ def latest_signal(df: pd.DataFrame, cfg: dict[str, Any]) -> Signal | None:
 def prepare(df: pd.DataFrame, cfg: dict[str, Any]) -> pd.DataFrame:
     mode = str(cfg.get("signal_mode") or cfg.get("algo") or "").lower()
     if mode in {"hw_range", "trend_pullback", "breakout_adx", "rsi_cross", "squeeze_bo", "scalper_2h", "scalp_2h", "2h",
-                "aziz_orb", "aziz_vwap", "steidl_ib_break", "steidl_ib_fade", "fabris_ntz", "book_optimal"}:
+                "aziz_orb", "aziz_vwap", "steidl_ib_break", "steidl_ib_fade", "fabris_ntz", "book_optimal",
+                "volman_scalp", "chan_bb_scalp", "hw_runner", "thomas_10r", "ensemble", "ensemble_optimal", "all_books"}:
         from aegis.features import enrich_all
 
         frame = enrich_all(df, cfg)

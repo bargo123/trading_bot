@@ -1,0 +1,61 @@
+# VIDEO-LIKE $100 — closest BOOK path (not the ad’s no-stop gold grid)
+#
+# Books check (Fuller / Brown / Windsor / Thomas / Ponsi / Silvani / Elder):
+# - Video = many same-size legs + hold huge floating DD ≈ Brown DCA / stupid pyramid
+#   → books mark as HIGHEST RUIN. We do NOT ship that as default.
+# - Closest allowed: Fuller add-to-winners (agg risk ≤1R) + Thomas compound on wins
+# - Instrument: GC=F (gold futures proxy; video used XAUUSDm)
+# - Still NOT “$100 → thousands in 5 hours” — that clip is marketing time-lapse
+#
+symbol: GC=F
+timeframe: 15m
+lookback_days: 30
+starting_equity: 100
+signal_mode: hw_runner
+algo: hw_runner
+high_risk_mode: thomas_growth
+high_risk_safe: false
+allow_unsafe_high_risk: true
+risk_percent: 10
+hr_thomas_win_frac: 0.5
+hr_risk_min: 0.5
+hr_risk_max_cap: 100
+hr_max_consecutive_losses: 99
+hr_equity_floor_frac: 0.01
+
+adx_period: 14
+adx_trend_threshold: 20
+adx_range_max: 99
+adx_min: 15
+ema_fast: 50
+ema_slow: 200
+donchian_period: 55
+atr_period: 14
+atr_sl_mult: 2.5
+atr_tp_mult: 4.0
+atr_trail_mult: 1.0
+runner_tp_r: 6
+min_rr: 0.5
+bb_period: 20
+bb_std: 1.8
+rsi_period: 14
+rsi_oversold: 35
+rsi_overbought: 70
+min_atr_pct: 0.0002
+spread_bps: 1.2
+slippage_bps: 0.6
+cost_buffer: 1.0
+session_start_utc: 0
+session_end_utc: 23
+max_daily_loss_percent: 99
+max_total_drawdown_percent: 99.9
+max_positions: 1
+kill_switch: false
+pyramid_enabled: true
+pyramid_max_adds: 4
+pyramid_add_r: 0.75
+pyramid_adx_min: 15
+mode: paper
+poll_seconds: 30
+ntz_max_trades_day: 40
+test_name: video_like_100

@@ -236,7 +236,9 @@ class HighRiskController:
                 self.halt_reason = (
                     f"forever_safe: risk bankroll wiped — protected ${self.protected_principal:.2f} locked"
                 )
-            elif self.halt_on_first_loss or self.mode in {"forever_safe", "principal_safe", "safe_high_risk"}:
+            elif self.halt_on_first_loss:
+                # forever_safe defaults this True; fast configs may set False and
+                # rely on bankroll wipe + equity floor instead.
                 self.halted = True
                 self.halt_reason = "forever_safe: first loss — locked (principal protected)"
             if self.mode in {

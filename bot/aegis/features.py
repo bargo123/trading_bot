@@ -50,6 +50,19 @@ def enrich_all(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     out["bb_width_ma"] = out["bb_width"].rolling(50).mean()
     out["atr_channel_up"] = out["sma_20"] + 2.0 * out["atr"]
     out["atr_channel_dn"] = out["sma_20"] - 2.0 * out["atr"]
+    # Volman (Forex Price Action Scalping): 20ema + micro-range / doji structure
+    ema20_n = int(cfg.get("volman_ema", 20))
+    out["ema_20"] = ema(out["close"], ema20_n)
+    body = (out["close"] - out["open"]).abs()
+    bar_range = (out["high"] - out["low"]).replace(0, np.nan)
+    doji_frac = float(cfg.get("volman_doji_body_frac", 0.35))
+    out["volman_doji"] = body <= (doji_frac * bar_range)
+    prev_doji = out["volman_doji"].shift(1)
+    prev_doji = prev_doji.where(prev_doji.notna(), False).astype(bool)
+    out["volman_dd"] = out["volman_doji"].fillna(False).astype(bool) & prev_doji
+    # Setup box = last 2 bars high/low (Double Doji / First Break micro-range)
+    out["volman_box_high"] = out["high"].rolling(2).max().shift(1)
+    out["volman_box_low"] = out["low"].rolling(2).min().shift(1)
     out["regime"] = np.where(
         (out["adx"] >= float(cfg.get("adx_trend_threshold", 25)))
         & (out["ema_fast"] != out["ema_slow"]),
