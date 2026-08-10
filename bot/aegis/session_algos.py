@@ -11,7 +11,11 @@ SignalFn = Callable[[pd.Series, dict[str, Any]], Optional[Signal]]
 
 def cost_ok(row: pd.Series, cfg: dict[str, Any], tp_dist: float) -> bool:
     close = float(row["close"])
-    bps = float(cfg.get("spread_bps", 1.0)) + float(cfg.get("slippage_bps", 0.5))
+    bps = (
+        float(cfg.get("spread_bps", 1.0))
+        + float(cfg.get("slippage_bps", 0.5))
+        + float(cfg.get("commission_bps", 0.0))
+    )
     round_trip = close * (bps / 10000.0) * 2
     buffer = float(cfg.get("cost_buffer", 2.0))
     return tp_dist > round_trip * buffer
@@ -702,8 +706,51 @@ def sig_chan_bb_scalp(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
     return None
 
 
+def sig_firehose(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
+    """
+    Max-frequency scalp on OHLC (video firehose spirit within bar data limits).
+    Triggers on micro-break of prior bar + 20ema side; tiny pip TP/SL.
+    Ceiling ≈ number of bars in session (1m ≈ hundreds/day, not thousands of round-trips).
+    """
+    need = ["ema_20", "close", "high", "low", "close_prev", "high_prev", "low_prev"]
+    if any(pd.isna(row.get(k)) for k in need if k != "close_prev"):
+        # close_prev/high_prev set in prepare
+        pass
+    if pd.isna(row.get("ema_20")) or pd.isna(row.get("close")):
+        return None
+    if not in_session(row["time"], cfg.get("session_start_utc"), cfg.get("session_end_utc")):
+        return None
+
+    close = float(row["close"])
+    ema20 = float(row["ema_20"])
+    prev_high = float(row["high_prev"]) if not pd.isna(row.get("high_prev")) else float(row["high"])
+    prev_low = float(row["low_prev"]) if not pd.isna(row.get("low_prev")) else float(row["low"])
+    pip = float(cfg.get("volman_pip_size", cfg.get("firehose_pip_size", 0.0001)))
+    tp_pips = float(cfg.get("firehose_tp_pips", cfg.get("volman_tp_pips", 3.0)))
+    sl_pips = float(cfg.get("firehose_sl_pips", cfg.get("volman_sl_pips", 6.0)))
+
+    # Long: close breaks prior high while above ema
+    if close > prev_high and close >= ema20:
+        sl = close - sl_pips * pip
+        tp = close + tp_pips * pip
+        if tp <= close or not cost_ok(row, cfg, abs(tp - close)):
+            return None
+        return Signal("buy", "firehose", close, sl, tp, None, row["time"], "firehose_up")
+    # Short: close breaks prior low while below ema
+    if close < prev_low and close <= ema20:
+        sl = close + sl_pips * pip
+        tp = close - tp_pips * pip
+        if tp >= close or not cost_ok(row, cfg, abs(close - tp)):
+            return None
+        return Signal("sell", "firehose", close, sl, tp, None, row["time"], "firehose_dn")
+    return None
+
+
 # Registry filled after all sig_* defs; ensemble looks up via _ALGO_TABLE
 _ALGO_TABLE: dict[str, SignalFn] = {}
+
+from aegis.cafb import sig_cafb
+from aegis.pulse import sig_pulse
 
 ALGOS: dict[str, SignalFn] = {
     "hw_range": sig_hw_range,
@@ -721,6 +768,9 @@ ALGOS: dict[str, SignalFn] = {
     "thomas_10r": sig_thomas_10r,
     "volman_scalp": sig_volman_scalp,
     "chan_bb_scalp": sig_chan_bb_scalp,
+    "firehose": sig_firehose,
+    "cafb": sig_cafb,
+    "pulse_scalp": sig_pulse,
     "ensemble": sig_ensemble,
     "ensemble_optimal": sig_ensemble,
     "all_books": sig_ensemble,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 import numpy as np
@@ -27,6 +27,8 @@ class BacktestResult:
     net_pnl: float
     final_equity: float
     halt_reason: str = ""
+    ambiguous_exits: int = 0
+    skipped_entries: dict[str, int] = field(default_factory=dict)
 
 
 def run_backtest(
@@ -43,7 +45,8 @@ def run_backtest(
     equity = float(cfg.get("starting_equity", 10_000))
     spread_bps = float(cfg.get("spread_bps", 1.0))
     slip_bps = float(cfg.get("slippage_bps", 0.5))
-    cost_bps = spread_bps + slip_bps
+    commission_bps = float(cfg.get("commission_bps", 0.0))
+    cost_bps = spread_bps + slip_bps + commission_bps
 
     hr = HighRiskController.from_config(cfg, equity)
     # Fuller pyramid: mode or legacy flag
@@ -57,6 +60,41 @@ def run_backtest(
     curve = []
     pos = None
     halt_reason = ""
+    ambiguous_exits = 0
+
+    def close_position(exit_time, exit_price: float, outcome: str) -> None:
+        nonlocal equity, pos, halt_reason
+        assert pos is not None
+        side = pos["side"]
+        move = (exit_price - pos["entry"]) if side == "buy" else (pos["entry"] - exit_price)
+        cost = pos["entry"] * (cost_bps / 10000.0) * 2
+        pnl = pos["units"] * (move - cost)
+        initial_risk_money = float(pos["unit0"]) * float(pos["risk_den"])
+        if bool(cfg.get("negative_balance_protection", True)) and equity + pnl <= 0:
+            pnl = -equity
+            outcome = "bankruptcy"
+            halt_reason = "bankruptcy"
+        r = pnl / initial_risk_money if initial_risk_money > 0 else 0.0
+        equity += pnl
+        hr.on_trade_closed(pnl, equity)
+        trades.append(
+            {
+                "entry_time": pos["time"],
+                "exit_time": exit_time,
+                "side": side,
+                "mode": pos["mode"],
+                "reason": pos["reason"],
+                "entry": pos["entry"],
+                "exit": exit_price,
+                "pnl": pnl,
+                "r": r,
+                "outcome": outcome,
+                "adds": int(pos.get("adds", 0)),
+                "risk_pct": pos.get("risk_pct"),
+                "hr_step": pos.get("hr_step"),
+            }
+        )
+        pos = None
 
     for i in range(len(frame) - 1):
         row = frame.iloc[i]
@@ -116,6 +154,7 @@ def run_backtest(
                 hit_sl = low <= sl
                 hit_tp = tp is not None and high >= tp
                 if hit_sl and hit_tp:
+                    ambiguous_exits += 1
                     exit_price, outcome = sl, "sl"
                 elif hit_sl:
                     exit_price, outcome = sl, "sl"
@@ -125,6 +164,7 @@ def run_backtest(
                 hit_sl = high >= sl
                 hit_tp = tp is not None and low <= tp
                 if hit_sl and hit_tp:
+                    ambiguous_exits += 1
                     exit_price, outcome = sl, "sl"
                 elif hit_sl:
                     exit_price, outcome = sl, "sl"
@@ -142,36 +182,17 @@ def run_backtest(
                     exit_price, outcome = close_n, "flatten"
 
             if exit_price is not None:
-                move = (exit_price - pos["entry"]) if side == "buy" else (pos["entry"] - exit_price)
-                cost = pos["entry"] * (cost_bps / 10000.0) * 2
-                pnl = pos["units"] * (move - cost)
-                r_den = abs(pos["entry0"] - pos["entry_sl"])
-                r = move / r_den if r_den else 0
-                equity += pnl
-                hr.on_trade_closed(pnl, equity)
-                trades.append(
-                    {
-                        "entry_time": pos["time"],
-                        "exit_time": nxt["time"],
-                        "side": side,
-                        "mode": pos["mode"],
-                        "reason": pos["reason"],
-                        "entry": pos["entry"],
-                        "exit": exit_price,
-                        "pnl": pnl,
-                        "r": r,
-                        "outcome": outcome,
-                        "adds": int(pos.get("adds", 0)),
-                        "risk_pct": pos.get("risk_pct"),
-                        "hr_step": pos.get("hr_step"),
-                    }
-                )
-                pos = None
+                close_position(nxt["time"], float(exit_price), str(outcome))
 
         if pos is not None:
             continue
 
-        ok, why = risk.allow(equity, 0)
+        if equity <= 0:
+            halt_reason = "bankruptcy"
+            continue
+
+        entry_now = pd.Timestamp(nxt["time"]).to_pydatetime()
+        ok, why = risk.allow(equity, 0, now=entry_now)
         if not ok:
             halt_reason = why
             continue
@@ -218,11 +239,12 @@ def run_backtest(
             continue
 
         risk_pct = hr.effective_risk_percent(equity)
+        min_stop = abs(entry) * float(cfg.get("min_atr_pct", 0.0004))
         units = risk.size_units(
             equity,
             entry,
             sl,
-            min_stop=abs(entry) * float(cfg.get("min_atr_pct", 0.0004)),
+            min_stop=min_stop,
             risk_percent=risk_pct,
         )
         if units <= 0:
@@ -235,6 +257,7 @@ def run_backtest(
             "entry0": entry,
             "sl": sl,
             "entry_sl": sl,
+            "risk_den": max(abs(entry - sl), min_stop),
             "initial_risk": abs(entry - sl),
             "tp": tp,
             "trail_atr_mult": sig.trail_atr_mult,
@@ -248,13 +271,29 @@ def run_backtest(
             "hr_step": hr.step,
         }
 
+    if pos is not None and len(frame):
+        last = frame.iloc[-1]
+        close_position(last["time"], float(last["close"]), "eof")
+
     curve.append(equity)
     trades_df = pd.DataFrame(trades)
     eq = pd.Series(curve, name="equity")
     if hr.halt_reason and not halt_reason:
         halt_reason = hr.halt_reason
     if trades_df.empty:
-        return BacktestResult(trades_df, eq, 0, 0, 0, 0, 0, 0, equity, halt_reason)
+        return BacktestResult(
+            trades=trades_df,
+            equity_curve=eq,
+            win_rate=0,
+            profit_factor=0,
+            max_drawdown_pct=0,
+            expectancy_r=0,
+            total_trades=0,
+            net_pnl=0,
+            final_equity=equity,
+            halt_reason=halt_reason,
+            ambiguous_exits=ambiguous_exits,
+        )
 
     wins = trades_df.loc[trades_df["pnl"] > 0, "pnl"]
     losses = trades_df.loc[trades_df["pnl"] <= 0, "pnl"]
@@ -267,12 +306,13 @@ def run_backtest(
         equity_curve=eq,
         win_rate=float((trades_df["pnl"] > 0).mean() * 100),
         profit_factor=(gp / gl) if gl > 0 else float("inf"),
-        max_drawdown_pct=float((-dd.min()) if len(dd) else 0),
+        max_drawdown_pct=max(0.0, float((-dd.min()) if len(dd) else 0)),
         expectancy_r=float(trades_df["r"].mean()),
         total_trades=len(trades_df),
         net_pnl=float(trades_df["pnl"].sum()),
         final_equity=equity,
         halt_reason=halt_reason,
+        ambiguous_exits=ambiguous_exits,
     )
 
 

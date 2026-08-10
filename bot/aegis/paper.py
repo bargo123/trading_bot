@@ -5,6 +5,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+import pandas as pd
+
 from aegis.data import add_spread_proxy, fetch_ohlcv
 from aegis.high_risk import HighRiskController
 from aegis.journal import append_journal
@@ -30,6 +32,7 @@ class PaperPosition:
 @dataclass
 class PaperBroker:
     equity: float
+    cost_bps: float = 0.0
     position: PaperPosition | None = None
     history: list[dict[str, Any]] = field(default_factory=list)
 
@@ -37,7 +40,8 @@ class PaperBroker:
         assert self.position is not None
         pos = self.position
         move = (price - pos.entry) if pos.side == "buy" else (pos.entry - price)
-        pnl = pos.units * move
+        round_trip_cost = pos.entry * (self.cost_bps / 10000.0) * 2.0
+        pnl = pos.units * (move - round_trip_cost)
         self.equity += pnl
         self.history.append(
             {
@@ -58,11 +62,26 @@ class PaperBot:
         self.cfg = cfg
         self.risk = RiskEngine.from_config(cfg)
         start = float(cfg.get("starting_equity", 10_000))
-        self.broker = PaperBroker(equity=start)
+        self.broker = PaperBroker(
+            equity=start,
+            cost_bps=(
+                float(cfg.get("spread_bps", 1.0))
+                + float(cfg.get("slippage_bps", 0.5))
+                + float(cfg.get("commission_bps", 0.0))
+            ),
+        )
         self.hr = HighRiskController.from_config(cfg, start)
         self.journal_path = journal_path
         self.start_equity = start
         self.protected = float(getattr(self.hr, "protected_principal", start * 0.8))
+        self.last_processed_bar = None
+
+    def accept_new_bar(self, bar_time) -> bool:
+        ts = pd.Timestamp(bar_time)
+        if self.last_processed_bar is not None and ts <= self.last_processed_bar:
+            return False
+        self.last_processed_bar = ts
+        return True
 
     def manage_open(self, bar: dict[str, Any]) -> None:
         pos = self.broker.position
@@ -115,10 +134,17 @@ class PaperBot:
         df = add_spread_proxy(df, float(self.cfg.get("spread_bps", 1.0)))
         frame = prepare(df, self.cfg)
         bar = frame.iloc[-2].to_dict()
+        if not self.accept_new_bar(bar["time"]):
+            logger.info("No new closed bar")
+            return
         self.manage_open(bar)
 
         open_n = 0 if self.broker.position is None else 1
-        ok, reason = self.risk.allow(self.broker.equity, open_n)
+        ok, reason = self.risk.allow(
+            self.broker.equity,
+            open_n,
+            now=pd.Timestamp(bar["time"]).to_pydatetime(),
+        )
         if not ok:
             logger.info("No new entries: %s", reason)
             return

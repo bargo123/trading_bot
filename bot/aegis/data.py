@@ -6,7 +6,13 @@ from typing import Any
 import pandas as pd
 
 
-def fetch_ohlcv(symbol: str, timeframe: str, lookback_days: int) -> pd.DataFrame:
+def fetch_ohlcv(
+    symbol: str,
+    timeframe: str,
+    lookback_days: int,
+    *,
+    allow_daily_fallback: bool = False,
+) -> pd.DataFrame:
     """Fetch OHLCV via yfinance (works on macOS without a broker)."""
     import yfinance as yf
 
@@ -38,9 +44,10 @@ def fetch_ohlcv(symbol: str, timeframe: str, lookback_days: int) -> pd.DataFrame
         auto_adjust=True,
         progress=False,
     )
+    actual_interval = interval
     if df is None or df.empty:
-        # Fallback: daily bars if intraday unavailable for this symbol
-        if interval != "1d":
+        # A fallback must be explicit: silently testing daily bars as M1/M5 is invalid.
+        if interval != "1d" and allow_daily_fallback:
             df = yf.download(
                 symbol,
                 period="max",
@@ -48,6 +55,7 @@ def fetch_ohlcv(symbol: str, timeframe: str, lookback_days: int) -> pd.DataFrame
                 auto_adjust=True,
                 progress=False,
             )
+            actual_interval = "1d"
         if df is None or df.empty:
             raise RuntimeError(f"No data returned for {symbol} ({interval})")
 
@@ -61,6 +69,14 @@ def fetch_ohlcv(symbol: str, timeframe: str, lookback_days: int) -> pd.DataFrame
     out = out.dropna()
     out["time"] = pd.to_datetime(out.index, utc=True)
     out = out.reset_index(drop=True)
+    out.attrs.update(
+        {
+            "symbol": symbol,
+            "requested_interval": interval,
+            "actual_interval": actual_interval,
+            "requested_lookback_days": int(lookback_days),
+        }
+    )
     return out
 
 

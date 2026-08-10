@@ -11,6 +11,7 @@ class RiskState:
     day_start_equity: float | None = None
     peak_equity: float | None = None
     halted: bool = False
+    permanent_halt: bool = False
     reason: str = ""
 
 
@@ -39,15 +40,21 @@ class RiskEngine:
         if self.state.day != today:
             self.state.day = today
             self.state.day_start_equity = equity
-            self.state.halted = False
-            self.state.reason = ""
+            if not self.state.permanent_halt:
+                self.state.halted = False
+                self.state.reason = ""
         if self.state.peak_equity is None or equity > self.state.peak_equity:
             self.state.peak_equity = equity
 
-    def allow(self, equity: float, open_positions: int) -> tuple[bool, str]:
+    def allow(
+        self,
+        equity: float,
+        open_positions: int,
+        now: datetime | None = None,
+    ) -> tuple[bool, str]:
         if self.kill_switch:
             return False, "kill_switch"
-        self.update(equity)
+        self.update(equity, now=now)
         if self.state.halted:
             return False, self.state.reason or "halted"
         if open_positions >= self.max_positions:
@@ -64,6 +71,7 @@ class RiskEngine:
             tot_dd = (self.state.peak_equity - equity) / self.state.peak_equity * 100
             if tot_dd >= self.max_total_drawdown_percent:
                 self.state.halted = True
+                self.state.permanent_halt = True
                 self.state.reason = f"max_drawdown {tot_dd:.2f}%"
                 return False, self.state.reason
         return True, "ok"

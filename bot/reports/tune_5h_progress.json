@@ -1,0 +1,9 @@
+{
+  "trials": 65445,
+  "fetch_errors": 0,
+  "bt_errors": 0,
+  "hits_100": 2516,
+  "phase": "exploit_best",
+  "elapsed_sec": 17999.228534936905,
+  "started_at": "2026-08-10 04:42:11"
+}
