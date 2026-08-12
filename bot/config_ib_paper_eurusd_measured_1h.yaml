@@ -1,0 +1,67 @@
+# IBKR paper execution for the measured low-frequency 1h research control.
+# This is not a guaranteed edge. Live ports and forced every-bar trading stay disabled.
+engine: ibkr
+mode: ib_paper
+allow_live: false
+ib_host: 127.0.0.1
+ib_port: 4002
+ib_client_id: 7
+ib_dashboard_client_id: 71
+ib_control_client_id: 72
+ib_status_client_id: 79
+ib_order_tif: GTC
+ib_order_ack_timeout: 5
+dashboard_host: 127.0.0.1
+dashboard_port: 8787
+
+symbol: EURUSD
+timeframe: 1h
+lookback_days: 90
+poll_seconds: 30
+paper_trading_enabled: true
+dry_run: false
+order_quantity: 20000
+
+starting_equity: 100
+signal_mode: hw_range
+algo: hw_range
+ema_fast: 50
+ema_slow: 200
+adx_period: 14
+adx_trend_threshold: 99
+adx_range_max: 24
+atr_period: 14
+atr_sl_mult: 3.0
+atr_tp_mult: 0.45
+atr_trail_mult: 3.0
+rsi_period: 14
+rsi_oversold: 40
+rsi_overbought: 65
+bb_period: 24
+bb_std: 1.8
+donchian_period: 55
+min_rr: 0.01
+min_atr_pct: 0.0004
+cost_buffer: 1.15
+spread_bps: 0.8
+slippage_bps: 0.4
+ib_round_trip_commission_usd: 4.0
+min_expected_net_usd: 1.0
+session_start_utc: 0
+session_end_utc: 21
+
+risk_percent: 1
+high_risk_mode: traditional
+high_risk_safe: true
+allow_unsafe_high_risk: false
+hr_risk_max_cap: 2
+hr_equity_floor_frac: 0.5
+hr_max_consecutive_losses: 5
+max_daily_loss_percent: 5
+max_total_drawdown_percent: 15
+max_positions: 1
+pyramid_enabled: false
+kill_switch: false
+ntz_max_trades_day: 0
+max_hold_seconds: 0
+test_name: ib_paper_eurusd_measured_1h

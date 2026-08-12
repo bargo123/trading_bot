@@ -32,24 +32,6 @@ def stochastic(
 def enrich_all(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     """One feature frame shared by all bake-off strategies."""
     out = df.copy()
-    # Drop every generated feature before rebuilding. Several scripts intentionally
-    # pass an enriched frame back into prepare(); merge-derived profile columns must
-    # be removed too or pandas creates _x/_y fields and the second pass fails.
-    _exact = {
-        "ema_fast", "ema_slow", "ema_13", "ema_20", "sma_20", "atr", "adx", "rsi",
-        "regime", "vwap", "vwap_prev", "close_prev", "high_prev", "low_prev",
-        "rsi_prev", "above_ib", "below_ib", "init_buy", "init_sell",
-        "prior_va_hi", "prior_va_lo", "vwap_reclaim", "vwap_reject",
-    }
-    _prefixes = (
-        "bb_", "donch", "macd", "stoch_", "atr_channel_", "volman_",
-        "orb_", "ib_", "ntz_", "cafb_",
-        "pulse_",
-    )
-    generated = [
-        c for c in out.columns if c in _exact or any(c.startswith(p) for p in _prefixes)
-    ]
-    out = out.drop(columns=generated, errors="ignore")
     out["ema_fast"] = ema(out["close"], int(cfg.get("ema_fast", 50)))
     out["ema_slow"] = ema(out["close"], int(cfg.get("ema_slow", 200)))
     out["ema_13"] = ema(out["close"], 13)

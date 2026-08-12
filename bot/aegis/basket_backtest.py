@@ -89,6 +89,7 @@ def run_basket_backtest(
         + float(cfg.get("slippage_bps", 0.5))
         + float(cfg.get("commission_bps", 0.0))
     )
+    fixed_commission = max(0.0, float(cfg.get("commission_round_trip_usd", 0.0)))
     positions: dict[str, dict[str, Any]] = {}
     trades: list[dict[str, Any]] = []
     skipped: Counter[str] = Counter()
@@ -105,7 +106,7 @@ def run_basket_backtest(
             else float(pos["entry"]) - exit_price
         )
         cost = float(pos["entry"]) * (cost_bps / 10000.0) * 2.0
-        pnl = float(pos["units"]) * (move - cost)
+        pnl = float(pos["units"]) * (move - cost) - fixed_commission
         initial_risk_money = float(pos["initial_risk_money"])
         if bool(cfg.get("negative_balance_protection", True)) and equity + pnl <= 0:
             pnl = -equity
@@ -128,6 +129,7 @@ def run_basket_backtest(
                 "tp": pos["tp"],
                 "units": pos["units"],
                 "pnl": pnl,
+                "fixed_commission_usd": fixed_commission,
                 "r": r_mult,
                 "outcome": outcome,
                 "risk_pct": pos["risk_pct"],
@@ -143,6 +145,7 @@ def run_basket_backtest(
             end += 1
         group = events[at:end]
         now_dt = now.to_pydatetime()
+        exited_symbols: set[str] = set()
         risk.update(equity, now=now_dt)
 
         for event in group:
@@ -181,10 +184,11 @@ def run_basket_backtest(
                 exit_price, outcome = close_n, "time"
             if exit_price is not None:
                 close_position(symbol, nxt["time"], float(exit_price), str(outcome))
+                exited_symbols.add(symbol)
 
         for event in group:
             symbol = event["symbol"]
-            if symbol in positions:
+            if symbol in positions or symbol in exited_symbols:
                 continue
             if equity <= 0:
                 halt_reason = "bankruptcy"

@@ -71,7 +71,64 @@ def test_portfolio_position_limit_is_shared() -> None:
     assert res.skipped_entries.get("max_positions", 0) == 1
 
 
+def test_intrabar_exit_cannot_reenter_at_that_bars_open() -> None:
+    def signal_each_bar(row, _cfg):
+        price = float(row["close"])
+        return Signal("buy", "test", price, price - 1, price + 1, None, row["time"], "sequence")
+
+    res = run_basket_backtest(
+        {"AAAUSD=X": _bars(100.0)},
+        _cfg(),
+        prepare_fn=lambda df, _cfg: df,
+        signal_fn=signal_each_bar,
+    )
+    assert res.total_trades == 1
+
+
+def test_fixed_round_trip_commission_is_charged_once() -> None:
+    res = run_basket_backtest(
+        {"AAAUSD=X": _bars(100.0)},
+        _cfg(commission_round_trip_usd=4.0),
+        prepare_fn=lambda df, _cfg: df,
+        signal_fn=_sig,
+    )
+    assert res.total_trades == 1
+    assert float(res.trades.iloc[0]["pnl"]) == -3.0
+    assert float(res.trades.iloc[0]["fixed_commission_usd"]) == 4.0
+    assert res.final_equity == 97.0
+    assert res.win_rate == 0.0
+
+
+def test_signal_price_never_replaces_next_real_open() -> None:
+    bars = pd.DataFrame(
+        [
+            {"time": pd.Timestamp("2024-01-02 10:00", tz="UTC"), "open": 100.0, "high": 100.0, "low": 100.0, "close": 100.0, "volume": 1},
+            {"time": pd.Timestamp("2024-01-02 10:01", tz="UTC"), "open": 101.0, "high": 101.0, "low": 101.0, "close": 101.0, "volume": 1},
+            {"time": pd.Timestamp("2024-01-02 10:02", tz="UTC"), "open": 101.0, "high": 103.0, "low": 101.0, "close": 102.0, "volume": 1},
+        ]
+    )
+
+    def synthetic_signal(row, _cfg):
+        if pd.Timestamp(row["time"]).minute == 0:
+            return Signal("buy", "ha_test", 999.0, 998.0, 1000.0, None, row["time"], "synthetic")
+        return None
+
+    res = run_basket_backtest(
+        {"AAAUSD=X": bars},
+        _cfg(),
+        prepare_fn=lambda df, _cfg: df,
+        signal_fn=synthetic_signal,
+    )
+    assert res.total_trades == 1
+    assert float(res.trades.iloc[0]["entry"]) == 101.0
+    assert float(res.trades.iloc[0]["sl"]) == 100.0
+    assert float(res.trades.iloc[0]["tp"]) == 102.0
+
+
 if __name__ == "__main__":
     test_two_symbols_share_one_equity_curve()
     test_portfolio_position_limit_is_shared()
+    test_intrabar_exit_cannot_reenter_at_that_bars_open()
+    test_fixed_round_trip_commission_is_charged_once()
+    test_signal_price_never_replaces_next_real_open()
     print("ALL BASKET BACKTEST TESTS PASSED")

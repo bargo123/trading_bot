@@ -108,6 +108,29 @@ def test_open_position_is_liquidated_at_end() -> None:
     assert abs(res.final_equity - 100.5) < 1e-9
 
 
+def test_intrabar_exit_cannot_reenter_at_that_bars_open() -> None:
+    bars = _frame(
+        [
+            (100, 100, 100, 100),
+            (100, 100.2, 99.8, 100),
+            (100, 101.2, 99.9, 101),
+        ]
+    )
+
+    def sig(row, _cfg):
+        if row.name in {0, 1}:
+            return Signal("buy", "test", 100, 99, 101, None, row["time"], "sequence")
+        return None
+
+    res = run_backtest(
+        bars,
+        _cfg(),
+        prepare_fn=lambda df, _cfg: df,
+        signal_fn=sig,
+    )
+    assert res.total_trades == 1
+
+
 def test_all_in_loss_stops_at_bankruptcy() -> None:
     bars = _frame([(100, 100, 100, 100), (100, 100.1, 99.9, 100), (100, 100.1, 98.9, 99)])
 
@@ -189,6 +212,7 @@ if __name__ == "__main__":
     test_total_drawdown_halt_persists_across_days()
     test_expectancy_r_is_net_of_round_trip_cost()
     test_open_position_is_liquidated_at_end()
+    test_intrabar_exit_cannot_reenter_at_that_bars_open()
     test_all_in_loss_stops_at_bankruptcy()
     test_prepare_is_idempotent()
     test_intraday_download_does_not_silently_fallback_to_daily()
