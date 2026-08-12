@@ -710,7 +710,8 @@ def sig_firehose(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
     """
     Max-frequency scalp on OHLC (video firehose spirit within bar data limits).
     Triggers on micro-break of prior bar + 20ema side; tiny pip TP/SL.
-    Ceiling ≈ number of bars in session (1m ≈ hundreds/day, not thousands of round-trips).
+    Set firehose_every_bar: true to fire every closed bar (EMA side) — needed when
+    IB 5s bars are flat and classic breakouts never print.
     """
     need = ["ema_20", "close", "high", "low", "close_prev", "high_prev", "low_prev"]
     if any(pd.isna(row.get(k)) for k in need if k != "close_prev"):
@@ -729,20 +730,36 @@ def sig_firehose(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
     tp_pips = float(cfg.get("firehose_tp_pips", cfg.get("volman_tp_pips", 3.0)))
     sl_pips = float(cfg.get("firehose_sl_pips", cfg.get("volman_sl_pips", 6.0)))
 
-    # Long: close breaks prior high while above ema
-    if close > prev_high and close >= ema20:
+    def _long(reason: str) -> Signal:
         sl = close - sl_pips * pip
         tp = close + tp_pips * pip
-        if tp <= close or not cost_ok(row, cfg, abs(tp - close)):
-            return None
-        return Signal("buy", "firehose", close, sl, tp, None, row["time"], "firehose_up")
-    # Short: close breaks prior low while below ema
-    if close < prev_low and close <= ema20:
+        return Signal("buy", "firehose", close, sl, tp, None, row["time"], reason)
+
+    def _short(reason: str) -> Signal:
         sl = close + sl_pips * pip
         tp = close - tp_pips * pip
-        if tp >= close or not cost_ok(row, cfg, abs(close - tp)):
+        return Signal("sell", "firehose", close, sl, tp, None, row["time"], reason)
+
+    # Spray mode: one signal every bar so paper firehose actually cycles in dead tape
+    if bool(cfg.get("firehose_every_bar", False)):
+        sig = _long("firehose_bar_up") if close >= ema20 else _short("firehose_bar_dn")
+        dist = abs(float(sig.tp) - close)
+        if not cost_ok(row, cfg, dist):
             return None
-        return Signal("sell", "firehose", close, sl, tp, None, row["time"], "firehose_dn")
+        return sig
+
+    # Long: close breaks prior high while above ema
+    if close > prev_high and close >= ema20:
+        sig = _long("firehose_up")
+        if float(sig.tp) <= close or not cost_ok(row, cfg, abs(float(sig.tp) - close)):
+            return None
+        return sig
+    # Short: close breaks prior low while below ema
+    if close < prev_low and close <= ema20:
+        sig = _short("firehose_dn")
+        if float(sig.tp) >= close or not cost_ok(row, cfg, abs(close - float(sig.tp))):
+            return None
+        return sig
     return None
 
 

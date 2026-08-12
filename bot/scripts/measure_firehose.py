@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from aegis.backtest import run_backtest  # noqa: E402
 from aegis.data import fetch_ohlcv  # noqa: E402
-from aegis.strategy import prepare, signal_from_row  # noqa: E402
+from aegis.strategy import prepare, signal_for_row  # noqa: E402
 
 SYMBOLS = [
     "EURUSD=X",
@@ -47,11 +47,10 @@ def main() -> None:
             # Count raw signals (upper bound before one-position gate)
             sig_n = 0
             for _, row in df.iterrows():
-                if signal_from_row(row, c) is not None:
+                if signal_for_row(row, c) is not None:
                     sig_n += 1
-            # run_backtest calls prepare() again — pass raw OHLCV, not enriched frame
-            bt = run_backtest(raw, c)
-            trades = int(bt.total_trades)
+            bt = run_backtest(df, c)
+            trades = int(bt.get("trades", 0) or len(bt.get("trade_list", []) or []))
             days = max(len(raw) / (24 * 60), 0.01)  # 1m bars
             # Prefer calendar span if available
             if "time" in raw.columns:
@@ -59,8 +58,8 @@ def main() -> None:
                 span_days = max((t1 - t0).total_seconds() / 86400.0, 0.01)
             else:
                 span_days = days
-            wr = float(bt.win_rate) / 100.0  # BacktestResult stores percent
-            eq = float(bt.final_equity)
+            wr = float(bt.get("win_rate", 0) or 0)
+            eq = float(bt.get("ending_equity", c["starting_equity"]))
             tpd = trades / span_days
             spd = sig_n / span_days
             total_trades += trades

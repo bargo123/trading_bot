@@ -1,6 +1,6 @@
 # Aegis book-to-code and project-health audit
 
-Audit date: 2026-08-09  
+Audit date: 2026-08-09; measurement correction: 2026-08-12
 Status: source/code audit, corrective implementation, exhaustive benchmark, and two new-strategy measurements complete.
 
 ## 1. Audit scope and source integrity
@@ -201,11 +201,9 @@ If the OHLC candidate passes its gate, the Windows validation path is:
 
 ## 8. Verification performed during the audit
 
-- `bot/tests/test_fabris_fuller_unit.py`: passed when run directly.
-- `bot/tests/test_high_risk_unit.py`: passed when run directly.
+- `bot/.venv/bin/python -m pytest -q`: 66 tests passed in 0.99 seconds during the 2026-08-12 final follow-up, including backtest chronology, fixed-dollar basket commission, HALE features/signals, CAFB/Pulse, paper accounting/safety, IBKR order hygiene, dashboard state, and process control.
 - The two cases in `tests/test_extract.py`: invoked directly and passed.
-- `python -m pytest`: unavailable because `pytest` is not installed in `bot/.venv`.
-- `unittest discover`: zero tests collected because current tests are plain functions.
+- The repository-declared `pytest` and `ib_insync` dependencies were installed into `bot/.venv` before the full suite; the tests used fakes/local state and did not connect to or mutate the broker.
 - `git diff --check`: passed for the existing working tree.
 - Existing modified/untracked strategy, config, report, and CSV files were treated as user-owned and not overwritten.
 
@@ -215,12 +213,15 @@ If the OHLC candidate passes its gate, the Windows validation path is:
 
 - Historical bar time now flows through `RiskEngine.allow()`; total-drawdown halts persist across day changes.
 - Single-symbol and basket R multiples include spread, slippage, and optional commission.
+- The shared basket now subtracts a configurable fixed round-trip dollar commission once per closed trade. A regression test proves the IB-like `$4` charge turns a gross `$1` winner into a net `$3` loss on a `$100` account.
 - Open positions are liquidated and charged at EOF; same-bar ambiguity is counted; bankruptcy/negative-balance protection is explicit.
-- Feature preparation is idempotent across indicator, profile, CAFB, and pulse columns.
+- A position that exits using a bar's high/low can no longer re-enter at that already-passed bar's open. Regression tests cover both the single-symbol and shared-basket engines.
+- Feature preparation is idempotent across indicator, profile, CAFB, pulse, and HALE columns.
 - Intraday downloads no longer silently fall back to daily bars; requested/actual interval metadata is attached.
 - Paper closes now charge the same cost inputs, reject duplicate closed bars, and pass bar time into risk checks.
 - A chronological shared-equity basket engine now enforces position count, heat, currency exposure, leverage, minimum units, and unit step. Oversized requests are capped to available heat/leverage before being rejected.
 - Added the Cost-Aware Failed-Break Basket and EMA/ATR Pulse Basket, synthetic no-look-ahead/cost tests, configs, tuning scripts, immutable Yahoo snapshots, and complete reports.
+- Added canonical Heikin-Ashi signal prices, prior-day/prior-session/round levels, separate range-fade and trend-pullback branches, and a regression test proving synthetic HA signal prices never replace the next real OHLC entry.
 
 ### Exhaustive benchmark result
 
@@ -228,26 +229,28 @@ The corrected shared-capital benchmark attempted every distinct registered funct
 
 - No existing strategy had positive net E[R] in all three segments.
 - No existing strategy achieved 100% WR on holdout with at least one trade.
-- The closest positive holdout was `thomas_10r`: 15 trades, 0.95/day, 46.7% WR, net E[R] +0.008, PF 1.03, max DD 7.1%, `$100 -> $100.33`. Its development segment was materially negative, so it is not promoted.
-- Firehose holdout: 139 trades, 8.81/day, 52.5% WR, net E[R] -0.157, PF 0.49, max DD 30.5%, `$100 -> $69.77`, halted on max drawdown.
+- No existing strategy had positive net E[R] on the corrected holdout. The least-negative active result was `thomas_10r`: 36 trades, 2.28/day, 44.4% WR, net E[R] -0.054, PF 1.16, max DD 5.5%, `$100 -> $103.35`. Variable risk made dollar P&L positive despite negative mean R, so it is not promoted.
+- Firehose holdout: 140 trades, 8.88/day, 44.3% WR, net E[R] -0.181, PF 0.39, max DD 30.0%, `$100 -> $70.24`, halted on max drawdown.
 
 ### New strategy results
 
-- CAFB M5 frozen holdout: 11 trades, 0.7/day, 54.5% WR, net E[R] -0.328, PF 0.56, max DD 5.3%, `$100 -> $97.03`.
+- CAFB M5 frozen holdout: 7 trades, 0.4/day, 28.6% WR, net E[R] -1.105, PF 0.15, max DD 6.4%, `$100 -> $94.50`.
 - CAFB M1 frozen holdout: 12 trades, 8.7/day, 41.7% WR, net E[R] -0.629, PF 0.37, max DD 4.1%, `$100 -> $96.92`.
-- Pulse M5 frozen holdout: 9 trades, 0.6/day, 66.7% WR, net E[R] -0.086, PF 0.22, max DD 1.6%, `$100 -> $98.63`.
-- Pulse M1 frozen holdout: 27 trades, 19.6/day, 29.6% WR, net E[R] -0.125, PF 0.17, max DD 3.8%, `$100 -> $96.30`.
+- Pulse M5 frozen holdout: 8 trades, 0.5/day, 62.5% WR, net E[R] -0.101, PF 0.18, max DD 1.6%, `$100 -> $98.56`.
+- Pulse M1 frozen holdout: 26 trades, 18.9/day, 30.8% WR, net E[R] -0.120, PF 0.18, max DD 3.6%, `$100 -> $96.58`.
 - Across 288 CAFB and 432 Pulse parameter/timeframe configurations, neither new family produced a 100% frozen holdout or a candidate positive on both development and validation with adequate evidence.
+- HALE evaluated 528 development/validation configurations. None of the four family/timeframe selections passed both the minimum-sample and positive development/validation E[R]/PF gates. Its diagnostic M5 pullback holdout produced 34 trades, 2.16/day, 55.9% WR, net E[R] -0.259, PF 0.41, max DD 12.5%, and `$100 -> $88.86` from 2026-07-23 02:50 UTC through 2026-08-07 21:25 UTC.
+- With the IB-like fixed `$4` round-trip commission, HALE's cost gate admitted zero trades. Bypassing that gate forced 7 trades, 0 wins, net E[R] -14.099, max DD 32.4%, and `$100 -> $67.60` before the max-drawdown halt.
 
 ### Corrected 1h selected-sample result
 
-The original `config_tuned_100wr.yaml` parameters were re-measured without re-tuning on fresh 1h data:
+The original `config_tuned_100wr.yaml` parameters were re-measured without re-tuning on the immutable 1h snapshot:
 
 - Exact 90-day sample: 2026-05-10 23:00 UTC to 2026-08-07 21:00 UTC.
-- 29 trades, 0.33/day, 100% observed WR; 95% Wilson lower bound 88.3%.
+- 25 trades, 0.28/day, 100% observed WR; 95% Wilson lower bound 86.7%.
 - Net E[R] +0.060, PF infinite because no observed loss, max closed-equity DD 0%.
-- At modeled 100% risk: `$100 -> $533.75`, historical arithmetic profit `$4.88/calendar day`.
-- At 20% risk on the 60-day slice: `$100 -> $131.55`, `$0.53/calendar day`.
+- At modeled 100% risk: `$100 -> $426.96`, historical arithmetic profit `$3.68/calendar day`.
+- At 20% risk on the 60-day slice: `$100 -> $126.99`, `$0.45/calendar day`.
 - At 1.5x costs the 60-day cost gate admitted only one trade; at 2x costs it admitted zero.
 
 This is still the only observed 100% sample, but it is a previously selected rolling sample, not frozen OOS, is far below firehose frequency, is highly cost-sensitive, and the single-symbol engine does not prove its all-in units are broker-executable.
@@ -260,4 +263,5 @@ Detailed results:
 
 - `bot/reports/CAFB_BASKET.md`
 - `bot/reports/PULSE_BASKET.md`
+- `bot/reports/HALE_BASKET.md`
 - `bot/reports/TUNED_100WR_CORRECTED.md`
