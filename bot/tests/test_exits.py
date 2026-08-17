@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from aegis.exits import (
     firehose_stops_from_quote,
     giveback_reason,
+    live_firehose_stops,
     mfe_after_quick_win,
     quick_win_clips,
     should_scratch_never_green,
@@ -30,6 +31,14 @@ def test_must_have_been_green_before_lock():
     assert giveback_reason(0.04, 0.05, cfg) is None
     assert giveback_reason(0.04, 0.0, cfg) == "gave_back"
     assert giveback_reason(0.08, -0.02, cfg) == "gave_back"
+
+
+def test_giveback_floor_exits_still_green_not_at_zero() -> None:
+    cfg = {"close_if_gave_back": True, "lock_mfe_usd": 0.04, "giveback_floor_usd": 0.02}
+    assert giveback_reason(0.04, 0.03, cfg) is None
+    assert giveback_reason(0.04, 0.02, cfg) == "gave_back"
+    winners = quick_win_clips([SimpleNamespace(unrealized_pnl=0.04)], 0.03)
+    assert len(winners) == 1
 
 
 def test_fractional_giveback():
@@ -62,6 +71,26 @@ def test_firehose_stops_from_live_quote_not_bar_close() -> None:
     assert abs(tp2 - (bid - 1 * pip)) < 1e-12
     fat = firehose_stops_from_quote("buy", 1.10000, 1.10020, cfg, pip)
     assert fat is None
+
+
+def test_live_firehose_stops_applies_scratch_overlay_not_core_rewrite() -> None:
+    pip = 0.0001
+    bid, ask = 1.10000, 1.10003
+    core = {"firehose_tp_pips": 1, "firehose_sl_pips": 30, "intel_enabled": False}
+    sl, tp = live_firehose_stops("buy", bid, ask, core, pip)
+    assert abs(sl - (ask - 30 * pip)) < 1e-12
+    assert abs(tp - (ask + 1 * pip)) < 1e-12
+    overlay = {
+        "firehose_tp_pips": 1,
+        "firehose_sl_pips": 30,
+        "intel_enabled": True,
+        "intel_scratch_pips": 8,
+        "firehose_pip_size": pip,
+    }
+    sl8, tp8 = live_firehose_stops("buy", bid, ask, overlay, pip)
+    assert abs(sl8 - (ask - 8 * pip)) < 1e-12
+    assert abs(tp8 - (ask + 1 * pip)) < 1e-12
+    assert live_firehose_stops("buy", 1.10000, 1.10020, overlay, pip) is None
 
 
 def test_never_green_scratch_only_when_mfe_never_armed() -> None:

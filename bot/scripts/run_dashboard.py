@@ -19,10 +19,51 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from aegis.config import load_config  # noqa: E402
+from aegis.paper_control import heartbeat_max_age  # noqa: E402
 
 logger = logging.getLogger("aegis.dashboard")
 DASHBOARD_DIR = ROOT / "dashboard"
 INDEX_HTML = DASHBOARD_DIR / "index.html"
+HEARTBEAT_FIELDS = (
+    "symbol",
+    "local_symbol",
+    "feed_usable",
+    "feed_age_seconds",
+    "trades_today",
+    "modeled_costs_today",
+    "paper_promoted",
+    "gate_reason",
+    "regime",
+    "signal_side",
+    "flow_score",
+    "expected_net_usd",
+)
+
+
+def collect_order_rows(ib) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    working: list[dict[str, object]] = []
+    cancelling: list[dict[str, object]] = []
+    active = {"PendingSubmit", "PreSubmitted", "Submitted", "ApiPending", "PendingCancel"}
+    for trade in list(ib.reqAllOpenOrders() or []):
+        status = str(trade.orderStatus.status or "")
+        if status not in active:
+            continue
+        order = trade.order
+        raw_price = (
+            order.lmtPrice
+            if order.orderType == "LMT"
+            else order.auxPrice if order.orderType == "STP" else None
+        )
+        row: dict[str, object] = {
+            "id": order.orderId,
+            "action": order.action,
+            "type": order.orderType,
+            "quantity": float(order.totalQuantity),
+            "price": float(raw_price) if raw_price not in (None, 0, 0.0) else None,
+            "status": status,
+        }
+        (cancelling if status == "PendingCancel" else working).append(row)
+    return working, cancelling
 
 
 class DeskState:
@@ -80,7 +121,7 @@ class DeskState:
             if hb.exists():
                 data = json.loads(hb.read_text(encoding="utf-8"))
                 age = time.time() - float(data.get("ts", 0))
-                if age <= 15:
+                if age <= heartbeat_max_age(self.cfg):
                     return True
         except Exception:
             pass
@@ -89,6 +130,17 @@ class DeskState:
             return "run_broker_paper" in out
         except Exception:
             return False
+
+    def _heartbeat_fields(self) -> dict[str, Any]:
+        path = ROOT / "reports" / "bot_heartbeat.json"
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return {key: payload[key] for key in HEARTBEAT_FIELDS if key in payload}
+
+    def _set_market_data_type(self, ib) -> None:
+        ib.reqMarketDataType(int(self.cfg.get("ib_market_data_type", 3)))
 
     def _read_journal(self, limit: int = 25) -> list[dict[str, Any]]:
         if not self.journal.exists():
@@ -142,9 +194,11 @@ class DeskState:
             "symbol": str(self.cfg.get("symbol", "EURUSD")),
             "algo": str(self.cfg.get("algo", self.cfg.get("signal_mode", ""))),
             "order_quantity": float(self.cfg.get("order_quantity", 0)),
+            **self._heartbeat_fields(),
         }
         try:
             ib = self._connect()
+            self._set_market_data_type(ib)
             # Ensure position stream is subscribed (otherwise positions() can look empty)
             try:
                 ib.reqPositions()

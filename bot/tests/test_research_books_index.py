@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from aegis.research.book_audit import build_book_coverage, markdown_book_coverage
 from aegis.research.books_index import BookIndex, discover_books_root
+from aegis.research.thousand_day_gap import calculate_thousand_day_gap
 
 
 def test_index_records_provenance_and_search(tmp_path: Path):
@@ -56,3 +58,56 @@ def test_discover_books_root_prefers_worktree_then_original(tmp_path, monkeypatc
     monkeypatch.setattr("aegis.research.books_index.ORIGINAL_BOOKS", orig)
     root = discover_books_root()
     assert root == orig
+
+
+def test_book_coverage_reconciles_catalog_notes_index_and_near_duplicates(tmp_path: Path):
+    books = tmp_path / "books"
+    books.mkdir()
+    shared = "A" * 2_000
+    (books / "alpha.md").write_text(f"# Alpha\n\n{shared}\n", encoding="utf-8")
+    (books / "beta.md").write_text(f"# Alpha\n\n{shared[:-1]}B\n", encoding="utf-8")
+    (books / "sample-author.md").write_text("# Sample\nplaceholder\n", encoding="utf-8")
+    catalog = tmp_path / "BOOKS_FULL.md"
+    catalog.write_text("- [Alpha](alpha.md)\n", encoding="utf-8")
+
+    ledger = build_book_coverage(
+        books_dir=books,
+        catalog_path=catalog,
+        index_path=tmp_path / "index.sqlite",
+        notes_dir=tmp_path / "notes",
+        ledger_path=tmp_path / "ledger.json",
+    )
+
+    assert ledger["reconciliation"]["all_extracts_indexed"] is True
+    assert ledger["reconciliation"]["all_extracts_noted"] is True
+    alpha = next(row for row in ledger["records"] if row["filename"] == "alpha.md")
+    placeholder = next(row for row in ledger["records"] if row["filename"] == "sample-author.md")
+    assert alpha["cataloged"] is True
+    assert alpha["word_count"] == 2
+    assert placeholder["coverage_status"] == "placeholder"
+    assert placeholder["catalog_exclusion"] == "below_usable_word_minimum"
+    assert ledger["near_duplicate_candidates"]
+    report = markdown_book_coverage(ledger)
+    assert "Indexing a file is not implementation" in report
+    assert "Hand-curated compliance join" in report
+    idx = BookIndex(tmp_path / "index.sqlite")
+    assert len(idx.all_rows()) == 3
+
+
+def test_thousand_day_gap_refuses_size_up_for_negative_observed_history(tmp_path: Path):
+    deals = tmp_path / "deals.jsonl"
+    deals.write_text(
+        "\n".join(
+            [
+                '{"source":"mt5_deal","ticket":"1","pnl":-0.10,"qty":0.01,"ts":"2026-01-01T01:00:00+00:00"}',
+                '{"source":"mt5_deal","ticket":"2","pnl":0.05,"qty":0.01,"ts":"2026-01-02T01:00:00+00:00"}',
+                '{"source":"mt5_deal","ticket":"2","pnl":0.04,"qty":0.01,"ts":"2026-01-02T01:00:00+00:00"}',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    gap = calculate_thousand_day_gap(deals)
+    assert gap["n_trades"] == 2
+    assert gap["mean_active_day_pnl_usd"] < 0
+    assert gap["required_quantity_if_linear"] is None
+    assert "size-up cannot close" in gap["size_conclusion"]

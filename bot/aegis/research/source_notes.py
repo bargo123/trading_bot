@@ -6,14 +6,17 @@ import json
 from pathlib import Path
 from typing import Any
 
-from aegis.research.books_index import PLACEHOLDER_NAMES, extract_claims
+from aegis.research.books_index import (
+    PLACEHOLDER_NAMES,
+    extract_claims,
+    extract_provenance,
+    word_count,
+)
 from aegis.research.paths import RESEARCH_DIR, ensure_research_dirs
 
 MISSING_EXTRACTS = {
     "kaufman": "Perry Kaufman Trading Systems and Methods — no full extract on disk",
     "volman": "Bob Volman Forex Price Action Scalping — digest only",
-    "johnson": "Barry Johnson Algorithmic Trading and DMA — scanned PDF, OCR in progress",
-    "gann": "W. D. Gann How to Make Profits In Commodities (1976) — scanned PDF, OCR in progress",
 }
 
 
@@ -39,6 +42,7 @@ def build_source_notes(books_dir: Path, out_dir: Path | None = None) -> list[dic
         body = md.read_text(encoding="utf-8", errors="replace")
         digest = hashlib.sha256(body.encode("utf-8", errors="replace")).hexdigest()
         claims = extract_claims(body, filename=md.name)
+        provenance = extract_provenance(body)
         setup = _section(body, "setup")
         entry = _section(body, "entry")
         exit_ = _section(body, "exit")
@@ -51,6 +55,8 @@ def build_source_notes(books_dir: Path, out_dir: Path | None = None) -> list[dic
             "filename": md.name,
             "title": (claims.get("headings") or [md.stem])[0] if claims.get("headings") else md.stem,
             "file_hash": digest,
+            "byte_size": len(body.encode("utf-8", errors="replace")),
+            "word_count": word_count(body),
             "label": _label(md.name, claims),
             "placeholder": bool(claims.get("placeholder") or md.name in PLACEHOLDER_NAMES),
             "duplicate_of": hashes.get(digest),
@@ -62,6 +68,7 @@ def build_source_notes(books_dir: Path, out_dir: Path | None = None) -> list[dic
             "risk": risk,
             "warnings": claims.get("warnings") or [],
             "evidence_quality": "extract",
+            "provenance": provenance,
             "implemented": False,
             "claims": claims,
         }

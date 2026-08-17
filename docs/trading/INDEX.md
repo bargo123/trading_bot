@@ -3,7 +3,7 @@
 Local LLM chat/training was removed. Use **full books** with Cursor.
 
 ## Full books (usable)
-- Catalog: `@docs/trading/BOOKS_FULL.md` (**50 books**, ~5.15M words)
+- Catalog: `@docs/trading/BOOKS_FULL.md` (**52 books**, ~5.50M words)
 - Folder: `@docs/trading/books/`
 - Rebuild catalog (does **not** delete extracts): `python scripts/rebuild_books_catalog.py`
 - Extract a Downloads PDF: `python scripts/extract_pdf_to_books.py`
@@ -21,7 +21,7 @@ Local LLM chat/training was removed. Use **full books** with Cursor.
 - Protected live firehose: `@docs/CORE_STRATEGY_V1.md`
 - Cartea + Aldridge + Oreste + Narang + Van Der Post: `@docs/trading/NEW_BOOKS_HFT_CARTEA_ALDRIDGE_ORESTE_NARANG_VANDERPOST.md`
 - Davey + Aronson + Chan + Carver + Elder + Tharp + Clenow + Grimes + Schwager + Murphy + Nison + du Plessis: `@docs/trading/NEW_BOOKS_CORE_TWELVE.md`
-- Kaufman / Volman / Johnson notes: `@docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md`
+- Kaufman / Volman (still no extract) + Chan/Johnson notes: `@docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md`
 - Frost/Prechter / Gann / Johnson / Chan 2013 / Prado / Zuckerman: `@docs/trading/NEW_BOOKS_SIX_BATCH.md`
 
 ## Newly extracted (full text now in `books/`)
@@ -33,6 +33,8 @@ Local LLM chat/training was removed. Use **full books** with Cursor.
 - Donadio / Ghosh / Rossier — *Developing High-Frequency Trading Systems* — `@docs/trading/books/developing-high-frequency-trading-systems.md`
 - Brian Anderson — *The 1 Hour Trade* (2014) — `@docs/trading/books/the-1-hour-trade-anderson.md` (US $1–$10 stock ORB, not FX HFT)
 - Frost & Prechter — *Elliott Wave Principle* (2005, OCR) — `@docs/trading/books/elliott-wave-principle-frost-prechter-2005.md`
+- W. D. Gann — *How to Make Profits In Commodities* (1976, OCR) — `@docs/trading/books/how-to-make-profits-in-commodities-gann-1976.md`
+- Barry Johnson — *Algorithmic Trading and DMA* (2010, OCR) — `@docs/trading/books/algorithmic-trading-and-dma-johnson-2010.md`
 - Ernie Chan — *Algorithmic Trading* (2013) — `@docs/trading/books/algorithmic-trading-winning-strategies-chan-2013.md`
 - Marcos López de Prado — *Advances in Financial Machine Learning* (2018) — `@docs/trading/books/advances-in-financial-machine-learning-prado-2018.md`
 - Gregory Zuckerman — *The Man Who Solved the Market* (2019) — `@docs/trading/books/the-man-who-solved-the-market-zuckerman-2019.md`
@@ -42,7 +44,6 @@ Attach one book (or a few) per chat, then ask for concrete bot code.
 ## Not on this machine (no usable text extract yet)
 - Perry Kaufman — *Trading Systems and Methods* (any edition)
 - Bob Volman — *Forex Price Action Scalping* (digest only)
-- Frost & Prechter / Gann / Johnson DMA — Gann and Johnson scans still OCR'ing via `scripts/ocr_pdf_to_books.py`
 
 ## Source pipeline
 - Do **not** run `scripts/rebuild_full_books_for_cursor.py` — it deletes extracts that are not in `cleaned/*.jsonl`.

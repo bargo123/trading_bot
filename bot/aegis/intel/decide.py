@@ -20,11 +20,22 @@ LAST: dict[str, Any] = {
     "quality": None,
     "reason": "",
     "side": "",
+    "mega_votes": None,
+    "mega_names": None,
 }
 
 
 def reset_last() -> None:
-    LAST.update({"decision": "accept", "quality": None, "reason": "", "side": ""})
+    LAST.update(
+        {
+            "decision": "accept",
+            "quality": None,
+            "reason": "",
+            "side": "",
+            "mega_votes": None,
+            "mega_names": None,
+        }
+    )
 
 
 def last_intel() -> dict[str, Any]:
@@ -49,6 +60,28 @@ def _flag(row: pd.Series, key: str) -> bool:
     except (TypeError, ValueError):
         return False
     return bool(val)
+
+
+def _utc_hour(row: pd.Series) -> int | None:
+    ts = row.get("time")
+    if ts is None:
+        return None
+    t = pd.Timestamp(ts)
+    if getattr(t, "tzinfo", None) is not None:
+        t = t.tz_convert("UTC")
+    return int(t.hour)
+
+
+def _hour_set(cfg: dict[str, Any], key: str, default: list[int]) -> set[int]:
+    raw = cfg.get(key, default)
+    if raw is None:
+        return set(default)
+    if isinstance(raw, str):
+        return {int(part.strip()) for part in raw.split(",") if part.strip()}
+    try:
+        return {int(x) for x in raw}
+    except TypeError:
+        return {int(raw)}
 
 
 def intel_decision(row: pd.Series, cfg: dict[str, Any], side: str) -> Decision:
@@ -99,6 +132,30 @@ def intel_decision(row: pd.Series, cfg: dict[str, Any], side: str) -> Decision:
         er = _num(row, "kaufman_er")
         if er is None or er < min_er:
             return _done("reject", "er")
+
+    # Direction stack. Not a 100% claim — skip CORE spray that fades HTF / structure.
+    if bool(cfg.get("intel_require_htf", False)):
+        htf = _num(row, "htf_ema")
+        close = _num(row, "close")
+        if htf is None or close is None:
+            return _done("wait", "htf")
+        if side == "buy" and close < htf:
+            return _done("reject", "htf")
+        if side == "sell" and close > htf:
+            return _done("reject", "htf")
+
+    if bool(cfg.get("intel_require_structure", False)):
+        st = str(row.get("structure") or "chop")
+        if side == "buy" and st == "trend_down":
+            return _done("reject", "structure")
+        if side == "sell" and st == "trend_up":
+            return _done("reject", "structure")
+
+    if bool(cfg.get("intel_skip_ny_open", False)):
+        hour = _utc_hour(row)
+        hours = _hour_set(cfg, "intel_ny_open_hours", [13, 14, 15])
+        if hour is not None and hour in hours:
+            return _done("reject", "ny_open")
 
     if bool(cfg.get("intel_skip_doji", False)) and _flag(row, "volman_doji"):
         return _done("wait", "doji")
@@ -467,6 +524,19 @@ def intel_decision(row: pd.Series, cfg: dict[str, Any], side: str) -> Decision:
         k = int(cfg.get("intel_knn_k", 15) or 15)
         if not similarity_allows(row, memory, k=k, min_wr=min_wr):
             return _done("reject", "knn")
+
+    # Multi-book mega stack (research_proxy). Not "best bot ever" — confluence only.
+    if bool(cfg.get("intel_mega_book", False)):
+        from aegis.intel.mega_book import mega_book_votes
+
+        mega = mega_book_votes(row, cfg, side)
+        LAST["mega_votes"] = mega["votes"]
+        LAST["mega_names"] = list(mega["names"])
+        if not mega["ok"]:
+            return _done(
+                "reject",
+                f"mega_{mega['votes']}<{mega['needed']}",
+            )
 
     return _done("accept", "ok")
 

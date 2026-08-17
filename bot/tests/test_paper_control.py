@@ -233,8 +233,8 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert cfg["mode"] == "mt5_demo"
     assert cfg["allow_live"] is False
     assert cfg["paper_trading_enabled"] is True
-    assert cfg["firehose_every_bar"] is False
-    assert cfg["firehose_book_filter"] is True
+    assert cfg["firehose_every_bar"] is True
+    assert cfg["firehose_book_filter"] is False
     assert cfg["firehose_chart_read"] is True
     assert cfg["firehose_vpa_filter"] is True
     assert cfg["firehose_brooks_range"] is True
@@ -242,31 +242,44 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert cfg["firehose_jansen_filter"] is True
     assert cfg["firehose_harris_jump"] is True
     assert cfg["oms_pretrade"] is True
-    assert cfg["firehose_no_stack_if_red"] is True
+    assert cfg["firehose_no_stack_if_red"] is False
     assert float(cfg["max_quote_age_s"]) == 5.0
     assert float(cfg["jansen_score_min"]) == 0.15
     assert float(cfg["harris_jump_atr"]) == 1.8
     assert float(cfg["firehose_tp_pips"]) == 1.0
     assert float(cfg["firehose_sl_pips"]) >= 25.0
-    assert float(cfg["flatten_if_profit_usd"]) > 0
-    assert cfg["firehose_stack"] is False
-    assert int(cfg["firehose_max_per_symbol"]) == 1
+    assert float(cfg["flatten_if_profit_usd"]) == 0.01
+    assert float(cfg["lock_mfe_usd"]) == 0.03
+    assert float(cfg["giveback_floor_usd"]) == 0.01
+    assert float(cfg["flatten_if_profit_usd"]) <= float(cfg["lock_mfe_usd"])
+    assert cfg["firehose_stack"] is True
+    assert int(cfg["firehose_max_per_symbol"]) == 3
     assert str(cfg.get("position_sizing_mode") or "") != "risk"
     assert float(cfg["order_quantity"]) == 0.01
     assert float(cfg.get("max_daily_loss_percent") or 0) == 0.0
     assert float(cfg.get("max_total_drawdown_percent") or 0) == 0.0
-    assert int(cfg["max_positions"]) == 8
+    assert int(cfg["max_positions"]) == 40
     assert int(cfg.get("no_money_reject_limit") or 0) == 3
     assert float(cfg.get("no_money_window_s") or 0) == 300
-    assert float(cfg.get("execution_backoff_s") or 0) == 900
+    assert float(cfg.get("execution_backoff_s") or 0) == 60
     assert cfg.get("intel_enabled") is True
+    assert float(cfg.get("intel_scratch_pips") or 0) == 4
+    assert cfg.get("intel_require_htf") is False
+    assert cfg.get("intel_require_structure") is False
+    assert cfg.get("intel_require_body") is True
+    assert float(cfg.get("intel_min_er") or 0) == 0.15
+    assert cfg.get("intel_mega_book") is True
+    assert int(cfg.get("intel_mega_min_votes") or 0) == 3
+    assert cfg.get("intel_skip_ny_open") is False
     assert cfg.get("intel_skip_rsi_ext") is True
     assert cfg.get("intel_skip_doji_against") is True
     assert cfg.get("intel_skip_stretched_doji_buy") is True
     assert cfg.get("intel_skip_barbwire_sell") is True
     assert cfg.get("intel_skip_late_buy_chase") is True
+    assert cfg.get("intel_skip_wrong_edge") is False
+    assert cfg.get("intel_skip_weak_adx_edge") is False
     assert cfg.get("firehose_anchor_quote") is True
-    assert float(cfg.get("scratch_never_green_seconds") or 0) >= 45
+    assert float(cfg.get("scratch_never_green_seconds") or 0) == 0
     assert float(cfg["max_spread_pips"]) <= 0.5
     from aegis.config import configured_symbols
 
@@ -293,6 +306,17 @@ def test_firehose_does_not_consume_bar_on_spread_skip_or_reject():
 
 def test_firehose_can_stack_same_product_same_side():
     assert firehose_can_add(open_total=0, max_positions=40, held_sides=[], signal_side="buy") is True
+    assert (
+        firehose_can_add(
+            open_total=0,
+            max_positions=40,
+            held_sides=[],
+            signal_side="buy",
+            last_entry_age_s=5.0,
+            clip_interval_s=15.0,
+        )
+        is False
+    )
     assert firehose_can_add(open_total=40, max_positions=40, held_sides=[], signal_side="buy") is False
     assert (
         firehose_can_add(

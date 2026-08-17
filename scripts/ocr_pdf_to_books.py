@@ -61,18 +61,12 @@ def _page_gray(page, scale: float, max_side: int):
     import numpy as np
     import pymupdf
 
-    best = None
-    best_area = 0
-    for im in page.get_images() or []:
-        area = int(im[2]) * int(im[3])
-        if area > best_area:
-            best_area = area
-            best = im
-    if best is not None and best_area >= 80 * 80:
-        info = page.parent.extract_image(best[0])
+    large = [im for im in (page.get_images() or []) if int(im[2]) * int(im[3]) >= 80 * 80]
+    if len(large) == 1:
+        info = page.parent.extract_image(large[0][0])
         arr = np.frombuffer(info["image"], dtype=np.uint8)
         img = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
-        if img is not None:
+        if img is not None and float(img.std()) >= 12:
             return _cap_max_side(img, max_side)
     pix = page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), colorspace=pymupdf.csGRAY, alpha=False)
     img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w)
@@ -188,8 +182,8 @@ def main() -> int:
             else:
                 empty += 1
             elapsed = time.time() - t0
+            _save_checkpoint(dest, i + 1, pages, empty)
             if i < start + 2 or (i + 1) % 5 == 0 or i + 1 == doc.page_count:
-                _save_checkpoint(dest, i + 1, pages, empty)
                 words_so_far = sum(len(re.findall(r"\b\w+\b", t)) for _, t in pages)
                 print(
                     f"  page {i + 1}/{doc.page_count} {elapsed:.1f}s text_pages={len(pages)} words={words_so_far}",

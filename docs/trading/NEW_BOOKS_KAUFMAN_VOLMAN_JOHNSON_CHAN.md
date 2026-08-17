@@ -4,9 +4,9 @@
 | Book | Extract |
 |------|---------|
 | **Bob Volman** *Forex Price Action Scalping* (2011) | **PDF not on this PC** — digest notes only |
-| **Ernie Chan** *Algorithmic Trading* (2013) | Use Chan 2008 extract: `@docs/trading/books/quantitative-trading-how-to-build-your-own-algorithmic-trading-business-2008-wil.md` (2013 book PDF not on this PC) |
+| **Ernie Chan** *Algorithmic Trading* (2013) | `@docs/trading/books/algorithmic-trading-winning-strategies-chan-2013.md` |
 | **Perry Kaufman** *Trading Systems and Methods* | **PDF not on this PC** — cannot extract. Efficiency ratio is cited via Tharp. |
-| **Barry Johnson** *Algorithmic Trading and DMA* (2010) | **PDF not on this PC** — cannot extract |
+| **Barry Johnson** *Algorithmic Trading and DMA* (2010) | `@docs/trading/books/algorithmic-trading-and-dma-johnson-2010.md` (OCR) |
 
 ## What the readable books allow
 ### Volman
@@ -20,9 +20,9 @@
 - Explicitly: prototypes omit costs → **inflated** results; not trade-as-is.
 - HFT / dark pools make some MR harder — not a retail DMA stack.
 
-### Kaufman / Johnson (unavailable text here)
+### Kaufman (still no extract) / Johnson (OCR on disk)
 - Kaufman (from citations elsewhere): systems design, efficiency/noise filters, costs matter.
-- Johnson: **DMA / exchange microstructure / latency** — needs co-lo + real order book; **not** yfinance paper on Mac.
+- Johnson: **DMA / exchange microstructure / latency** — needs co-lo + real order book; **not** yfinance paper on Mac. Full OCR: `@docs/trading/books/algorithmic-trading-and-dma-johnson-2010.md`.
 
 ## What we built
 - `volman_scalp` — 20 EMA + double-doji micro-range break + pip TP/SL  

@@ -2,4 +2,4 @@
 
 None. No challenger has passed costed holdout expectancy, profit factor, and search-count gates on real MT5 data.
 
-Firehose benchmark `replay_firehose_1_30_s3`: trades=4113 E=-0.004855893032472543 PF=None (not a champion).
+Firehose benchmark `entry_family_always_take`: trades=103 E=-0.03451242196604659 PF=0.5657785979463091 (not a champion).

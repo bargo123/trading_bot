@@ -20,8 +20,8 @@ sys.path.insert(0, str(ROOT))
 from aegis.config import configured_symbols, load_config, max_spread_for, pip_size_for  # noqa: E402
 from aegis.engines import OrderRequest, OrderResult, create_engine  # noqa: E402
 from aegis.exits import (  # noqa: E402
-    firehose_stops_from_quote,
     giveback_reason,
+    live_firehose_stops,
     load_mfe,
     mfe_after_quick_win,
     quick_win_clips,
@@ -297,8 +297,6 @@ def main() -> None:
                     ),
                 },
             )
-            if flat.ok:
-                last_bar_time.pop(sym, None)
             return flat
 
         def close_quick_wins(sym: str, winners, equity: float, held: float):
@@ -379,7 +377,6 @@ def main() -> None:
                     )
                     if res.ok:
                         closed += 1
-                        last_bar_time.pop(sym, None)
                     else:
                         last_fail = res.message
                         if is_market_closed_retcode(res.message):
@@ -554,6 +551,8 @@ def main() -> None:
                                     "decision": info.get("decision"),
                                     "reason": info.get("reason"),
                                     "quality": info.get("quality"),
+                                    "mega_votes": info.get("mega_votes"),
+                                    "mega_names": info.get("mega_names"),
                                     "bar": str(bar_time),
                                 },
                             )
@@ -585,7 +584,7 @@ def main() -> None:
             sl = float(sig.sl) if sig.sl is not None else None
             tp = float(sig.tp) if sig.tp is not None else None
             if bool(cfg.get("firehose_anchor_quote", True)):
-                anchored = firehose_stops_from_quote(sig.side, q.bid, q.ask, loop_cfg, pip)
+                anchored = live_firehose_stops(sig.side, q.bid, q.ask, loop_cfg, pip)
                 if anchored is None:
                     append_journal(
                         journal,
@@ -934,11 +933,8 @@ def main() -> None:
                             open_pos = eng.positions(sym)
                             if open_pos and not stack_clips:
                                 continue
-                        just_closed = (not open_pos) and (sym in position_opened_at)
                         if not open_pos:
                             position_opened_at.pop(sym, None)
-                            if just_closed:
-                                last_bar_time.pop(sym, None)
                             if sym in mfe:
                                 mfe.pop(sym, None)
                                 save_mfe(mfe_path, mfe)

@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS books (
     claims_json TEXT,
     warnings TEXT,
     placeholder INTEGER NOT NULL DEFAULT 0,
-    duplicate_of TEXT
+    duplicate_of TEXT,
+    word_count INTEGER,
+    provenance_json TEXT
 );
 """
 
@@ -55,6 +57,38 @@ def _title_and_headings(text: str) -> tuple[str, str]:
     headings = re.findall(r"^#{1,3}\s+(.+)$", text, flags=re.M)
     title = headings[0].strip() if headings else ""
     return title, " | ".join(h.strip() for h in headings[:40])
+
+
+def word_count(text: str) -> int:
+    """Count tokens consistently for audit reports; it is not a readability measure."""
+    return len(re.findall(r"\b[\w][\w'-]*\b", text, flags=re.UNICODE))
+
+
+def extract_provenance(text: str) -> dict[str, Any]:
+    """Read extract-header metadata without claiming the source PDF is available."""
+    header = text[:12_000]
+    fields: dict[str, str] = {}
+    for label in ("Source file", "Pages with text", "Empty pages", "Extractor"):
+        match = re.search(rf"^-\s*{re.escape(label)}:\s*(.+?)\s*$", header, flags=re.M)
+        if match:
+            fields[label] = match.group(1).strip().strip("`")
+    extractor = fields.get("Extractor", "")
+    return {
+        "source_file": fields.get("Source file") or None,
+        "pages_with_text": _as_int(fields.get("Pages with text")),
+        "empty_pages": _as_int(fields.get("Empty pages")),
+        "extractor": extractor or None,
+        "extraction_kind": "ocr" if extractor.lower().startswith("rapidocr") else (
+            "text_pdf" if extractor else "unknown"
+        ),
+    }
+
+
+def _as_int(value: str | None) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except ValueError:
+        return None
 
 
 def extract_claims(text: str, *, filename: str = "") -> dict[str, Any]:
@@ -111,26 +145,33 @@ class BookIndex:
                 con.execute("ALTER TABLE books ADD COLUMN placeholder INTEGER NOT NULL DEFAULT 0")
             if "duplicate_of" not in cols:
                 con.execute("ALTER TABLE books ADD COLUMN duplicate_of TEXT")
+            if "word_count" not in cols:
+                con.execute("ALTER TABLE books ADD COLUMN word_count INTEGER")
+            if "provenance_json" not in cols:
+                con.execute("ALTER TABLE books ADD COLUMN provenance_json TEXT")
 
     def rebuild(self, books_dir: Path) -> int:
         n = 0
-        files: list[tuple[Path, str, str, str, str, dict[str, Any]]] = []
+        files: list[tuple[Path, str, str, str, str, dict[str, Any], int, dict[str, Any]]] = []
         for md in sorted(books_dir.glob("*.md")):
             body = md.read_text(encoding="utf-8", errors="replace")
             title, headings = _title_and_headings(body)
             digest = hashlib.sha256(body.encode("utf-8", errors="replace")).hexdigest()
             claims = extract_claims(body, filename=md.name)
-            files.append((md, title, headings, digest, body, claims))
+            files.append(
+                (md, title, headings, digest, body, claims, word_count(body), extract_provenance(body))
+            )
         with sqlite3.connect(str(self.path)) as con:
             con.execute("DELETE FROM books")
-            for md, title, headings, digest, body, claims in files:
+            for md, title, headings, digest, body, claims, words, provenance in files:
                 is_ph = md.name in PLACEHOLDER_NAMES or bool(claims.get("placeholder"))
                 con.execute(
                     """
                     INSERT INTO books(
                         path, title, headings, file_hash, body,
-                        claims_json, warnings, placeholder, duplicate_of
-                    ) VALUES (?,?,?,?,?,?,?,?,?)
+                        claims_json, warnings, placeholder, duplicate_of, word_count,
+                        provenance_json
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
                     """,
                     (
                         str(md),
@@ -142,6 +183,8 @@ class BookIndex:
                         " | ".join(claims.get("warnings") or []),
                         1 if is_ph else 0,
                         None,
+                        words,
+                        json.dumps(provenance),
                     ),
                 )
                 n += 1
@@ -156,6 +199,47 @@ class BookIndex:
                 else:
                     first[digest] = path
         return n
+
+    def all_rows(self, *, include_body: bool = False) -> list[dict[str, Any]]:
+        """Enumerate indexed extracts without a search query. Indexing is not implementation."""
+        cols = "path, title, headings, file_hash, claims_json, warnings, placeholder, duplicate_of, word_count, provenance_json"
+        if include_body:
+            cols += ", body"
+        with sqlite3.connect(str(self.path)) as con:
+            con.row_factory = sqlite3.Row
+            try:
+                rows = con.execute(f"SELECT {cols} FROM books ORDER BY path").fetchall()
+            except sqlite3.OperationalError:
+                rows = con.execute(
+                    "SELECT path, title, headings, file_hash, claims_json, warnings, placeholder, duplicate_of FROM books ORDER BY path"
+                ).fetchall()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            try:
+                claims = json.loads(row["claims_json"] or "{}")
+            except json.JSONDecodeError:
+                claims = {}
+            try:
+                provenance = json.loads(row["provenance_json"] or "{}") if "provenance_json" in row.keys() else {}
+            except (json.JSONDecodeError, IndexError):
+                provenance = {}
+            item = {
+                "path": row["path"],
+                "title": row["title"],
+                "headings": row["headings"],
+                "file_hash": row["file_hash"],
+                "implemented": False,
+                "warnings": row["warnings"] or "",
+                "placeholder": bool(row["placeholder"]),
+                "duplicate_of": row["duplicate_of"],
+                "word_count": row["word_count"] if "word_count" in row.keys() else None,
+                "provenance": provenance,
+                "claims": claims,
+            }
+            if include_body:
+                item["body"] = row["body"]
+            out.append(item)
+        return out
 
     def search(self, query: str, limit: int = 8) -> list[dict[str, Any]]:
         q = query.strip().lower()

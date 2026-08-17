@@ -82,6 +82,33 @@ def firehose_stops_from_quote(
     return None
 
 
+def live_firehose_stops(
+    side: str,
+    bid: float,
+    ask: float,
+    cfg: dict[str, Any],
+    pip: float,
+) -> tuple[float, float] | None:
+    """Quote-anchored CORE 1/30, then intel scratch overlay on the stop only.
+
+    Does not change firehose_tp_pips / firehose_sl_pips. Returns None when the
+    live spread already eats the take (same as firehose_stops_from_quote).
+    """
+    anchored = firehose_stops_from_quote(side, bid, ask, cfg, pip)
+    if anchored is None:
+        return None
+    sl, tp = anchored
+    side_l = str(side or "").lower()
+    if side_l == "buy":
+        entry = float(ask)
+    elif side_l == "sell":
+        entry = float(bid)
+    else:
+        return None
+    sl, _name = working_stop(side_l, entry, float(sl), cfg)
+    return float(sl), float(tp)
+
+
 def should_scratch_never_green(
     *,
     held_s: float,

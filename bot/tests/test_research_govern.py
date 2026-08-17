@@ -159,6 +159,43 @@ def test_tail_stress_needs_edge_to_survive_one_more_loss():
     assert robust["expectancy_after_one_more_loss"] > 0
 
 
+def test_governed_accept_rejects_cosmetic_win_rate_payoff():
+    """High WR with fat losses must not promote even when n, losses, and EV look passable."""
+    pnls = [0.02] * 176 + [-0.12] * 24
+    with pytest.raises(GateReject, match="payoff|wins_erased"):
+        governed_accept(
+            {
+                "expectancy": float(sum(pnls) / len(pnls)),
+                "profit_factor": (0.02 * 176) / (0.12 * 24),
+                "n_trades": 200,
+                "net_pnl": float(sum(pnls)),
+                "win_rate": 176 / 200,
+            },
+            None,
+            pnls=pnls,
+            n_searches=1,
+        )
+
+
+def test_governed_accept_rejects_unsampled_structural_1_to_30():
+    pnls = [0.2] * 30 + [-0.05] * 10
+    with pytest.raises(GateReject, match="payoff|wins_erased|SL/TP"):
+        governed_accept(
+            {
+                "expectancy": 0.14,
+                "profit_factor": 12.0,
+                "n_trades": 40,
+                "net_pnl": 5.5,
+                "win_rate": 0.75,
+            },
+            None,
+            pnls=pnls,
+            n_searches=1,
+            sl_pips=30.0,
+            tp_pips=1.0,
+        )
+
+
 def test_champion_can_be_demoted_when_it_was_an_artifact(tmp_path: Path):
     from aegis.research.champion import ChampionStore
 

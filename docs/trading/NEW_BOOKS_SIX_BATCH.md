@@ -1,14 +1,14 @@
 # Six-book batch — Frost/Prechter, Gann, Johnson, Chan 2013, Prado, Zuckerman
 
-Educational digest. **No invented win rates.** Chan 2013, Prado, Zuckerman, and Frost/Prechter extracts are on disk. Gann and Johnson PDFs are **image scans**; OCR is running.
+Educational digest. **No invented win rates.** All six extracts are on disk (Chan/Prado/Zuckerman text PDFs; Frost/Gann/Johnson OCR).
 
 ## Source status (this machine)
 
 | Book | PDF on disk | Full extract | Label |
 |------|-------------|--------------|-------|
 | **Frost & Prechter** — Elliott Wave (2005) | Yes (scanned) | `@docs/trading/books/elliott-wave-principle-frost-prechter-2005.md` (OCR, ~61k words) | extract |
-| **W. D. Gann** — Commodities (1976) | Yes (scanned) | OCR in progress | research_proxy |
-| **Barry Johnson** — DMA (2010) | Yes (scanned) | OCR pending | research_proxy |
+| **W. D. Gann** — Commodities (1976) | Yes (scanned) | `@docs/trading/books/how-to-make-profits-in-commodities-gann-1976.md` (OCR, ~109k words) | extract |
+| **Barry Johnson** — DMA (2010) | Yes (scanned) | `@docs/trading/books/algorithmic-trading-and-dma-johnson-2010.md` (OCR, ~237k words) | extract |
 | **Ernie Chan** — Algo Trading (2013) | Yes | `@docs/trading/books/algorithmic-trading-winning-strategies-chan-2013.md` (74,529 words) | extract |
 | **López de Prado** — AFML (2018) | Yes | `@docs/trading/books/advances-in-financial-machine-learning-prado-2018.md` (126,471 words) | extract |
 | **Gregory Zuckerman** — Medallion (2019) | Yes | `@docs/trading/books/the-man-who-solved-the-market-zuckerman-2019.md` (109,403 words) | extract |

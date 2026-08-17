@@ -65,8 +65,8 @@ def book_compliance_matrix() -> list[dict[str, str]]:
         {"book": "Chan 2013", "implemented": "chan_bb_fade research entry + chan_bb_scalp demo algo", "gap": "extract on disk; costs kill naive MR", "claim": "research_proxy not faithful Chan basket"},
         {"book": "Prado AFML", "implemented": "purged_holdout + meta-label + triple-barrier + CPCV proxy", "gap": "extract on disk; no full AFML library or LOB features", "claim": "research_proxy not Jansen ML"},
         {"book": "Frost/Prechter Elliott", "implemented": "objective swing-leg counter", "gap": "OCR extract on disk; subjective wave counts rejected by Aronson", "claim": "research_proxy not Elliott Wave Principle"},
-        {"book": "Johnson DMA", "implemented": "spread-vs-ATR gate only", "gap": "OCR in progress; no exchange DMA/co-lo", "claim": "research_proxy; DMA unavailable on retail MT5"},
-        {"book": "Gann 1976", "implemented": "bar-count cycle + slope/ATR proxy", "gap": "OCR in progress; not hand-drawn angles", "claim": "research_proxy"},
+        {"book": "Johnson DMA", "implemented": "spread-vs-ATR gate only", "gap": "OCR extract on disk; no exchange DMA/co-lo", "claim": "research_proxy; DMA unavailable on retail MT5"},
+        {"book": "Gann 1976", "implemented": "bar-count cycle + slope/ATR proxy", "gap": "OCR extract on disk; not hand-drawn angles", "claim": "research_proxy"},
         {"book": "Zuckerman Medallion", "implemented": "six_book_stack vote ensemble + overfit gates", "gap": "narrative not a strategy book", "claim": "research_proxy; no Medallion replication"},
         {"book": "Nison / du Plessis", "implemented": "PnF/Renko/Kagi/TLB engines", "gap": "research_proxy", "claim": "not a trading system"},
     ]

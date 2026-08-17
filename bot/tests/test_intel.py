@@ -315,6 +315,86 @@ def test_barbwire_and_impulse_and_chop_doji_gates():
     assert intel_decision(t18, h18, "buy") == "reject"
     assert intel_decision(t18, h18, "sell") == "accept"
     assert intel_decision(_row(time=pd.Timestamp("2026-07-14 18:10", tz="UTC"), close_ema_pips=1.20), h18, "buy") == "accept"
+    htf = {"intel_enabled": True, "intel_require_htf": True}
+    assert intel_decision(_row(close=1.1002, htf_ema=1.0990), htf, "buy") == "accept"
+    assert intel_decision(_row(close=1.1002, htf_ema=1.1010), htf, "buy") == "reject"
+    assert intel_decision(_row(close=1.1002, htf_ema=1.1010), htf, "sell") == "accept"
+    assert intel_decision(_row(close=1.1002, htf_ema=1.0990), htf, "sell") == "reject"
+    struct = {"intel_enabled": True, "intel_require_structure": True}
+    assert intel_decision(_row(structure="trend_down"), struct, "buy") == "reject"
+    assert intel_decision(_row(structure="trend_down"), struct, "sell") == "accept"
+    assert intel_decision(_row(structure="trend_up"), struct, "sell") == "reject"
+    assert intel_decision(_row(structure="chop"), struct, "buy") == "accept"
+    ny = {"intel_enabled": True, "intel_skip_ny_open": True}
+    assert intel_decision(_row(time=pd.Timestamp("2026-08-17 14:19", tz="UTC")), ny, "buy") == "reject"
+    assert intel_decision(_row(time=pd.Timestamp("2026-08-17 14:19", tz="UTC")), ny, "sell") == "reject"
+    assert intel_decision(_row(time=pd.Timestamp("2026-08-17 16:00", tz="UTC")), ny, "buy") == "accept"
+    mega_cfg = {
+        "intel_enabled": True,
+        "intel_mega_book": True,
+        "intel_mega_min_votes": 3,
+        "intel_mega_er_min": 0.35,
+        "intel_mega_jansen_min": 0.15,
+        "intel_weak_adx": 22.0,
+    }
+    strong = _row(
+        close=1.1010,
+        open=1.1000,
+        htf_ema=1.0990,
+        ema_20=1.1000,
+        structure="trend_up",
+        kaufman_er=0.55,
+        close_ema_pips=2.0,
+        range_loc=0.20,
+        brooks_in_range=True,
+        brooks_failed_bo_dn=True,
+        vpa_effort_up=True,
+        jansen_score=0.40,
+        harris_jump=False,
+        impulse_green=True,
+        impulse_red=False,
+        rsi=55.0,
+        adx=28.0,
+        ret3_pips=1.5,
+        volman_doji=False,
+    )
+    assert intel_decision(strong, mega_cfg, "buy") == "accept"
+    from aegis.intel.decide import last_intel
+
+    assert int(last_intel().get("mega_votes") or 0) >= 5
+    weak = _row(
+        close=1.1002,
+        open=1.1000,
+        htf_ema=1.1010,
+        structure="chop",
+        kaufman_er=0.10,
+        jansen_score=0.0,
+        rsi=50.0,
+        adx=10.0,
+        ret3_pips=0.0,
+        harris_jump=True,
+    )
+    assert intel_decision(weak, mega_cfg, "buy") == "reject"
+    assert str(last_intel().get("reason") or "").startswith("mega_")
+
+    mega_cfg3 = {**mega_cfg, "intel_mega_min_votes": 3}
+    mid = _row(
+        close=1.1005,
+        open=1.1000,
+        htf_ema=1.0990,
+        ema_20=1.1000,
+        structure="trend_up",
+        kaufman_er=0.40,
+        close_ema_pips=1.0,
+        jansen_score=0.20,
+        harris_jump=False,
+        impulse_green=True,
+        rsi=55.0,
+        adx=25.0,
+        ret3_pips=0.5,
+        volman_doji=False,
+    )
+    assert intel_decision(mid, mega_cfg3, "buy") == "accept"
 
 
 def test_scratch_overlay_does_not_rewrite_core_sl_when_off():

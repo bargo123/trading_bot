@@ -240,6 +240,9 @@ def firehose_can_add(
     """
     if int(open_total) >= int(max_positions):
         return False
+    interval = float(clip_interval_s or 0.0)
+    if interval > 0 and last_entry_age_s is not None and float(last_entry_age_s) < interval:
+        return False
     n = len(held_sides)
     if n <= 0:
         return True
@@ -249,9 +252,6 @@ def firehose_can_add(
         return False
     cap = int(max_per_symbol or 0)
     if cap > 0 and n >= cap:
-        return False
-    interval = float(clip_interval_s or 0.0)
-    if interval > 0 and last_entry_age_s is not None and float(last_entry_age_s) < interval:
         return False
     side = str(signal_side or "").lower()
     for held in held_sides:

@@ -1,9 +1,9 @@
 # Safety dashboard
 
-- risk_halted: True (max_drawdown 39.11%)
-- permanent_halt: True
+- risk_halted: False (ok)
+- permanent_halt: False
 - circuit_ok: True
-- quote_stale: 726
-- open: 4 ['USDCAD:sell', 'EURUSD:buy', 'EURJPY:buy', 'EURCAD:buy']
+- quote_stale: 0
+- open: 0 []
 - last_decision: rejected
 - live YAML writable: False

@@ -6,11 +6,47 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG = ROOT / "reports" / "watchdog.log"
 PY = sys.executable
+
+
+@dataclass(frozen=True)
+class ChildSpec:
+    name: str
+    command: list[str]
+    output: Path
+
+
+def runtime_python_path(executable: str | Path) -> Path:
+    return Path(executable)
+
+
+def child_specs(root: Path, python: Path, config: Path) -> list[ChildSpec]:
+    runner = "run_mgc_firehose.py" if "mgc" in config.name.casefold() else "run_broker_paper.py"
+    return [
+        ChildSpec(
+            "bot",
+            [python.as_posix(), "-u", str(root / "scripts" / runner), "--config", str(config)],
+            root / "reports" / "paper_runner_stdout.log",
+        ),
+        ChildSpec(
+            "dashboard",
+            [
+                python.as_posix(),
+                "-u",
+                str(root / "scripts" / "run_dashboard.py"),
+                "--config",
+                str(config),
+                "--port",
+                "8787",
+            ],
+            root / "reports" / "dashboard.log",
+        ),
+    ]
 
 
 def log(msg: str) -> None:

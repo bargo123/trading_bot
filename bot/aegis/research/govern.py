@@ -5,6 +5,7 @@ from typing import Any, Sequence
 
 from aegis.research.gates import GateReject, evaluate_promotion
 from aegis.research.stress import bootstrap_expectancy, family_wise_ok, tail_stress
+from aegis.intel.expected_value import MAX_WINS_ERASED_BY_AVERAGE_LOSS, payoff_metrics
 
 MIN_OBSERVED_LOSSES = 5
 
@@ -34,13 +35,31 @@ def governed_accept(
     pnls: Sequence[float],
     n_searches: int,
     worst_case_loss: float | None = None,
+    sl_pips: float | None = None,
+    tp_pips: float | None = None,
 ) -> None:
     evaluate_promotion(metrics, champion)
+    if sl_pips is not None and tp_pips is not None:
+        tp = float(tp_pips)
+        if tp <= 0:
+            raise GateReject("tp_pips must be positive to judge structural payoff")
+        structural = float(sl_pips) / tp
+        if structural >= MAX_WINS_ERASED_BY_AVERAGE_LOSS:
+            raise GateReject(
+                f"structural payoff wins_erased={structural:.1f} from SL/TP "
+                f"{float(sl_pips):.1f}/{tp:.1f}"
+            )
     tail = tail_stress(pnls, worst_case_loss=worst_case_loss)
     if tail["n_losses"] < MIN_OBSERVED_LOSSES:
         raise GateReject(
             f"only {int(tail['n_losses'])} observed loss(es); need at least "
             f"{MIN_OBSERVED_LOSSES} before a win rate can be trusted"
+        )
+    payoff = payoff_metrics(pnls)
+    if payoff.get("cosmetic_win_rate"):
+        raise GateReject(
+            "destructive payoff asymmetry: "
+            f"wins_erased_by_average_loss={payoff.get('wins_erased_by_average_loss')}"
         )
     if tail["expectancy_after_one_more_loss"] <= 0:
         raise GateReject(

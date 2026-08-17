@@ -42,8 +42,10 @@ order_quantity: 0.01
 starting_equity: 100
 signal_mode: firehose
 algo: firehose
-firehose_every_bar: false
-firehose_book_filter: true
+# CORE spray on. Book AND-stack OFF so it actually fires; mega-book intel
+# still requires confluence. Not a 100% WR or $1000/day claim.
+firehose_every_bar: true
+firehose_book_filter: false
 firehose_chart_read: true
 firehose_skip_doji: true
 firehose_require_body: true
@@ -65,24 +67,26 @@ firehose_tp_pips: 1
 firehose_sl_pips: 30
 volman_ema: 20
 max_hold_seconds: 0
-flatten_if_profit_usd: 0.05
+# Bank the first green cent. 45s never_green was flattening almost every clip red
+# (12/15 last flattens) before $0.03 could print. 4-pip broker scratch is the tail cap.
+flatten_if_profit_usd: 0.01
 scratch_losers: false
 close_if_gave_back: true
 lock_mfe_usd: 0.03
-giveback_floor_usd: 0.0
+giveback_floor_usd: 0.01
 firehose_anchor_quote: true
-scratch_never_green_seconds: 45
+scratch_never_green_seconds: 0
 scratch_cooldown_s: 120
 max_spread_pips: 0.3
 max_spread_price: 3.0e-05
 spread_bps_floor: 0.2
-firehose_stack: false
-firehose_max_per_symbol: 1
-# 15s so first ticket PnL exists before a second clip; 1s raced no_stack_if_red (same-bar 2x red).
+firehose_stack: true
+firehose_max_per_symbol: 3
+# Same-symbol stacks are allowed, including into red. 15s spaces the 2nd/3rd clip.
 firehose_clip_interval_s: 15
 oms_pretrade: true
 max_quote_age_s: 5
-firehose_no_stack_if_red: true
+firehose_no_stack_if_red: false
 ema_fast: 20
 ema_slow: 200
 atr_period: 14
@@ -112,21 +116,38 @@ hr_max_consecutive_losses: 20
 # 0 = demo keep-spraying. 10% total DD already tripped at 39% off peak $94.28.
 max_daily_loss_percent: 0
 max_total_drawdown_percent: 0
-max_positions: 8
+max_positions: 40
 no_money_reject_limit: 3
 no_money_window_s: 300
 execution_backoff_s: 60
 intel_enabled: true
+intel_scratch_pips: 4
+intel_require_htf: false
+intel_require_structure: false
+intel_require_body: true
+intel_min_er: 0.15
+# Multi-book confluence around CORE. research_proxy — not a 100% WR claim.
+intel_mega_book: true
+intel_mega_min_votes: 3
+intel_mega_er_min: 0.15
+intel_mega_jansen_min: 0.05
+intel_skip_ny_open: false
+intel_ny_open_hours:
+- 13
+- 14
+- 15
 intel_skip_rsi_ext: true
 intel_skip_doji_against: true
 intel_skip_stretched_doji_buy: true
-intel_skip_stretched_buy: true
+intel_skip_stretched_buy: false
 intel_skip_barbwire_sell: true
 intel_skip_barbwire_buy: true
 intel_skip_late_buy_chase: true
 intel_skip_impulse_against: true
-intel_skip_wrong_edge: true
+intel_skip_wrong_edge: false
 intel_skip_above_range_buy: true
+intel_skip_weak_adx_edge: false
+intel_weak_adx: 22.0
 pyramid_enabled: false
 kill_switch: false
 ntz_max_trades_day: 200
