@@ -136,6 +136,7 @@ def main() -> None:
     last_nomoney_journal = 0.0
     last_mktclosed_journal = 0.0
     last_intel_journal: dict[str, float] = {}
+    intelligent_brain = None
     margin_cooldown_s = 30.0
     close_block_until = 0.0
     t2t = TickToTrade()
@@ -404,6 +405,7 @@ def main() -> None:
         def maybe_enter(sym: str, equity: float, open_count: int) -> None:
             nonlocal day_trades, day_stamp, last_halt_journal, close_block_until
             nonlocal margin_block_until
+            brain_decision = None
             if open_attempt_blocked(time.time(), close_block_until):
                 return
             bars = eng.bars(sym, str(cfg["timeframe"]), int(cfg.get("lookback_days", 30)))
@@ -528,62 +530,126 @@ def main() -> None:
                     logger.info("Skip %s: daily trade cap %s", sym, max_day)
                     return
 
-            sig = signal_from_row(row, loop_cfg)
-            if sig is None:
-                if bool(cfg.get("intel_enabled", False)):
-                    from aegis.intel.decide import last_intel
+            intelligent_mode = bool(cfg.get("intelligent_firehose", False))
+            sig = None
+            if intelligent_mode:
+                nonlocal intelligent_brain
+                from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+                from aegis.strategy import Signal
 
-                    info = last_intel()
-                    if info.get("decision") in ("reject", "wait") and info.get("reason") not in (
-                        "",
-                        "intel_off",
-                    ):
-                        now_s = time.time()
-                        key = f"{sym}:{info.get('reason')}"
-                        if now_s - last_intel_journal.get(key, 0.0) >= 30.0:
-                            last_intel_journal[key] = now_s
-                            append_journal(
-                                journal,
-                                {
-                                    "event": "intel_skip",
-                                    "symbol": sym,
-                                    "side": info.get("side"),
-                                    "decision": info.get("decision"),
-                                    "reason": info.get("reason"),
-                                    "quality": info.get("quality"),
-                                    "mega_votes": info.get("mega_votes"),
-                                    "mega_names": info.get("mega_names"),
-                                    "bar": str(bar_time),
-                                },
-                            )
-                logger.info("No signal %s @ %s close=%.5f", sym, bar_time, float(row["close"]))
-                if firehose_consume_bar(no_signal=True):
-                    last_bar_time[sym] = bar_time
+                if intelligent_brain is None:
+                    intelligent_brain = IntelligentFirehoseBrain(cfg)
+                completed = raw.iloc[:-1].copy() if len(raw) >= 2 else raw
+                hint_cfg = dict(loop_cfg)
+                hint_cfg["intel_enabled"] = False
+                hint = signal_from_row(row, hint_cfg)
+                decision = intelligent_brain.evaluate(
+                    symbol=sym,
+                    row=row,
+                    completed_m1=completed,
+                    positions=eng.positions(),
+                    equity=equity,
+                    pip=pip,
+                    core_side=None if hint is None else hint.side,
+                )
+                brain_decision = decision
+                if decision.action not in {"fire", "scale"}:
+                    now_s = time.time()
+                    key = f"{sym}:{decision.reason}"
+                    if now_s - last_intel_journal.get(key, 0.0) >= 15.0:
+                        last_intel_journal[key] = now_s
+                        append_journal(
+                            journal,
+                            {
+                                "event": "intel_brain_skip",
+                                "symbol": sym,
+                                "action": decision.action,
+                                "reason": decision.reason,
+                                "analogue_n": decision.analogue_n,
+                                "bar": str(bar_time),
+                                **dict(decision.journal),
+                            },
+                        )
+                    if firehose_consume_bar(no_signal=True):
+                        last_bar_time[sym] = bar_time
+                    return
+                sig = Signal(
+                    decision.side or "buy",
+                    "intelligent_firehose",
+                    float(row["close"]),
+                    float(decision.sl) if decision.sl is not None else float(row["close"]),
+                    float(decision.tp) if decision.tp is not None else None,
+                    None,
+                    bar_time,
+                    decision.reason,
+                )
+            else:
+                sig = signal_from_row(row, loop_cfg)
+                if sig is None:
+                    if bool(cfg.get("intel_enabled", False)):
+                        from aegis.intel.decide import last_intel
+
+                        info = last_intel()
+                        if info.get("decision") in ("reject", "wait") and info.get("reason") not in (
+                            "",
+                            "intel_off",
+                        ):
+                            now_s = time.time()
+                            key = f"{sym}:{info.get('reason')}"
+                            if now_s - last_intel_journal.get(key, 0.0) >= 30.0:
+                                last_intel_journal[key] = now_s
+                                append_journal(
+                                    journal,
+                                    {
+                                        "event": "intel_skip",
+                                        "symbol": sym,
+                                        "side": info.get("side"),
+                                        "decision": info.get("decision"),
+                                        "reason": info.get("reason"),
+                                        "quality": info.get("quality"),
+                                        "mega_votes": info.get("mega_votes"),
+                                        "mega_names": info.get("mega_names"),
+                                        "bar": str(bar_time),
+                                    },
+                                )
+                    logger.info("No signal %s @ %s close=%.5f", sym, bar_time, float(row["close"]))
+                    if firehose_consume_bar(no_signal=True):
+                        last_bar_time[sym] = bar_time
+                    return
+            if sig is None:
                 return
             if should_block_scratch_cooldown(
                 since_s=None if sym not in last_scratch_at else time.time() - last_scratch_at[sym],
                 cfg=cfg,
             ):
                 return
-            held_now = [p.side for p in eng.positions(sym)]
-            age = None if sym not in last_entry_at else time.time() - last_entry_at[sym]
-            if not firehose_can_add(
-                open_total=len(eng.positions()),
-                max_positions=max_positions,
-                held_sides=held_now,
-                signal_side=sig.side,
-                stack=stack_clips,
-                max_per_symbol=max_per_symbol,
-                last_entry_age_s=age,
-                clip_interval_s=clip_interval_s,
-                held_pnl=sum(float(p.unrealized_pnl) for p in eng.positions(sym)),
-                no_stack_if_red=bool(cfg.get("firehose_no_stack_if_red", False)),
-            ):
-                return
+            if not intelligent_mode:
+                held_now = [p.side for p in eng.positions(sym)]
+                age = None if sym not in last_entry_at else time.time() - last_entry_at[sym]
+                if not firehose_can_add(
+                    open_total=len(eng.positions()),
+                    max_positions=max_positions,
+                    held_sides=held_now,
+                    signal_side=sig.side,
+                    stack=stack_clips,
+                    max_per_symbol=max_per_symbol,
+                    last_entry_age_s=age,
+                    clip_interval_s=clip_interval_s,
+                    held_pnl=sum(float(p.unrealized_pnl) for p in eng.positions(sym)),
+                    no_stack_if_red=bool(cfg.get("firehose_no_stack_if_red", False)),
+                ):
+                    return
+            else:
+                age = None if sym not in last_entry_at else time.time() - last_entry_at[sym]
+                interval = float(clip_interval_s or 0.0)
+                if interval > 0 and age is not None and float(age) < interval:
+                    return
+                if len(eng.positions()) >= max_positions:
+                    return
 
             sl = float(sig.sl) if sig.sl is not None else None
             tp = float(sig.tp) if sig.tp is not None else None
-            if bool(cfg.get("firehose_anchor_quote", True)):
+            if bool(cfg.get("firehose_anchor_quote", True)) and not intelligent_mode:
                 anchored = live_firehose_stops(sig.side, q.bid, q.ask, loop_cfg, pip)
                 if anchored is None:
                     append_journal(
@@ -601,7 +667,9 @@ def main() -> None:
                     return
                 sl, tp = anchored
             order_qty = qty
-            if str(cfg.get("position_sizing_mode") or "").lower() == "risk" and sl is not None:
+            if brain_decision is not None and brain_decision.quantity is not None:
+                order_qty = float(brain_decision.quantity)
+            if str(cfg.get("position_sizing_mode") or "").lower() == "risk" and sl is not None and not intelligent_mode:
                 entry = float(q.ask if sig.side == "buy" else q.bid)
                 try:
                     spec = ContractSpec.from_mapping(sym, eng.symbol_spec(sym))
@@ -680,6 +748,25 @@ def main() -> None:
                 sig.reason,
                 live_spread,
             )
+            if brain_decision is not None:
+                append_journal(
+                    journal,
+                    {
+                        "event": "intel_brain_fire",
+                        "symbol": sym,
+                        "action": brain_decision.action,
+                        "reason": brain_decision.reason,
+                        "side": brain_decision.side,
+                        "analogue_n": brain_decision.analogue_n,
+                        "expected_net_value": brain_decision.expected_net_value,
+                        "information_id": brain_decision.information_id,
+                        "sl": sl,
+                        "tp": tp,
+                        "qty": order_qty,
+                        "bar": str(bar_time),
+                        **dict(brain_decision.journal),
+                    },
+                )
             if not send_orders:
                 append_journal(
                     journal,

@@ -23,6 +23,7 @@ sys.path.insert(0, str(BOT))
 from aegis.config import configured_symbols, load_config  # noqa: E402
 from aegis.intel.paths import INTEL_DIR  # noqa: E402
 from aegis.paper_control import ProcessLock  # noqa: E402
+from aegis.research.analogues import load_analogue_index  # noqa: E402
 from aegis.research.intelligent_champion import (  # noqa: E402
     load_intelligent_champion,
     strategy_from_champion,
@@ -86,6 +87,8 @@ def run_live(cfg: dict[str, Any], *, once: bool, poll: float, jsonl_path: Path, 
     symbols = configured_symbols(cfg)
     knowledge = load_knowledge_table(INTEL_DIR / "knowledge_table.json")
     strategy = strategy_from_champion(load_intelligent_champion())
+    analogue_path = Path(str(cfg.get("analogue_index_path") or (INTEL_DIR / "analogue_index.json")))
+    analogue_records = load_analogue_index(analogue_path)
     book = ShadowBook()
     cache = MarketStateCache()
     last_bar_time: dict[str, pd.Timestamp] = {}
@@ -115,6 +118,7 @@ def run_live(cfg: dict[str, Any], *, once: bool, poll: float, jsonl_path: Path, 
                         strategy=strategy,
                         book=book,
                         cache=cache,
+                        analogue_records=analogue_records,
                     )
                 except Exception as exc:
                     write_heartbeat(

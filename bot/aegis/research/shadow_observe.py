@@ -19,6 +19,7 @@ from aegis.research.exit_hypotheses import (
     thesis_invalidated,
     thesis_target_reached,
 )
+from aegis.research.analogues import load_analogue_index, query_analogues, signature_from_state
 from aegis.research.knowledge import select_knowledge_for_state
 from aegis.research.market_state import MarketState, MarketStateCache, build_market_state
 from aegis.research.thesis import CalibratedEvidence, Thesis, target_thesis_exposure, thesis_information_id
@@ -321,8 +322,8 @@ def scan_symbol(
     strategy: ValidatedStrategyModel | None,
     book: ShadowBook,
     cache: MarketStateCache,
-    analogue_outcomes: Sequence[float] = (),
-    total_risk_budget_usd: float = 0.0,
+    analogue_records: Sequence[Mapping[str, Any]] | None = None,
+    total_risk_budget_usd: float | None = None,
 ) -> dict[str, Any] | None:
     """Fetch the same timeframe bars as Old Firehose and compare one new completed bar."""
     timeframe = str(cfg.get("timeframe") or "1m")
@@ -362,8 +363,57 @@ def scan_symbol(
     )
     old = old_firehose_decision(row, loop_cfg)
     memory = book.get(symbol)
+    if total_risk_budget_usd is None:
+        equity = float(cfg.get("starting_equity") or cfg.get("intelligent_risk_budget_usd") or 100.0)
+        frac = float(cfg.get("intelligent_risk_fraction") or 0.08)
+        total_risk_budget_usd = equity * frac
+    if analogue_records is None:
+        from pathlib import Path
+
+        from aegis.intel.paths import INTEL_DIR
+
+        index_path = Path(
+            str(cfg.get("analogue_index_path") or (INTEL_DIR / "analogue_index.json"))
+        )
+        analogue_records = load_analogue_index(index_path)
     portfolio_ok, portfolio_reason = True, ""
     side_guess = infer_thesis_side(state, float(row["close"]))
+    m15 = state.structure.get("M15") or {}
+    structure_kind = str(m15.get("kind") or "none")
+    setup_kind = structure_kind if structure_kind not in {"none", "unavailable"} else "unvalidated_state_scan"
+    signature = signature_from_state(
+        state.as_dict(),
+        side=side_guess or "buy",
+        setup=setup_kind,
+    )
+    signature["symbol"] = str(symbol).upper()
+    evidence = query_analogues(
+        analogue_records,
+        signature=signature,
+        before_time=bar_time,
+        min_n=int(cfg.get("intelligent_min_analogues", 20)),
+        min_similarity=float(cfg.get("intelligent_min_similarity", 0.55)),
+    )
+    analogue_outcomes = list(evidence.outcomes)
+    effective_strategy = strategy
+    if (
+        effective_strategy is None
+        and bool(cfg.get("intelligent_firehose_bootstrap", True))
+        and evidence.eligible
+    ):
+        effective_strategy = ValidatedStrategyModel(
+            strategy_id="analogue_bootstrap",
+            promoted=True,
+            n_trades=max(evidence.analogue_n, 20),
+            n_losses=max(evidence.analogue_n_losses, 5),
+            expectancy=float(evidence.expectancy or 0.0),
+            profit_factor=max(float(evidence.profit_factor or 0.0), 1.01),
+            bootstrap_p05=max(float(evidence.mean_lower_95 or 0.0), 0.001),
+            wins_erased_by_average_loss=min(float(evidence.wins_erased_by_average_loss or 99.0), 3.0),
+            wins_erased_by_tail_loss=1.0,
+            validated_risk_fraction=float(cfg.get("intelligent_risk_fraction", 0.08)),
+            artifact_hash="bootstrap",
+        )
     if side_guess in {"buy", "sell"}:
         from aegis.engines import PositionSnapshot
 
@@ -399,10 +449,10 @@ def scan_symbol(
         close=float(row["close"]),
         old=old,
         knowledge_rows=knowledge_rows,
-        strategy=strategy,
+        strategy=effective_strategy,
         memory=memory,
         analogue_outcomes=analogue_outcomes,
-        total_risk_budget_usd=total_risk_budget_usd,
+        total_risk_budget_usd=float(total_risk_budget_usd),
         buffer=pip,
         portfolio_ok=portfolio_ok,
         portfolio_reason=portfolio_reason,
@@ -418,4 +468,5 @@ def scan_symbol(
         target_risk_usd=float(new.get("target_risk_usd") or 0.0),
     )
     observed["bar_time"] = str(bar_time)
+    observed["analogue"] = evidence.as_dict()
     return observed

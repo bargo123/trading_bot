@@ -152,3 +152,13 @@ pyramid_enabled: false
 kill_switch: false
 ntz_max_trades_day: 200
 test_name: mt5_demo_firehose_hw
+# Intelligent Firehose demo brain — thesis/EV/exposure (not heuristic intel stack).
+intelligent_firehose: true
+intelligent_firehose_bootstrap: true
+intel_enabled: false
+intelligent_risk_budget_usd: 100
+intelligent_risk_fraction: 0.08
+intelligent_min_analogues: 20
+intelligent_min_similarity: 0.55
+intelligent_max_clips_per_thesis: 5
+analogue_index_path: intel/analogue_index.json

@@ -119,6 +119,22 @@ def test_scan_symbol_uses_completed_bar_and_never_places_orders():
         )
         for row in m1.itertuples(index=False)
     ]
+    analogue_records = [
+        {
+            "bar_time": f"2026-01-01T{hour:02d}:00:00+00:00",
+            "symbol": "EURUSD",
+            "side": "buy",
+            "setup": "breakout",
+            "regime": "trend",
+            "structure": "breakout",
+            "volatility": "stable",
+            "session": "london",
+            "h1_direction": "up",
+            "m5_direction": "up",
+            "outcome": 0.04 if hour % 4 else -0.02,
+        }
+        for hour in range(30)
+    ]
 
     class FakeEngine:
         def bars(self, symbol, timeframe, lookback_days):
@@ -135,6 +151,9 @@ def test_scan_symbol_uses_completed_bar_and_never_places_orders():
         "firehose_every_bar": True,
         "intel_enabled": False,
         "max_positions": 40,
+        "intelligent_firehose_bootstrap": True,
+        "starting_equity": 100,
+        "intelligent_risk_fraction": 0.08,
     }
     observed = scan_symbol(
         engine=FakeEngine(),
@@ -145,9 +164,12 @@ def test_scan_symbol_uses_completed_bar_and_never_places_orders():
         strategy=None,
         book=ShadowBook(),
         cache=MarketStateCache(),
+        analogue_records=analogue_records,
     )
     assert observed is not None
     assert observed["placed_orders"] is False
+    assert "analogue" in observed
+    assert observed["analogue"]["analogue_n"] >= 0
     assert observed["old"]["action"] in {"buy", "sell", "skip"}
     assert observed["new"]["action"] in {"fire", "skip", "scale", "reduce", "exit"}
     again = scan_symbol(
