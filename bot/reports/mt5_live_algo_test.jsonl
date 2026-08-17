@@ -1,0 +1,21 @@
+{"algo": "firehose_every_bar", "event": "fill", "tf": "1m", "side": "buy", "reason": "firehose_bar_up", "order_id": "57954888409", "unrealized_at_exit": 0.0, "equity_delta": 0.0, "equity": 94.41, "ts": "2026-08-12T22:24:34.986771+00:00"}
+{"algo": "hw_range", "event": "skip", "tf": "15m"}
+{"algo": "hw_runner", "event": "skip", "tf": "15m"}
+{"algo": "trend_pullback", "event": "skip", "tf": "15m"}
+{"algo": "breakout_adx", "event": "skip", "tf": "15m"}
+{"algo": "rsi_cross", "event": "skip", "tf": "15m"}
+{"algo": "squeeze_bo", "event": "skip", "tf": "15m"}
+{"algo": "aziz_orb", "event": "skip", "tf": "15m"}
+{"algo": "aziz_vwap", "event": "fill", "tf": "15m", "side": "buy", "reason": "aziz_vwap", "order_id": "57954891854", "unrealized_at_exit": -0.01, "equity_delta": -0.01, "equity": 94.4, "ts": "2026-08-12T22:25:24.144952+00:00"}
+{"algo": "steidl_ib_break", "event": "skip", "tf": "15m"}
+{"algo": "steidl_ib_fade", "event": "skip", "tf": "15m"}
+{"algo": "fabris_ntz", "event": "skip", "tf": "15m"}
+{"algo": "book_optimal", "event": "skip", "tf": "15m"}
+{"algo": "thomas_10r", "event": "skip", "tf": "15m"}
+{"algo": "volman_scalp", "event": "skip", "tf": "1m"}
+{"algo": "chan_bb_scalp", "event": "skip", "tf": "1m"}
+{"algo": "cafb", "event": "skip", "tf": "1m"}
+{"algo": "pulse_scalp", "event": "skip", "tf": "1m"}
+{"algo": "pa_select", "event": "skip", "tf": "15m"}
+{"algo": "ensemble", "event": "skip", "tf": "15m"}
+{"algo": "scalper_2h", "event": "skip", "tf": "1m"}

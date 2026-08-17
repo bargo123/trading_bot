@@ -1,0 +1,19 @@
+---
+description: CORE_STRATEGY_V1 is frozen — wrap it, do not replace it
+alwaysApply: true
+---
+
+# CORE_STRATEGY_V1 is frozen
+
+The live firehose formula is **protected**. Do not redesign, replace, or
+simplify `sig_firehose` every-bar EMA-side logic, TP/SL geometry, or the
+24h / 0.01 / `max_positions: 40` execution shape.
+
+Research belongs in `bot/aegis/intel/` and `bot/scripts/intel_*.py`.
+`intel_enabled` stays **false** on the live YAML until a challenger beats
+the champion on unseen data.
+
+```text
+# ❌ BAD — rewrite firehose to a new signal
+# ✅ GOOD — CORE signal, then intel ACCEPT/REJECT/WAIT around it
+```

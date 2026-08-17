@@ -1,12 +1,12 @@
 # Kaufman / Volman / Johnson / Chan — high-frequency basket scalp
 
-## Source PDFs (Downloads)
+## Source PDFs (this machine)
 | Book | Extract |
 |------|---------|
-| **Bob Volman** *Forex Price Action Scalping* (2011) | Full text OK |
-| **Ernie Chan** *Algorithmic Trading* (2013) | Full text OK |
-| **Perry Kaufman** *Trading Systems and Methods* 3e (1998) | **Image-only PDF** — no text layer |
-| **Barry Johnson** *Algorithmic Trading and DMA* (2010) | **Image-only PDF** — no text layer |
+| **Bob Volman** *Forex Price Action Scalping* (2011) | **PDF not on this PC** — digest notes only |
+| **Ernie Chan** *Algorithmic Trading* (2013) | Use Chan 2008 extract: `@docs/trading/books/quantitative-trading-how-to-build-your-own-algorithmic-trading-business-2008-wil.md` (2013 book PDF not on this PC) |
+| **Perry Kaufman** *Trading Systems and Methods* | **PDF not on this PC** — cannot extract. Efficiency ratio is cited via Tharp. |
+| **Barry Johnson** *Algorithmic Trading and DMA* (2010) | **PDF not on this PC** — cannot extract |
 
 ## What the readable books allow
 ### Volman

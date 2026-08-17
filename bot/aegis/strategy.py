@@ -74,7 +74,8 @@ def signal_from_row(row: pd.Series, cfg: dict[str, Any]) -> Signal | None:
     if mode in {"hw_range", "trend_pullback", "breakout_adx", "rsi_cross", "squeeze_bo",
                 "aziz_orb", "aziz_vwap", "steidl_ib_break", "steidl_ib_fade", "fabris_ntz",
                 "book_optimal", "hw_runner", "thomas_10r", "volman_scalp", "chan_bb_scalp",
-                "firehose", "cafb", "pulse_scalp", "ensemble", "ensemble_optimal", "all_books"}:
+                "firehose", "cafb", "pulse_scalp", "ensemble", "ensemble_optimal", "all_books",
+                "pa_select"}:
         from aegis.session_algos import ALGOS
 
         return ALGOS[mode](row, cfg)
@@ -164,4 +165,8 @@ def prepare(df: pd.DataFrame, cfg: dict[str, Any]) -> pd.DataFrame:
         from aegis.pulse import prepare_pulse
 
         return prepare_pulse(df, cfg)
+    if mode == "pa_select":
+        from aegis.pa_select import prepare_pa_select
+
+        return prepare_pa_select(df, cfg)
     return enrich(df, cfg)

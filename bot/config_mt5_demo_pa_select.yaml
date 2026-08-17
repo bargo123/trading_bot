@@ -1,0 +1,103 @@
+# MT5 demo — selective MTF price-action (pa_select). EURUSD.
+# Opposite of the M1 every-bar firehose: 1–3 setups/day at D1/H4 levels.
+# Educational/systems only. Not 100% WR. Not 90% WR. Edwards/Magee: no
+# pattern is fully reliable. Tharp: expectancy, not winrate. Elder Impulse
+# is a censor. Do not start this while the 24h firehose runner is holding
+# the process lock — stop that runner first if you want to switch.
+engine: mt5
+mode: mt5_demo
+allow_live: false
+dry_run: false
+paper_trading_enabled: true
+mt5_path: C:\Program Files\MetaTrader 5\terminal64.exe
+mt5_magic: 260813
+mt5_deviation: 20
+mt5_max_lots: 0.10
+
+symbol: EURUSD
+symbols:
+  - EURUSD
+timeframe: 15m
+lookback_days: 40
+poll_seconds: 15
+order_quantity: 0.01
+
+starting_equity: 100
+signal_mode: pa_select
+algo: pa_select
+firehose_every_bar: false
+max_hold_seconds: 0
+scratch_losers: false
+flatten_if_profit_usd: 0
+max_positions: 1
+ntz_max_trades_day: 3
+
+# Pip-aware levels (JPY uses jpy_pip_size). Example 5-pip SL / 20-pip TP
+# is expressed as wick+buffer stop and 4R target — both configurable.
+firehose_pip_size: 0.0001
+jpy_pip_size: 0.01
+pa_daily_tf: d1
+pa_structure_tf: h4
+pa_confirm_tf: h1
+pa_daily_lookback_days: 180
+pa_structure_lookback_days: 90
+pa_confirm_lookback_days: 60
+pa_daily_mode: ema
+pa_htf_ema_period: 21
+pa_swing_n: 3
+pa_zone_cluster_pips: 15
+pa_zone_pips: 8
+pa_round_pips: 100
+pa_round_half: true
+pa_min_er: 0.30
+pa_range_min_er: 0.0
+er_period: 10
+pa_allow_trend: true
+pa_allow_range: true
+pa_require_h1: true
+pa_require_multi_touch: false
+pa_elder_censor: true
+pa_allow_pin: true
+pa_allow_engulf: true
+pa_allow_retest: true
+pa_sl_buffer_pips: 1.0
+pa_max_sl_pips: 12.0
+pa_min_sl_pips: 0.0
+pa_tp_mode: r_multiple
+pa_tp_r: 4.0
+pa_tp_pips: 20.0
+min_rr: 2.0
+
+ema_fast: 50
+ema_slow: 200
+atr_period: 14
+adx_period: 14
+adx_trend_threshold: 25
+adx_range_max: 18
+donchian_period: 20
+bb_period: 20
+bb_std: 2.0
+rsi_period: 14
+min_atr_pct: 0.0
+cost_buffer: 1.0
+spread_bps: 2.26
+slippage_bps: 0.4
+commission_round_trip_usd: 0.0
+spread_bps_floor: 0.2
+max_spread_pips: 2
+max_spread_price: 0.00020
+session_start_utc: 0
+session_end_utc: 24
+
+risk_percent: 1
+high_risk_mode: traditional
+high_risk_safe: true
+allow_unsafe_high_risk: false
+hr_risk_max_cap: 2
+hr_equity_floor_frac: 0.5
+hr_max_consecutive_losses: 5
+max_daily_loss_percent: 3.0
+max_total_drawdown_percent: 12.0
+pyramid_enabled: false
+kill_switch: false
+test_name: mt5_demo_pa_select

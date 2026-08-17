@@ -1,0 +1,16 @@
+---
+description: Shadow research cycle — never touch the live MT5 runner
+alwaysApply: true
+---
+
+# Research cycle
+
+Start from `bot/aegis/research/` registry and reports, not chat memory.
+
+- One falsifiable hypothesis per cycle.
+- Use full-book source notes under `bot/research/source_notes/`, not `NEW_BOOKS_*` digests as evidence.
+- Never invent metrics, leak future bars, or promote on win rate alone.
+- Never edit `bot/config_mt5_demo_firehose_hw.yaml`, restart `run_broker_paper.py`, flatten, or set `allow_live`.
+- Never import `aegis.research` into `bot/scripts/run_broker_paper.py`.
+- `allow_code_edit` stays false unless the user explicitly enables it.
+- Label work `implemented`, `research_proxy`, or `unavailable`. Do not claim HFT, Level 2, or faithful author systems without tests and data.

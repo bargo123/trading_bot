@@ -17,10 +17,38 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from aegis.config import load_config  # noqa: E402
-from aegis.engines import OrderRequest, create_engine  # noqa: E402
+from aegis.config import configured_symbols, load_config, max_spread_for, pip_size_for  # noqa: E402
+from aegis.engines import OrderRequest, OrderResult, create_engine  # noqa: E402
+from aegis.exits import (  # noqa: E402
+    firehose_stops_from_quote,
+    giveback_reason,
+    load_mfe,
+    mfe_after_quick_win,
+    quick_win_clips,
+    save_mfe,
+    should_block_scratch_cooldown,
+    should_scratch_never_green,
+    update_mfe,
+)
+from aegis.execution_circuit import ExecutionCircuit  # noqa: E402
 from aegis.high_risk import HighRiskController  # noqa: E402
+from aegis.oms import (  # noqa: E402
+    TickToTrade,
+    close_attempt_blocked,
+    is_market_closed_retcode,
+    oms_allows,
+    open_attempt_blocked,
+    quote_age_s,
+    update_close_backoff,
+)
+from aegis.paper_control import (  # noqa: E402
+    ProcessLock,
+    firehose_can_add,
+    firehose_consume_bar,
+    jpy_cluster_blocks,
+)
 from aegis.risk import RiskEngine  # noqa: E402
+from aegis.sizing import ContractSpec, size_lots_for_risk  # noqa: E402
 from aegis.strategy import prepare, signal_from_row  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -55,27 +83,69 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     cfg = load_config(args.config)
-    if str(cfg.get("engine", "")).lower() == "mt5":
-        raise SystemExit("MT5 engine not implemented yet — use engine: ibkr")
+    engine_name = str(cfg.get("engine", "")).lower()
+    if engine_name == "mt5":
+        from aegis.paper_control import paper_execution_enabled
 
-    eng = create_engine(cfg)
-    eng.connect()
+        send_orders = paper_execution_enabled(cfg)
+    else:
+        send_orders = not bool(cfg.get("dry_run", False))
+
+    lock = ProcessLock(ROOT / "reports" / "run_broker_paper.lock")
+    lock.acquire()
+    try:
+        eng = create_engine(cfg)
+        eng.connect()
+    except Exception:
+        lock.release()
+        raise
     journal = ROOT / "reports" / f"{cfg.get('test_name', 'ib_paper')}_journal.jsonl"
     heartbeat = ROOT / "reports" / "bot_heartbeat.json"
+    risk_path = ROOT / "reports" / "risk_state.json"
     risk = RiskEngine.from_config(cfg)
-    symbol = str(cfg["symbol"])
-    qty = float(cfg.get("order_quantity", 20000))
-    last_bar_time = None
+    risk.load_json(risk_path)
+    circuit_path = ROOT / "reports" / "execution_circuit.json"
+    circuit = ExecutionCircuit(
+        limit=int(cfg.get("no_money_reject_limit", 3) or 3),
+        window_s=float(cfg.get("no_money_window_s", 300) or 300),
+        backoff_s=float(cfg.get("execution_backoff_s", 900) or 900),
+    )
+    circuit.load_json(circuit_path)
+    symbols = configured_symbols(cfg)
+    qty = float(cfg.get("order_quantity", 0.01 if engine_name == "mt5" else 20000))
+    last_bar_time: dict[str, pd.Timestamp] = {}
     hr = None
-    position_opened_at: Optional[float] = None
+    position_opened_at: dict[str, float] = {}
+    last_entry_at: dict[str, float] = {}
+    last_scratch_at: dict[str, float] = {}
     max_hold = float(cfg.get("max_hold_seconds", 0) or 0)
+    max_positions = int(cfg.get("max_positions", 1) or 1)
+    jpy_cluster_max = int(cfg.get("firehose_jpy_cluster_max", 0) or 0)
+    flatten_profit = float(cfg.get("flatten_if_profit_usd", 0) or 0)
+    scratch_losers = bool(cfg.get("scratch_losers", True))
+    stack_clips = bool(cfg.get("firehose_stack", False))
+    max_per_symbol = int(cfg.get("firehose_max_per_symbol", 1) or 1)
+    clip_interval_s = float(cfg.get("firehose_clip_interval_s", 0) or 0)
+    mfe_path = ROOT / "reports" / "firehose_mfe.json"
+    mfe = load_mfe(mfe_path)
+    pa_select_mode = str(cfg.get("signal_mode") or cfg.get("algo") or "").lower() in {"pa_select"}
+    day_trades = 0
+    day_stamp = None
+    last_halt_journal = 0.0
+    margin_block_until = 0.0
+    last_nomoney_journal = 0.0
+    last_mktclosed_journal = 0.0
+    last_intel_journal: dict[str, float] = {}
+    margin_cooldown_s = 30.0
+    close_block_until = 0.0
+    t2t = TickToTrade()
 
     def write_heartbeat(extra: Optional[dict] = None) -> None:
         payload = {
             "pid": os.getpid(),
             "ts": time.time(),
             "iso": datetime.now(timezone.utc).isoformat(),
-            "symbol": symbol,
+            "symbols": symbols,
             "qty": qty,
         }
         if extra:
@@ -88,181 +158,836 @@ def main() -> None:
         if not acct.is_paper and not bool(cfg.get("allow_live", False)):
             raise SystemExit("Not a paper session. Refusing to trade.")
         hr = HighRiskController.from_config(cfg, acct.equity)
+        live_symbols: list[str] = []
+        for name in symbols:
+            try:
+                eng.quote(name)
+                live_symbols.append(name)
+            except Exception as exc:
+                logger.warning("Dropping %s from watchlist: %s", name, exc)
+        if not live_symbols:
+            raise SystemExit("No tradeable symbols on this MT5 account.")
+        symbols = live_symbols
         logger.info(
-            "Connected engine=%s account=%s equity=%.2f paper=%s qty=%.0f",
+            "Connected engine=%s account=%s equity=%.2f paper=%s qty=%s symbols=%s",
             eng.name,
             acct.account_id,
             acct.equity,
             acct.is_paper,
             qty,
+            ",".join(symbols),
         )
         append_journal(
             journal,
-            {"event": "start", "engine": eng.name, "account": acct.account_id, "equity": acct.equity},
+            {
+                "event": "start",
+                "engine": eng.name,
+                "account": acct.account_id,
+                "equity": acct.equity,
+                "symbols": symbols,
+            },
         )
-        write_heartbeat({"equity": acct.equity, "status": "running"})
+        loaded = risk.load_json(risk_path)
+        logger.info(
+            "Risk state loaded=%s day=%s start=%.2f halted=%s reason=%s",
+            loaded,
+            risk.state.day,
+            float(risk.state.day_start_equity or 0),
+            risk.state.halted,
+            risk.state.reason,
+        )
+        write_heartbeat({"equity": acct.equity, "status": "running", "open": 0})
+        # allow() clears a persisted daily_loss halt when max_daily_loss_percent <= 0.
+        try:
+            open_n = len(eng.positions())
+        except Exception:
+            open_n = 0
+        risk.allow(acct.equity, open_positions=open_n)
+        risk.save_json(risk_path)
+        append_journal(
+            journal,
+            {
+                "event": "risk_state",
+                "loaded": loaded,
+                **risk.dump(),
+                "equity": acct.equity,
+            },
+        )
 
-        while True:
-            try:
-                write_heartbeat({"status": "running"})
-                bars = eng.bars(symbol, str(cfg["timeframe"]), int(cfg.get("lookback_days", 30)))
-                if len(bars) < 50:
-                    logger.warning("Not enough bars yet (%s)", len(bars))
-                    if args.once:
-                        break
-                    time.sleep(float(cfg.get("poll_seconds", 60)))
-                    continue
+        leftover = eng.positions()
+        if leftover:
+            logger.info(
+                "Adopting %s leftover position(s); not flattening: %s",
+                len(leftover),
+                ", ".join(f"{p.symbol}:{p.side}" for p in leftover),
+            )
+            now_s = time.time()
+            for pos in leftover:
+                position_opened_at.setdefault(pos.symbol, now_s)
+                last_entry_at.setdefault(pos.symbol, now_s)
+            append_journal(
+                journal,
+                {
+                    "event": "adopt_positions",
+                    "count": len(leftover),
+                    "held": [f"{p.symbol}:{p.side}" for p in leftover],
+                    "equity": acct.equity,
+                },
+            )
 
-                raw = bars_to_frame(bars)
-                frame = prepare(raw, cfg)
-                row = frame.iloc[-2]  # last closed bar
-                bar_time = pd.Timestamp(row["time"])
-                if last_bar_time is not None and bar_time <= last_bar_time:
-                    if args.once:
-                        print("No new bar")
-                        break
-                    time.sleep(float(cfg.get("poll_seconds", 60)))
-                    continue
-                last_bar_time = bar_time
+        def flatten_open(sym: str, open_pos, equity: float, held: float, reason: str = "max_hold"):
+            nonlocal close_block_until
+            now_ts = time.time()
+            if close_attempt_blocked(now_ts, close_block_until):
+                return OrderResult(ok=False, message="market_closed_backoff")
+            pos0 = open_pos[0]
+            logger.info(
+                "Flatten %s %s qty=%s reason=%s held=%.0fs pnl=%.2f",
+                sym,
+                pos0.side,
+                pos0.quantity,
+                reason,
+                held,
+                float(pos0.unrealized_pnl),
+            )
+            if hasattr(eng, "flatten_positions"):
+                flat = eng.flatten_positions(sym)
+            else:
+                close_side = "sell" if pos0.side == "buy" else "buy"
+                flat = eng.place_order(
+                    OrderRequest(
+                        symbol=sym,
+                        side=close_side,
+                        quantity=float(pos0.quantity),
+                        kind="market",
+                        client_tag=f"aegis_{reason}"[:40],
+                    )
+                )
+            if not flat.ok:
+                prev_until = close_block_until
+                close_block_until = update_close_backoff(
+                    close_block_until, flat.message, datetime.now(timezone.utc)
+                )
+                if close_block_until > prev_until:
+                    logger.warning(
+                        "%s close blocked until %.0f (%s); %s",
+                        sym,
+                        close_block_until,
+                        reason,
+                        flat.message,
+                    )
+            append_journal(
+                journal,
+                {
+                    "event": "flatten",
+                    "symbol": sym,
+                    "reason": reason,
+                    "held_s": held,
+                    "pnl": float(pos0.unrealized_pnl),
+                    "ok": flat.ok,
+                    "msg": flat.message,
+                    "equity": equity,
+                    **(
+                        {
+                            "market_closed": True,
+                            "close_block_until": close_block_until,
+                        }
+                        if is_market_closed_retcode(flat.message)
+                        else {}
+                    ),
+                },
+            )
+            if flat.ok:
+                last_bar_time.pop(sym, None)
+            return flat
 
-                acct = eng.account()
-                open_pos = eng.positions(symbol)
-                equity = acct.equity
-
-                # Already in a trade: hold, do not treat max_positions as a fatal halt
-                if open_pos:
-                    if position_opened_at is None:
-                        position_opened_at = time.time()
-                    held = time.time() - position_opened_at
-                    # Flat tape: TP never hits — force flatten so firehose can cycle
-                    if max_hold > 0 and held >= max_hold:
-                        pos0 = open_pos[0]
-                        close_side = "sell" if pos0.side == "buy" else "buy"
-                        logger.info(
-                            "Max hold %.0fs reached — flattening %s qty=%.0f",
-                            max_hold,
-                            pos0.side,
-                            pos0.quantity,
-                        )
-                        try:
-                            ibx = eng._require()  # type: ignore[attr-defined]
-                            ibx.reqGlobalCancel()
-                            ibx.sleep(0.5)
-                        except Exception:
-                            pass
-                        flat = eng.place_order(
-                            OrderRequest(
-                                symbol=symbol,
-                                side=close_side,
-                                quantity=float(pos0.quantity),
-                                kind="market",
-                                client_tag="aegis_maxhold_flat",
-                            )
+        def close_quick_wins(sym: str, winners, equity: float, held: float):
+            """Close only clips at/above flatten_if_profit_usd. Leave the rest."""
+            nonlocal close_block_until
+            now_ts = time.time()
+            if close_attempt_blocked(now_ts, close_block_until):
+                return OrderResult(ok=False, message="market_closed_backoff")
+            if hasattr(eng, "close_ticket"):
+                closed = 0
+                last_fail = ""
+                for pos in winners:
+                    ticket = str(getattr(pos, "ticket", "") or "").strip()
+                    pnl = float(pos.unrealized_pnl)
+                    if not ticket:
+                        logger.warning(
+                            "Quick-win %s skip clip with no ticket pnl=%.2f",
+                            sym,
+                            pnl,
                         )
                         append_journal(
                             journal,
                             {
                                 "event": "flatten",
-                                "reason": "max_hold",
+                                "symbol": sym,
+                                "reason": "quick_win",
+                                "ticket": "",
                                 "held_s": held,
-                                "ok": flat.ok,
-                                "msg": flat.message,
+                                "pnl": pnl,
+                                "ok": False,
+                                "msg": "no ticket",
                                 "equity": equity,
                             },
                         )
-                        position_opened_at = None
-                        time.sleep(float(cfg.get("poll_seconds", 60)))
+                        last_fail = "no ticket"
                         continue
-
-                    logger.info("Open position: %s — waiting (held=%.0fs)", open_pos[0], held)
-                    append_journal(
-                        journal,
-                        {
-                            "event": "position",
-                            "side": open_pos[0].side,
-                            "qty": open_pos[0].quantity,
-                            "avg": open_pos[0].avg_price,
-                            "bar": str(bar_time),
-                            "equity": equity,
-                        },
+                    logger.info(
+                        "Quick-win close %s ticket=%s pnl=%.2f held=%.0fs",
+                        sym,
+                        ticket,
+                        pnl,
+                        held,
                     )
-                    if args.once:
-                        break
-                    time.sleep(float(cfg.get("poll_seconds", 60)))
-                    continue
-
-                position_opened_at = None
-                ok, reason = risk.allow(
-                    equity,
-                    open_positions=0,
-                    now=bar_time.to_pydatetime() if hasattr(bar_time, "to_pydatetime") else bar_time,
-                )
-                if not ok:
-                    logger.warning("Risk halt: %s (continuing watch)", reason)
-                    append_journal(journal, {"event": "halt", "reason": reason, "equity": equity})
-                    time.sleep(float(cfg.get("poll_seconds", 60)))
-                    continue
-                hr_ok, hr_reason = hr.allow(equity)
-                if not hr_ok:
-                    logger.warning("HR halt: %s (continuing watch)", hr_reason)
-                    append_journal(journal, {"event": "hr_halt", "reason": hr_reason, "equity": equity})
-                    time.sleep(float(cfg.get("poll_seconds", 60)))
-                    continue
-
-                sig = signal_from_row(row, cfg)
-                if sig is None:
-                    logger.info("No signal @ %s close=%.5f", bar_time, float(row["close"]))
-                    if args.once:
-                        break
-                    time.sleep(float(cfg.get("poll_seconds", 60)))
-                    continue
-
-                # Tiny fixed quantity — never all-in on broker demo
-                req = OrderRequest(
-                    symbol=symbol,
-                    side=sig.side,
-                    quantity=qty,
-                    kind="market",
-                    stop_loss=float(sig.sl) if sig.sl is not None else None,
-                    take_profit=float(sig.tp) if sig.tp is not None else None,
-                    client_tag=f"aegis_{sig.reason}"[:40],
-                )
-                logger.info(
-                    "SIGNAL %s %s qty=%.0f sl=%s tp=%s reason=%s",
-                    sig.side,
-                    symbol,
-                    qty,
-                    req.stop_loss,
-                    req.take_profit,
-                    sig.reason,
-                )
-                if bool(cfg.get("dry_run", False)):
-                    append_journal(journal, {"event": "dry_run_signal", "signal": sig.__dict__})
-                    print("dry_run — not sending order")
-                else:
-                    res = eng.place_order(req)
+                    res = eng.close_ticket(ticket)
+                    if not res.ok:
+                        prev_until = close_block_until
+                        close_block_until = update_close_backoff(
+                            close_block_until, res.message, datetime.now(timezone.utc)
+                        )
+                        if close_block_until > prev_until:
+                            logger.warning(
+                                "%s close_ticket blocked until %.0f (quick_win); %s",
+                                sym,
+                                close_block_until,
+                                res.message,
+                            )
                     append_journal(
                         journal,
                         {
-                            "event": "order",
+                            "event": "flatten",
+                            "symbol": sym,
+                            "reason": "quick_win",
+                            "ticket": ticket,
+                            "held_s": held,
+                            "pnl": pnl,
                             "ok": res.ok,
-                            "id": res.broker_order_id,
                             "msg": res.message,
-                            "side": sig.side,
-                            "qty": qty,
-                            "sl": req.stop_loss,
-                            "tp": req.take_profit,
-                            "reason": sig.reason,
+                            "equity": equity,
+                            **(
+                                {
+                                    "market_closed": True,
+                                    "close_block_until": close_block_until,
+                                }
+                                if is_market_closed_retcode(res.message)
+                                else {}
+                            ),
+                        },
+                    )
+                    if res.ok:
+                        closed += 1
+                        last_bar_time.pop(sym, None)
+                    else:
+                        last_fail = res.message
+                        if is_market_closed_retcode(res.message):
+                            break
+                if closed:
+                    return OrderResult(ok=True, message=f"closed {closed} ticket(s)")
+                return OrderResult(ok=False, message=last_fail or "no winning tickets closed")
+            open_now = list(eng.positions(sym))
+            if open_now and len(quick_win_clips(open_now, flatten_profit)) >= len(open_now):
+                return flatten_open(sym, open_now, equity, held, reason="quick_win")
+            append_journal(
+                journal,
+                {
+                    "event": "flatten",
+                    "symbol": sym,
+                    "reason": "quick_win",
+                    "held_s": held,
+                    "ok": False,
+                    "msg": "no close_ticket; mixed book left intact",
+                    "equity": equity,
+                },
+            )
+            return OrderResult(ok=False, message="no close_ticket; mixed book left intact")
+
+        def maybe_enter(sym: str, equity: float, open_count: int) -> None:
+            nonlocal day_trades, day_stamp, last_halt_journal, close_block_until
+            nonlocal margin_block_until
+            if open_attempt_blocked(time.time(), close_block_until):
+                return
+            bars = eng.bars(sym, str(cfg["timeframe"]), int(cfg.get("lookback_days", 30)))
+            if len(bars) < 50:
+                logger.warning("%s: not enough bars yet (%s)", sym, len(bars))
+                return
+            raw = bars_to_frame(bars)
+            prep_cfg = cfg
+            if pa_select_mode:
+                from aegis.pa_select import fetch_mtf_frames
+
+                bar_time_raw = pd.Timestamp(raw.iloc[-2]["time"])
+                prev_raw = last_bar_time.get(sym)
+                if prev_raw is not None and bar_time_raw <= prev_raw:
+                    return
+                prep_cfg = dict(cfg)
+                prep_cfg["pa_mtf_frames"] = fetch_mtf_frames(eng, sym, cfg)
+            frame = prepare(raw, prep_cfg)
+            row = frame.iloc[-2]
+            bar_time = pd.Timestamp(row["time"])
+            prev = last_bar_time.get(sym)
+            if prev is not None and bar_time <= prev:
+                return
+
+            q = eng.quote(sym)
+            t0 = time.perf_counter()
+            live_spread = max(0.0, float(q.ask) - float(q.bid))
+            mid = (float(q.bid) + float(q.ask)) / 2.0 if q.bid and q.ask else 0.0
+            live_bps = (live_spread / mid * 10000.0) if mid > 0 else 0.0
+            pip = pip_size_for(sym, cfg)
+            loop_cfg = dict(prep_cfg)
+            loop_cfg["spread_bps"] = max(live_bps, float(cfg.get("spread_bps_floor", 0.2) or 0.0))
+            loop_cfg["firehose_pip_size"] = pip
+            loop_cfg["volman_pip_size"] = pip
+
+            if bool(cfg.get("oms_pretrade", False)):
+                max_age = float(cfg.get("max_quote_age_s", 5.0) or 0.0)
+                age = quote_age_s(q)
+                if max_age > 0 and age > max_age:
+                    t2t.note_reject("stale_quote")
+                    append_journal(
+                        journal,
+                        {
+                            "event": "quote_stale",
+                            "symbol": sym,
+                            "age_s": age,
+                            "max_s": max_age,
                             "bar": str(bar_time),
                         },
                     )
-                    print(f"order ok={res.ok} id={res.broker_order_id} {res.message}")
-                    if res.ok:
-                        position_opened_at = time.time()
+                    return
 
+            # Live daily-loss is UTC wall clock. Bar timestamps can be yesterday
+            # (or a stale MT5 bar) and would wipe a persisted halt on restart.
+            ok, reason = risk.allow(equity, open_positions=open_count)
+            if not ok:
+                logger.warning("Risk halt: %s (continuing watch)", reason)
+                risk.save_json(risk_path)
+                now_s = time.time()
+                if now_s - last_halt_journal >= 60:
+                    last_halt_journal = now_s
+                    append_journal(journal, {"event": "halt", "reason": reason, "equity": equity})
+                return
+            c_ok, c_reason = circuit.allow(now=time.time())
+            if not c_ok:
+                logger.warning("Execution circuit: %s (continuing watch)", c_reason)
+                now_s = time.time()
+                if now_s - last_halt_journal >= 60:
+                    last_halt_journal = now_s
+                    append_journal(
+                        journal,
+                        {"event": "halt", "reason": c_reason, "equity": equity},
+                    )
+                return
+            hr_ok, hr_reason = hr.allow(equity)
+            if not hr_ok:
+                logger.warning("HR halt: %s (continuing watch)", hr_reason)
+                append_journal(journal, {"event": "hr_halt", "reason": hr_reason, "equity": equity})
+                return
+
+            max_spread = max_spread_for(sym, cfg)
+            if max_spread > 0 and live_spread > max_spread + 1e-12:
+                logger.info(
+                    "Skip %s: live spread %.5f > max %.5f",
+                    sym,
+                    live_spread,
+                    max_spread,
+                )
+                append_journal(
+                    journal,
+                    {
+                        "event": "spread_skip",
+                        "symbol": sym,
+                        "spread": live_spread,
+                        "max": max_spread,
+                        "bar": str(bar_time),
+                    },
+                )
+                return
+
+            if flatten_profit > 0 and hasattr(eng, "round_trip_spread_usd"):
+                try:
+                    rt_usd = float(eng.round_trip_spread_usd(sym, qty))
+                except Exception:
+                    rt_usd = 0.0
+                if rt_usd >= flatten_profit:
+                    logger.info(
+                        "Skip %s: round-trip spread $%.2f >= quick-win $%.2f",
+                        sym,
+                        rt_usd,
+                        flatten_profit,
+                    )
+                    return
+
+            if pa_select_mode:
+                max_day = int(cfg.get("ntz_max_trades_day", 0) or 0)
+                bar_day = bar_time.tz_convert("UTC").date() if getattr(bar_time, "tzinfo", None) else bar_time.date()
+                if day_stamp != bar_day:
+                    day_stamp = bar_day
+                    day_trades = 0
+                if max_day > 0 and day_trades >= max_day:
+                    logger.info("Skip %s: daily trade cap %s", sym, max_day)
+                    return
+
+            sig = signal_from_row(row, loop_cfg)
+            if sig is None:
+                if bool(cfg.get("intel_enabled", False)):
+                    from aegis.intel.decide import last_intel
+
+                    info = last_intel()
+                    if info.get("decision") in ("reject", "wait") and info.get("reason") not in (
+                        "",
+                        "intel_off",
+                    ):
+                        now_s = time.time()
+                        key = f"{sym}:{info.get('reason')}"
+                        if now_s - last_intel_journal.get(key, 0.0) >= 30.0:
+                            last_intel_journal[key] = now_s
+                            append_journal(
+                                journal,
+                                {
+                                    "event": "intel_skip",
+                                    "symbol": sym,
+                                    "side": info.get("side"),
+                                    "decision": info.get("decision"),
+                                    "reason": info.get("reason"),
+                                    "quality": info.get("quality"),
+                                    "bar": str(bar_time),
+                                },
+                            )
+                logger.info("No signal %s @ %s close=%.5f", sym, bar_time, float(row["close"]))
+                if firehose_consume_bar(no_signal=True):
+                    last_bar_time[sym] = bar_time
+                return
+            if should_block_scratch_cooldown(
+                since_s=None if sym not in last_scratch_at else time.time() - last_scratch_at[sym],
+                cfg=cfg,
+            ):
+                return
+            held_now = [p.side for p in eng.positions(sym)]
+            age = None if sym not in last_entry_at else time.time() - last_entry_at[sym]
+            if not firehose_can_add(
+                open_total=len(eng.positions()),
+                max_positions=max_positions,
+                held_sides=held_now,
+                signal_side=sig.side,
+                stack=stack_clips,
+                max_per_symbol=max_per_symbol,
+                last_entry_age_s=age,
+                clip_interval_s=clip_interval_s,
+                held_pnl=sum(float(p.unrealized_pnl) for p in eng.positions(sym)),
+                no_stack_if_red=bool(cfg.get("firehose_no_stack_if_red", False)),
+            ):
+                return
+
+            sl = float(sig.sl) if sig.sl is not None else None
+            tp = float(sig.tp) if sig.tp is not None else None
+            if bool(cfg.get("firehose_anchor_quote", True)):
+                anchored = firehose_stops_from_quote(sig.side, q.bid, q.ask, loop_cfg, pip)
+                if anchored is None:
+                    append_journal(
+                        journal,
+                        {
+                            "event": "spread_skip",
+                            "symbol": sym,
+                            "reason": "take_vs_live_spread",
+                            "spread": live_spread,
+                            "bid": float(q.bid),
+                            "ask": float(q.ask),
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
+                sl, tp = anchored
+            order_qty = qty
+            if str(cfg.get("position_sizing_mode") or "").lower() == "risk" and sl is not None:
+                entry = float(q.ask if sig.side == "buy" else q.bid)
+                try:
+                    spec = ContractSpec.from_mapping(sym, eng.symbol_spec(sym))
+                    decision = size_lots_for_risk(
+                        equity=float(equity),
+                        risk_percent=float(cfg.get("risk_percent", 0) or 0),
+                        entry=entry,
+                        stop=float(sl),
+                        spec=spec,
+                    )
+                except Exception as exc:
+                    logger.warning("%s risk sizing failed: %s", sym, exc)
+                    append_journal(
+                        journal,
+                        {
+                            "event": "sizing_skip",
+                            "symbol": sym,
+                            "reason": str(exc),
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
+                if not decision.allowed or decision.lots <= 0:
+                    append_journal(
+                        journal,
+                        {
+                            "event": "sizing_skip",
+                            "symbol": sym,
+                            "reason": decision.reason,
+                            "budget": decision.budget_usd,
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
+                order_qty = decision.lots
+            req = OrderRequest(
+                symbol=sym,
+                side=sig.side,
+                quantity=order_qty,
+                kind="market",
+                stop_loss=sl,
+                take_profit=tp,
+                client_tag=f"aegis_{sig.reason}"[:40],
+            )
+            oms_ok, oms_why = oms_allows(
+                req,
+                q,
+                cfg,
+                open_count=len(eng.positions()),
+                check_quote_age=False,
+            )
+            if not oms_ok:
+                t2t.note_reject(oms_why)
+                append_journal(
+                    journal,
+                    {
+                        "event": "oms_reject",
+                        "reason": oms_why,
+                        "symbol": sym,
+                        "side": sig.side,
+                        "qty": order_qty,
+                        "sl": req.stop_loss,
+                        "tp": req.take_profit,
+                        "bar": str(bar_time),
+                    },
+                )
+                logger.info("OMS reject %s %s (%s)", sym, sig.side, oms_why)
+                return
+            logger.info(
+                "SIGNAL %s %s qty=%s sl=%s tp=%s reason=%s spread=%.5f",
+                sig.side,
+                sym,
+                order_qty,
+                req.stop_loss,
+                req.take_profit,
+                sig.reason,
+                live_spread,
+            )
+            if not send_orders:
+                append_journal(
+                    journal,
+                    {"event": "dry_run_signal", "symbol": sym, "signal": sig.__dict__},
+                )
+                print(f"dry_run — not sending {sym}")
+                if firehose_consume_bar(order_ok=True, stack_more=stack_clips):
+                    last_bar_time[sym] = bar_time
+                return
+            res = eng.place_order(req)
+            t2t_ms = (time.perf_counter() - t0) * 1000.0
+            t2t.record_ms(t2t_ms)
+            intel_q = None
+            if bool(cfg.get("intel_enabled", False)):
+                from aegis.intel.decide import last_intel as _last_intel
+
+                intel_q = _last_intel().get("quality")
+            mkt_closed_extra: dict = {}
+            if not res.ok and is_market_closed_retcode(res.message):
+                prev_until = close_block_until
+                close_block_until = update_close_backoff(
+                    close_block_until, res.message, datetime.now(timezone.utc)
+                )
+                mkt_closed_extra = {
+                    "market_closed": True,
+                    "close_block_until": close_block_until,
+                }
+                if close_block_until > prev_until:
+                    logger.warning(
+                        "%s open blocked until %.0f; %s",
+                        sym,
+                        close_block_until,
+                        res.message,
+                    )
+            append_journal(
+                journal,
+                {
+                    "event": "order",
+                    "ok": res.ok,
+                    "id": res.broker_order_id,
+                    "msg": res.message,
+                    "symbol": sym,
+                    "side": sig.side,
+                    "qty": order_qty,
+                    "sl": req.stop_loss,
+                    "tp": req.take_profit,
+                    "reason": sig.reason,
+                    "spread": live_spread,
+                    "bar": str(bar_time),
+                    "t2t_ms": round(t2t_ms, 3),
+                    "quote_age_s": round(quote_age_s(q), 3),
+                    "intel_quality": intel_q,
+                    **mkt_closed_extra,
+                },
+            )
+            print(f"order {sym} ok={res.ok} id={res.broker_order_id} {res.message}")
+            if res.ok:
+                circuit.observe(res.message or "", now=time.time(), ok=True)
+                if firehose_consume_bar(order_ok=True, stack_more=stack_clips):
+                    last_bar_time[sym] = bar_time
+                now_s = time.time()
+                last_entry_at[sym] = now_s
+                position_opened_at[sym] = now_s
+                if pa_select_mode:
+                    day_trades += 1
+            else:
+                last_bar_time.pop(sym, None)
+                msg = res.message or ""
+                if not mkt_closed_extra:
+                    if "10019" in msg or "No money" in msg:
+                        circuit.observe(msg, now=time.time())
+                        try:
+                            circuit.save_json(circuit_path)
+                        except Exception:
+                            pass
+                        margin_block_until = time.time() + margin_cooldown_s
+                        logger.warning(
+                            "%s order not accepted (margin); pause new entries %.0fs. %s",
+                            sym,
+                            margin_cooldown_s,
+                            msg,
+                        )
+                    else:
+                        logger.warning("%s order not accepted — will retry this bar. %s", sym, msg)
+
+        cfg_path = Path(args.config)
+        cfg_mtime = 0.0
+
+        def reload_live_yaml() -> None:
+            """Pick up YAML fine-tunes without a second runner. Never allow_live."""
+            nonlocal cfg, qty, max_hold, max_positions, flatten_profit, scratch_losers
+            nonlocal stack_clips, max_per_symbol, clip_interval_s, symbols, cfg_mtime
+            nonlocal jpy_cluster_max
+            try:
+                mtime = cfg_path.stat().st_mtime
+            except OSError:
+                return
+            if mtime <= cfg_mtime:
+                return
+            try:
+                new = load_config(cfg_path)
+            except Exception:
+                logger.exception("live yaml reload failed")
+                return
+            new["allow_live"] = False
+            cfg.clear()
+            cfg.update(new)
+            cfg_mtime = mtime
+            qty = float(cfg.get("order_quantity", 0.01 if engine_name == "mt5" else 20000))
+            max_hold = float(cfg.get("max_hold_seconds", 0) or 0)
+            max_positions = int(cfg.get("max_positions", 1) or 1)
+            flatten_profit = float(cfg.get("flatten_if_profit_usd", 0) or 0)
+            scratch_losers = bool(cfg.get("scratch_losers", True))
+            stack_clips = bool(cfg.get("firehose_stack", False))
+            max_per_symbol = int(cfg.get("firehose_max_per_symbol", 1) or 1)
+            clip_interval_s = float(cfg.get("firehose_clip_interval_s", 0) or 0)
+            jpy_cluster_max = int(cfg.get("firehose_jpy_cluster_max", 0) or 0)
+            symbols[:] = configured_symbols(cfg)
+            risk.risk_percent = float(cfg.get("risk_percent", 0.75))
+            risk.max_daily_loss_percent = float(cfg.get("max_daily_loss_percent", 0) or 0)
+            risk.max_total_drawdown_percent = float(cfg.get("max_total_drawdown_percent", 0) or 0)
+            risk.max_positions = max_positions
+            risk.kill_switch = bool(cfg.get("kill_switch", False))
+            circuit.reconfigure(
+                limit=int(cfg.get("no_money_reject_limit", 3) or 3),
+                window_s=float(cfg.get("no_money_window_s", 300) or 300),
+                backoff_s=float(cfg.get("execution_backoff_s", 900) or 900),
+            )
+            logger.info(
+                "Reloaded live yaml tp=%s sl=%s dd=%s intel=%s rsi_ext=%s",
+                cfg.get("firehose_tp_pips"),
+                cfg.get("firehose_sl_pips"),
+                risk.max_total_drawdown_percent,
+                cfg.get("intel_enabled"),
+                cfg.get("intel_skip_rsi_ext"),
+            )
+
+        while True:
+            try:
+                reload_live_yaml()
+                poll = float(cfg.get("poll_seconds", 60))
+                acct = eng.account()
+                equity = acct.equity
+                all_pos = eng.positions()
+                extra_hb = {
+                    "status": "running",
+                    "equity": equity,
+                    "open": len(all_pos),
+                    "held": [f"{p.symbol}:{p.side}" for p in all_pos],
+                    "max_positions": max_positions,
+                    "firehose_every_bar": bool(cfg.get("firehose_every_bar")),
+                    "position_sizing_mode": str(cfg.get("position_sizing_mode") or ""),
+                    "risk_halted": bool(risk.state.halted),
+                    "risk_reason": str(risk.state.reason or ""),
+                    "circuit_blocked_until": float(circuit.blocked_until or 0),
+                }
+                _risk_ok, _risk_why = risk.allow(equity, open_positions=len(all_pos))
+                extra_hb["risk_halted"] = bool(risk.state.halted) or (not _risk_ok)
+                extra_hb["risk_reason"] = str(risk.state.reason or _risk_why or "")
+                _c_ok, _c_why = circuit.allow(now=time.time())
+                extra_hb["circuit_ok"] = bool(_c_ok)
+                if not _c_ok:
+                    extra_hb["circuit_reason"] = _c_why
+                extra_hb.update(t2t.snapshot())
+                if close_block_until > 0:
+                    extra_hb["close_block_until"] = close_block_until
+                    extra_hb["close_block_until_iso"] = datetime.fromtimestamp(
+                        close_block_until, timezone.utc
+                    ).isoformat()
+                write_heartbeat(extra_hb)
+                try:
+                    risk.save_json(risk_path)
+                except Exception:
+                    pass
+
+                holding: list[str] = []
+                for sym in symbols:
+                    try:
+                        open_pos = eng.positions(sym)
+                        if open_pos:
+                            opened = position_opened_at.get(sym)
+                            if opened is None:
+                                opened = time.time()
+                                position_opened_at[sym] = opened
+                            held = time.time() - opened
+                            pnl = float(open_pos[0].unrealized_pnl)
+                            prev_peak = mfe.get(sym)
+                            peak = update_mfe(prev_peak, pnl)
+                            if prev_peak is None or peak != prev_peak:
+                                mfe[sym] = peak
+                                save_mfe(mfe_path, mfe)
+                            gb = giveback_reason(peak, pnl, cfg)
+                            closed_now = False
+                            pnls = [float(p.unrealized_pnl) for p in open_pos]
+                            winners = (
+                                quick_win_clips(open_pos, flatten_profit)
+                                if flatten_profit > 0
+                                else []
+                            )
+                            if winners:
+                                flat = close_quick_wins(sym, winners, equity, held)
+                                leftover_pos = eng.positions(sym)
+                                if flat.ok:
+                                    peak_left = mfe_after_quick_win(
+                                        [float(p.unrealized_pnl) for p in leftover_pos]
+                                    )
+                                    if peak_left is None:
+                                        mfe.pop(sym, None)
+                                    else:
+                                        mfe[sym] = peak_left
+                                    save_mfe(mfe_path, mfe)
+                                    if not leftover_pos:
+                                        position_opened_at.pop(sym, None)
+                                        last_entry_at.pop(sym, None)
+                                    closed_now = True
+                            elif gb:
+                                flat = flatten_open(sym, open_pos, equity, held, reason=gb)
+                                if flat.ok:
+                                    position_opened_at.pop(sym, None)
+                                    last_entry_at.pop(sym, None)
+                                    last_scratch_at[sym] = time.time()
+                                    mfe.pop(sym, None)
+                                    save_mfe(mfe_path, mfe)
+                                    closed_now = True
+                            elif should_scratch_never_green(
+                                held_s=held, peak=peak, pnls=pnls, cfg=cfg
+                            ):
+                                flat = flatten_open(
+                                    sym, open_pos, equity, held, reason="never_green"
+                                )
+                                if flat.ok:
+                                    position_opened_at.pop(sym, None)
+                                    last_entry_at.pop(sym, None)
+                                    last_scratch_at[sym] = time.time()
+                                    mfe.pop(sym, None)
+                                    save_mfe(mfe_path, mfe)
+                                    closed_now = True
+                            elif max_hold > 0 and held >= max_hold:
+                                if scratch_losers or pnl >= 0:
+                                    flat = flatten_open(sym, open_pos, equity, held, reason="max_hold")
+                                    if flat.ok:
+                                        position_opened_at.pop(sym, None)
+                                        last_entry_at.pop(sym, None)
+                                        mfe.pop(sym, None)
+                                        save_mfe(mfe_path, mfe)
+                                        closed_now = True
+                            if not closed_now:
+                                holding.append(f"{sym} {open_pos[0].side} {held:.0f}s pnl={pnl:.2f}")
+                                if not stack_clips:
+                                    continue
+                            open_pos = eng.positions(sym)
+                            if open_pos and not stack_clips:
+                                continue
+                        just_closed = (not open_pos) and (sym in position_opened_at)
+                        if not open_pos:
+                            position_opened_at.pop(sym, None)
+                            if just_closed:
+                                last_bar_time.pop(sym, None)
+                            if sym in mfe:
+                                mfe.pop(sym, None)
+                                save_mfe(mfe_path, mfe)
+                        if len(eng.positions()) >= max_positions:
+                            continue
+                        if jpy_cluster_blocks(
+                            [p.symbol for p in eng.positions()],
+                            sym,
+                            jpy_cluster_max,
+                        ):
+                            continue
+                        if open_attempt_blocked(time.time(), close_block_until):
+                            now_s = time.time()
+                            if now_s - last_mktclosed_journal >= 60:
+                                last_mktclosed_journal = now_s
+                                append_journal(
+                                    journal,
+                                    {
+                                        "event": "open_skip",
+                                        "reason": "market_closed_backoff",
+                                        "until": close_block_until,
+                                        "equity": equity,
+                                        "open": len(eng.positions()),
+                                    },
+                                )
+                            continue
+                        if time.time() < margin_block_until:
+                            now_s = time.time()
+                            if now_s - last_nomoney_journal >= 60:
+                                last_nomoney_journal = now_s
+                                append_journal(
+                                    journal,
+                                    {
+                                        "event": "margin_skip",
+                                        "until": margin_block_until,
+                                        "equity": equity,
+                                        "open": len(eng.positions()),
+                                    },
+                                )
+                            continue
+                        maybe_enter(sym, equity, len(eng.positions()))
+                    except Exception:
+                        logger.exception("Symbol loop error %s", sym)
+
+                if holding:
+                    logger.info("Holding %s equity=%.2f", "; ".join(holding), equity)
                 if args.once:
                     break
-                time.sleep(float(cfg.get("poll_seconds", 60)))
+                time.sleep(poll)
             except KeyboardInterrupt:
                 raise
             except Exception as exc:
@@ -278,11 +1003,27 @@ def main() -> None:
                     pass
     finally:
         try:
-            if heartbeat.exists():
-                heartbeat.unlink()
+            risk.save_json(risk_path)
         except Exception:
             pass
-        eng.disconnect()
+        try:
+            circuit.save_json(circuit_path)
+        except Exception:
+            pass
+        try:
+            lock.release()
+        except Exception:
+            pass
+        try:
+            write_heartbeat({"status": "stopped", "pid": os.getpid()})
+        except Exception:
+            pass
+        # Detach only. mt5.shutdown() kills the terminal and the demo session.
+        if hasattr(eng, "disconnect"):
+            try:
+                eng.disconnect()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

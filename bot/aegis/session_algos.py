@@ -706,6 +706,75 @@ def sig_chan_bb_scalp(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
     return None
 
 
+def _flag(row: pd.Series, key: str) -> bool:
+    val = row.get(key)
+    try:
+        if val is None or pd.isna(val):
+            return False
+    except (TypeError, ValueError):
+        return False
+    return bool(val)
+
+
+def _intel_allows(row: pd.Series, cfg: dict[str, Any], side: str) -> bool:
+    """Meta layer around CORE. Off unless intel_enabled. Does not change EMA-side."""
+    if not bool(cfg.get("intel_enabled", False)):
+        return True
+    from aegis.intel.decide import intel_allows
+
+    return intel_allows(row, cfg, side)
+
+
+def _firehose_book_allows(row: pd.Series, cfg: dict[str, Any], side: str) -> bool:
+    """Censor, not a 100% WR claim.
+
+    Jansen/Harris accuracy gates run even when firehose_book_filter is off.
+    """
+    from aegis.accuracy import accuracy_allows
+
+    if not accuracy_allows(row, cfg, side):
+        return False
+    if not bool(cfg.get("firehose_book_filter", False)):
+        return True
+    pip = float(cfg.get("volman_pip_size", cfg.get("firehose_pip_size", 0.0001)))
+    bar_range = float(row.get("high", 0) or 0) - float(row.get("low", 0) or 0)
+    min_range = float(cfg.get("firehose_min_range_pips", 1.0)) * pip
+    if bar_range + 1e-12 < min_range:
+        return False
+    if bool(cfg.get("firehose_skip_doji", True)) and _flag(row, "volman_doji"):
+        return False
+    close = float(row["close"])
+    open_ = float(row["open"])
+    if bool(cfg.get("firehose_require_body", True)):
+        if side == "buy" and close < open_:
+            return False
+        if side == "sell" and close > open_:
+            return False
+    er = row.get("kaufman_er")
+    min_er = float(cfg.get("firehose_min_er", 0.35))
+    if er is None or pd.isna(er) or float(er) < min_er:
+        return False
+    htf = row.get("htf_ema")
+    if htf is not None and not pd.isna(htf):
+        if side == "buy" and close < float(htf):
+            return False
+        if side == "sell" and close > float(htf):
+            return False
+    if side == "buy" and _flag(row, "impulse_red"):
+        return False
+    if side == "sell" and _flag(row, "impulse_green"):
+        return False
+    from aegis.chart_read import chart_confirms
+
+    if not chart_confirms(row, cfg, side):
+        return False
+    from aegis.direction import direction_allows
+
+    if not direction_allows(row, cfg, side):
+        return False
+    return True
+
+
 def sig_firehose(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
     """
     Max-frequency scalp on OHLC (video firehose spirit within bar data limits).
@@ -721,6 +790,10 @@ def sig_firehose(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
         return None
     if not in_session(row["time"], cfg.get("session_start_utc"), cfg.get("session_end_utc")):
         return None
+    if bool(cfg.get("intel_enabled", False)):
+        from aegis.intel.decide import reset_last
+
+        reset_last()
 
     close = float(row["close"])
     ema20 = float(row["ema_20"])
@@ -744,20 +817,26 @@ def sig_firehose(row: pd.Series, cfg: dict[str, Any]) -> Optional[Signal]:
     if bool(cfg.get("firehose_every_bar", False)):
         sig = _long("firehose_bar_up") if close >= ema20 else _short("firehose_bar_dn")
         dist = abs(float(sig.tp) - close)
-        if not cost_ok(row, cfg, dist):
+        if not _firehose_book_allows(row, cfg, sig.side) or not cost_ok(row, cfg, dist):
+            return None
+        if not _intel_allows(row, cfg, sig.side):
             return None
         return sig
 
     # Long: close breaks prior high while above ema
     if close > prev_high and close >= ema20:
         sig = _long("firehose_up")
-        if float(sig.tp) <= close or not cost_ok(row, cfg, abs(float(sig.tp) - close)):
+        if float(sig.tp) <= close or not _firehose_book_allows(row, cfg, "buy") or not cost_ok(row, cfg, abs(float(sig.tp) - close)):
+            return None
+        if not _intel_allows(row, cfg, "buy"):
             return None
         return sig
     # Short: close breaks prior low while below ema
     if close < prev_low and close <= ema20:
         sig = _short("firehose_dn")
-        if float(sig.tp) >= close or not cost_ok(row, cfg, abs(close - float(sig.tp))):
+        if float(sig.tp) >= close or not _firehose_book_allows(row, cfg, "sell") or not cost_ok(row, cfg, abs(close - float(sig.tp))):
+            return None
+        if not _intel_allows(row, cfg, "sell"):
             return None
         return sig
     return None
@@ -768,6 +847,7 @@ _ALGO_TABLE: dict[str, SignalFn] = {}
 
 from aegis.cafb import sig_cafb
 from aegis.pulse import sig_pulse
+from aegis.pa_select import sig_pa_select
 
 ALGOS: dict[str, SignalFn] = {
     "hw_range": sig_hw_range,
@@ -788,6 +868,7 @@ ALGOS: dict[str, SignalFn] = {
     "firehose": sig_firehose,
     "cafb": sig_cafb,
     "pulse_scalp": sig_pulse,
+    "pa_select": sig_pa_select,
     "ensemble": sig_ensemble,
     "ensemble_optimal": sig_ensemble,
     "all_books": sig_ensemble,

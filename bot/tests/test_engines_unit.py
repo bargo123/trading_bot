@@ -27,18 +27,14 @@ def test_factory_rejects_live_port_without_flag():
             assert str(port) in str(e) or "live" in str(e).lower()
 
 
-def test_mt5_stub_raises_on_connect():
-    eng = create_engine({"engine": "mt5"})
+def test_factory_mt5():
+    eng = create_engine({"engine": "mt5", "allow_live": False})
     assert isinstance(eng, MT5Engine)
-    try:
-        eng.connect()
-        raise AssertionError("expected NotImplementedError")
-    except NotImplementedError:
-        pass
+    assert eng.name == "mt5"
 
 
 if __name__ == "__main__":
     test_factory_ibkr()
     test_factory_rejects_live_port_without_flag()
-    test_mt5_stub_raises_on_connect()
+    test_factory_mt5()
     print("OK")

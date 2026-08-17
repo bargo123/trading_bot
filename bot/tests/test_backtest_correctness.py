@@ -59,6 +59,20 @@ def test_historical_daily_loss_uses_bar_time() -> None:
     assert "daily_loss" in reason
 
 
+def test_zero_total_drawdown_clears_persisted_halt_and_keeps_trading() -> None:
+    day = datetime(2026, 8, 14, 12, tzinfo=timezone.utc)
+    risk = RiskEngine(1.0, 0.0, 0.0, 40)
+    risk.state.peak_equity = 94.28
+    risk.state.halted = True
+    risk.state.permanent_halt = True
+    risk.state.reason = "max_drawdown 12.01%"
+    ok, reason = risk.allow(79.48, 4, now=day)
+    assert ok
+    assert reason == "ok"
+    assert risk.state.halted is False
+    assert risk.state.permanent_halt is False
+
+
 def test_total_drawdown_halt_persists_across_days() -> None:
     risk = RiskEngine(1.0, 50.0, 10.0, 1)
     day1 = datetime(2020, 1, 2, 12, tzinfo=timezone.utc)
@@ -68,6 +82,36 @@ def test_total_drawdown_halt_persists_across_days() -> None:
     assert not ok and "max_drawdown" in reason
     ok, reason = risk.allow(89.0, 0, now=day2)
     assert not ok and "max_drawdown" in reason
+
+
+def test_daily_halt_survives_json_reload(tmp_path: Path) -> None:
+    path = tmp_path / "risk_state.json"
+    day = datetime(2026, 8, 13, 12, tzinfo=timezone.utc)
+    first = RiskEngine(1.0, 3.0, 50.0, 3)
+    first.update(94.46, now=day)
+    ok, reason = first.allow(91.12, 0, now=day)
+    assert not ok and "daily_loss" in reason
+    first.save_json(path)
+    restarted = RiskEngine(1.0, 3.0, 50.0, 3)
+    assert restarted.load_json(path)
+    ok, reason = restarted.allow(91.92, 0, now=day)
+    assert not ok
+    assert "daily_loss" in reason
+    assert restarted.state.day_start_equity == 94.46
+
+
+def test_daily_loss_disabled_clears_persisted_halt() -> None:
+    day = datetime(2026, 8, 13, 16, tzinfo=timezone.utc)
+    risk = RiskEngine(1.0, 0.0, 50.0, 40)
+    risk.state.day = day.date()
+    risk.state.day_start_equity = 92.72
+    risk.state.peak_equity = 94.28
+    risk.state.halted = True
+    risk.state.reason = "daily_loss 4.07%"
+    ok, reason = risk.allow(90.49, 0, now=day)
+    assert ok
+    assert reason == "ok"
+    assert risk.state.halted is False
 
 
 def test_expectancy_r_is_net_of_round_trip_cost() -> None:
@@ -209,7 +253,9 @@ def test_intraday_download_does_not_silently_fallback_to_daily() -> None:
 
 if __name__ == "__main__":
     test_historical_daily_loss_uses_bar_time()
+    test_zero_total_drawdown_clears_persisted_halt_and_keeps_trading()
     test_total_drawdown_halt_persists_across_days()
+    test_daily_loss_disabled_clears_persisted_halt()
     test_expectancy_r_is_net_of_round_trip_cost()
     test_open_position_is_liquidated_at_end()
     test_intrabar_exit_cannot_reenter_at_that_bars_open()

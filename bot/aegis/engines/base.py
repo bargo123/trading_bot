@@ -49,6 +49,9 @@ class PositionSnapshot:
     quantity: float
     avg_price: float
     unrealized_pnl: float = 0.0
+    ticket: str = ""
+    stop_loss: float = 0.0
+    take_profit: float = 0.0
 
 
 @dataclass(frozen=True)

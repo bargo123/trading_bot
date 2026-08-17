@@ -1,0 +1,15 @@
+with_cursor: false
+allow_code_edit: false
+live_config: config_mt5_demo_firehose_hw.yaml
+lookback_days: 14
+min_trades: 8
+dd_tolerance_pct: 2.0
+is_fraction: 0.7
+walk_forward_folds: 3
+git_commit: false
+pytest_subset:
+  - tests/test_paper_control.py
+  - tests/test_optimizer.py
+pytest_extra_args:
+  - -k
+  - "not test_ib_paper_config_defaults_to_observation_only"

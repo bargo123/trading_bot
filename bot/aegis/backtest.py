@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional
 import numpy as np
 import pandas as pd
 
+from aegis.exits import giveback_reason, update_mfe, working_stop
 from aegis.risk import RiskEngine
 from aegis.strategy import Signal, prepare, signal_from_row
 from aegis.pyramid import next_pyramid_sl, should_pyramid
@@ -29,6 +30,7 @@ class BacktestResult:
     halt_reason: str = ""
     ambiguous_exits: int = 0
     skipped_entries: dict[str, int] = field(default_factory=dict)
+    intel_memory: list[dict[str, Any]] = field(default_factory=list)
 
 
 def run_backtest(
@@ -37,6 +39,7 @@ def run_backtest(
     *,
     prepare_fn: Optional[PrepareFn] = None,
     signal_fn: Optional[SignalFn] = None,
+    intel_memory: Optional[list[dict[str, Any]]] = None,
 ) -> BacktestResult:
     prep = prepare_fn or prepare
     signal = signal_fn or signal_from_row
@@ -61,6 +64,9 @@ def run_backtest(
     pos = None
     halt_reason = ""
     ambiguous_exits = 0
+    memory: list[dict[str, Any]] = list(intel_memory or [])
+    cfg_run = dict(cfg)
+    cfg_run["_intel_memory"] = memory
 
     def close_position(exit_time, exit_price: float, outcome: str) -> None:
         nonlocal equity, pos, halt_reason
@@ -68,7 +74,8 @@ def run_backtest(
         side = pos["side"]
         move = (exit_price - pos["entry"]) if side == "buy" else (pos["entry"] - exit_price)
         cost = pos["entry"] * (cost_bps / 10000.0) * 2
-        pnl = pos["units"] * (move - cost)
+        commission_rt = float(cfg.get("commission_round_trip_usd", 0.0) or 0.0)
+        pnl = pos["units"] * (move - cost) - commission_rt
         initial_risk_money = float(pos["unit0"]) * float(pos["risk_den"])
         if bool(cfg.get("negative_balance_protection", True)) and equity + pnl <= 0:
             pnl = -equity
@@ -92,8 +99,15 @@ def run_backtest(
                 "adds": int(pos.get("adds", 0)),
                 "risk_pct": pos.get("risk_pct"),
                 "hr_step": pos.get("hr_step"),
+                "mfe": pos.get("mfe"),
+                "mae": pos.get("mae"),
+                "bars_held": pos.get("bars_held"),
+                "symbol": pos.get("symbol") or cfg.get("symbol"),
+                "intel_snap": pos.get("intel_snap"),
             }
         )
+        snap = pos.get("intel_snap") if isinstance(pos.get("intel_snap"), dict) else {}
+        memory.append({"features": dict(snap), "win": pnl > 0})
         pos = None
 
     for i in range(len(frame) - 1):
@@ -149,15 +163,16 @@ def run_backtest(
 
             exit_price = None
             outcome = None
-            sl, tp = pos["sl"], pos.get("tp")
+            core_sl, tp = pos["sl"], pos.get("tp")
+            sl, sl_name = working_stop(side, float(pos["entry"]), float(core_sl), cfg)
             if side == "buy":
                 hit_sl = low <= sl
                 hit_tp = tp is not None and high >= tp
                 if hit_sl and hit_tp:
                     ambiguous_exits += 1
-                    exit_price, outcome = sl, "sl"
+                    exit_price, outcome = sl, sl_name
                 elif hit_sl:
-                    exit_price, outcome = sl, "sl"
+                    exit_price, outcome = sl, sl_name
                 elif hit_tp:
                     exit_price, outcome = tp, "tp"
             else:
@@ -165,15 +180,39 @@ def run_backtest(
                 hit_tp = tp is not None and low <= tp
                 if hit_sl and hit_tp:
                     ambiguous_exits += 1
-                    exit_price, outcome = sl, "sl"
+                    exit_price, outcome = sl, sl_name
                 elif hit_sl:
-                    exit_price, outcome = sl, "sl"
+                    exit_price, outcome = sl, sl_name
                 elif hit_tp:
                     exit_price, outcome = tp, "tp"
+
+            cost = pos["entry"] * (cost_bps / 10000.0) * 2
+            commission_rt = float(cfg.get("commission_round_trip_usd", 0.0) or 0.0)
+            fav = (float(nxt["high"]) - pos["entry"]) if side == "buy" else (pos["entry"] - float(nxt["low"]))
+            adv = (pos["entry"] - float(nxt["low"])) if side == "buy" else (float(nxt["high"]) - pos["entry"])
+            close_move = (close_n - pos["entry"]) if side == "buy" else (pos["entry"] - close_n)
+            mfe_pnl = float(pos["units"]) * (fav - cost) - commission_rt
+            unreal = float(pos["units"]) * (close_move - cost) - commission_rt
+            pos["mfe"] = update_mfe(pos.get("mfe"), mfe_pnl)
+            pos["mae"] = max(float(pos.get("mae") or 0.0), max(0.0, float(adv)))
+            gb = giveback_reason(float(pos["mfe"]), unreal, cfg)
+            if exit_price is None and gb:
+                exit_price, outcome = close_n, gb
+            flatten_profit = float(cfg.get("flatten_if_profit_usd", 0) or 0)
+            if exit_price is None and flatten_profit > 0 and unreal >= flatten_profit:
+                exit_price, outcome = close_n, "quick_win"
 
             max_hold = int(cfg.get("max_hold_bars", 0) or 0)
             if exit_price is None and max_hold > 0 and pos["bars_held"] >= max_hold:
                 exit_price, outcome = close_n, "time"
+            intel_hold = int(cfg.get("intel_max_hold_bars", 0) or 0)
+            if (
+                exit_price is None
+                and bool(cfg.get("intel_enabled", False))
+                and intel_hold > 0
+                and pos["bars_held"] >= intel_hold
+            ):
+                exit_price, outcome = close_n, "intel_time"
 
             if exit_price is None and flatten_utc is not None:
                 ts = pd.Timestamp(nxt["time"])
@@ -183,6 +222,7 @@ def run_backtest(
 
             if exit_price is not None:
                 close_position(nxt["time"], float(exit_price), str(outcome))
+                continue
 
         if pos is not None:
             continue
@@ -220,7 +260,7 @@ def run_backtest(
             if day_n >= max_day:
                 continue
 
-        sig = signal(row, cfg)
+        sig = signal(row, cfg_run)
         if sig is None:
             continue
 
@@ -247,6 +287,9 @@ def run_backtest(
             min_stop=min_stop,
             risk_percent=risk_pct,
         )
+        fixed_units = float(cfg.get("fixed_units", 0) or 0)
+        if fixed_units > 0:
+            units = fixed_units
         if units <= 0:
             continue
         pos = {
@@ -269,6 +312,19 @@ def run_backtest(
             "bars_held": 0,
             "risk_pct": risk_pct,
             "hr_step": hr.step,
+            "mfe": 0.0,
+            "mae": 0.0,
+            "symbol": cfg.get("symbol"),
+            "intel_snap": {k: row.get(k) for k in (
+                "kaufman_er", "rsi", "range_loc", "jansen_score", "adx", "atr",
+                "ema_20", "open", "close", "high", "low", "brooks_in_range",
+                "harris_jump", "volman_doji", "impulse_green", "impulse_red",
+                "brooks_barbwire", "ema_side_streak", "atr_expand",
+                "close_ema_pips", "ret3_pips", "time",
+                "elliott_phase", "elliott_leg", "elliott_up_leg",
+                "gann_cycle_hit", "gann_angle_z", "bb_pct_b", "prado_fdiff",
+                "johnson_spread_ok", "h1_up", "m5_up",
+            ) if k in row.index},
         }
 
     if pos is not None and len(frame):
@@ -293,6 +349,7 @@ def run_backtest(
             final_equity=equity,
             halt_reason=halt_reason,
             ambiguous_exits=ambiguous_exits,
+            intel_memory=memory,
         )
 
     wins = trades_df.loc[trades_df["pnl"] > 0, "pnl"]
@@ -313,6 +370,7 @@ def run_backtest(
         final_equity=equity,
         halt_reason=halt_reason,
         ambiguous_exits=ambiguous_exits,
+        intel_memory=memory,
     )
 
 

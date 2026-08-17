@@ -8,6 +8,7 @@ cleaned/**
 !cleaned/.gitkeep
 docs/trading/books/**
 docs/trading/BOOKS_FULL.md
+docs/trading/extra_hft_pdfs/
 reports/**
 !reports/.gitkeep
 
@@ -28,3 +29,25 @@ adapters/
 models/
 chroma_db/
 datasets/
+
+# Optimizer runtime (templates are un-ignored below)
+bot/optimizer/*
+!bot/optimizer/.gitkeep
+!bot/optimizer/config.yaml
+!bot/optimizer/AGENT_PROMPT.md
+bot/reports/*_journal.jsonl
+bot/reports/bot_heartbeat.json
+bot/reports/*.lock
+bot/reports/risk_state.json
+bot/reports/execution_circuit.json
+bot/reports/paper_runner_stdout.log*
+bot/reports/*.bak
+bot/reports/research/*.log
+
+# Intel research runtime (code + frozen_v1.json stay in git)
+bot/intel/*
+!bot/intel/.gitkeep
+
+# Research runtime (code stays in bot/aegis/research/)
+bot/research/*
+!bot/research/.gitkeep
