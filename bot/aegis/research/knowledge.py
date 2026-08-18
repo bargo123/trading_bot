@@ -226,7 +226,99 @@ def extract_book_sections(body: str) -> dict[str, str]:
     entry = extract_named_section(body, "entry")
     exit_ = extract_named_section(body, "exit") or extract_named_section(body, "invalidation")
     risk = extract_named_section(body, "risk") or extract_named_section(body, "stop")
-    return {"setup": setup, "entry": entry, "exit": exit_, "risk": risk}
+    prose = extract_prose_snippets(body)
+    return {
+        "setup": setup or prose.get("setup") or "",
+        "entry": entry or prose.get("entry") or "",
+        "exit": exit_ or prose.get("invalidation") or prose.get("exit") or "",
+        "risk": risk or prose.get("stop") or prose.get("risk") or "",
+        "confirmation": prose.get("confirmation") or "",
+        "target": prose.get("target") or "",
+        "scale_in": prose.get("scale_in") or "",
+        "scale_out": prose.get("scale_out") or "",
+        "session": prose.get("session") or "",
+        "limitations": prose.get("limitations") or "",
+    }
+
+
+_PROSE_BUCKETS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("setup", ("setup", "the pattern", "look for", "when the market", "in a trend", "in a range")),
+    ("entry", ("enter", "entry", "buy when", "sell when", "trigger", "initiate")),
+    ("invalidation", ("invalidat", "thesis is wrong", "if the market closes", "failed break", "stop out")),
+    ("exit", ("exit", "get out", "close the trade", "abandon")),
+    ("stop", ("stop-loss", "stop loss", "protective stop", "place the stop")),
+    ("risk", ("risk", "position size", "fraction of capital", "do not risk")),
+    ("target", ("target", "take profit", "profit objective", "measured move")),
+    ("confirmation", ("confirm", "confirmation", "effort versus result", "volume confirms")),
+    ("scale_in", ("add to", "scale in", "pyramid", "increase exposure", "add on a pullback")),
+    ("scale_out", ("scale out", "take partial", "reduce the position", "bank a portion")),
+    ("session", ("london", "new york", "asian session", "overlap", "rth")),
+    ("limitations", ("does not work", "fails when", "caveat", "limitation", "discretionary")),
+)
+
+
+def _sentences(text: str) -> list[str]:
+    blob = " ".join(str(text or "").split())
+    parts = re.split(r"(?<=[.!?])\s+", blob)
+    return [part.strip() for part in parts if len(part.strip()) >= 40]
+
+
+def extract_prose_snippets(body: str, *, limit: int = 3, cap: int = 420) -> dict[str, str]:
+    """Mine usable setup/entry/invalidation prose when books lack ## Setup headings."""
+    sentences = _sentences(body)
+    out: dict[str, str] = {}
+    for bucket, needles in _PROSE_BUCKETS:
+        hits: list[str] = []
+        for sentence in sentences:
+            lower = sentence.lower()
+            if any(needle in lower for needle in needles):
+                hits.append(sentence)
+            if len(hits) >= limit:
+                break
+        if hits:
+            out[bucket] = " ".join(hits)[:cap]
+    return out
+
+
+STRATEGY_FAMILIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("trend_continuation", ("trend", "continuation", "with-trend", "momentum")),
+    ("trend_pullback", ("pullback", "retracement", "dip")),
+    ("failed_breakout", ("failed break", "failure", "false break", "spring")),
+    ("range_edge_fade", ("range", "fade", "mean reversion")),
+    ("breakout_continuation", ("breakout", "break-out")),
+    ("breakout_retest", ("retest", "backtest")),
+    ("volatility_expansion", ("expansion", "volatility break")),
+    ("volatility_compression", ("compression", "squeeze", "narrow range")),
+    ("volume_effort_result", ("effort versus result", "volume spread", "vsa")),
+    ("market_profile_rejection", ("market profile", "excess", "value area")),
+    ("session_breakout", ("london", "new york open", "session")),
+    ("multi_timeframe_alignment", ("higher timeframe", "multiple time frame", "htf")),
+)
+
+
+def expand_strategy_hypotheses(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """One book may yield many competing hypotheses. Disagreement is stored, never averaged."""
+    expanded: list[dict[str, Any]] = []
+    for row in rows:
+        blob = " ".join(
+            [
+                str(row.get("title") or ""),
+                " ".join(str(item) for item in (row.get("concepts") or [])),
+                str(row.get("setup") or ""),
+                str(row.get("entry") or ""),
+                str(row.get("invalidation") or ""),
+            ]
+        ).lower()
+        matched = [name for name, needles in STRATEGY_FAMILIES if any(needle in blob for needle in needles)]
+        families = matched or ["unclassified_scan"]
+        for family in families:
+            item = dict(row)
+            item["strategy_family"] = family
+            item["hypothesis_id"] = f"{str(row.get('file_hash') or '')[:12]}:{family}"
+            item["classification"] = "mechanical" if "rule" in blob or "system" in blob else "mixed"
+            item["claims_requiring_validation"] = True
+            expanded.append(item)
+    return expanded
 
 
 def extract_concepts(headings: str, body: str, claim_headings: Iterable[str] | None = None) -> tuple[str, ...]:
@@ -259,6 +351,7 @@ def compile_from_index(index: BookIndex, notes_dir: Path | None = None) -> list[
     if notes_dir is not None:
         notes_by_hash = {source.file_hash: source for source in load_source_knowledge(notes_dir)}
     sources: list[SourceKnowledge] = []
+    extras: dict[str, dict[str, str]] = {}
     for row in index.all_rows(include_body=True):
         if row.get("placeholder") or row.get("duplicate_of"):
             continue
@@ -268,6 +361,7 @@ def compile_from_index(index: BookIndex, notes_dir: Path | None = None) -> list[
         claims = row.get("claims") if isinstance(row.get("claims"), dict) else {}
         body = str(row.get("body") or "")
         sections = extract_book_sections(body)
+        extras[file_hash] = sections
         note = notes_by_hash.get(file_hash)
         concepts = extract_concepts(
             str(row.get("headings") or ""),
@@ -285,11 +379,23 @@ def compile_from_index(index: BookIndex, notes_dir: Path | None = None) -> list[
                 entry=sections["entry"] or str(claims.get("entry") or "") or (note.entry if note else ""),
                 exit=sections["exit"] or str(claims.get("exit") or "") or (note.exit if note else ""),
                 risk=sections["risk"] or str(claims.get("risk") or "") or (note.risk if note else ""),
-                limitations=tuple(str(item) for item in (claims.get("warnings") or [])),
+                limitations=tuple(str(item) for item in (claims.get("warnings") or []))
+                or tuple(filter(None, [sections.get("limitations") or ""])),
                 label="research_proxy",
             )
         )
-    return compile_knowledge_table(sources)
+    table = compile_knowledge_table(sources)
+    for item in table:
+        extra = extras.get(str(item.get("file_hash") or ""), {})
+        item["confirmation"] = extra.get("confirmation") or ""
+        item["stop_logic"] = extra.get("stop") or item.get("risk") or ""
+        item["target_logic"] = extra.get("target") or ""
+        item["scale_in_logic"] = extra.get("scale_in") or ""
+        item["scale_out_logic"] = extra.get("scale_out") or ""
+        item["session_requirements"] = extra.get("session") or ""
+        item["market_type"] = "fx_futures_equities_unspecified"
+        item["expected_holding_period"] = "state_dependent"
+    return expand_strategy_hypotheses(table)
 
 
 def select_knowledge_for_state(
@@ -327,7 +433,8 @@ def knowledge_markdown(rows: Iterable[Mapping[str, Any]]) -> str:
         "",
         "Label: `research_proxy`. Presence here is not an implemented strategy.",
         "",
-        f"- hashed_sources: {len(items)}",
+        f"- hashed_sources: {len({str(row.get('file_hash') or '') for row in items})}",
+        f"- hypothesis_rows: {len(items)}",
         f"- with_setup_section: {with_setup}",
         f"- with_invalidation_section: {with_exit}",
         "",

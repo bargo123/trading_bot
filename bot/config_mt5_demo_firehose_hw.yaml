@@ -67,9 +67,8 @@ firehose_tp_pips: 1
 firehose_sl_pips: 30
 volman_ema: 20
 max_hold_seconds: 0
-# Bank the first green cent. 45s never_green was flattening almost every clip red
-# (12/15 last flattens) before $0.03 could print. 4-pip broker scratch is the tail cap.
-flatten_if_profit_usd: 0.01
+# Bank only when CORE flatten is on. Intelligent Firehose owns exits.
+flatten_if_profit_usd: 0
 scratch_losers: false
 close_if_gave_back: true
 lock_mfe_usd: 0.03
@@ -120,7 +119,7 @@ max_positions: 40
 no_money_reject_limit: 3
 no_money_window_s: 300
 execution_backoff_s: 60
-intel_enabled: true
+intel_enabled: false
 intel_scratch_pips: 4
 intel_require_htf: false
 intel_require_structure: false
@@ -161,4 +160,7 @@ intelligent_risk_fraction: 0.08
 intelligent_min_analogues: 20
 intelligent_min_similarity: 0.55
 intelligent_max_clips_per_thesis: 5
+max_currency_direction_positions: 10
 analogue_index_path: intel/analogue_index.json
+knowledge_table_path: intel/knowledge_table.json
+intelligent_champion_path: intel/intelligent_champion.json

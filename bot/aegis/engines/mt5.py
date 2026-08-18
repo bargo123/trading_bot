@@ -17,6 +17,16 @@ from aegis.engines.base import (
     PositionSnapshot,
     Quote,
 )
+import re
+
+
+def sanitize_mt5_comment(tag: str) -> str:
+    """MT5 Python order_send rejects punctuation and long comment strings."""
+    cleaned = re.sub(r"[^A-Za-z0-9]", "", str(tag or "aegis"))
+    if not cleaned.lower().startswith("aegis"):
+        cleaned = "aegis" + cleaned
+    return (cleaned or "aegis")[:16]
+
 
 logger = logging.getLogger(__name__)
 
@@ -545,6 +555,10 @@ class MT5Engine(BrokerEngine):
             price = round(round(price / tick) * tick, digits)
         return round(price, digits)
 
+    @staticmethod
+    def _sanitize_comment(tag: str) -> str:
+        return sanitize_mt5_comment(tag)
+
     def _mutation_allowed(self) -> Optional[str]:
         acct = self.account()
         if not acct.is_paper and not self.allow_live:
@@ -565,7 +579,7 @@ class MT5Engine(BrokerEngine):
         if tick is None:
             return OrderResult(ok=False, message=f"no tick for {name}")
         filling = self._filling(info)
-        comment = (req.client_tag or "aegis")[:31]
+        comment = self._sanitize_comment(req.client_tag or "aegis")
         sl = self._round_price(float(req.stop_loss), info) if req.stop_loss is not None else 0.0
         tp = self._round_price(float(req.take_profit), info) if req.take_profit is not None else 0.0
         if req.kind == "limit":

@@ -37,6 +37,11 @@ HEARTBEAT_FIELDS = (
     "signal_side",
     "flow_score",
     "expected_net_usd",
+    "intelligent_firehose",
+    "counts",
+    "champion",
+    "analogue_records",
+    "knowledge_rows",
 )
 
 

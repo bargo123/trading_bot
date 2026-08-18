@@ -46,6 +46,25 @@ def test_compile_from_index_skips_placeholders_and_extracts_sections(tmp_path: P
     assert retest["invalidation"]
     assert retest["file_hash"]
     assert "damir_retest" in retest["strategy_modules"]
+    assert retest.get("strategy_family")
     matched = select_knowledge_for_state(rows, regime="range", structure_kind="retest")
     assert matched
     assert matched[0]["filename"] == "retest.md"
+
+
+def test_prose_extract_fills_setup_without_named_headings():
+    from aegis.research.knowledge import extract_book_sections
+
+    body = (
+        "In a trend the setup is a pullback to the moving average that still holds. "
+        "Enter after the next bar closes back with the trend. "
+        "Invalidate the idea if the market closes beyond the swing that defined the pullback. "
+        "Place the stop loss just beyond that swing. "
+        "The target is the measured move of the prior impulse. "
+        "Do not add to a loser; scale in only after a successful retest."
+    )
+    sections = extract_book_sections(body)
+    assert sections["setup"]
+    assert sections["entry"]
+    assert sections["exit"] or sections["setup"]
+    assert sections["risk"] or "stop" in body.lower()

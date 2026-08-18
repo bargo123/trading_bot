@@ -230,6 +230,17 @@
     </div>
 
     <section>
+      <h2>Intelligent Firehose</h2>
+      <div class="side" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:8px;">
+        <div class="tile"><div class="label">Mode</div><div class="val" id="intelMode">—</div></div>
+        <div class="tile"><div class="label">Champion</div><div class="val" id="intelChamp">—</div></div>
+        <div class="tile"><div class="label">Analogues</div><div class="val" id="intelAnalogues">—</div></div>
+        <div class="tile"><div class="label">Book rows</div><div class="val" id="intelBooks">—</div></div>
+      </div>
+      <p class="sub" id="intelCounts">FIRE / SCALE / HOLD / REDUCE / EXIT appear once the demo brain is live.</p>
+    </section>
+
+    <section>
       <h2>Positions</h2>
       <div id="positionsEmpty" class="empty">No open positions</div>
       <table id="positionsTable" hidden>
@@ -330,6 +341,14 @@
         $("openRisk").textContent = d.positions?.length
           ? `${d.positions.length} open · ${upnl >= 0 ? "+" : ""}$${upnl.toFixed(2)}`
           : "Flat";
+
+        $("intelMode").textContent = d.intelligent_firehose ? "ON" : "off";
+        $("intelChamp").textContent = d.champion || "none";
+        $("intelAnalogues").textContent = d.analogue_records ?? "—";
+        $("intelBooks").textContent = d.knowledge_rows ?? "—";
+        const c = d.counts || {};
+        $("intelCounts").textContent =
+          `FIRE ${c.fire || 0} · SCALE ${c.scale || 0} · HOLD ${c.hold || 0} · REDUCE ${c.reduce || 0} · EXIT ${c.exit || 0} · SKIP ${c.skip || 0}`;
 
         const tag = $("modeTag");
         tag.textContent = d.is_paper ? "PAPER" : "LIVE";

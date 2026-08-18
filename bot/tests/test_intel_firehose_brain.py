@@ -134,6 +134,65 @@ def test_9191_wr_negative_ev_model_never_promotes():
     assert "expectancy" in reason or "profit_factor" in reason or "payoff" in reason or reason.startswith("destructive")
 
 
+def test_analogue_store_excludes_future_bars():
+    records = [
+        {
+            "bar_time": "2026-01-01T12:00:00+00:00",
+            "symbol": "EURUSD",
+            "side": "buy",
+            "setup": "breakout",
+            "regime": "trend",
+            "structure": "breakout",
+            "volatility": "stable",
+            "session": "london",
+            "h1_direction": "up",
+            "m5_direction": "up",
+            "outcome": 0.05,
+        },
+        {
+            "bar_time": "2026-01-01T12:10:00+00:00",
+            "symbol": "EURUSD",
+            "side": "buy",
+            "setup": "breakout",
+            "regime": "trend",
+            "structure": "breakout",
+            "volatility": "stable",
+            "session": "london",
+            "h1_direction": "up",
+            "m5_direction": "up",
+            "outcome": -0.20,
+        },
+    ]
+    store = AnalogueStore(records)
+    evidence = store.query(
+        signature={
+            "symbol": "EURUSD",
+            "side": "buy",
+            "setup": "breakout",
+            "regime": "trend",
+            "structure": "breakout",
+            "volatility": "stable",
+            "session": "london",
+            "h1_direction": "up",
+            "m5_direction": "up",
+        },
+        before_time="2026-01-01T12:10:00+00:00",
+        min_n=1,
+        min_similarity=0.5,
+    )
+    assert evidence.analogue_n == 1
+    assert evidence.expectancy == 0.05
+
+
+def test_sanitize_mt5_comment_is_short_ascii():
+    from aegis.engines.mt5 import sanitize_mt5_comment
+
+    tag = sanitize_mt5_comment("aegis_positive_state_ev_on_validated_strategy")
+    assert tag.startswith("aegis")
+    assert len(tag) <= 16
+    assert tag.isalnum()
+
+
 def test_analogue_store_rejects_cosmetic_win_rate():
     records = []
     for hour in range(40):

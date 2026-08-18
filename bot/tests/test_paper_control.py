@@ -248,7 +248,7 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert float(cfg["harris_jump_atr"]) == 1.8
     assert float(cfg["firehose_tp_pips"]) == 1.0
     assert float(cfg["firehose_sl_pips"]) >= 25.0
-    assert float(cfg["flatten_if_profit_usd"]) == 0.01
+    assert float(cfg["flatten_if_profit_usd"]) == 0.0
     assert float(cfg["lock_mfe_usd"]) == 0.03
     assert float(cfg["giveback_floor_usd"]) == 0.01
     assert float(cfg["flatten_if_profit_usd"]) <= float(cfg["lock_mfe_usd"])
@@ -262,7 +262,8 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert int(cfg.get("no_money_reject_limit") or 0) == 3
     assert float(cfg.get("no_money_window_s") or 0) == 300
     assert float(cfg.get("execution_backoff_s") or 0) == 60
-    assert cfg.get("intel_enabled") is True
+    assert cfg.get("intel_enabled") is False
+    assert cfg.get("intelligent_firehose") is True
     assert float(cfg.get("intel_scratch_pips") or 0) == 4
     assert cfg.get("intel_require_htf") is False
     assert cfg.get("intel_require_structure") is False

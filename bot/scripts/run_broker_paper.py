@@ -137,6 +137,9 @@ def main() -> None:
     last_mktclosed_journal = 0.0
     last_intel_journal: dict[str, float] = {}
     intelligent_brain = None
+    from aegis.intel.lifecycle import ingest_deals, new_cursor
+
+    deal_cursor = new_cursor()
     margin_cooldown_s = 30.0
     close_block_until = 0.0
     t2t = TickToTrade()
@@ -553,15 +556,72 @@ def main() -> None:
                     core_side=None if hint is None else hint.side,
                 )
                 brain_decision = decision
+                if decision.action in {"exit", "reduce"}:
+                    open_pos = list(eng.positions(sym))
+                    close_n = int(decision.close_clips or (len(open_pos) if decision.action == "exit" else 1))
+                    closed = 0
+                    if hasattr(eng, "close_ticket") and open_pos:
+                        ranked = sorted(open_pos, key=lambda pos: float(pos.unrealized_pnl))
+                        for pos in ranked[: max(close_n, 0)]:
+                            ticket = str(getattr(pos, "ticket", "") or "").strip()
+                            if not ticket:
+                                continue
+                            res = eng.close_ticket(ticket)
+                            append_journal(
+                                journal,
+                                {
+                                    "event": "intel_brain_exit" if decision.action == "exit" else "intel_brain_reduce",
+                                    "symbol": sym,
+                                    "action": decision.action,
+                                    "reason": decision.reason,
+                                    "ticket": ticket,
+                                    "pnl": float(pos.unrealized_pnl),
+                                    "ok": res.ok,
+                                    "msg": res.message,
+                                    "bar": str(bar_time),
+                                    **dict(decision.journal),
+                                },
+                            )
+                            if res.ok:
+                                closed += 1
+                                try:
+                                    from aegis.intel.outcome_log import append_outcome
+
+                                    append_outcome(
+                                        {
+                                            "symbol": sym,
+                                            "side": pos.side,
+                                            "pnl": float(pos.unrealized_pnl),
+                                            "reason": decision.reason,
+                                            "action": decision.action,
+                                            "information_id": decision.information_id,
+                                            "analogue_n": decision.analogue_n,
+                                        }
+                                    )
+                                except Exception:
+                                    pass
+                    leftover = eng.positions(sym)
+                    intelligent_brain.memory.apply(
+                        sym,
+                        "exit" if not leftover else "reduce",
+                        side=decision.side,
+                        information_id=decision.information_id,
+                        target_risk=0.0 if not leftover else max(0.0, float(decision.journal.get("expectancy") or 0.0)),
+                        clips=len(leftover),
+                    )
+                    if firehose_consume_bar(no_signal=True):
+                        last_bar_time[sym] = bar_time
+                    return
                 if decision.action not in {"fire", "scale"}:
                     now_s = time.time()
+                    event = "intel_brain_hold" if decision.action == "hold" else "intel_brain_skip"
                     key = f"{sym}:{decision.reason}"
                     if now_s - last_intel_journal.get(key, 0.0) >= 15.0:
                         last_intel_journal[key] = now_s
                         append_journal(
                             journal,
                             {
-                                "event": "intel_brain_skip",
+                                "event": event,
                                 "symbol": sym,
                                 "action": decision.action,
                                 "reason": decision.reason,
@@ -570,7 +630,7 @@ def main() -> None:
                                 **dict(decision.journal),
                             },
                         )
-                    if firehose_consume_bar(no_signal=True):
+                    if decision.action != "hold" and firehose_consume_bar(no_signal=True):
                         last_bar_time[sym] = bar_time
                     return
                 sig = Signal(
@@ -830,6 +890,15 @@ def main() -> None:
                 now_s = time.time()
                 last_entry_at[sym] = now_s
                 position_opened_at[sym] = now_s
+                if intelligent_mode and intelligent_brain is not None and brain_decision is not None:
+                    intelligent_brain.memory.apply(
+                        sym,
+                        brain_decision.action,
+                        side=brain_decision.side,
+                        information_id=brain_decision.information_id,
+                        target_risk=float(brain_decision.expected_net_value or 0.0) or 1.0,
+                        clips=len(eng.positions(sym)),
+                    )
                 if pa_select_mode:
                     day_trades += 1
             else:
@@ -931,6 +1000,20 @@ def main() -> None:
                 if not _c_ok:
                     extra_hb["circuit_reason"] = _c_why
                 extra_hb.update(t2t.snapshot())
+                if intelligent_brain is not None:
+                    extra_hb.update(intelligent_brain.snapshot())
+                    extra_hb["intelligent_firehose"] = True
+                else:
+                    extra_hb["intelligent_firehose"] = bool(cfg.get("intelligent_firehose", False))
+                if hasattr(eng, "history_deals"):
+                    try:
+                        for event in ingest_deals(eng.history_deals(1), deal_cursor):
+                            if event.get("is_exit"):
+                                from aegis.intel.outcome_log import append_outcome
+
+                                append_outcome({**event, "source": "reconcile"})
+                    except Exception:
+                        pass
                 if close_block_until > 0:
                     extra_hb["close_block_until"] = close_block_until
                     extra_hb["close_block_until_iso"] = datetime.fromtimestamp(
@@ -961,9 +1044,10 @@ def main() -> None:
                             gb = giveback_reason(peak, pnl, cfg)
                             closed_now = False
                             pnls = [float(p.unrealized_pnl) for p in open_pos]
+                            intelligent_mode = bool(cfg.get("intelligent_firehose", False))
                             winners = (
                                 quick_win_clips(open_pos, flatten_profit)
-                                if flatten_profit > 0
+                                if flatten_profit > 0 and not intelligent_mode
                                 else []
                             )
                             if winners:
@@ -982,7 +1066,7 @@ def main() -> None:
                                         position_opened_at.pop(sym, None)
                                         last_entry_at.pop(sym, None)
                                     closed_now = True
-                            elif gb:
+                            elif (not intelligent_mode) and gb:
                                 flat = flatten_open(sym, open_pos, equity, held, reason=gb)
                                 if flat.ok:
                                     position_opened_at.pop(sym, None)
@@ -991,7 +1075,7 @@ def main() -> None:
                                     mfe.pop(sym, None)
                                     save_mfe(mfe_path, mfe)
                                     closed_now = True
-                            elif should_scratch_never_green(
+                            elif (not intelligent_mode) and should_scratch_never_green(
                                 held_s=held, peak=peak, pnls=pnls, cfg=cfg
                             ):
                                 flat = flatten_open(
