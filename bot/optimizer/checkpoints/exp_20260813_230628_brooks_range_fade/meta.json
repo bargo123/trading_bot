@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_230628_brooks_range_fade",
+  "ts": "2026-08-13T23:06:28.080360+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_brooks_range": true
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_230628_brooks_range_fade",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "brooks_range_fade",
+  "hypothesis": "Brooks Ranges: in overlapping bars, skip the middle third; buy low / sell high. Do not cut max_positions or leave 24h firehose.",
+  "rationale": "Brooks Ranges: in overlapping bars, skip the middle third; buy low / sell high. Do not cut max_positions or leave 24h firehose.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "2668e39dd54f3e6f:efficiency ratio",
+  "concept": "kaufman_er"
+}

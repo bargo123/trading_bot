@@ -1,0 +1,34 @@
+{
+  "source": "mt5_bars",
+  "bars": 11530,
+  "generation": "gen5",
+  "gate": "path-dependent OOS E after costs AND full $ vs live rsi_ext-only. Not WR. Not TP3 stored best. Not CORE-naked.",
+  "baseline_id": "intel_skip_rsi_ext",
+  "baseline_oos_e": -0.0012878909090943717,
+  "baseline_pnl": -6.491472800001162,
+  "baseline_wr": 97.16312056737588,
+  "baseline_n": 141,
+  "challenger": null,
+  "experiments": [
+    {
+      "id": "intel_rsi_ext_unready",
+      "decision": "reject",
+      "reason": "OOS E -0.0038 vs baseline -0.0013, n=40, full pnl -6.68 vs -6.49",
+      "wr": 97.14285714285714,
+      "e": -0.015910136666669832,
+      "pnl": -6.682257400001089,
+      "n": 140,
+      "oos_wr": 97.5,
+      "oos_e": -0.0037715666666696783,
+      "oos_n": 40
+    }
+  ],
+  "not_a_100_wr_claim": true,
+  "leftover_after_rsi_ext": {
+    "incomplete_warmup": {"losses": 1, "wins": 0},
+    "extreme_doji": {"leftover_losses": 1, "leftover_wins": 9, "all_wins": 26},
+    "floor_chop_not_doji": "sell RSI 38 ER 0.03 loc 0.0 is not a doji; this gate does not target it"
+  },
+  "live_decision": "reject",
+  "live_reason": "OOS E -0.0038 and full $-6.68 both worse than rsi_ext-only OOS E -0.0013 / $-6.49. YAML stays intel_skip_rsi_ext only. Not 100% WR."
+}

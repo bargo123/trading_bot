@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_022003_widen_tp_tharp",
+  "ts": "2026-08-13T02:20:03.048223+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_tp_pips": 3
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_022003_widen_tp_tharp",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "widen_tp_tharp",
+  "hypothesis": "Accepted OOS still E=-0.014 after TP=2 (WR 94%, avg_win 0.039 vs |avg_loss| 0.891, PF 0.73). At this WR avg_win must exceed ~0.054 to flip E (Tharp). TP=1->2 was accepted/promising; next increment TP=3 vs 30-pip SL. Kaufman ER rejected (E unchanged); scratch/max_pos/spread already rejected. Live still TP=1 (pending promote, open=3): WR 35%, E=-0.029 \u2014 do not edit live YAML. Educational only.",
+  "rationale": "Accepted OOS still E=-0.014 after TP=2 (WR 94%, avg_win 0.039 vs |avg_loss| 0.891, PF 0.73). At this WR avg_win must exceed ~0.054 to flip E (Tharp). TP=1->2 was accepted/promising; next increment TP=3 vs 30-pip SL. Kaufman ER rejected (E unchanged); scratch/max_pos/spread already rejected. Live still TP=1 (pending promote, open=3): WR 35%, E=-0.029 \u2014 do not edit live YAML. Educational only.",
+  "weakness": "high_wr_neg_e",
+  "book_file": "docs/trading/NEW_BOOKS_CORE_TWELVE.md",
+  "snippet_hash": "df34995b4f33195e:expectancy",
+  "concept": "tharp_expectancy"
+}

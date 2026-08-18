@@ -1,7 +1,7 @@
 {
   "status": "observing",
   "pid": 15308,
-  "ts_utc": "2026-08-18T18:04:09.909484+00:00",
+  "ts_utc": "2026-08-18T18:17:59.232962+00:00",
   "symbols": [
     "EURUSD",
     "GBPUSD",
@@ -30,9 +30,9 @@
     "CADCHF",
     "AUDSGD"
   ],
-  "bars_this_process": 26010,
-  "bars_on_disk": 28324,
-  "bars_this_cycle": 8,
+  "bars_this_process": 26366,
+  "bars_on_disk": 28680,
+  "bars_this_cycle": 16,
   "placed_orders": false,
   "allow_live": false,
   "inherited_strategy": null,

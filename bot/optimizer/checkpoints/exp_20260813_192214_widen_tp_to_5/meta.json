@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_192214_widen_tp_to_5",
+  "ts": "2026-08-13T19:22:14.940263+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_tp_pips": 5
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_192214_widen_tp_to_5",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "widen_tp_to_5",
+  "hypothesis": "Tharp: exits dominate expectancy. Stored book_filter avg_win 0.088 vs |avg_loss| 0.815; TP 4 was a noisy false accept. Probe TP 5 vs SL 25 on the same every-bar 24h spray.",
+  "rationale": "Tharp: exits dominate expectancy. Stored book_filter avg_win 0.088 vs |avg_loss| 0.815; TP 4 was a noisy false accept. Probe TP 5 vs SL 25 on the same every-bar 24h spray.",
+  "weakness": "high_wr_neg_e",
+  "book_file": "docs/trading/NEW_BOOKS_CORE_TWELVE.md",
+  "snippet_hash": "df34995b4f33195e:expectancy",
+  "concept": "tharp_expectancy"
+}

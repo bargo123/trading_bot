@@ -1,0 +1,154 @@
+{
+  "source": "mt5_bars",
+  "bars": 11530,
+  "generation": "gen7",
+  "gate": "Promote only if OOS E AND full $ both beat rsi_ext-only. Path-dependent after costs.",
+  "rsi_ext_full": {
+    "win_rate": 97.26027397260275,
+    "profit_factor": 0.41123654996783643,
+    "max_drawdown_pct": 8.18886513668009,
+    "expectancy_r": -0.014244556621007883,
+    "total_trades": 146,
+    "net_pnl": -6.239115800001229,
+    "final_equity": 93.76088419999876,
+    "halt_reason": "",
+    "avg_win": 0.030689199999988977,
+    "avg_loss": -2.6492455499999155,
+    "max_consecutive_wins": 107,
+    "max_consecutive_losses": 1,
+    "sharpe": -1.110687934906071,
+    "sortino": -0.069216019283689
+  },
+  "n_win": 142,
+  "n_loss": 4,
+  "remaining_losers": [
+    {
+      "side": "sell",
+      "outcome": "sl",
+      "pnl": -3.0691415999998917,
+      "mfe": 0.0,
+      "mae": 0.003129999999999855,
+      "bars_held": 1037,
+      "entry_time": "2026-08-04 21:20:00+00:00",
+      "rsi": 44.88786173376114,
+      "adx": 15.073702987384253,
+      "kaufman_er": 0.29629629629606785,
+      "range_loc": 0.21951219512229467,
+      "volman_doji": true,
+      "brooks_in_range": true,
+      "ema_side_streak": 10,
+      "close_ema_pips": -0.5865459557874431,
+      "ret3_pips": 0.5000000000010552,
+      "hour_utc": 21,
+      "body_with_side": false
+    },
+    {
+      "side": "buy",
+      "outcome": "sl",
+      "pnl": -3.0692795999998914,
+      "mfe": 0.0007204000000144816,
+      "mae": 0.003030000000000088,
+      "bars_held": 569,
+      "entry_time": "2026-08-06 09:47:00+00:00",
+      "rsi": 57.20707828399692,
+      "adx": 41.13339543893229,
+      "kaufman_er": 0.41176470588260905,
+      "range_loc": 0.8974358974358244,
+      "volman_doji": true,
+      "brooks_in_range": true,
+      "ema_side_streak": 3,
+      "close_ema_pips": 1.1205405606840024,
+      "ret3_pips": 1.5999999999993797,
+      "hour_utc": 9,
+      "body_with_side": true
+    },
+    {
+      "side": "sell",
+      "outcome": "sl",
+      "pnl": -3.0690941999998915,
+      "mfe": 0.0,
+      "mae": 0.005300000000000082,
+      "bars_held": 1209,
+      "entry_time": "2026-08-06 19:21:00+00:00",
+      "rsi": 33.18143256870948,
+      "adx": 25.621886577325256,
+      "kaufman_er": 0.6304347826087009,
+      "range_loc": 0.1315789473683903,
+      "volman_doji": true,
+      "brooks_in_range": true,
+      "ema_side_streak": 10,
+      "close_ema_pips": -3.2137646333407766,
+      "ret3_pips": -0.40000000000040004,
+      "hour_utc": 19,
+      "body_with_side": false
+    },
+    {
+      "side": "buy",
+      "outcome": "eof",
+      "pnl": -1.389466799999988,
+      "mfe": 0.0,
+      "mae": 0.0014899999999999913,
+      "bars_held": 81,
+      "entry_time": "2026-08-14 19:39:00+00:00",
+      "rsi": 52.645222933551764,
+      "adx": 25.082795317207587,
+      "kaufman_er": 0.3846153846154503,
+      "range_loc": 0.603448275862168,
+      "volman_doji": false,
+      "brooks_in_range": true,
+      "ema_side_streak": 3,
+      "close_ema_pips": 0.742933283470748,
+      "ret3_pips": 1.2000000000012,
+      "hour_utc": 19,
+      "body_with_side": false
+    }
+  ],
+  "candidate_scan": [
+    {
+      "id": "intel_late_buy_chase",
+      "loss_hits": 0,
+      "win_hits": 19
+    },
+    {
+      "id": "intel_require_body",
+      "loss_hits": 3,
+      "win_hits": 45
+    },
+    {
+      "id": "intel_london_dead_er",
+      "loss_hits": 0,
+      "win_hits": 0
+    }
+  ],
+  "picked": {
+    "id": "intel_require_body",
+    "patch": {
+      "intel_enabled": true,
+      "intel_skip_rsi_ext": true,
+      "intel_require_body": true
+    },
+    "hypothesis": "Volman: skip CORE when body is against the EMA-side spray.",
+    "loss_hits": 3,
+    "win_hits": 45
+  },
+  "experiment": {
+    "id": "intel_require_body",
+    "decision": "reject",
+    "reason": "OOS E -0.0072 vs baseline 0.0004, n=63, full pnl -7.22 vs -6.24",
+    "oos_e": -0.007218419047622233,
+    "pnl": -7.22439380000143,
+    "n": 175,
+    "oos_n": 63
+  },
+  "baseline_oos_e": 0.000368630555552054,
+  "baseline_pnl": -6.239115800001229,
+  "promote": false,
+  "live_yaml": "intel_skip_rsi_ext only",
+  "why": {
+    "intel_late_buy_chase": "no-op on this rsi_ext path-dependent book (0 of 4 remaining losses; 19 winner hits). The RSI-68.5 ceiling loss_db row was not taken after rsi_ext sequencing.",
+    "intel_require_body": "fired on 3/4 remaining losses but also 45 winners. Path-dependent OOS E -0.0072 vs rsi_ext +0.0004; full $ -7.22 vs -6.24. Reject.",
+    "intel_london_dead_er": "no-op (0 remaining losses, 0 winners). None of the 4 losers were hour 7/8/11/12 with ER<0.10.",
+    "visible_before_entry": "3 of 4 remaining are 30-pip SL (2 never-green). Common: brooks_in_range. Two sells had body against the spray (doji/red close on sell). One buy was a ceiling doji with RSI 57 (not 70). One buy is an unfinished eof, not a full stop. Body-with-trade is not a usable gate after costs."
+  },
+  "not_a_100_wr_claim": true
+}

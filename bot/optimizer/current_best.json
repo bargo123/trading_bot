@@ -1,0 +1,21 @@
+{
+  "accepted_yaml": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "experiment_id": "exp_20260814_181029_intel_weak_adx_edge",
+  "metrics": {
+    "win_rate": 98.48484848484848,
+    "profit_factor": 1.5072871162339176,
+    "max_drawdown_pct": 0.4398222666666704,
+    "expectancy_r": 0.0034145060606026977,
+    "total_trades": 66,
+    "net_pnl": 0.2246051632693089,
+    "final_equity": 100.2246051632694,
+    "halt_reason": "",
+    "avg_win": 0.010267117529593577,
+    "avg_loss": -0.4427574761542734,
+    "max_consecutive_wins": 65,
+    "max_consecutive_losses": 1,
+    "sharpe": 0.5035677471844758,
+    "sortino": null
+  },
+  "updated_utc": "2026-08-14T18:16:36.409857+00:00"
+}

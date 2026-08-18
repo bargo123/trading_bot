@@ -1,0 +1,45 @@
+{
+  "filename": "market-structure.md",
+  "title": "Market Structure",
+  "file_hash": "6287ef3c50888d7ede78f4c6f4a6f1f5f55f343638303eabbea709aba6753e96",
+  "byte_size": 1202,
+  "word_count": 158,
+  "label": "unavailable",
+  "placeholder": true,
+  "duplicate_of": null,
+  "timeframes": [],
+  "data_required": [],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "Sample_Author_-_Market_Structure.md",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "market-structure.md",
+    "timeframes": [],
+    "data_required": [],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [],
+    "evidence_quality": "extract",
+    "placeholder": true,
+    "implemented": false,
+    "headings": [
+      "Market Structure",
+      "Chapter 1 Liquidity",
+      "Chapter 2 Author Disagreement",
+      "Chapter 3 Psychology"
+    ]
+  }
+}

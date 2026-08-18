@@ -1,0 +1,13 @@
+{"event_id":"nfp_2026_01","title":"US Nonfarm Payrolls (scheduled)","currency":"USD","impact":"high","event_utc":"2026-01-09T12:30:00+00:00","as_of_utc":"2025-12-26T00:00:00+00:00"}
+{"event_id":"nfp_2026_02","title":"US Nonfarm Payrolls (scheduled)","currency":"USD","impact":"high","event_utc":"2026-02-06T12:30:00+00:00","as_of_utc":"2026-01-23T00:00:00+00:00"}
+{"event_id":"nfp_2026_03","title":"US Nonfarm Payrolls (scheduled)","currency":"USD","impact":"high","event_utc":"2026-03-06T12:30:00+00:00","as_of_utc":"2026-02-20T00:00:00+00:00"}
+{"event_id":"nfp_2026_04","title":"US Nonfarm Payrolls (scheduled)","currency":"USD","impact":"high","event_utc":"2026-04-03T12:30:00+00:00","as_of_utc":"2026-03-20T00:00:00+00:00"}
+{"event_id":"nfp_2026_05","title":"US Nonfarm Payrolls (scheduled)","currency":"USD","impact":"high","event_utc":"2026-05-01T12:30:00+00:00","as_of_utc":"2026-04-17T00:00:00+00:00"}
+{"event_id":"nfp_2026_06","title":"US Nonfarm Payrolls (scheduled)","currency":"USD","impact":"high","event_utc":"2026-06-05T12:30:00+00:00","as_of_utc":"2026-05-22T00:00:00+00:00"}
+{"event_id":"nfp_2026_07","title":"US Nonfarm Payrolls (scheduled)","currency":"USD","impact":"high","event_utc":"2026-07-02T12:30:00+00:00","as_of_utc":"2026-06-18T00:00:00+00:00"}
+{"event_id":"nfp_2026_08","title":"US Nonfarm Payrolls (scheduled)","currency":"USD","impact":"high","event_utc":"2026-08-07T12:30:00+00:00","as_of_utc":"2026-07-24T00:00:00+00:00"}
+{"event_id":"fomc_2026_05","title":"FOMC rate decision (scheduled window)","currency":"USD","impact":"high","event_utc":"2026-05-06T18:00:00+00:00","as_of_utc":"2026-04-22T00:00:00+00:00"}
+{"event_id":"fomc_2026_06","title":"FOMC rate decision (scheduled window)","currency":"USD","impact":"high","event_utc":"2026-06-17T18:00:00+00:00","as_of_utc":"2026-06-03T00:00:00+00:00"}
+{"event_id":"fomc_2026_07","title":"FOMC rate decision (scheduled window)","currency":"USD","impact":"high","event_utc":"2026-07-29T18:00:00+00:00","as_of_utc":"2026-07-15T00:00:00+00:00"}
+{"event_id":"ecb_2026_06","title":"ECB monetary policy (scheduled window)","currency":"EUR","impact":"high","event_utc":"2026-06-11T12:15:00+00:00","as_of_utc":"2026-05-28T00:00:00+00:00"}
+{"event_id":"ecb_2026_07","title":"ECB monetary policy (scheduled window)","currency":"EUR","impact":"high","event_utc":"2026-07-23T12:15:00+00:00","as_of_utc":"2026-07-09T00:00:00+00:00"}

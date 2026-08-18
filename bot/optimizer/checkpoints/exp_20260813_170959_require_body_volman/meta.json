@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_170959_require_body_volman",
+  "ts": "2026-08-13T17:09:59.875475+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_require_body": true
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_170959_require_body_volman",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "require_body_volman",
+  "hypothesis": "Volman: skip doji-like bars with no body so every-bar spray does not fill the book.",
+  "rationale": "Volman: skip doji-like bars with no body so every-bar spray does not fill the book.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "296a84a1651c669f:Kaufman",
+  "concept": "kaufman_er"
+}

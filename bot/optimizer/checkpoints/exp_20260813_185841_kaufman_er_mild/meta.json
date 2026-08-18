@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_185841_kaufman_er_mild",
+  "ts": "2026-08-13T18:58:41.552707+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_min_er": 0.15
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_185841_kaufman_er_mild",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "kaufman_er_mild",
+  "hypothesis": "Kaufman on firehose: mild ER 0.15 skips the deadest bars; ER 0.3 already failed OOS. Keep every-bar 24h spray.",
+  "rationale": "Kaufman on firehose: mild ER 0.15 skips the deadest bars; ER 0.3 already failed OOS. Keep every-bar 24h spray.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "296a84a1651c669f:Kaufman",
+  "concept": "kaufman_er"
+}

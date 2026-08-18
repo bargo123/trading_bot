@@ -1,0 +1,234 @@
+{
+  "source": "mt5_bars",
+  "bars": 11530,
+  "generation": "gen13",
+  "gate": "Promote only if OOS E AND full $ both beat the four-flag live combo. Replay is not the gate. Hydra honesty. Small-n. Not 100% WR.",
+  "live_combo": {
+    "flags": [
+      "intel_skip_rsi_ext",
+      "intel_skip_doji_against",
+      "intel_skip_stretched_doji_buy",
+      "intel_skip_barbwire_sell"
+    ],
+    "oos_e": 0.004464704888885025,
+    "pnl": -5.500308000001549,
+    "full_e": -0.011044795180726404,
+    "n": 166,
+    "wr": 97.59036144578313,
+    "n_loss": 4,
+    "n_win": 162
+  },
+  "remaining_losers": [
+    {
+      "entry_time": "2026-08-04 21:34:00+00:00",
+      "exit_time": "2026-08-05 14:37:00+00:00",
+      "side": "sell",
+      "outcome": "sl",
+      "pnl": -3.0691481999998915,
+      "mfe": 0.0,
+      "mae": 0.0030199999999998006,
+      "bars_held": 1023,
+      "quality": 69.3,
+      "body_against": false,
+      "features": {
+        "open": 1.15256,
+        "high": 1.15258,
+        "low": 1.15242,
+        "close": 1.15247,
+        "volume": null,
+        "ema_20": 1.152542380952381,
+        "atr": null,
+        "rsi": 50.0,
+        "adx": null,
+        "kaufman_er": null,
+        "jansen_score": -0.2,
+        "harris_jump": false,
+        "brooks_in_range": false,
+        "range_loc": null,
+        "volman_doji": false,
+        "impulse_green": false,
+        "impulse_red": true,
+        "spread": null,
+        "brooks_barbwire": false,
+        "ema_side_streak": 1,
+        "atr_expand": null,
+        "close_ema_pips": -0.7238095238082387,
+        "ret3_pips": null,
+        "hour_utc": 21
+      },
+      "hits": {
+        "floor_run_sell": false
+      }
+    },
+    {
+      "entry_time": "2026-08-06 09:48:00+00:00",
+      "exit_time": "2026-08-06 19:16:00+00:00",
+      "side": "buy",
+      "outcome": "sl",
+      "pnl": -3.0692819999998915,
+      "mfe": 0.0,
+      "mae": 0.003070000000000128,
+      "bars_held": 568,
+      "quality": 28.0,
+      "body_against": false,
+      "features": {
+        "open": 1.15466,
+        "high": 1.15472,
+        "low": 1.15466,
+        "close": 1.1547,
+        "volume": null,
+        "ema_20": 1.154562427282605,
+        "atr": 9.714285714287499e-05,
+        "rsi": 59.78758459358581,
+        "adx": 39.50074237770873,
+        "kaufman_er": 0.5094339622642142,
+        "jansen_score": 1.4428449652226074,
+        "harris_jump": false,
+        "brooks_in_range": true,
+        "range_loc": 1.0263157894738533,
+        "volman_doji": false,
+        "impulse_green": true,
+        "impulse_red": false,
+        "spread": null,
+        "brooks_barbwire": false,
+        "ema_side_streak": 4,
+        "atr_expand": 0.9710817565157824,
+        "close_ema_pips": 1.37572717395118,
+        "ret3_pips": 1.2999999999996348,
+        "hour_utc": 9
+      },
+      "hits": {
+        "floor_run_sell": false
+      }
+    },
+    {
+      "entry_time": "2026-08-06 19:20:00+00:00",
+      "exit_time": "2026-08-07 15:30:00+00:00",
+      "side": "sell",
+      "outcome": "sl",
+      "pnl": -3.0690935999998916,
+      "mfe": 0.0,
+      "mae": 0.005310000000000148,
+      "bars_held": 1210,
+      "quality": 74.9771391416737,
+      "body_against": false,
+      "features": {
+        "open": 1.15168,
+        "high": 1.15168,
+        "low": 1.15152,
+        "close": 1.15156,
+        "volume": null,
+        "ema_20": 1.1519252055647378,
+        "atr": 0.00016357142857142165,
+        "rsi": 32.63399372716076,
+        "adx": 23.832859278095196,
+        "kaufman_er": 0.546391752577513,
+        "jansen_score": -0.8715506816872411,
+        "harris_jump": false,
+        "brooks_in_range": true,
+        "range_loc": 0.11842105263146362,
+        "volman_doji": false,
+        "impulse_green": false,
+        "impulse_red": true,
+        "spread": null,
+        "brooks_barbwire": false,
+        "ema_side_streak": 9,
+        "atr_expand": 1.0017497812773712,
+        "close_ema_pips": -3.6520556473784715,
+        "ret3_pips": -0.9999999999998899,
+        "hour_utc": 19
+      },
+      "hits": {
+        "floor_run_sell": true
+      }
+    },
+    {
+      "entry_time": "2026-08-14 19:39:00+00:00",
+      "exit_time": "2026-08-14 21:41:00+00:00",
+      "side": "buy",
+      "outcome": "eof",
+      "pnl": -1.26946680000009,
+      "mfe": 0.0,
+      "mae": 0.0014899999999999913,
+      "bars_held": 122,
+      "quality": 65.95735242669313,
+      "body_against": true,
+      "features": {
+        "open": 1.15781,
+        "high": 1.15784,
+        "low": 1.15778,
+        "close": 1.15778,
+        "volume": null,
+        "ema_20": 1.157705706671653,
+        "atr": 0.00010000000000003657,
+        "rsi": 52.645222933551764,
+        "adx": 25.082795317207587,
+        "kaufman_er": 0.3846153846154503,
+        "jansen_score": 0.8908407890640211,
+        "harris_jump": false,
+        "brooks_in_range": true,
+        "range_loc": 0.603448275862168,
+        "volman_doji": false,
+        "impulse_green": true,
+        "impulse_red": false,
+        "spread": null,
+        "brooks_barbwire": false,
+        "ema_side_streak": 3,
+        "atr_expand": 0.940860215054072,
+        "close_ema_pips": 0.742933283470748,
+        "ret3_pips": 1.2000000000012,
+        "hour_utc": 19
+      },
+      "hits": {
+        "floor_run_sell": false
+      }
+    }
+  ],
+  "winner_sacrifice_replay": {
+    "intel_floor_run_sell": {
+      "loss_hits": 1,
+      "sl_hits": 1,
+      "win_hits": 30
+    }
+  },
+  "picked": "intel_floor_run_sell",
+  "experiments": [
+    {
+      "id": "intel_floor_run_sell",
+      "decision": "reject",
+      "reason": "OOS E 0.0040 vs baseline 0.0045, n=78, full pnl -6.74 vs -5.50",
+      "oos_e": 0.004004268376064773,
+      "oos_n": 78,
+      "pnl": -6.7388196000011025,
+      "n": 131,
+      "wr": 96.94656488549617,
+      "full_e": -0.017147123664125564,
+      "loss_removal": {
+        "losses_avoided": 0.0,
+        "winners_sacrificed": 35.0,
+        "loss_removal_efficiency": 0.0
+      },
+      "beats_live_oos_e": false,
+      "beats_live_full_usd": false,
+      "promote": false,
+      "winner_sacrifice_replay": {
+        "loss_hits": 1,
+        "sl_hits": 1,
+        "win_hits": 30
+      }
+    }
+  ],
+  "promote": null,
+  "promoted_live_yaml": false,
+  "live_yaml": "intel_skip_rsi_ext + intel_skip_doji_against + intel_skip_stretched_doji_buy + intel_skip_barbwire_sell",
+  "live_yaml_unchanged_unless_promote": true,
+  "paper_restart": false,
+  "not_a_100_wr_claim": true,
+  "honest": {
+    "small_n": "3 real SLs + 1 eof. floor_run hits only Aug 6 19:20. Not 100% WR.",
+    "replay_vs_path": "Replay 1 SL / 30 winners. Path-dependent losses_avoided=0, winners_sacrificed=35. Replay is not the gate.",
+    "gate": "OOS E +0.0040 vs +0.0045; full $ −$6.74 vs −$5.50. Both worse. Reject. YAML unchanged.",
+    "same_hydra_as_hour19": "n 166→131, −$1.24, 35 winners gone — skipping the 1210-bar SL did not pay after costs because it also skipped 30+ 1-pip clips.",
+    "not_retried": "Aug 4 NaN, Aug 6 09:48 loc>1, eof, ny_hour_19."
+  }
+}

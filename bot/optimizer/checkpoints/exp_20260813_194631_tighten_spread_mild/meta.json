@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_194631_tighten_spread_mild",
+  "ts": "2026-08-13T19:46:31.838890+00:00",
+  "status": "open",
+  "patch": {
+    "max_spread_pips": 0.7
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_194631_tighten_spread_mild",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "tighten_spread_mild",
+  "hypothesis": "Harris/Aldridge: 0.64 spread gate starved OOS trades. Mild 0.70 vs live 0.8 so a 3-pip take still clears cost without London-only.",
+  "rationale": "Harris/Aldridge: 0.64 spread gate starved OOS trades. Mild 0.70 vs live 0.8 so a 3-pip take still clears cost without London-only.",
+  "weakness": "spread_bleed",
+  "book_file": "docs/trading/NEW_BOOKS_HFT_CARTEA_ALDRIDGE_ORESTE_NARANG_VANDERPOST.md",
+  "snippet_hash": "a01af36101df838f:spread",
+  "concept": "harris_spread_gate"
+}

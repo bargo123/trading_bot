@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_180723_tighten_tp_to_2",
+  "ts": "2026-08-13T18:07:23.567787+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_tp_pips": 2
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_180723_tighten_tp_to_2",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "tighten_tp_to_2",
+  "hypothesis": "Accepted is still TP3/SL25 with book_filter; widen_tp_to_4 was reverted (WR 89.2% vs best 93.4%). Hunt EURUSD ~95% WR was 1-pip take \u2014 step 3\u21922 on the same 24h every-bar spray (not TP1 yet: that sample had negative E). Harris: max_spread 0.8 still < take. Volman/Kaufman ER/doji/body/min-range already rejected. Reject if OOS expectancy_r falls.",
+  "rationale": "Accepted is still TP3/SL25 with book_filter; widen_tp_to_4 was reverted (WR 89.2% vs best 93.4%). Hunt EURUSD ~95% WR was 1-pip take \u2014 step 3\u21922 on the same 24h every-bar spray (not TP1 yet: that sample had negative E). Harris: max_spread 0.8 still < take. Volman/Kaufman ER/doji/body/min-range already rejected. Reject if OOS expectancy_r falls.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "296a84a1651c669f:Kaufman",
+  "concept": "kaufman_er"
+}

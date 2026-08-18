@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_011126_widen_tp_probe",
+  "ts": "2026-08-13T01:11:26.822999+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_tp_pips": 2
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_011126_widen_tp_probe",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "widen_tp_probe",
+  "hypothesis": "Live firehose: WR 34.8%, E=-0.031, avg_win 0.039 < |avg_loss| 0.068, PF 0.31. 1-pip TP sits on the 0.8 Harris spread gate. Untested Tharp probe: widen TP to 2 vs 30-pip SL (scratch/max_pos/spread already rejected). Educational only.",
+  "rationale": "Live firehose: WR 34.8%, E=-0.031, avg_win 0.039 < |avg_loss| 0.068, PF 0.31. 1-pip TP sits on the 0.8 Harris spread gate. Untested Tharp probe: widen TP to 2 vs 30-pip SL (scratch/max_pos/spread already rejected). Educational only.",
+  "weakness": "high_wr_neg_e",
+  "book_file": "docs/trading/NEW_BOOKS_CORE_TWELVE.md",
+  "snippet_hash": "df34995b4f33195e:expectancy",
+  "concept": "tharp_expectancy"
+}

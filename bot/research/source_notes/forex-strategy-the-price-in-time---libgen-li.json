@@ -1,0 +1,105 @@
+{
+  "filename": "forex-strategy-the-price-in-time---libgen-li.md",
+  "title": "Forex Strategy  The Price in Time - libgen.li",
+  "file_hash": "818d3602266c1575051f2169d082ee0cc71c92a7ad6651ffcf1a955d9da823c3",
+  "byte_size": 98258,
+  "word_count": 17364,
+  "label": "research_proxy",
+  "placeholder": false,
+  "duplicate_of": null,
+  "timeframes": [
+    "H1",
+    "H4",
+    "M1",
+    "M15",
+    "M30",
+    "M5",
+    "daily",
+    "intraday"
+  ],
+  "data_required": [
+    "news_calendar",
+    "volume_unspecified"
+  ],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [
+    "The opinions expressed in this text are in no way intended to constitute an invitation to engage in any transaction involving the purchase or sale of shares, futures contracts, stock options, funds or any other financial instruments. Therefore, they do not in any way constitute a public solicitation of savings or investment advice. The risks of loss from trading can be very high. Investors should carefully consider the risks involved in trading and investing on the basis of their financial situation. This p resentation is for educational and informational purposes only, all the operations described are carried out in demo mode for educational purposes and are presented as a simple opportunity for reflection. By reading the contents, you acknowledge your responsibility in the use of the information and you agree to consult a professional financial advisor before any use or implementation of the information.",
+    "Needless to say, how many hours - days and nights - I've spent on the chart s looking spasmodically for the \"perfect pattern\", the one that enables you to generate constant gains over time. After years of studies and comparisons with very good traders, I have come to a certain conclusion: the perfect patterns do not exist!",
+    "In fact, you should know that many of the platforms offered by brokers - and especially the Metatrader - do not have the option to change the GMT from the settings. Consequently, you should pay close attention to the time displayed on the charts because it is not always the same as the GMT time and since for the purposes of the strategy is essential to know the opening and closing times of the various sessions that make up the day, if we are misled by the \"wrong\" time of the platform our analysis on the historical data would be wrong, and consequently so would our trading.",
+    "As you can see, the day is the same; the timeframes change, the trend of the charts changes, but the four elements that we need to operate do not change:",
+    "This model of management, besides being simple, turns out to be very effective for those currency pairs that do not have very wide intraday ranges and often have the tendency to invert course passing from long to short movements and vice versa during the same session, since it protects us from the risk taken from the attainment of the TP 1 and the target on the TP 2 is rather easily reachable guaranteeing an appreciable risk/reward of 1:2.",
+    "Only later, when you are more familiar with the method, will you be able to add more currency pairs. But do not be in a hurry: it is better to start with a single well analyzed instrument t han with several instruments which have been analyzed in a rush and perhaps not in depth.",
+    "Respect the method. Do not switch from one method to another.",
+    "If you have any questions or doubts, do not hesitate to contact our customer support team at support@thepriceintime.com, they will be always at your disposal to help you and answer your questions.",
+    "The indicator will automatically create colored boxes of the various sessions and the extensions of the \"Take Profit levels\", if the Asian session and the \"NTZ area\" do not meet the correct parameters, the boxes will turn red indicating that the currency pair will not be suitable for trade. In addition, the money manager will calcu late the size of the positions. In practice, once installed, you will not have to worry about doing everything manually but you can focus only on managing the trades, making your operation more fluid and faster.",
+    "If the price movement of the Asian session is too big and exceeds 40 pips (or the maximum value we have chosen) the box becomes red, warning us that it is not advisable to trade.",
+    "If an NTZ area with a range greater or lesser to the preset values is created the green box becomes red warning us that it is not advisable to trade."
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "Gabriele Fabris - Forex Strategy_ The Price in Time - libgen.li.pdf",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "forex-strategy-the-price-in-time---libgen-li.md",
+    "timeframes": [
+      "H1",
+      "H4",
+      "M1",
+      "M15",
+      "M30",
+      "M5",
+      "daily",
+      "intraday"
+    ],
+    "data_required": [
+      "news_calendar",
+      "volume_unspecified"
+    ],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [
+      "The opinions expressed in this text are in no way intended to constitute an invitation to engage in any transaction involving the purchase or sale of shares, futures contracts, stock options, funds or any other financial instruments. Therefore, they do not in any way constitute a public solicitation of savings or investment advice. The risks of loss from trading can be very high. Investors should carefully consider the risks involved in trading and investing on the basis of their financial situation. This p resentation is for educational and informational purposes only, all the operations described are carried out in demo mode for educational purposes and are presented as a simple opportunity for reflection. By reading the contents, you acknowledge your responsibility in the use of the information and you agree to consult a professional financial advisor before any use or implementation of the information.",
+      "Needless to say, how many hours - days and nights - I've spent on the chart s looking spasmodically for the \"perfect pattern\", the one that enables you to generate constant gains over time. After years of studies and comparisons with very good traders, I have come to a certain conclusion: the perfect patterns do not exist!",
+      "In fact, you should know that many of the platforms offered by brokers - and especially the Metatrader - do not have the option to change the GMT from the settings. Consequently, you should pay close attention to the time displayed on the charts because it is not always the same as the GMT time and since for the purposes of the strategy is essential to know the opening and closing times of the various sessions that make up the day, if we are misled by the \"wrong\" time of the platform our analysis on the historical data would be wrong, and consequently so would our trading.",
+      "As you can see, the day is the same; the timeframes change, the trend of the charts changes, but the four elements that we need to operate do not change:",
+      "This model of management, besides being simple, turns out to be very effective for those currency pairs that do not have very wide intraday ranges and often have the tendency to invert course passing from long to short movements and vice versa during the same session, since it protects us from the risk taken from the attainment of the TP 1 and the target on the TP 2 is rather easily reachable guaranteeing an appreciable risk/reward of 1:2.",
+      "Only later, when you are more familiar with the method, will you be able to add more currency pairs. But do not be in a hurry: it is better to start with a single well analyzed instrument t han with several instruments which have been analyzed in a rush and perhaps not in depth.",
+      "Respect the method. Do not switch from one method to another.",
+      "If you have any questions or doubts, do not hesitate to contact our customer support team at support@thepriceintime.com, they will be always at your disposal to help you and answer your questions.",
+      "The indicator will automatically create colored boxes of the various sessions and the extensions of the \"Take Profit levels\", if the Asian session and the \"NTZ area\" do not meet the correct parameters, the boxes will turn red indicating that the currency pair will not be suitable for trade. In addition, the money manager will calcu late the size of the positions. In practice, once installed, you will not have to worry about doing everything manually but you can focus only on managing the trades, making your operation more fluid and faster.",
+      "If the price movement of the Asian session is too big and exceeds 40 pips (or the maximum value we have chosen) the box becomes red, warning us that it is not advisable to trade.",
+      "If an NTZ area with a range greater or lesser to the preset values is created the green box becomes red warning us that it is not advisable to trade."
+    ],
+    "evidence_quality": "extract",
+    "placeholder": false,
+    "implemented": false,
+    "headings": [
+      "Forex Strategy  The Price in Time - libgen.li",
+      "Pages 1-10 (pp. 1-10)",
+      "Pages 11-20 (pp. 11-20)",
+      "Pages 21-30 (pp. 21-30)",
+      "Pages 31-40 (pp. 31-40)",
+      "Pages 41-50 (pp. 41-50)",
+      "Pages 51-60 (pp. 51-60)",
+      "Pages 61-70 (pp. 61-70)",
+      "Pages 71-80 (pp. 71-80)",
+      "Pages 81-90 (pp. 81-90)",
+      "Pages 91-100 (pp. 91-100)",
+      "Pages 101-110 (pp. 101-110)",
+      "Pages 111-120 (pp. 111-120)",
+      "Pages 121-130 (pp. 121-130)",
+      "Pages 131-140 (pp. 131-140)",
+      "Pages 141-149 (pp. 141-149)"
+    ]
+  }
+}

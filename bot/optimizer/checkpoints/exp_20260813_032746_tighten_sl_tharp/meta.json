@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_032746_tighten_sl_tharp",
+  "ts": "2026-08-13T03:27:46.942527+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_sl_pips": 25
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_032746_tighten_sl_tharp",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "tighten_sl_tharp",
+  "hypothesis": "Accepted OOS still E=-0.009 at TP=3/SL=30 (WR 90.9%, avg_win 0.072 vs |avg_loss| 0.829, PF 0.87). At this WR avg_win must exceed ~0.083 to flip E (Tharp); TP 1->2->3 already accepted/promising but firehose_tp_pips is frozen pending promote (live still TP=1, open=2) \u2014 do not edit live YAML. drop_gbpnzd/ER/scratch/max_pos/spread rejected. Untested: SL 30->25 so |avg_loss| can fall under ~0.72 without chasing WR. Educational only.",
+  "rationale": "Accepted OOS still E=-0.009 at TP=3/SL=30 (WR 90.9%, avg_win 0.072 vs |avg_loss| 0.829, PF 0.87). At this WR avg_win must exceed ~0.083 to flip E (Tharp); TP 1->2->3 already accepted/promising but firehose_tp_pips is frozen pending promote (live still TP=1, open=2) \u2014 do not edit live YAML. drop_gbpnzd/ER/scratch/max_pos/spread rejected. Untested: SL 30->25 so |avg_loss| can fall under ~0.72 without chasing WR. Educational only.",
+  "weakness": "high_wr_neg_e",
+  "book_file": "docs/trading/NEW_BOOKS_CORE_TWELVE.md",
+  "snippet_hash": "df34995b4f33195e:expectancy",
+  "concept": "tharp_expectancy"
+}

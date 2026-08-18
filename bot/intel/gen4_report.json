@@ -1,0 +1,175 @@
+{
+  "source": "mt5_bars",
+  "bars": 11530,
+  "generation": "gen4",
+  "gate": "path-dependent OOS E after costs vs CORE 1/30 (not WR, not TP3 stored best)",
+  "champion": "CORE_STRATEGY_V1",
+  "baseline_oos_e": -0.01862728401826763,
+  "baseline_pnl": -11.320502400000844,
+  "baseline_wr": 95.71428571428572,
+  "pattern": {
+    "n_win": 134,
+    "n_loss": 6,
+    "n_sl": 5,
+    "n_never_green_sl": 4,
+    "avg_win_usd": 0.030709729850735244,
+    "avg_loss_usd": -2.572601033333228,
+    "loss_to_win_ratio": 83.77152927874536,
+    "breakeven_wr": 0.9882035866462688,
+    "pattern": "CORE losses are almost all 30-pip stop-outs. Most of those never went 1 pip in favor (MFE=0). Pre-entry: buy at range ceiling / sell at floor (Brooks/Damir wrong-edge) and/or RSI exhaustion. 1-pip winners also print at those edges on noise, so WR is not the gate \u2014 OOS E after costs is.",
+    "pre_entry": {
+      "brooks_in_range": {
+        "win": {
+          "n": 134,
+          "hits": 131,
+          "frac": 0.9776119402985075
+        },
+        "loss": {
+          "n": 6,
+          "hits": 5,
+          "frac": 0.8333333333333334
+        }
+      },
+      "brooks_barbwire": {
+        "win": {
+          "n": 134,
+          "hits": 12,
+          "frac": 0.08955223880597014
+        },
+        "loss": {
+          "n": 6,
+          "hits": 0,
+          "frac": 0.0
+        }
+      },
+      "volman_doji": {
+        "win": {
+          "n": 134,
+          "hits": 40,
+          "frac": 0.29850746268656714
+        },
+        "loss": {
+          "n": 6,
+          "hits": 2,
+          "frac": 0.3333333333333333
+        }
+      },
+      "chop_doji": {
+        "win": {
+          "n": 134,
+          "hits": 3,
+          "frac": 0.022388059701492536
+        },
+        "loss": {
+          "n": 6,
+          "hits": 0,
+          "frac": 0.0
+        }
+      },
+      "impulse_against": {
+        "win": {
+          "n": 134,
+          "hits": 0,
+          "frac": 0.0
+        },
+        "loss": {
+          "n": 6,
+          "hits": 0,
+          "frac": 0.0
+        }
+      },
+      "wrong_extreme": {
+        "win": {
+          "n": 134,
+          "hits": 97,
+          "frac": 0.7238805970149254
+        },
+        "loss": {
+          "n": 6,
+          "hits": 4,
+          "frac": 0.6666666666666666
+        }
+      },
+      "rsi_ext": {
+        "win": {
+          "n": 134,
+          "hits": 70,
+          "frac": 0.5223880597014925
+        },
+        "loss": {
+          "n": 6,
+          "hits": 2,
+          "frac": 0.3333333333333333
+        }
+      }
+    }
+  },
+  "challenger": "intel_weak_adx_edge",
+  "experiments": [
+    {
+      "id": "intel_rsi_ext",
+      "decision": "accept",
+      "reason": "OOS E 0.0003 vs baseline -0.0186, n=45, full pnl -6.22 vs -11.32",
+      "wr": 97.22222222222221,
+      "e": -0.0144000240740772,
+      "pnl": -6.220810400001127,
+      "n": 144,
+      "oos_wr": 97.77777777777777,
+      "oos_e": 0.00030213185184895116,
+      "oos_n": 45
+    },
+    {
+      "id": "intel_weak_adx_edge",
+      "decision": "accept",
+      "reason": "OOS E 0.0003 vs baseline -0.0186, n=45, full pnl -6.25 vs -11.32",
+      "wr": 97.2027972027972,
+      "e": -0.014572486713289836,
+      "pnl": -6.251596800001114,
+      "n": 143,
+      "oos_wr": 97.77777777777777,
+      "oos_e": 0.0003030651851822842,
+      "oos_n": 45
+    },
+    {
+      "id": "intel_rsi_ext_weak_adx",
+      "decision": "accept",
+      "reason": "OOS E 0.0003 vs baseline -0.0186, n=45, full pnl -6.25 vs -11.32",
+      "wr": 97.2027972027972,
+      "e": -0.014572486713289836,
+      "pnl": -6.251596800001114,
+      "n": 143,
+      "oos_wr": 97.77777777777777,
+      "oos_e": 0.0003030651851822842,
+      "oos_n": 45
+    }
+  ],
+  "not_a_100_wr_claim": true,
+  "leftover_after_rsi_ext": {
+    "n_loss": 3,
+    "never_green": [
+      {
+        "side": "buy",
+        "rsi": 68.5,
+        "range_loc": 0.94,
+        "adx": 19.7,
+        "kaufman_er": 0.71,
+        "volman_doji": true,
+        "mfe": 0.0,
+        "visible": "Brooks ceiling doji, Wilder ADX 20 range, RSI 68 not yet 70"
+      },
+      {
+        "side": "sell",
+        "rsi": 38.4,
+        "range_loc": 0.0,
+        "adx": 17.9,
+        "kaufman_er": 0.029,
+        "volman_doji": false,
+        "mfe": 0.0,
+        "visible": "Damir floor + Kaufman dead ER 0.03, ADX 18 range"
+      }
+    ],
+    "warmup_incomplete_features": 1
+  },
+  "live_decision": "reject_stack",
+  "live_reason": "weak_adx_edge OOS E ties rsi_ext at +0.0003; full $ is worse (-6.25 vs -6.22). Do not stack on live rsi_ext. Not a 100% WR claim. CORE 1/30 unchanged."
+}

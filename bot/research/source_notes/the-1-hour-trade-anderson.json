@@ -1,0 +1,103 @@
+{
+  "filename": "the-1-hour-trade-anderson.md",
+  "title": "Brian Anderson \u2014 The 1 Hour Trade (2014)",
+  "file_hash": "ccf4dcf9dd305787848d96f7c1510346bed6ef654b84e96194814f125fd5c454",
+  "byte_size": 80838,
+  "word_count": 14018,
+  "label": "research_proxy",
+  "placeholder": false,
+  "duplicate_of": null,
+  "timeframes": [
+    "daily",
+    "weekly"
+  ],
+  "data_required": [
+    "mt5_l2",
+    "volume_unspecified"
+  ],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [
+    "really do not need any other indicators to be successful.",
+    "The pattern day trading restrictions do not apply to cash accounts",
+    "Do not use a mental stop. As soon as you execute an entry order,",
+    "trades that do not have the momentum to continue a big run past the"
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": null,
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "the-1-hour-trade-anderson.md",
+    "timeframes": [
+      "daily",
+      "weekly"
+    ],
+    "data_required": [
+      "mt5_l2",
+      "volume_unspecified"
+    ],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [
+      "really do not need any other indicators to be successful.",
+      "The pattern day trading restrictions do not apply to cash accounts",
+      "Do not use a mental stop. As soon as you execute an entry order,",
+      "trades that do not have the momentum to continue a big run past the"
+    ],
+    "evidence_quality": "extract",
+    "placeholder": false,
+    "implemented": false,
+    "headings": [
+      "Brian Anderson \u2014 The 1 Hour Trade (2014)",
+      "Page 1",
+      "Page 2",
+      "Page 3",
+      "Page 4",
+      "Page 5",
+      "Page 6",
+      "Page 7",
+      "Page 8",
+      "Page 9",
+      "Page 10",
+      "Page 11",
+      "Page 12",
+      "Page 13",
+      "Page 14",
+      "Page 15",
+      "Page 16",
+      "Page 17",
+      "Page 18",
+      "Page 19",
+      "Page 20",
+      "Page 21",
+      "Page 22",
+      "Page 23",
+      "Page 24",
+      "Page 25",
+      "Page 26",
+      "Page 27",
+      "Page 28",
+      "Page 29",
+      "Page 30",
+      "Page 31",
+      "Page 32",
+      "Page 33",
+      "Page 34",
+      "Page 35",
+      "Page 36",
+      "Page 37",
+      "Page 38",
+      "Page 39"
+    ]
+  }
+}

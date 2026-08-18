@@ -1,0 +1,209 @@
+{
+  "source": "mt5_bars",
+  "bars": 11530,
+  "generation": "gen10",
+  "gate": "Promote only if OOS E AND full $ both beat rsi_ext+doji_against+stretched_doji_buy. Hydra $ without losses_avoided is allowed but must still beat both. Small-n. Not 100% WR.",
+  "live_combo": {
+    "flags": [
+      "intel_skip_rsi_ext",
+      "intel_skip_doji_against",
+      "intel_skip_stretched_doji_buy"
+    ],
+    "oos_e": 0.00434113783783367,
+    "pnl": -2.0430558000018677,
+    "full_e": -0.0038259471910148724,
+    "n": 178,
+    "wr": 98.31460674157303,
+    "n_loss": 3,
+    "n_win": 175
+  },
+  "remaining_losers": [
+    {
+      "entry_time": "2026-08-07 12:31:00+00:00",
+      "exit_time": "2026-08-07 15:30:00+00:00",
+      "side": "sell",
+      "outcome": "sl",
+      "pnl": -3.0691583999998917,
+      "mfe": 0.0008415999997924453,
+      "mae": 0.004230000000000178,
+      "bars_held": 179,
+      "quality": 77.31172037949037,
+      "body_against": false,
+      "features": {
+        "open": 1.15274,
+        "high": 1.15274,
+        "low": 1.1526399999999999,
+        "close": 1.1526399999999999,
+        "volume": null,
+        "ema_20": 1.152757265273669,
+        "atr": 7.857142857145163e-05,
+        "rsi": 42.23278871503963,
+        "adx": 58.563204185931454,
+        "kaufman_er": 0.7419354838719844,
+        "jansen_score": -0.8152867299150619,
+        "harris_jump": false,
+        "brooks_in_range": true,
+        "range_loc": 0.33999999999960034,
+        "volman_doji": false,
+        "impulse_green": false,
+        "impulse_red": true,
+        "spread": null,
+        "brooks_barbwire": false,
+        "ema_side_streak": 3,
+        "atr_expand": 0.7913669064750763,
+        "close_ema_pips": -1.1726527366917594,
+        "ret3_pips": -1.900000000001345,
+        "hour_utc": 12
+      },
+      "hits": {
+        "barbwire_sell": false,
+        "stretched_sell": false,
+        "barbwire": false
+      }
+    },
+    {
+      "entry_time": "2026-08-12 08:25:00+00:00",
+      "exit_time": "2026-08-12 15:30:00+00:00",
+      "side": "sell",
+      "outcome": "sl",
+      "pnl": -3.0691955999998917,
+      "mfe": 0.0,
+      "mae": 0.003049999999999997,
+      "bars_held": 425,
+      "quality": 52.75733974604863,
+      "body_against": true,
+      "features": {
+        "open": 1.15324,
+        "high": 1.15327,
+        "low": 1.15322,
+        "close": 1.15326,
+        "volume": null,
+        "ema_20": 1.153341259458211,
+        "atr": 5.285714285712435e-05,
+        "rsi": 32.39994415467467,
+        "adx": 50.03883545755595,
+        "kaufman_er": 0.37500000000034694,
+        "jansen_score": -0.28955662434028184,
+        "harris_jump": false,
+        "brooks_in_range": true,
+        "range_loc": 0.1612903225803679,
+        "volman_doji": false,
+        "impulse_green": false,
+        "impulse_red": false,
+        "spread": null,
+        "brooks_barbwire": true,
+        "ema_side_streak": 25,
+        "atr_expand": 0.9130166563849624,
+        "close_ema_pips": -0.8125945821113589,
+        "ret3_pips": -0.2999999999997449,
+        "hour_utc": 8
+      },
+      "hits": {
+        "barbwire_sell": true,
+        "stretched_sell": false,
+        "barbwire": true
+      }
+    },
+    {
+      "entry_time": "2026-08-14 19:39:00+00:00",
+      "exit_time": "2026-08-14 21:28:00+00:00",
+      "side": "buy",
+      "outcome": "eof",
+      "pnl": -1.2794668000001554,
+      "mfe": 0.0,
+      "mae": 0.0014899999999999913,
+      "bars_held": 109,
+      "quality": 65.95735242669313,
+      "body_against": true,
+      "features": {
+        "open": 1.15781,
+        "high": 1.15784,
+        "low": 1.15778,
+        "close": 1.15778,
+        "volume": null,
+        "ema_20": 1.157705706671653,
+        "atr": 0.00010000000000003657,
+        "rsi": 52.645222933551764,
+        "adx": 25.082795317207587,
+        "kaufman_er": 0.3846153846154503,
+        "jansen_score": 0.8908407890640211,
+        "harris_jump": false,
+        "brooks_in_range": true,
+        "range_loc": 0.603448275862168,
+        "volman_doji": false,
+        "impulse_green": true,
+        "impulse_red": false,
+        "spread": null,
+        "brooks_barbwire": false,
+        "ema_side_streak": 3,
+        "atr_expand": 0.940860215054072,
+        "close_ema_pips": 0.742933283470748,
+        "ret3_pips": 1.2000000000012,
+        "hour_utc": 19
+      },
+      "hits": {
+        "barbwire_sell": false,
+        "stretched_sell": false,
+        "barbwire": false
+      }
+    }
+  ],
+  "winner_sacrifice_replay": {
+    "intel_barbwire_sell": {
+      "loss_hits": 1,
+      "sl_hits": 1,
+      "win_hits": 11
+    },
+    "intel_stretched_sell": {
+      "loss_hits": 0,
+      "sl_hits": 0,
+      "win_hits": 13
+    },
+    "intel_barbwire": {
+      "loss_hits": 1,
+      "sl_hits": 1,
+      "win_hits": 28
+    }
+  },
+  "picked": "intel_barbwire_sell",
+  "experiments": [
+    {
+      "id": "intel_barbwire_sell",
+      "decision": "accept",
+      "reason": "OOS E 0.0045 vs baseline 0.0043, n=76, full pnl -1.95 vs -2.04",
+      "oos_e": 0.004497069298241468,
+      "oos_n": 76,
+      "pnl": -1.9488120000019011,
+      "n": 181,
+      "wr": 98.34254143646409,
+      "full_e": -0.0035889723756942367,
+      "loss_removal": {
+        "losses_avoided": 0.0,
+        "winners_sacrificed": -3.0,
+        "loss_removal_efficiency": 0.0
+      },
+      "beats_live_oos_e": true,
+      "beats_live_full_usd": true,
+      "promote": true,
+      "winner_sacrifice_replay": {
+        "loss_hits": 1,
+        "sl_hits": 1,
+        "win_hits": 11
+      }
+    }
+  ],
+  "promote": "intel_barbwire_sell",
+  "promoted_live_yaml": true,
+  "live_yaml": "intel_skip_rsi_ext + intel_skip_doji_against + intel_skip_stretched_doji_buy + intel_skip_barbwire_sell",
+  "live_yaml_unchanged_unless_promote": false,
+  "paper_restart": false,
+  "paper_reload": "hot-reload existing runner; no second process",
+  "not_a_100_wr_claim": true,
+  "honest": {
+    "small_n": "Live combo remaining was 2 real SLs + 1 eof, not the gen9 four. Hydra dropped Aug 4 21:17 and Aug 6 19:20; minted Aug 7 12:31.",
+    "picked": "barbwire_sell hits Aug 12 08:25 (barbwire, streak 25, body-against). Replay 1 SL / 11 winners. Tighter than global barbwire (1/28).",
+    "stretched_sell": "No-op on this sequence (0 remaining SL / 13 winners). Aug 6 19:20 (-3.65 EMA) is gone.",
+    "path_dependent": "losses_avoided=0. $ lift ~$0.09 (n 178→181, winner-sacrifice −3). Full E still −0.0036. Hydra, not a cleaner book. Not 100% WR.",
+    "untouched": "Aug 7 12:31 sell SL loc 0.34 ER 0.74 ADX 58 not barbwire; Aug 14 19:39 eof."
+  }
+}

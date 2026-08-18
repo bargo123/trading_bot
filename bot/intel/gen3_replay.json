@@ -1,0 +1,179 @@
+{
+  "method": "chronological_trade_replay",
+  "note": "Signal-bar features only. Skipping a 30-pip hold does not free those bars for later CORE sprays. Conservative vs path-dependent backtest.",
+  "n_records": 201,
+  "core_full": {
+    "n": 201,
+    "wins": 192,
+    "losses": 9,
+    "wr": 95.5223880597015,
+    "e": -0.02597931708126375,
+    "pnl": -15.665528200001475
+  },
+  "core_oos": {
+    "n": 61,
+    "wins": 59,
+    "losses": 2,
+    "wr": 96.72131147540983,
+    "e": -0.007039052459019389,
+    "pnl": -1.288146600000502
+  },
+  "challenger": "intel_wrong_extreme",
+  "promote": [
+    "intel_wrong_extreme"
+  ],
+  "experiments": [
+    {
+      "id": "intel_rsi_ext",
+      "hypothesis": "Reference: Wilder/Elder RSI>=70 buy / <=30 sell already on live YAML.",
+      "patch": {
+        "intel_enabled": true,
+        "intel_skip_rsi_ext": true
+      },
+      "decision": "accept",
+      "reason": "replay OOS E 0.0102 vs CORE -0.0070, n=28, full pnl -12.02 vs -15.67",
+      "full": {
+        "n": 113,
+        "wins": 108,
+        "losses": 5,
+        "wr": 95.57522123893806,
+        "e": -0.0354614053097377,
+        "pnl": -12.02141640000065
+      },
+      "oos": {
+        "n": 28,
+        "wins": 28,
+        "losses": 0,
+        "wr": 100.0,
+        "e": 0.01022994047618717,
+        "pnl": 0.8593149999996913
+      },
+      "wins_sacrificed": 84,
+      "losses_avoided": 4,
+      "beats_live_rsi_ext": null
+    },
+    {
+      "id": "intel_wrong_extreme",
+      "hypothesis": "Brooks/Damir: reject only loc>=0.90 buys / loc<=0.10 sells (all measured SL).",
+      "patch": {
+        "intel_enabled": true,
+        "intel_skip_wrong_edge": true,
+        "intel_wrong_buy_loc": 0.9,
+        "intel_wrong_sell_loc": 0.1
+      },
+      "decision": "accept",
+      "reason": "replay OOS E 0.0102 vs CORE -0.0070, n=14, full pnl -4.66 vs -15.67",
+      "full": {
+        "n": 50,
+        "wins": 48,
+        "losses": 2,
+        "wr": 96.0,
+        "e": -0.031078904000003207,
+        "pnl": -4.6618356000003125
+      },
+      "oos": {
+        "n": 14,
+        "wins": 14,
+        "losses": 0,
+        "wr": 100.0,
+        "e": 0.0102300619047586,
+        "pnl": 0.4296625999998457
+      },
+      "wins_sacrificed": 144,
+      "losses_avoided": 7,
+      "beats_live_rsi_ext": true
+    },
+    {
+      "id": "intel_quality_min_40",
+      "hypothesis": "Quality cap 28 on wrong-extreme / RSI-ext; reject score < 40.",
+      "patch": {
+        "intel_enabled": true,
+        "intel_quality_min": 40.0
+      },
+      "decision": "reject",
+      "reason": "replay OOS E 0.0102 vs CORE -0.0070, n=10, full pnl -4.91 vs -15.67 (does not beat live rsi_ext OOS E 0.0102)",
+      "full": {
+        "n": 42,
+        "wins": 40,
+        "losses": 2,
+        "wr": 95.23809523809524,
+        "e": -0.03894966349206668,
+        "pnl": -4.907657600000224
+      },
+      "oos": {
+        "n": 10,
+        "wins": 10,
+        "losses": 0,
+        "wr": 100.0,
+        "e": 0.010216553333330028,
+        "pnl": 0.30649659999988976
+      },
+      "wins_sacrificed": 152,
+      "losses_avoided": 7,
+      "beats_live_rsi_ext": false
+    },
+    {
+      "id": "intel_rsi_ext_wrong_extreme",
+      "hypothesis": "Live RSI-ext plus extreme wrong-edge (does not replace CORE 1/30).",
+      "patch": {
+        "intel_enabled": true,
+        "intel_skip_rsi_ext": true,
+        "intel_skip_wrong_edge": true,
+        "intel_wrong_buy_loc": 0.9,
+        "intel_wrong_sell_loc": 0.1
+      },
+      "decision": "reject",
+      "reason": "replay OOS E 0.0102 vs CORE -0.0070, n=10, full pnl -4.91 vs -15.67 (does not beat live rsi_ext OOS E 0.0102)",
+      "full": {
+        "n": 42,
+        "wins": 40,
+        "losses": 2,
+        "wr": 95.23809523809524,
+        "e": -0.03894966349206668,
+        "pnl": -4.907657600000224
+      },
+      "oos": {
+        "n": 10,
+        "wins": 10,
+        "losses": 0,
+        "wr": 100.0,
+        "e": 0.010216553333330028,
+        "pnl": 0.30649659999988976
+      },
+      "wins_sacrificed": 152,
+      "losses_avoided": 7,
+      "beats_live_rsi_ext": false
+    },
+    {
+      "id": "intel_rsi_ext_quality_40",
+      "hypothesis": "Live RSI-ext plus confidence min 40 (wrong-extreme caps at 28).",
+      "patch": {
+        "intel_enabled": true,
+        "intel_skip_rsi_ext": true,
+        "intel_quality_min": 40.0
+      },
+      "decision": "reject",
+      "reason": "replay OOS E 0.0102 vs CORE -0.0070, n=10, full pnl -4.91 vs -15.67 (does not beat live rsi_ext OOS E 0.0102)",
+      "full": {
+        "n": 42,
+        "wins": 40,
+        "losses": 2,
+        "wr": 95.23809523809524,
+        "e": -0.03894966349206668,
+        "pnl": -4.907657600000224
+      },
+      "oos": {
+        "n": 10,
+        "wins": 10,
+        "losses": 0,
+        "wr": 100.0,
+        "e": 0.010216553333330028,
+        "pnl": 0.30649659999988976
+      },
+      "wins_sacrificed": 152,
+      "losses_avoided": 7,
+      "beats_live_rsi_ext": false
+    }
+  ],
+  "ts": "2026-08-14T17:19:52.422730+00:00"
+}

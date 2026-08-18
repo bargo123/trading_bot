@@ -1,0 +1,1170 @@
+{
+  "schema_version": 1,
+  "claim": "Every on-disk markdown extract was hashed, counted, source-noted, and indexed. This is not a claim that every strategy was implemented or every source PDF was complete.",
+  "usable_word_minimum": 1500,
+  "reconciliation": {
+    "extracts_on_disk": 54,
+    "catalog_entries": 52,
+    "indexed_rows": 54,
+    "source_note_rows": 54,
+    "all_extracts_indexed": true,
+    "all_extracts_noted": true,
+    "catalog_missing_on_disk": []
+  },
+  "near_duplicate_candidates": [
+    {
+      "left": "the-mental-game-of-trading-a-system-for-solving-problems-with-greed-fear-anger-c-5dfe4c06.md",
+      "right": "the-mental-game-of-trading-a-system-for-solving-problems-with-greed-fear-anger-c.md",
+      "similarity": 0.9995,
+      "method": "same normalized title + sampled normalized text"
+    }
+  ],
+  "records": [
+    {
+      "filename": "a-complete-guide-to-volume-price-analysis-coulling.md",
+      "file_hash": "ce93f7a83c6e0608ca2988df048c022dd7bc59efa7e8bbee74f99173d94ebffd",
+      "hash_prefix": "ce93f7a83c6e",
+      "byte_size": 420447,
+      "word_count": 75614,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Anna Coulling - A Complete Guide To Volume Price Analysis_ Read the book then read the market (2013, Marinablu International Ltd) - libgen.li.pdf",
+        "pages_with_text": 272,
+        "empty_pages": 1,
+        "extractor": "pypdf",
+        "extraction_kind": "text_pdf"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "advances-in-financial-machine-learning-prado-2018.md",
+      "file_hash": "50a0c4b8538f7ff7567d632e9ab95021781f30cb09f35060c9eb504eadb1f2fd",
+      "hash_prefix": "50a0c4b8538f",
+      "byte_size": 754403,
+      "word_count": 125291,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Marcos Lopez de Prado - Advances in Financial Machine Learning (2018, Wiley) - libgen.li.pdf",
+        "pages_with_text": 371,
+        "empty_pages": 22,
+        "extractor": "fitz",
+        "extraction_kind": "text_pdf"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "algorithmic-trading-and-dma-johnson-2010.md",
+      "file_hash": "825945a238fa9a03287cab27f9b682a42979bd84473e993ae7e4404e5b42f344",
+      "hash_prefix": "825945a238fa",
+      "byte_size": 1558137,
+      "word_count": 232505,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Barry Johnson - Algorithmic Trading and DMA_ An introduction to direct access trading strategies (2010, 4Myeloma Press) - libgen.li.pdf",
+        "pages_with_text": 581,
+        "empty_pages": 14,
+        "extractor": "rapidocr scale=2.0",
+        "extraction_kind": "ocr"
+      },
+      "coverage_status": "ocr_degraded"
+    },
+    {
+      "filename": "algorithmic-trading-winning-strategies-chan-2013.md",
+      "file_hash": "a8f5666e0530bb6a770fa37b02751b6802aa66c3fbe729961ed54789dbb382af",
+      "hash_prefix": "a8f5666e0530",
+      "byte_size": 439840,
+      "word_count": 73839,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "[Wiley Trading] Ernie Chan - Algorithmic Trading_ Winning Strategies and Their Rationale (2013, Wiley) - libgen.li.pdf",
+        "pages_with_text": 214,
+        "empty_pages": 11,
+        "extractor": "fitz",
+        "extraction_kind": "text_pdf"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "beat-the-forex-dealer-an-insider-s-look-into-trading-today-s-foreign-exchange-ma.md",
+      "file_hash": "016c4251763f56ee6c0283e8522904c1e8c61dab700852ec509054fb3e1c8218",
+      "hash_prefix": "016c4251763f",
+      "byte_size": 362769,
+      "word_count": 67395,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "[Wiley Trading] Agustin Silvani - Beat the Forex Dealer_ An insider's look into trading today's foreign exchange market (2008, Wiley) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "beyond-candlesticks-new-japanese-charting-techniques-revealed-wiley-finance-1994.md",
+      "file_hash": "858ed9f64a3bcb20d362801992e79873503a87af3bdcbf14ff7de554429decbb",
+      "hash_prefix": "858ed9f64a3b",
+      "byte_size": 380969,
+      "word_count": 69562,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "[Wiley Finance] Steve Nison - Beyond Candlesticks_ New Japanese Charting Techniques Revealed (Wiley Finance) (1994, Wiley) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "building-winning-algorithmic-trading-systems-website-a-trader-s-journey-from-dat.md",
+      "file_hash": "c45210cb20249cd0ead427b9c14f22866a65764d80af705711e53f8277c06412",
+      "hash_prefix": "c45210cb2024",
+      "byte_size": 457394,
+      "word_count": 80389,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Kevin J. Davey - Building Winning Algorithmic Trading Systems, + Website_ A Trader\u2019s Journey from Data Mining to Monte Carlo Simulation to Live (2014, Wiley) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "developing-high-frequency-trading-systems.md",
+      "file_hash": "1139155ebf6c396c45a9aabd0d6aa3571d43b3c3b21eb1af4d07c545f3a69aa3",
+      "hash_prefix": "1139155ebf6c",
+      "byte_size": 593274,
+      "word_count": 94677,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Developing High-Frequency Trading Systems_ Learn How to Implemen - Developing High-Frequency Trading Systems_ Learn How to Implement High-Frequency Trading From Scratch With C++ or Java Basics - libgen.li.pdf",
+        "pages_with_text": 309,
+        "empty_pages": 12,
+        "extractor": "fitz",
+        "extraction_kind": "text_pdf"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "elliott-wave-principle-frost-prechter-2005.md",
+      "file_hash": "072a7d8995c501fad4ff593530611bb4409d1e150dfa4d71653e914a19215e60",
+      "hash_prefix": "072a7d8995c5",
+      "byte_size": 387084,
+      "word_count": 59926,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "A.J. Frost, Robert R. Prechter - Elliott Wave Principle_ Key To Market Behavior (2005, New Classics Library) - libgen.li.pdf",
+        "pages_with_text": 248,
+        "empty_pages": 8,
+        "extractor": "rapidocr scale=1.6",
+        "extraction_kind": "ocr"
+      },
+      "coverage_status": "ocr_degraded"
+    },
+    {
+      "filename": "encyclopedia-of-chart-patterns-2005-john-wiley-sons-inc---libgen-li.md",
+      "file_hash": "d10b043b296c92c097efe360b876dcb123288aac4e1f0bad812dc84a2e755a26",
+      "hash_prefix": "d10b043b296c",
+      "byte_size": 2018694,
+      "word_count": 359732,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "BULKOWSKI, Thomas N. - Encyclopedia of Chart Patterns (2005, John Wiley & Sons, Inc.) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "evidence-based-technical-analysis-applying-the-scientific-method-and-statistical.md",
+      "file_hash": "da63d05d614209475e45a592702b17c50faa3b2fb39560172da774b6c5fa9ced",
+      "hash_prefix": "da63d05d6142",
+      "byte_size": 1157258,
+      "word_count": 190076,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "[Wiley trading] Aronson, David - Evidence-Based Technical Analysis_ Applying the Scientific Method and Statistical Inference to Trading Signals (2011, Wiley) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "following-the-trend-diversified-managed-futures-trading-wiley-trading-2023-wiley.md",
+      "file_hash": "b6f41d0e32b64e06585ad15bfa0f124482f21e465f3e4f2bb3c065651647dc91",
+      "hash_prefix": "b6f41d0e32b6",
+      "byte_size": 552181,
+      "word_count": 100880,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Andreas F. Clenow - Following the Trend_ Diversified Managed Futures Trading (Wiley Trading) (2023, Wiley) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "forex-patterns-probabilities-trading-strategies-for-trending-range-bound-markets.md",
+      "file_hash": "5886c6379221be90cb758cdb1bfcf68412cca94a6d5f0b45dfcfbf3a5a97061d",
+      "hash_prefix": "5886c6379221",
+      "byte_size": 392332,
+      "word_count": 70130,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "[Wiley Trading] Ed Ponsi - Forex Patterns & Probabilities_ Trading Strategies for Trending & Range-Bound Markets (2007, Wiley) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "forex-strategy-the-price-in-time---libgen-li.md",
+      "file_hash": "818d3602266c1575051f2169d082ee0cc71c92a7ad6651ffcf1a955d9da823c3",
+      "hash_prefix": "818d3602266c",
+      "byte_size": 98258,
+      "word_count": 17364,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Gabriele Fabris - Forex Strategy_ The Price in Time - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "getting-started-in-technical-analysis-1999-wiley---libgen-li.md",
+      "file_hash": "5d396afeacf6211ff2f77293cda7657e589f52625cb5a3b9c3283e64d9b29115",
+      "hash_prefix": "5d396afeacf6",
+      "byte_size": 514306,
+      "word_count": 74321,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Jack D. Schwager - Getting Started in Technical Analysis (1999, Wiley) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "hands-on-machine-learning-for-algorithmic-trading-jansen.md",
+      "file_hash": "ef518f214f407e70f51ec2f46b2cf23743168a19ea7f9aac03eec0f37c72b3f2",
+      "hash_prefix": "ef518f214f40",
+      "byte_size": 867323,
+      "word_count": 131618,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Jansen, Stefan - Hands-on machine learning for algorithmic trading design and implement investment strategies based on smart algorithms that lea (2018, Packt Publishing) - libgen.li.pdf",
+        "pages_with_text": 502,
+        "empty_pages": 2,
+        "extractor": "fitz",
+        "extraction_kind": "text_pdf"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "high-frequency-trading-a-practical-guide-aldridge.md",
+      "file_hash": "06363123bad9391ef80516e7497d0a9f7faa171ff009e1087a6eaac093633e5a",
+      "hash_prefix": "06363123bad9",
+      "byte_size": 766823,
+      "word_count": 122076,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": null,
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "how-to-day-trade-for-a-living-a-beginner-s-guide-to-trading-tools-and-tactics-mo.md",
+      "file_hash": "67faa7ac4cb3265868056e45758dc8d71fea5f65ae11312a62a80adde7041b5c",
+      "hash_prefix": "67faa7ac4cb3",
+      "byte_size": 453256,
+      "word_count": 81260,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Andrew Aziz - How to Day Trade for a Living_ A Beginner's Guide to Trading Tools and Tactics, Money Management, Discipline and Trading Psycho (2015) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "how-to-make-profits-in-commodities-gann-1976.md",
+      "file_hash": "6133739f0c67f403cb15cb8cb15cb1e0e8e113704b7bed26c8fb0c6ca33a7e56",
+      "hash_prefix": "6133739f0c67",
+      "byte_size": 619318,
+      "word_count": 108494,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "W. D. Gann - How to Make Profits In Commodities (1976, Lambert Gann Publishing Company) - libgen.li.pdf",
+        "pages_with_text": 217,
+        "empty_pages": 0,
+        "extractor": "rapidocr scale=1.5",
+        "extraction_kind": "ocr"
+      },
+      "coverage_status": "ocr_degraded"
+    },
+    {
+      "filename": "inside-the-black-box-narang.md",
+      "file_hash": "f2e59bf84e8b5ca99742545cd3c54452fbceb71471bb395e08d4175f077a973f",
+      "hash_prefix": "f2e59bf84e8b",
+      "byte_size": 804870,
+      "word_count": 135646,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": null,
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "market-structure.md",
+      "file_hash": "6287ef3c50888d7ede78f4c6f4a6f1f5f55f343638303eabbea709aba6753e96",
+      "hash_prefix": "6287ef3c5088",
+      "byte_size": 1202,
+      "word_count": 158,
+      "cataloged": false,
+      "catalog_exclusion": "below_usable_word_minimum",
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": true,
+      "provenance": {
+        "source_file": "Sample_Author_-_Market_Structure.md",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "placeholder"
+    },
+    {
+      "filename": "modelling-asset-prices-for-algorithmic-and-high-frequency-trading-cartea-jaimungal.md",
+      "file_hash": "9a21edb83192e11ebec3c5230dd1f8813af300f0255e14184c9dac78545e2f58",
+      "hash_prefix": "9a21edb83192",
+      "byte_size": 104520,
+      "word_count": 18449,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": null,
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "price-action-breakdown-damir-2016.md",
+      "file_hash": "e1fdb522bb0cfbe3f5f039406c0a39efb18a1d240d658d772f998d2881de6a3a",
+      "hash_prefix": "e1fdb522bb0c",
+      "byte_size": 137045,
+      "word_count": 24711,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Laurentiu Damir - Price Action Breakdown_ Exclusive Price Action Trading Approach to Financial Markets (2016, CreateSpace Independent Publishing Platform) - libgen.li.pdf",
+        "pages_with_text": 64,
+        "empty_pages": 1,
+        "extractor": "pypdf",
+        "extraction_kind": "text_pdf"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "profitable-forex-trading-using-high-and-low-risk-strategies-2024---annas-arch-37.md",
+      "file_hash": "e367d66220a77421e2015c458a153701240e95a601d09119063b1e052cc9ea21",
+      "hash_prefix": "e367d66220a7",
+      "byte_size": 260203,
+      "word_count": 48776,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Jim Brown - Profitable Forex Trading Using High and Low Risk Strategies (2024) - annas-arch-37acda4a3765.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "pyramiding-full-text-extracted.md",
+      "file_hash": "4027a6115c1215108419902f4d3808333e63de9937a19683ec8b0e080e55833a",
+      "hash_prefix": "4027a6115c12",
+      "byte_size": 10028,
+      "word_count": 1861,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "pyramiding_full_text_extracted.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "quantitative-trading-how-to-build-your-own-algorithmic-trading-business-2008-wil.md",
+      "file_hash": "e7bcd249e180bbb65f18ef1d46f46861116d8a4be872fd610b5c0ab831416208",
+      "hash_prefix": "e7bcd249e180",
+      "byte_size": 372373,
+      "word_count": 62167,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "[Wiley Trading] Ernie Chan - Quantitative Trading_ How to Build Your Own Algorithmic Trading Business (2008, Wiley) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "quantum-finance-van-der-post.md",
+      "file_hash": "b40c872a1ef1f11a95aec551257c110c62ea725b701321e97ab84123c439979a",
+      "hash_prefix": "b40c872a1ef1",
+      "byte_size": 368312,
+      "word_count": 51750,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": null,
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "quantum-trading-using-principles-of-modern-physics-oreste.md",
+      "file_hash": "be8546ff9093bcfe30da5227ba9ade05ca9291fe35e49f6d0a148de26683eb8f",
+      "hash_prefix": "be8546ff9093",
+      "byte_size": 506652,
+      "word_count": 89228,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": null,
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "reminiscences-of-a-stock-operator-2012-john-wiley-sons---libgen-li.md",
+      "file_hash": "216cbcd60c343b0c46aeebf9ad7c24df2500dbfd9e5b391c064ae3b88542ff9d",
+      "hash_prefix": "216cbcd60c34",
+      "byte_size": 781048,
+      "word_count": 145963,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "New York Stock Exchange._Lefevre, Edwin - Reminiscences of a stock operator (2012, John Wiley & Sons) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "sample-author.md",
+      "file_hash": "0cc0902e70baf89a2a6f37946d190c73ffed063ddaafe68203d3d7c4221a7e5c",
+      "hash_prefix": "0cc0902e70ba",
+      "byte_size": 1306,
+      "word_count": 196,
+      "cataloged": false,
+      "catalog_exclusion": "below_usable_word_minimum",
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": true,
+      "provenance": {
+        "source_file": "Sample_Author_-_Risk_Basics.md",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "placeholder"
+    },
+    {
+      "filename": "steidlmayer-on-markets-trading-with-market-profile-2003-john-wiley-sons---libgen.md",
+      "file_hash": "fae15b642382a9aa2ff32bb4d605c47588945552fb1d0a061d30bf89ee1857dc",
+      "hash_prefix": "fae15b642382",
+      "byte_size": 388086,
+      "word_count": 67443,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "[Wiley trading] Peter Steidlmayer - Steidlmayer on Markets _ Trading with Market Profile. (2003, John Wiley & Sons) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "stock-market-wizards-interviews-with-america-s-top-stock-traders-2001-harperbusi.md",
+      "file_hash": "040a37df581f4e92d84c13e81c7017aeefc26695045a288368edd9d55de7ca07",
+      "hash_prefix": "040a37df581f",
+      "byte_size": 712449,
+      "word_count": 126047,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Jack D. Schwager - Stock Market Wizards_ Interviews with America's Top Stock Traders (2001, HarperBusiness) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "stock-trading-investing-using-volume-price-analysis-coulling.md",
+      "file_hash": "7a169f637ed0e7769324d2e46817359291ce8b7f665f3797cf41e53ebc9f7291",
+      "hash_prefix": "7a169f637ed0",
+      "byte_size": 340792,
+      "word_count": 60237,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Anna Coulling - Stock Trading & Investing Using Volume Price Analysis_ Over 200 worked examples - libgen.li.pdf",
+        "pages_with_text": 431,
+        "empty_pages": 1,
+        "extractor": "pypdf",
+        "extraction_kind": "text_pdf"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "systematic-trading-a-unique-new-method-for-designing-trading-and-investing-syste.md",
+      "file_hash": "6860eb6bbb63aa38399e9bc07c7199391ca91fa9223cbfbd0270be2d19a6f487",
+      "hash_prefix": "6860eb6bbb63",
+      "byte_size": 603536,
+      "word_count": 103784,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Robert Carver - Systematic Trading_ A unique new method for designing trading and investing systems (2015, Harriman House) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "technical-analysis-of-stock-trends-eleventh-edition-2018-crc-press---libgen-li.md",
+      "file_hash": "e2502bfd59813c7d5f4e301c1a729f4483a2b15921377dfb64645f8d0d4256c6",
+      "hash_prefix": "e2502bfd5981",
+      "byte_size": 1617073,
+      "word_count": 274181,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Robert D. Edwards_ John Magee_ W.H.C. Bassetti - Technical Analysis of Stock Trends, Eleventh Edition (2018, CRC Press) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-1-hour-trade-anderson.md",
+      "file_hash": "ccf4dcf9dd305787848d96f7c1510346bed6ef654b84e96194814f125fd5c454",
+      "hash_prefix": "ccf4dcf9dd30",
+      "byte_size": 80838,
+      "word_count": 14018,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": null,
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-10xroi-trading-system----thomas-lr-thomas-lr----2014----109595d6293932cffaa6.md",
+      "file_hash": "022e992728b54ffbafa4bf8be046015556722491b93b02c6e8dc2bf56d5117db",
+      "hash_prefix": "022e992728b5",
+      "byte_size": 50261,
+      "word_count": 9304,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "The 10XROI Trading System -- Thomas, LR [Thomas, LR] -- 2014 -- 109595d6293932cffaa6677c24d1232c -- Anna\u2019s Archive.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-art-and-science-of-technical-analysis-market-structure-price-action-and-trad.md",
+      "file_hash": "aa11fd1f1a94914c73e3d25c6ab3f235a8260281658608ed5dfaad82b332af0a",
+      "hash_prefix": "aa11fd1f1a94",
+      "byte_size": 1089336,
+      "word_count": 185723,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "[Wiley finance series] Adam Grimes - The art and science of technical analysis _ market structure, price action, and trading strategies (2012, J. Wiley & Sons ) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-definitive-guide-to-point-and-figure-2005---libgen-li.md",
+      "file_hash": "61dc709b6c344b6807da9272aa2037709e07c3522bf2b55e4d42d9cafc6c8dc1",
+      "hash_prefix": "61dc709b6c34",
+      "byte_size": 828845,
+      "word_count": 158732,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Jeremy Du Plessis - The Definitive Guide to Point and Figure (2005) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-disciplined-trader-developing-winning-attitudes-1990-prentice-hall-press---l.md",
+      "file_hash": "7464707fce419e0865962fdc5938cea77867dfe01eb331ccc5bb6d6fe6e10655",
+      "hash_prefix": "7464707fce41",
+      "byte_size": 470931,
+      "word_count": 81180,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Mark Douglas - The Disciplined Trader_ Developing Winning Attitudes (1990, Prentice Hall Press) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-holy-grail-forex-trading-system-foreign-exchange-day-trading-was-this-the-ul.md",
+      "file_hash": "eb61914a27b5ad0bb7586db31f810497590f049e81ba30a8c6c28dcb9ae65d11",
+      "hash_prefix": "eb61914a27b5",
+      "byte_size": 131091,
+      "word_count": 24578,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Windsor, James - The Holy Grail Forex Trading System ( Foreign Exchange Day Trading )_ Was this the ultimate financial currency daytrading strat (2013, GD Publishing) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-man-who-solved-the-market-zuckerman-2019.md",
+      "file_hash": "6ad79c197bdb4d3c1924331a268a73647e089b099055290ed349200d087b27b5",
+      "hash_prefix": "6ad79c197bdb",
+      "byte_size": 668343,
+      "word_count": 108718,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Zuckerman, Gregory - The Man Who Solved the Market (2019) - libgen.li.pdf",
+        "pages_with_text": 322,
+        "empty_pages": 2,
+        "extractor": "fitz",
+        "extraction_kind": "text_pdf"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-mental-game-of-trading-a-system-for-solving-problems-with-greed-fear-anger-c-5dfe4c06.md",
+      "file_hash": "6a9b2e5da0c8cdb63214526df0ae9cd148667c051b3a89b35e787282e0898547",
+      "hash_prefix": "6a9b2e5da0c8",
+      "byte_size": 613206,
+      "word_count": 109865,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Jared Tendler - The Mental Game of Trading_ A System for Solving Problems with Greed, Fear, Anger, Confidence, and Discipline (2021, JT Press) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-mental-game-of-trading-a-system-for-solving-problems-with-greed-fear-anger-c.md",
+      "file_hash": "657c90c7c7bdbfc69541292ce7132586def0d6e7ef1e51ef80231fd207249d50",
+      "hash_prefix": "657c90c7c7bd",
+      "byte_size": 613214,
+      "word_count": 109867,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Jared Tendler - The Mental Game of Trading_ A System for Solving Problems with Greed, Fear, Anger, Confidence, and Discipline (2021, JT Press) - libgen.li (1).pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-new-market-wizards-conversations-with-america-s-top-traders.md",
+      "file_hash": "ef7298f82b3ed56d19b1d87089ef1357e20cc50610c3d1254c2ee2125b8b4d47",
+      "hash_prefix": "ef7298f82b3e",
+      "byte_size": 933246,
+      "word_count": 164079,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Schwager, Jack D - The New Market Wizards_ Conversations with America's Top Traders (2009, HarperCollins) - libgen.li.epub",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-new-trading-for-a-living-psychology-discipline-trading-tools-and-systems-ris.md",
+      "file_hash": "8ed0b8c56235da5b44b81b0570f8193dc178c141930e38e6ba5cb00c689692aa",
+      "hash_prefix": "8ed0b8c56235",
+      "byte_size": 721637,
+      "word_count": 126389,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "[Wiley Trading] Alexander Elder - The New Trading for a Living_ Psychology, Discipline, Trading Tools and Systems, Risk Control, Trade Management (2014, Wiley) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "the-ultimate-forex-trading-system-unbeatable-strategy-to----unknown----2021----6.md",
+      "file_hash": "8a82646b340da3541245d723054919830d09cdfb6205d39dfc4beb67018052c9",
+      "hash_prefix": "8a82646b340d",
+      "byte_size": 74690,
+      "word_count": 13164,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "The Ultimate Forex Trading System-Unbeatable Strategy to -- unknown -- 2021 -- 6bfc90dea41e229cd0414ed62f985de3 -- Anna\u2019s Archive.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "trade-the-price-action---forex-trading-system-2012---libgen-li.md",
+      "file_hash": "b115e2495f4e5afe4a7729c3f2b15a1dde8a690e6e2f8a166bc64d321fb639d9",
+      "hash_prefix": "b115e2495f4e",
+      "byte_size": 27436,
+      "word_count": 5055,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Laurentiu Damir - Trade the Price Action - Forex Trading System (2012) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "trade-your-way-to-financial-freedom-2006-mcgraw-hill-companies---libgen-li.md",
+      "file_hash": "dcdf6d315b60762d3a0f1750a77988f0a68eeb33dd9f3b86e3ef826118299360",
+      "hash_prefix": "dcdf6d315b60",
+      "byte_size": 673098,
+      "word_count": 118856,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Van K Tharp - Trade Your Way to Financial Freedom (2006, McGraw-Hill Companies) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "trading-and-exchanges-market-microstructure-for-practitioners---full---2002-oxfo.md",
+      "file_hash": "3adc820f26d0b1979ba11f6807c7ec79611f45d5132344f07529ad9ac22b8511",
+      "hash_prefix": "3adc820f26d0",
+      "byte_size": 2066425,
+      "word_count": 330485,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Larry Harris - Trading and Exchanges_ Market Microstructure for Practitioners - FULL - (2002, Oxford University Press, USA) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "trading-in-the-zone-2021-wiley-trading---libgen-li.md",
+      "file_hash": "fb3ff2a60087e9cd247ba661ab05614bf8e97b678c96c1bbe224d97683bfd5b6",
+      "hash_prefix": "fb3ff2a60087",
+      "byte_size": 441753,
+      "word_count": 77233,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Mark douglas - Trading In The Zone (2021, Wiley Trading) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "trading-price-action-ranges-brooks.md",
+      "file_hash": "70348b7e3d633c3af83d64b10fe41fd5d3885abcc90e3ce2816bb2e637837f36",
+      "hash_prefix": "70348b7e3d63",
+      "byte_size": 1382906,
+      "word_count": 259234,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "Al Brooks - Trading Price Action Ranges Technical Analysis of Price Charts Bar by Bar for the Serious Trader (2012, Wiley Trading) - libgen.li.pdf",
+        "pages_with_text": 616,
+        "empty_pages": 1,
+        "extractor": "pypdf",
+        "extraction_kind": "text_pdf"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "trading-with-intermarket-analysis-a-visual-approach-to-beating-the-financial-mar.md",
+      "file_hash": "340260e0c443a89664f0c4f23925f223225c157a261c77ce2964583fd4dd935a",
+      "hash_prefix": "340260e0c443",
+      "byte_size": 478838,
+      "word_count": 81424,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "[Wiley Trading, Volume 586] John J. Murphy - Trading with Intermarket Analysis_ A Visual Approach to Beating the Financial Markets Using Exchange-Traded Funds (2012, Wiley) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    },
+    {
+      "filename": "winning-the-trading-game-why-95-of-traders-lose-and-what-you-must-do-to-2008-wil.md",
+      "file_hash": "0c45fe84e4e8364b5b0a02ed7313a1a6667c6241dca480a664a766baf5944b43",
+      "hash_prefix": "0c45fe84e4e8",
+      "byte_size": 615088,
+      "word_count": 107636,
+      "cataloged": true,
+      "catalog_exclusion": null,
+      "source_note_exists": true,
+      "indexed": true,
+      "duplicate_of": null,
+      "placeholder": false,
+      "provenance": {
+        "source_file": "[Wiley Trading] Noble DraKoln - Winning the Trading Game_ Why 95% of Traders Lose and What You Must Do To.. (2008, Wiley) - libgen.li.pdf",
+        "pages_with_text": null,
+        "empty_pages": null,
+        "extractor": null,
+        "extraction_kind": "unknown"
+      },
+      "coverage_status": "full_extract"
+    }
+  ],
+  "unavailable": [
+    {
+      "key": "kaufman",
+      "coverage_status": "unavailable",
+      "reason": "Perry Kaufman Trading Systems and Methods \u2014 no full extract on disk"
+    },
+    {
+      "key": "volman",
+      "coverage_status": "unavailable",
+      "reason": "Bob Volman Forex Price Action Scalping \u2014 digest only"
+    }
+  ]
+}

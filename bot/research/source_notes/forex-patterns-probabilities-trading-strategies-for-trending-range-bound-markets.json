@@ -1,0 +1,108 @@
+{
+  "filename": "forex-patterns-probabilities-trading-strategies-for-trending-range-bound-markets.md",
+  "title": "Forex Patterns & Probabilities  Trading Strategies for Trending & Range-Bound Markets (2007, Wiley) - libgen.li",
+  "file_hash": "5886c6379221be90cb758cdb1bfcf68412cca94a6d5f0b45dfcfbf3a5a97061d",
+  "byte_size": 392332,
+  "word_count": 70130,
+  "label": "research_proxy",
+  "placeholder": false,
+  "duplicate_of": null,
+  "timeframes": [
+    "daily",
+    "intraday",
+    "weekly"
+  ],
+  "data_required": [
+    "volume_unspecified"
+  ],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [
+    "Do not be intimidated by fundamental analysis! A solid understanding of fundamentals is often what separates the good traders from the great ones.",
+    "We can\u2019t control the outcome of any individual trade, and markets do not always cooperate as we wish they would. It is possible to execute a plan perfectly and still lose money on a trade. However, if we create good plans and execute them properly on a consistent basis, we will be miles ahead of most traders.",
+    "This is not to imply that there was any failure on the part of the trader who maintained discipline and stayed out of the trade. Always remember, do not worry about the trades you do not enter; focus instead on the trades that you do enter.",
+    "I hope that I\u2019ve provided a warts-and-all example showing that things sometimes do not go exactly according to plan, because in the real world, they simply don\u2019t. I realize that there are people trying to sell you on the",
+    "We do not raise the stop, because from this point on the protective stop must be calculated according to the most recently closed candle. Since the most recently closed candle is the same candle that was open when we entered the trade, we cannot raise our stop yet. The daily ATR dips to",
+    "The only thing that the trader has to do with this strategy is move the stop once per day, after the daily candle closes. This is a perfect strategy for people who do not want to spend their entire day staring at a video screen.",
+    "Just in case anyone is not clear on this, I do not recommend exiting half of the position at your discretion once you are trading this style in a live account. This is an exercise, the purpose of which is to teach us this:",
+    "Technically speaking, in the forex market we do not have a price per se.",
+    "Why is this information valuable? Unlike most indicators, support and resistance levels tell us where the buyers and sellers have set up camp. Re- member, many of the large players, the hedge funds and the money-center banks, do not enter trades in the same manner that individual traders do.",
+    "on every trade, and by never averaging down on a losing trade. Traders who do not use stops and average down on losing trades are not really traders at all\u2014at least, they won\u2019t be for long.",
+    "Here\u2019s the good part: Due to the tremendous leverage afforded by the forex market, traders do not have to put up 100 percent of the value of a currency pair in order to control that investment. For example, a trader using leverage of 50\u20131 would need to invest only $2,000 to control one lot of a currency pair, instead of the full amount of $100,000.",
+    "If we do not have a trade execution within two hours, we will can- cel both the buy and sell orders. At that point, the reason for placing the trade is no longer valid, because the Asian markets are beginning to stir, and volume and volatility are about to increase. When real vol- ume enters the market, the moves are more likely to be real, so a strat- egy that fades breakouts would be inappropriate under these circum- stances."
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "[Wiley Trading] Ed Ponsi - Forex Patterns & Probabilities_ Trading Strategies for Trending & Range-Bound Markets (2007, Wiley) - libgen.li.pdf",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "forex-patterns-probabilities-trading-strategies-for-trending-range-bound-markets.md",
+    "timeframes": [
+      "daily",
+      "intraday",
+      "weekly"
+    ],
+    "data_required": [
+      "volume_unspecified"
+    ],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [
+      "Do not be intimidated by fundamental analysis! A solid understanding of fundamentals is often what separates the good traders from the great ones.",
+      "We can\u2019t control the outcome of any individual trade, and markets do not always cooperate as we wish they would. It is possible to execute a plan perfectly and still lose money on a trade. However, if we create good plans and execute them properly on a consistent basis, we will be miles ahead of most traders.",
+      "This is not to imply that there was any failure on the part of the trader who maintained discipline and stayed out of the trade. Always remember, do not worry about the trades you do not enter; focus instead on the trades that you do enter.",
+      "I hope that I\u2019ve provided a warts-and-all example showing that things sometimes do not go exactly according to plan, because in the real world, they simply don\u2019t. I realize that there are people trying to sell you on the",
+      "We do not raise the stop, because from this point on the protective stop must be calculated according to the most recently closed candle. Since the most recently closed candle is the same candle that was open when we entered the trade, we cannot raise our stop yet. The daily ATR dips to",
+      "The only thing that the trader has to do with this strategy is move the stop once per day, after the daily candle closes. This is a perfect strategy for people who do not want to spend their entire day staring at a video screen.",
+      "Just in case anyone is not clear on this, I do not recommend exiting half of the position at your discretion once you are trading this style in a live account. This is an exercise, the purpose of which is to teach us this:",
+      "Technically speaking, in the forex market we do not have a price per se.",
+      "Why is this information valuable? Unlike most indicators, support and resistance levels tell us where the buyers and sellers have set up camp. Re- member, many of the large players, the hedge funds and the money-center banks, do not enter trades in the same manner that individual traders do.",
+      "on every trade, and by never averaging down on a losing trade. Traders who do not use stops and average down on losing trades are not really traders at all\u2014at least, they won\u2019t be for long.",
+      "Here\u2019s the good part: Due to the tremendous leverage afforded by the forex market, traders do not have to put up 100 percent of the value of a currency pair in order to control that investment. For example, a trader using leverage of 50\u20131 would need to invest only $2,000 to control one lot of a currency pair, instead of the full amount of $100,000.",
+      "If we do not have a trade execution within two hours, we will can- cel both the buy and sell orders. At that point, the reason for placing the trade is no longer valid, because the Asian markets are beginning to stir, and volume and volatility are about to increase. When real vol- ume enters the market, the moves are more likely to be real, so a strat- egy that fades breakouts would be inappropriate under these circum- stances."
+    ],
+    "evidence_quality": "extract",
+    "placeholder": false,
+    "implemented": false,
+    "headings": [
+      "Forex Patterns & Probabilities  Trading Strategies for Trending & Range-Bound Markets (2007, Wiley) - libgen.li",
+      "Pages 1-10 (pp. 1-10)",
+      "Pages 11-20 (pp. 11-20)",
+      "Pages 21-30 (pp. 21-30)",
+      "Pages 31-40 (pp. 31-40)",
+      "Pages 41-50 (pp. 41-50)",
+      "Pages 51-60 (pp. 51-60)",
+      "Pages 61-70 (pp. 61-70)",
+      "Pages 71-80 (pp. 71-80)",
+      "Pages 81-90 (pp. 81-90)",
+      "Pages 91-100 (pp. 91-100)",
+      "Pages 101-110 (pp. 101-110)",
+      "Pages 111-120 (pp. 111-120)",
+      "Pages 121-130 (pp. 121-130)",
+      "Pages 131-140 (pp. 131-140)",
+      "Pages 141-150 (pp. 141-150)",
+      "Pages 151-160 (pp. 151-160)",
+      "Pages 161-170 (pp. 161-170)",
+      "Pages 171-180 (pp. 171-180)",
+      "Pages 181-190 (pp. 181-190)",
+      "Pages 191-200 (pp. 191-200)",
+      "CHAPTER 1 4 (pp. 201-210)",
+      "Pages 211-220 (pp. 211-220)",
+      "CHAPTER 1 6 (pp. 221-230)",
+      "Pages 231-240 (pp. 231-240)",
+      "Pages 241-250 (pp. 241-250)",
+      "Pages 251-260 (pp. 251-260)",
+      "Pages 261-270 (pp. 261-270)",
+      "Pages 271-271 (pp. 271-271)"
+    ]
+  }
+}

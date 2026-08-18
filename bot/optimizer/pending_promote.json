@@ -1,0 +1,8 @@
+{
+  "experiment_id": "exp_20260814_181029_intel_weak_adx_edge",
+  "accepted_yaml": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "reason": "not flat",
+  "ts": "2026-08-14T18:16:36.412246+00:00",
+  "open": 4,
+  "live_config": "C:\\Users\\Raqam\\trading_bot\\bot\\config_mt5_demo_firehose_hw.yaml"
+}

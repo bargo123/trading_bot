@@ -1,0 +1,106 @@
+{
+  "filename": "following-the-trend-diversified-managed-futures-trading-wiley-trading-2023-wiley.md",
+  "title": "Following the Trend  Diversified Managed Futures Trading (Wiley Trading) (2023, Wiley) - libgen.li",
+  "file_hash": "b6f41d0e32b64e06585ad15bfa0f124482f21e465f3e4f2bb3c065651647dc91",
+  "byte_size": 552181,
+  "word_count": 100880,
+  "label": "research_proxy",
+  "placeholder": false,
+  "duplicate_of": null,
+  "timeframes": [
+    "daily",
+    "intraday"
+  ],
+  "data_required": [
+    "mt5_l2",
+    "futures_oi",
+    "volume_unspecified"
+  ],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [
+    "The obvious problem with these calculated continuations is that they are not real. They are not tradable instruments, and they do not represent actual, real price moves. They are merely rough estimates of what a long- term hold- ing would have looked like and they are just calculated and highly theoretical time series. If you need long- term analytics, such as calculating a one hundred- day moving average, you absolutely need continuations. Doing this sort of maths on individual futures contracts makes little sense.",
+    "A much- touted aspect of trend following is the so- called crisis alpha effect, the tendency of the strategy to perform well when traditional markets do not. This is arguably the most important feature of a strategy such as trend",
+    "Anyhow , I digress. The first warning shot across the bow this year was when prestigious investment bank Bear Sterns quite suddenly blew up in",
+    "Y ou see the inverse situation in Figure\u00a08.4, where the futures contract starts out below the underlying, trading at a discount. For each day, we slowly, slowly approach the underlying until finally aligning with it at the end of the contract\u2019s life. It\u2019s important to understand that the contango and backwardation effects do not guarantee that the price will move up or down, merely from which direction it will approach the underlying. In that way, this effect acts as a tailwind or headwind, adding a bullish or bearish factor to the equation. W e are still very much dependent on the direction of the underlying asset, but this term structure effect gives us a boost in either direction.",
+    "I write books to teach ideas and concepts, to broaden your horizons, and show you what\u2019s possible. I do not, ever, intend for anyone to just take the demonstration trading rules from my books and go out and trade them as they are. That just isn\u2019t a good idea. Never trade anyone\u2019s rules, no matter who they are. Even if they are really clever, handsome, and funny Europeans who just can\u2019t refrain from sarcasm.",
+    "M ost people reading a book like this either dream of trading for a liv- ing, or they are already doing just that. This chapter is meant both for those of you who do not yet trade for a living, and for those of you are, but are doing it wrong. Y es, in my view , there is a wrong way to trade for a living. Somewhat ironically, it is exactly this wrong way that most people outside the industry see as the ultimate goal. T o trade your own money for a living. Having goals and big dreams is a good thing, but you should be care- ful in picking those goals. I hope that by the time you\u2019ve finished reading this chapter, you will agree with me that dreaming about trading your own money for a living is the wrong dream.",
+    "The first thing that you need to understand is that almost all day traders end up losing all or most of their money. The stories you hear of the social media stars, the influencers, and the gurus, it\u2019s not real life. The markets do not work that way. The stories are either made up, greatly exaggerated, or you might just hear about the gains and not the losses. Even if they were true, if such black market magic existed in the real world, using these super- natural abilities to trade for yourself still wouldn\u2019t make any sense."
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "Andreas F. Clenow - Following the Trend_ Diversified Managed Futures Trading (Wiley Trading) (2023, Wiley) - libgen.li.pdf",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "following-the-trend-diversified-managed-futures-trading-wiley-trading-2023-wiley.md",
+    "timeframes": [
+      "daily",
+      "intraday"
+    ],
+    "data_required": [
+      "mt5_l2",
+      "futures_oi",
+      "volume_unspecified"
+    ],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [
+      "The obvious problem with these calculated continuations is that they are not real. They are not tradable instruments, and they do not represent actual, real price moves. They are merely rough estimates of what a long- term hold- ing would have looked like and they are just calculated and highly theoretical time series. If you need long- term analytics, such as calculating a one hundred- day moving average, you absolutely need continuations. Doing this sort of maths on individual futures contracts makes little sense.",
+      "A much- touted aspect of trend following is the so- called crisis alpha effect, the tendency of the strategy to perform well when traditional markets do not. This is arguably the most important feature of a strategy such as trend",
+      "Anyhow , I digress. The first warning shot across the bow this year was when prestigious investment bank Bear Sterns quite suddenly blew up in",
+      "Y ou see the inverse situation in Figure\u00a08.4, where the futures contract starts out below the underlying, trading at a discount. For each day, we slowly, slowly approach the underlying until finally aligning with it at the end of the contract\u2019s life. It\u2019s important to understand that the contango and backwardation effects do not guarantee that the price will move up or down, merely from which direction it will approach the underlying. In that way, this effect acts as a tailwind or headwind, adding a bullish or bearish factor to the equation. W e are still very much dependent on the direction of the underlying asset, but this term structure effect gives us a boost in either direction.",
+      "I write books to teach ideas and concepts, to broaden your horizons, and show you what\u2019s possible. I do not, ever, intend for anyone to just take the demonstration trading rules from my books and go out and trade them as they are. That just isn\u2019t a good idea. Never trade anyone\u2019s rules, no matter who they are. Even if they are really clever, handsome, and funny Europeans who just can\u2019t refrain from sarcasm.",
+      "M ost people reading a book like this either dream of trading for a liv- ing, or they are already doing just that. This chapter is meant both for those of you who do not yet trade for a living, and for those of you are, but are doing it wrong. Y es, in my view , there is a wrong way to trade for a living. Somewhat ironically, it is exactly this wrong way that most people outside the industry see as the ultimate goal. T o trade your own money for a living. Having goals and big dreams is a good thing, but you should be care- ful in picking those goals. I hope that by the time you\u2019ve finished reading this chapter, you will agree with me that dreaming about trading your own money for a living is the wrong dream.",
+      "The first thing that you need to understand is that almost all day traders end up losing all or most of their money. The stories you hear of the social media stars, the influencers, and the gurus, it\u2019s not real life. The markets do not work that way. The stories are either made up, greatly exaggerated, or you might just hear about the gains and not the losses. Even if they were true, if such black market magic existed in the real world, using these super- natural abilities to trade for yourself still wouldn\u2019t make any sense."
+    ],
+    "evidence_quality": "extract",
+    "placeholder": false,
+    "implemented": false,
+    "headings": [
+      "Following the Trend  Diversified Managed Futures Trading (Wiley Trading) (2023, Wiley) - libgen.li",
+      "Pages 1-10 (pp. 1-10)",
+      "CHAPTER 14 Final W ords of\u00a0Caution 297 (pp. 11-20)",
+      "Pages 21-30 (pp. 21-30)",
+      "Pages 31-40 (pp. 31-40)",
+      "Pages 41-50 (pp. 41-50)",
+      "Pages 51-60 (pp. 51-60)",
+      "Pages 61-70 (pp. 61-70)",
+      "Pages 71-80 (pp. 71-80)",
+      "CHAPTER 4 (pp. 81-90)",
+      "Pages 91-100 (pp. 91-100)",
+      "Pages 101-110 (pp. 101-110)",
+      "Pages 111-120 (pp. 111-120)",
+      "Pages 121-130 (pp. 121-130)",
+      "Pages 131-140 (pp. 131-140)",
+      "Pages 141-150 (pp. 141-150)",
+      "Pages 151-160 (pp. 151-160)",
+      "Pages 161-170 (pp. 161-170)",
+      "Pages 171-180 (pp. 171-180)",
+      "Pages 181-190 (pp. 181-190)",
+      "Pages 191-200 (pp. 191-200)",
+      "Pages 201-210 (pp. 201-210)",
+      "Pages 211-220 (pp. 211-220)",
+      "Pages 221-230 (pp. 221-230)",
+      "Pages 231-240 (pp. 231-240)",
+      "Pages 241-250 (pp. 241-250)",
+      "Pages 251-260 (pp. 251-260)",
+      "Pages 261-270 (pp. 261-270)",
+      "Pages 271-280 (pp. 271-280)",
+      "Pages 281-290 (pp. 281-290)",
+      "Pages 291-300 (pp. 291-300)",
+      "Pages 301-310 (pp. 301-310)",
+      "Pages 311-320 (pp. 311-320)",
+      "Pages 321-330 (pp. 321-330)",
+      "Pages 331-339 (pp. 331-339)"
+    ]
+  }
+}

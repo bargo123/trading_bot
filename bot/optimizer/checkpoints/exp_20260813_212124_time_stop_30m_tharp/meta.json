@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_212124_time_stop_30m_tharp",
+  "ts": "2026-08-13T21:21:24.349719+00:00",
+  "status": "open",
+  "patch": {
+    "max_hold_seconds": 1800
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_212124_time_stop_30m_tharp",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "time_stop_30m_tharp",
+  "hypothesis": "Tharp: exits dominate expectancy. 30-minute time stop frees stuck 0.01 clips on the same 24h firehose; do not cut max_positions.",
+  "rationale": "Tharp: exits dominate expectancy. 30-minute time stop frees stuck 0.01 clips on the same 24h firehose; do not cut max_positions.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "296a84a1651c669f:Kaufman",
+  "concept": "kaufman_er"
+}

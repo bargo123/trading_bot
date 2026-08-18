@@ -1,0 +1,103 @@
+{
+  "filename": "trading-with-intermarket-analysis-a-visual-approach-to-beating-the-financial-mar.md",
+  "title": "Trading with Intermarket Analysis  A Visual Approach to Beating the Financial Markets Using Exchange-Traded Funds (2012, Wiley) - libgen.li",
+  "file_hash": "340260e0c443a89664f0c4f23925f223225c157a261c77ce2964583fd4dd935a",
+  "byte_size": 478838,
+  "word_count": 81424,
+  "label": "research_proxy",
+  "placeholder": false,
+  "duplicate_of": null,
+  "timeframes": [
+    "daily",
+    "weekly"
+  ],
+  "data_required": [
+    "volume_unspecified"
+  ],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [
+    "Some understanding of how the diff erent asset classes interact with each other is important for at least two reasons. First, such an understanding helps you appreciate how other fi nancial markets infl uence whichever market you\u2019re primarily interested in. For example, it\u2019s crucial to know how bonds and stocks interact. If you\u2019re trading stocks, you should be watching bonds because bond prices usually trend in the opposite direction of stocks. In many cases, turns in the bond market actually precede turns in stocks. Bond yields are inversely correlated with bond prices. That being the case, falling bond yields (rising bond prices) can be a negative warning for stocks.",
+    "Figure 1.1 compares the yield on the 10\u2010year Treasury note to the S&P 500 during 2000. After peaking that January (fi rst arrow), the bond yield started falling a lot faster than the stock market. By that spring, the bond yield had fallen to the lowest level in a year while the S&P 500 was still trending sideways (although the Nasdaq peaked that spring). The S&P 500 didn\u2019t start falling until the fourth quarter of that year (second arrow) and entered a major bear market that lasted for more than two years. That\u2019s a pretty dramatic example of falling bond yields giving early warning that the stock mar- ket was in trouble. It demonstrates how the bond market usually changes direction before stocks at major turning points and is often a leading indicator of the stock market. Figure 1.1 also demonstrates why it\u2019s so important for stock analysts to take trends in the bond market into consideration.",
+    "Energy stocks (which are tied to the price of oil) have a tendency to become market leaders near the end of a bull market in stocks. Energy leadership is almost always a dangerous warning sign for the stock market. One of the ways to tell that the stock market is peaking is when money starts to flow out of energy stocks and into defensive sectors like consumer staples, health care, and utilities. I\u2019ll show you how to spot those rotations and how to take advantage of them. And what they mean.",
+    "August, crude turned up even more sharply that September (second up arrow). The stock market peaked a month later during October (fi rst down arrow). Rising oil is usually a warning sign for stocks",
+    "The financial markets are leading indicators of economic trends. It took the Federal Reserve until the spring of 2003 to acknowledge the threat of deflation. The markets had spotted the threat years earlier. It also took the Fed a lot longer than it took chart analysts to recognize the threat from the housing collapse during 2007. The events surrounding stock market peaks during 2000 and 2007 demonstrated the need to incorporate some chart and intermarket analysis into eco- nomic and fundamental forecasting. It took the Wall Street community too long to figure out what many chartists already knew during the first half of 2000 and 2007 when warning signs of a market top were clearly visible, and that the economy was headed for trouble (as you\u2019ll see in the following chapters). The idea that technical analysis is a shortcut form of fundamental analysis is based on the premise that price action in any market is a leading indicator of that market\u2019s fundamentals. A lot of Wall Street analysts (and their clients) paid a big price for ignoring the clear chart signals that the markets were giving off during 2000 and 2007. They also paid a price for ignoring intermarket signals.",
+    "2007, gave us plenty of warning that this time would be diff erent.",
+    "I had given speeches that spring and summer on Wall Street, and written articles warning that intermarket trends in bonds and commodities had turned very dangerous for stocks. While the size of the stock downturn was a surprise, the fact that stocks did turn down shouldn\u2019t have been. Figure 2.4 shows an upward spike in commodity prices (up arrow) during the spring of 1987 coinciding with a plunge in bond prices (down arrow). The S&P 500 crashed that October (top portion).",
+    "Bond yields turned down before stocks in 2000 and 2007 and gave early warning of a stock market decline.",
+    "T his chapter covers intermarket reactions to the Asian currency crisis that occurred between 1997 and 1998. The most important result of that crisis was the dramatic decoupling of bond and stock prices. Those market reactions were a dress rehearsal for the intermarket model that dominated the following decade. One intermarket lesson resulting from that crisis was a warning that falling bond yields (rising bond prices) after 2000 would not have the same positive eff ect on stocks that it had prior to 1998. The two defl ationary events of the 1990s were the collapse in Japanese stocks in",
+    "Two defl ationary events took place during the 1990s that gave warning that market and economic analysis would take on a diff erent look in the years after 2000. The fi rst defl ationary event was the collapse in the Japanese stock market during 1990. The second was the Asian currency crisis during",
+    "As is usually the case in intermarket work, crude oil played a key role during 1999 in helping to set in motion a ripple eff ect that brought stocks down the following year. The price of crude oil tripled during 1999, which was a big reason why rates rose that year and bond prices fell. As is also normal, the rising price of oil had a positive eff ect on some market groups while hurting others. The biggest benefi ciaries of rising oil prices were stocks tied to oil. During 1999, energy shares became the market\u2019s strongest sector. (Y ou\u2019ll fi nd out later in the book why energy leadership is almost always a warning sign that a stock bull market and an economic recovery are nearing completion.) Groups that suff ered the most from rising oil were fuel\u2010intensive transportation stocks and interest rate\u2013sensitive fi nancial stocks.",
+    "Those sector rotations were early warning signs of an approaching market top. In addition to caus- ing those negative sector rotations, rising oil prices also prompted the Fed to start raising short\u2010term rates in the middle of 1999, which was a major reason why the market topped the following year."
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "[Wiley Trading, Volume 586] John J. Murphy - Trading with Intermarket Analysis_ A Visual Approach to Beating the Financial Markets Using Exchange-Traded Funds (2012, Wiley) - libgen.li.pdf",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "trading-with-intermarket-analysis-a-visual-approach-to-beating-the-financial-mar.md",
+    "timeframes": [
+      "daily",
+      "weekly"
+    ],
+    "data_required": [
+      "volume_unspecified"
+    ],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [
+      "Some understanding of how the diff erent asset classes interact with each other is important for at least two reasons. First, such an understanding helps you appreciate how other fi nancial markets infl uence whichever market you\u2019re primarily interested in. For example, it\u2019s crucial to know how bonds and stocks interact. If you\u2019re trading stocks, you should be watching bonds because bond prices usually trend in the opposite direction of stocks. In many cases, turns in the bond market actually precede turns in stocks. Bond yields are inversely correlated with bond prices. That being the case, falling bond yields (rising bond prices) can be a negative warning for stocks.",
+      "Figure 1.1 compares the yield on the 10\u2010year Treasury note to the S&P 500 during 2000. After peaking that January (fi rst arrow), the bond yield started falling a lot faster than the stock market. By that spring, the bond yield had fallen to the lowest level in a year while the S&P 500 was still trending sideways (although the Nasdaq peaked that spring). The S&P 500 didn\u2019t start falling until the fourth quarter of that year (second arrow) and entered a major bear market that lasted for more than two years. That\u2019s a pretty dramatic example of falling bond yields giving early warning that the stock mar- ket was in trouble. It demonstrates how the bond market usually changes direction before stocks at major turning points and is often a leading indicator of the stock market. Figure 1.1 also demonstrates why it\u2019s so important for stock analysts to take trends in the bond market into consideration.",
+      "Energy stocks (which are tied to the price of oil) have a tendency to become market leaders near the end of a bull market in stocks. Energy leadership is almost always a dangerous warning sign for the stock market. One of the ways to tell that the stock market is peaking is when money starts to flow out of energy stocks and into defensive sectors like consumer staples, health care, and utilities. I\u2019ll show you how to spot those rotations and how to take advantage of them. And what they mean.",
+      "August, crude turned up even more sharply that September (second up arrow). The stock market peaked a month later during October (fi rst down arrow). Rising oil is usually a warning sign for stocks",
+      "The financial markets are leading indicators of economic trends. It took the Federal Reserve until the spring of 2003 to acknowledge the threat of deflation. The markets had spotted the threat years earlier. It also took the Fed a lot longer than it took chart analysts to recognize the threat from the housing collapse during 2007. The events surrounding stock market peaks during 2000 and 2007 demonstrated the need to incorporate some chart and intermarket analysis into eco- nomic and fundamental forecasting. It took the Wall Street community too long to figure out what many chartists already knew during the first half of 2000 and 2007 when warning signs of a market top were clearly visible, and that the economy was headed for trouble (as you\u2019ll see in the following chapters). The idea that technical analysis is a shortcut form of fundamental analysis is based on the premise that price action in any market is a leading indicator of that market\u2019s fundamentals. A lot of Wall Street analysts (and their clients) paid a big price for ignoring the clear chart signals that the markets were giving off during 2000 and 2007. They also paid a price for ignoring intermarket signals.",
+      "2007, gave us plenty of warning that this time would be diff erent.",
+      "I had given speeches that spring and summer on Wall Street, and written articles warning that intermarket trends in bonds and commodities had turned very dangerous for stocks. While the size of the stock downturn was a surprise, the fact that stocks did turn down shouldn\u2019t have been. Figure 2.4 shows an upward spike in commodity prices (up arrow) during the spring of 1987 coinciding with a plunge in bond prices (down arrow). The S&P 500 crashed that October (top portion).",
+      "Bond yields turned down before stocks in 2000 and 2007 and gave early warning of a stock market decline.",
+      "T his chapter covers intermarket reactions to the Asian currency crisis that occurred between 1997 and 1998. The most important result of that crisis was the dramatic decoupling of bond and stock prices. Those market reactions were a dress rehearsal for the intermarket model that dominated the following decade. One intermarket lesson resulting from that crisis was a warning that falling bond yields (rising bond prices) after 2000 would not have the same positive eff ect on stocks that it had prior to 1998. The two defl ationary events of the 1990s were the collapse in Japanese stocks in",
+      "Two defl ationary events took place during the 1990s that gave warning that market and economic analysis would take on a diff erent look in the years after 2000. The fi rst defl ationary event was the collapse in the Japanese stock market during 1990. The second was the Asian currency crisis during",
+      "As is usually the case in intermarket work, crude oil played a key role during 1999 in helping to set in motion a ripple eff ect that brought stocks down the following year. The price of crude oil tripled during 1999, which was a big reason why rates rose that year and bond prices fell. As is also normal, the rising price of oil had a positive eff ect on some market groups while hurting others. The biggest benefi ciaries of rising oil prices were stocks tied to oil. During 1999, energy shares became the market\u2019s strongest sector. (Y ou\u2019ll fi nd out later in the book why energy leadership is almost always a warning sign that a stock bull market and an economic recovery are nearing completion.) Groups that suff ered the most from rising oil were fuel\u2010intensive transportation stocks and interest rate\u2013sensitive fi nancial stocks.",
+      "Those sector rotations were early warning signs of an approaching market top. In addition to caus- ing those negative sector rotations, rising oil prices also prompted the Fed to start raising short\u2010term rates in the middle of 1999, which was a major reason why the market topped the following year."
+    ],
+    "evidence_quality": "extract",
+    "placeholder": false,
+    "implemented": false,
+    "headings": [
+      "Trading with Intermarket Analysis  A Visual Approach to Beating the Financial Markets Using Exchange-Traded Funds (2012, Wiley) - libgen.li",
+      "Pages 1-10 (pp. 1-10)",
+      "Pages 11-20 (pp. 11-20)",
+      "Pages 21-30 (pp. 21-30)",
+      "CHAPTER  2 (pp. 31-40)",
+      "CHAPTER   3 (pp. 41-50)",
+      "CHAPTER  4 (pp. 51-60)",
+      "Pages 61-70 (pp. 61-70)",
+      "Pages 71-80 (pp. 71-80)",
+      "Pages 81-90 (pp. 81-90)",
+      "Pages 91-100 (pp. 91-100)",
+      "Pages 101-110 (pp. 101-110)",
+      "Pages 111-120 (pp. 111-120)",
+      "CHAPTER 9 (pp. 121-130)",
+      "Pages 131-140 (pp. 131-140)",
+      "Pages 141-150 (pp. 141-150)",
+      "Pages 151-160 (pp. 151-160)",
+      "CHAPTER 12 (pp. 161-170)",
+      "Pages 171-180 (pp. 171-180)",
+      "Pages 181-190 (pp. 181-190)",
+      "Pages 191-200 (pp. 191-200)",
+      "Pages 201-210 (pp. 201-210)",
+      "Pages 211-220 (pp. 211-220)",
+      "Pages 221-230 (pp. 221-230)",
+      "Pages 231-240 (pp. 231-240)",
+      "Pages 241-250 (pp. 241-250)"
+    ]
+  }
+}

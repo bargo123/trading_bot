@@ -1,0 +1,33 @@
+{
+  "source": "mt5_bars",
+  "bars": 11530,
+  "challenger": "intel_rsi_ext",
+  "baseline_oos_e": -0.018352596347034976,
+  "baseline_pnl": -11.291107600000885,
+  "experiments": [
+    {
+      "id": "intel_rsi_ext",
+      "decision": "accept",
+      "reason": "OOS E 0.0004 vs baseline -0.0184, n=49, full pnl -6.33 vs -11.29",
+      "oos_e": 0.0003652367346905466,
+      "pnl": -6.330809200001181,
+      "n": 144
+    },
+    {
+      "id": "intel_wrong_extreme",
+      "decision": "reject",
+      "reason": "OOS E -0.0404 vs baseline -0.0184, n=31, full pnl -10.60 vs -11.29",
+      "oos_e": -0.040406827956991916,
+      "pnl": -10.603850400000635,
+      "n": 111
+    },
+    {
+      "id": "intel_rsi_ext_quality_40",
+      "decision": "reject",
+      "reason": "OOS E -0.0404 vs baseline -0.0184, n=31, full pnl -10.60 vs -11.29",
+      "oos_e": -0.040406827956991916,
+      "pnl": -10.603850400000635,
+      "n": 111
+    }
+  ]
+}

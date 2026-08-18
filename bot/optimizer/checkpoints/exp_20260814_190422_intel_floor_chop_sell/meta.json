@@ -1,0 +1,20 @@
+{
+  "id": "exp_20260814_190422_intel_floor_chop_sell",
+  "ts": "2026-08-14T19:04:22.298734+00:00",
+  "status": "open",
+  "patch": {
+    "intel_enabled": true,
+    "intel_skip_floor_chop_sell": true,
+    "intel_floor_chop_er": 0.05,
+    "intel_floor_chop_loc": 0.15
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260814_190422_intel_floor_chop_sell",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "intel_floor_chop_sell",
+  "hypothesis": "Kaufman/Damir around CORE: skip SELL only when ER<0.05 and range_loc<=0.15. Not a global ER gate. Keep 1/30.",
+  "rationale": "Kaufman/Damir around CORE: skip SELL only when ER<0.05 and range_loc<=0.15. Not a global ER gate. Keep 1/30.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "2668e39dd54f3e6f:efficiency ratio",
+  "concept": "kaufman_er"
+}

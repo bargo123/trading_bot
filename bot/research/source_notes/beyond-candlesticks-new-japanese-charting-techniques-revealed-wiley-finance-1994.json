@@ -1,0 +1,110 @@
+{
+  "filename": "beyond-candlesticks-new-japanese-charting-techniques-revealed-wiley-finance-1994.md",
+  "title": "Beyond Candlesticks  New Japanese Charting Techniques Revealed (Wiley Finance) (1994, Wiley) - libgen.li",
+  "file_hash": "858ed9f64a3bcb20d362801992e79873503a87af3bdcbf14ff7de554429decbb",
+  "byte_size": 380969,
+  "word_count": 69562,
+  "label": "research_proxy",
+  "placeholder": false,
+  "duplicate_of": null,
+  "timeframes": [
+    "M1",
+    "daily",
+    "intraday",
+    "weekly"
+  ],
+  "data_required": [
+    "volume_unspecified"
+  ],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [
+    "Bar charts do not.",
+    "This is for the benefit of those who are familiar with all the candle pat- terns. Do not worry if you have not heard of the pattern before; it will not detract from the discussion of the chart.",
+    "L. \"See no evil\"-when yolJ see a bullish (bearish) trend, do not get caught up in iU consider it an opportunity to sell (buy).",
+    "Nippon Technical Analysts Association told me that he found it unusual that U.S. newspapers do not have opening stock prices; the Japanese have the openings in their papers. He said that he did not know why the Americans disregard the openings.",
+    "A note of caution: Some data vendors who do not have the actual opening price of a stock default to the prior session's close as today's open. This, in my opinion, is not valid. You must have the true open to draw an accurate candle line. Although an open on a stock will usually not be much different from the prior close, there are some candle patterns in which a higher or lower opening (compared to the prior close) gives valuable information. A data vendor that includes actual opens on stocks is Dial Data (Brooklyn, NY).",
+    "Long Black Real Body at High Price Area just as a long white candle could be an early signal that the market may be trying to build a bottom, so it is that a distinctively long black real body at a high price may be a tentative warning of a top. The long black real body should be significantly longer than the candles preceding it.",
+    "Falling black real body at 2 showed that the bears had wrested control of this stock. Note how black real body 2 was the longest black real body since at least November 1992. This shouts out a warning that there is now something very different about the market, and that appropriate defensive action-such as selling covered calls, or offsetting some longs- should be undertaken. For those who are familiar with all the candle patterns, note how the tall white candle at 1 and the black real body at rl ' ',, r'l",
+    "The tone of the market can be gauged by comparing the relative height, frequency, and color of a group of candle lines. The first sign of trouble in Exhibit 2.25 came with the long black candle at L. Note how this is the longest black candle in some time. Then, an aPPearance of an elongated black candle at 2 was an evident warning sign of trouble. The price de- scent continued until February's tall white candle at 3 arose. This was the loftiest white real body in many months, and relayed that the bulls had entered the market in force. Observe how the midpoint of February's white real body became a base for a minor rally.",
+    "EXHIBIT 2.30. Open Above the Center of a Black Real Body, Rubbermaid-Daily that defines a spinning top. A spinning toP is a warning sign that the market is losing its momentum. For instance, if the market is at or near a new high-especially after a steep advance-the emergence of a spin- ning top could be a signal that the bulls are having trouble in continuing their ascent. This could be a cautionary signal that the prior move is stalling.",
+    "In Exhibit 2.32, the strong, long white real bodies at the end of July left no doubt about who had control of this market-the bulls. But the two spinning tops after these long white real bodies sent out a warning",
+    "Daxro-Daily power to go thirteen more sessions in the direction of the gaP. I do not agree with the preciseness of the last part of that statement, but this technique of waiting three sessions for confirmation may Plovide a method to confirm a window's support or resistance.",
+    "In Exhibit 3.59, December's harami followed by a long black real body was an important warning. Also note how those three candles (that is, the two candles of the harami and the next candle) all had long upper shadows. After this group of bearish signals, there was a falling window with two black candles. This completed the two black gapping candles."
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "[Wiley Finance] Steve Nison - Beyond Candlesticks_ New Japanese Charting Techniques Revealed (Wiley Finance) (1994, Wiley) - libgen.li.pdf",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "beyond-candlesticks-new-japanese-charting-techniques-revealed-wiley-finance-1994.md",
+    "timeframes": [
+      "M1",
+      "daily",
+      "intraday",
+      "weekly"
+    ],
+    "data_required": [
+      "volume_unspecified"
+    ],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [
+      "Bar charts do not.",
+      "This is for the benefit of those who are familiar with all the candle pat- terns. Do not worry if you have not heard of the pattern before; it will not detract from the discussion of the chart.",
+      "L. \"See no evil\"-when yolJ see a bullish (bearish) trend, do not get caught up in iU consider it an opportunity to sell (buy).",
+      "Nippon Technical Analysts Association told me that he found it unusual that U.S. newspapers do not have opening stock prices; the Japanese have the openings in their papers. He said that he did not know why the Americans disregard the openings.",
+      "A note of caution: Some data vendors who do not have the actual opening price of a stock default to the prior session's close as today's open. This, in my opinion, is not valid. You must have the true open to draw an accurate candle line. Although an open on a stock will usually not be much different from the prior close, there are some candle patterns in which a higher or lower opening (compared to the prior close) gives valuable information. A data vendor that includes actual opens on stocks is Dial Data (Brooklyn, NY).",
+      "Long Black Real Body at High Price Area just as a long white candle could be an early signal that the market may be trying to build a bottom, so it is that a distinctively long black real body at a high price may be a tentative warning of a top. The long black real body should be significantly longer than the candles preceding it.",
+      "Falling black real body at 2 showed that the bears had wrested control of this stock. Note how black real body 2 was the longest black real body since at least November 1992. This shouts out a warning that there is now something very different about the market, and that appropriate defensive action-such as selling covered calls, or offsetting some longs- should be undertaken. For those who are familiar with all the candle patterns, note how the tall white candle at 1 and the black real body at rl ' ',, r'l",
+      "The tone of the market can be gauged by comparing the relative height, frequency, and color of a group of candle lines. The first sign of trouble in Exhibit 2.25 came with the long black candle at L. Note how this is the longest black candle in some time. Then, an aPPearance of an elongated black candle at 2 was an evident warning sign of trouble. The price de- scent continued until February's tall white candle at 3 arose. This was the loftiest white real body in many months, and relayed that the bulls had entered the market in force. Observe how the midpoint of February's white real body became a base for a minor rally.",
+      "EXHIBIT 2.30. Open Above the Center of a Black Real Body, Rubbermaid-Daily that defines a spinning top. A spinning toP is a warning sign that the market is losing its momentum. For instance, if the market is at or near a new high-especially after a steep advance-the emergence of a spin- ning top could be a signal that the bulls are having trouble in continuing their ascent. This could be a cautionary signal that the prior move is stalling.",
+      "In Exhibit 2.32, the strong, long white real bodies at the end of July left no doubt about who had control of this market-the bulls. But the two spinning tops after these long white real bodies sent out a warning",
+      "Daxro-Daily power to go thirteen more sessions in the direction of the gaP. I do not agree with the preciseness of the last part of that statement, but this technique of waiting three sessions for confirmation may Plovide a method to confirm a window's support or resistance.",
+      "In Exhibit 3.59, December's harami followed by a long black real body was an important warning. Also note how those three candles (that is, the two candles of the harami and the next candle) all had long upper shadows. After this group of bearish signals, there was a falling window with two black candles. This completed the two black gapping candles."
+    ],
+    "evidence_quality": "extract",
+    "placeholder": false,
+    "implemented": false,
+    "headings": [
+      "Beyond Candlesticks  New Japanese Charting Techniques Revealed (Wiley Finance) (1994, Wiley) - libgen.li",
+      "Pages 1-10 (pp. 1-10)",
+      "Pages 11-20 (pp. 11-20)",
+      "CHAPTER 2 (pp. 21-30)",
+      "Pages 31-40 (pp. 31-40)",
+      "Pages 41-50 (pp. 41-50)",
+      "Pages 51-60 (pp. 51-60)",
+      "Pages 61-70 (pp. 61-70)",
+      "Pages 71-80 (pp. 71-80)",
+      "Pages 81-90 (pp. 81-90)",
+      "Pages 91-100 (pp. 91-100)",
+      "Pages 101-110 (pp. 101-110)",
+      "Pages 111-120 (pp. 111-120)",
+      "Pages 121-130 (pp. 121-130)",
+      "Pages 131-140 (pp. 131-140)",
+      "Pages 141-150 (pp. 141-150)",
+      "Pages 151-160 (pp. 151-160)",
+      "Pages 161-170 (pp. 161-170)",
+      "Pages 171-180 (pp. 171-180)",
+      "Pages 181-190 (pp. 181-190)",
+      "Pages 191-200 (pp. 191-200)",
+      "Pages 201-210 (pp. 201-210)",
+      "Pages 211-220 (pp. 211-220)",
+      "Pages 221-230 (pp. 221-230)",
+      "Pages 231-240 (pp. 231-240)",
+      "Pages 241-250 (pp. 241-250)",
+      "Pages 251-260 (pp. 251-260)",
+      "Pages 261-270 (pp. 261-270)",
+      "Pages 271-276 (pp. 271-276)"
+    ]
+  }
+}

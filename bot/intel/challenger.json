@@ -1,0 +1,125 @@
+{
+  "id": "intel_weak_adx_edge",
+  "kind": "book",
+  "hypothesis": "Leftover never-green after rsi_ext: ADX<22 at loc>=0.90 buy / loc<=0.10 sell. Wilder range + Brooks/Damir edge. Not full wrong_edge.",
+  "inspiration": {
+    "file": "docs/trading/NEW_BOOKS_VPA_BROOKS_DAMIR.md",
+    "books": [
+      "Brooks Ranges 2012",
+      "Damir 2016"
+    ],
+    "keywords": [
+      "failed breakout",
+      "range",
+      "buy low sell high"
+    ],
+    "concept": "brooks_failed_bo"
+  },
+  "patch": {
+    "intel_enabled": true,
+    "intel_skip_weak_adx_edge": true,
+    "intel_weak_adx": 22.0
+  },
+  "baseline": {
+    "full": {
+      "win_rate": 95.71428571428572,
+      "profit_factor": 0.2665981333469554,
+      "max_drawdown_pct": 12.54719660000049,
+      "expectancy_r": -0.02695357714286013,
+      "total_trades": 140,
+      "net_pnl": -11.320502400000844,
+      "final_equity": 88.67949759999908,
+      "halt_reason": "",
+      "avg_win": 0.030709729850735244,
+      "avg_loss": -2.572601033333228,
+      "max_consecutive_wins": 43,
+      "max_consecutive_losses": 1,
+      "sharpe": -1.6257926338794528,
+      "sortino": -0.08544432224280003
+    },
+    "oos": {
+      "win_rate": 95.8904109589041,
+      "profit_factor": 0.344959219071693,
+      "max_drawdown_pct": 5.393444986800493,
+      "expectancy_r": -0.01862728401826763,
+      "total_trades": 73,
+      "net_pnl": -4.079375200000464,
+      "final_equity": 95.92062479999947,
+      "halt_reason": "",
+      "avg_win": 0.03068986857141755,
+      "avg_loss": -2.075888666666564,
+      "max_consecutive_wins": 43,
+      "max_consecutive_losses": 1,
+      "sharpe": -0.9246471104067556,
+      "sortino": -0.03977868429615767
+    }
+  },
+  "candidate": {
+    "full": {
+      "win_rate": 97.2027972027972,
+      "profit_factor": 0.40557027980700944,
+      "max_drawdown_pct": 8.224807600000034,
+      "expectancy_r": -0.014572486713289836,
+      "total_trades": 143,
+      "net_pnl": -6.251596800001114,
+      "final_equity": 93.74840319999886,
+      "halt_reason": "",
+      "avg_win": 0.0306861050359602,
+      "avg_loss": -2.6292413499998957,
+      "max_consecutive_wins": 107,
+      "max_consecutive_losses": 1,
+      "sharpe": -1.1165953130042572,
+      "sortino": -0.0660548482280991
+    },
+    "oos": {
+      "win_rate": 97.77777777777777,
+      "profit_factor": 1.0312446256748242,
+      "max_drawdown_pct": 1.2920196177338448,
+      "expectancy_r": 0.0003030651851822842,
+      "total_trades": 45,
+      "net_pnl": 0.04091379999960698,
+      "final_equity": 100.04091379999959,
+      "halt_reason": "",
+      "avg_win": 0.030690468181807155,
+      "avg_loss": -1.309466799999908,
+      "max_consecutive_wins": 44,
+      "max_consecutive_losses": 1,
+      "sharpe": 0.03786793803853745,
+      "sortino": null
+    },
+    "is": {
+      "win_rate": 96.0,
+      "profit_factor": 0.2841732369641376,
+      "max_drawdown_pct": 8.224807600000034,
+      "expectancy_r": -0.024736063333336788,
+      "total_trades": 100,
+      "net_pnl": -7.420819000000767,
+      "final_equity": 92.57918099999924,
+      "halt_reason": "",
+      "avg_win": 0.030687099999988976,
+      "avg_loss": -2.5916951499999277,
+      "max_consecutive_wins": 64,
+      "max_consecutive_losses": 1,
+      "sharpe": -1.3484985604686333,
+      "sortino": -0.0877822459360108
+    }
+  },
+  "walk_forward": [],
+  "loss_removal": {
+    "losses_avoided": 2.0,
+    "winners_sacrificed": -5.0,
+    "loss_removal_efficiency": null
+  },
+  "win_rate": 97.2027972027972,
+  "profit": -6.251596800001114,
+  "expectancy": -0.014572486713289836,
+  "profit_factor": 0.40557027980700944,
+  "drawdown": 8.224807600000034,
+  "number_of_trades": 143,
+  "accepted": true,
+  "decision": "accept",
+  "reason": "OOS E 0.0003 vs baseline -0.0186, n=45, full pnl -6.25 vs -11.32",
+  "lesson": "Keep CORE. Meta filter only if OOS expectancy rises after costs.",
+  "role": "CHALLENGER",
+  "updated_utc": "2026-08-14T17:44:10.220188+00:00"
+}

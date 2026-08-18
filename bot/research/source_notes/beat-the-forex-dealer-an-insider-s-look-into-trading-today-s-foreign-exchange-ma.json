@@ -1,0 +1,104 @@
+{
+  "filename": "beat-the-forex-dealer-an-insider-s-look-into-trading-today-s-foreign-exchange-ma.md",
+  "title": "Beat the Forex Dealer  An insider's look into trading today's foreign exchange market (2008, Wiley) - libgen.li",
+  "file_hash": "016c4251763f56ee6c0283e8522904c1e8c61dab700852ec509054fb3e1c8218",
+  "byte_size": 362769,
+  "word_count": 67395,
+  "label": "research_proxy",
+  "placeholder": false,
+  "duplicate_of": null,
+  "timeframes": [
+    "daily",
+    "weekly"
+  ],
+  "data_required": [
+    "mt5_l2",
+    "volume_unspecified"
+  ],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [
+    "Realizing that most FX books in print are e ither writte n by scam artists or aca\u00ad demics with little real-wor ld trading experience, I decided to put my own thoughts to paper. While I cenain ly do not proclaim to be any son of market wizard, the market insights J h<lvC gained while managing a success ful currency fund should prove valuable to readers, eve n if they are just starting their trading careers. Being a firm believer in the \"s mall is beaut iful\" mantra, I h ave therefore tried to keep this book short, and to the point.",
+    "What most of these new Pal1icipants fail to rea li ze is that they are stepp ing on to a battlefield littered wi th th e remains of day trader s and gen ius \"syste ms\". It is frequently noted that over 90 % of FX traders do not survive in the long run, yet you won't find that stat istic in any of the publicity dished out by the FX brokers.",
+    "16 Beat the Forex Dealer that the sharks will move in and actively push the market against them until they are dead in the water. Thi s acti ve \" hunting\" role is something that most model deve lopers do not t ake into acco unt, and to a large degree it can be said that their",
+    "1998, for example, were wiped oul. In general, any one-way market is bad for dea lers, since prices do not r etrace and they are forced to eventually unload their positions at a loss. However, from a dealer's perspecti ve, this is s imply seen as the",
+    "smart traders could, a nd did , make money from them. Jesse Livermore,4 for examp le, became so good aI picking stocks that h e was soon banned from all the b ucket shops in the East Coast. Cas inos do not like w inners a nd neither do",
+    "The s imple answer is \" no\". Since statistics show that most traders blow-up their acco unts before reaching their first anni versary, it is in a b roker' s best interest to gel as much as they can as qui ckly as they can. There is no s uch thing as a \"long-term \" relati onship between a mark et maker and his clients, and while the degree of dod gy ness may v ary from shop to shop. the c apital markets were founded on greed, not charit y. Stori es of big investment bank s rippin g o ff large corporate clients routin ely make the news, so is it really any surpri se to hear that retaillr aders do not fare any better? Sinc e dealers routinely change jobs and live on a daY-la-day basis (or bonUS-la-bonu s, actuall y) it should come as no surpri se to learn that they focus purely on short-term profit s. A trade is a trade and a deal is a dea l, so do not expect any sy mpathy from your broker/dealer an ytime soo n. Arter al1. he is not exac tly selling ladies shoes, either. A dealer's job is a risky one, and he knows that if you could . you would probabl y rip him off in a second , s o why s hould he treat you any differently? Although I am sure s queak y-clean shop s exist somew here, I have yet to come across any.",
+    "Since retail FX brokers do not have to offse t client transactio ns in an exchange, pricing dec isions become critica l. Large reta il FCMs have their own market makers, a Citi or Gold man for exam ple, which offer them a I pip spread or less on the most liquid pairs, which they use as their indicative price. To this rate, they add their 2 or 3 pips (or more!), which i s the rate clients see in their trading platforms, which enab les them to captu re a nice 3 or 4 p ip risk-free profit on a round-trip trade - not bad for si mpl y acting as the middle man between the FX \"wholesa lers\" and the rctail buyer.",
+    "As the Chinese genera l Sun-Tzu Ollce said. \" Keep your [riends close and your enemies even closer.\" All traders should heed this advice and keep a watchful eye on their FX broker. These days. dodgy acti vity seems 1O be more of len the norlll than the exception , so it is imperative to conduct your own due dili gence on your broker before opening an acco unt. Do not assume that beca use they proclaim to be large and \"we ll respec ted\" in the ind ustry that that makes them upstanding guys.",
+    "you go down. S ince retail off-exc hange forex trades are not guaranteed by a clear\u00ad ing organization, the fu nds that you have deposited are nOI insured and do not receive a priority in bankruptc y. Even customer funds depos ited by a dealer in an",
+    "or \"system\" has no relationsh ip with any broker. A dead giveaway is them asking you to trade with their \"preferred\" broker , which is just another way of saying that they make a pip or two out of every trade that you place. You want to steer clear of anyone making money from your trading. since at the end of the day they do not care if you win or lose money: they just want you to trade.",
+    "As a trader, you want to remain at all times objective and have as broad a view as possib le of the market , something that cannoL be accomplis hed using a single feed. Having a seco nd or third feed is your way of getting a \"seco nd opi nion'\u00b7 on the market and gives you a way to confirm the price actio n. Your platform feed should only be used for placing trades, bUL you r strategy and analysi s s hould rely on the purest, most unbiased price feed you can find. Most retai l trader s do not have the luxury of trading with a Reuters or EBS feed, but rest assu red that alternative sources can be found. Every trader should spend some time comparin g different feeds and charts to see how they perform in fast-moving markets when retail platform s regularly freeze their prices (and notice that demo feeds are different from li ve feeds). Having a stab le and faithful chart ing appl ication is espec ially vita l to all short- term trade rs.",
+    "If you feel you h ave been wronged and cannot come to a suitable agreement with your broker, do not hesitate to contact either the CFTC or the NFA. Although most brokers will usually fold when threate ned with official action. if they inste,ld choose to ca ll your bluff go directly to t hese agenc ies since both offer programs thm may help client s resolve disputes with brokers. You do not need to hire a lawyer to fi le a complaint , and usuall y laking this initial step is e noug h to scare a broker into a (reaso nable) settlement. since the last thing they want on their official record is another disgruntled trader."
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "[Wiley Trading] Agustin Silvani - Beat the Forex Dealer_ An insider's look into trading today's foreign exchange market (2008, Wiley) - libgen.li.pdf",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "beat-the-forex-dealer-an-insider-s-look-into-trading-today-s-foreign-exchange-ma.md",
+    "timeframes": [
+      "daily",
+      "weekly"
+    ],
+    "data_required": [
+      "mt5_l2",
+      "volume_unspecified"
+    ],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [
+      "Realizing that most FX books in print are e ither writte n by scam artists or aca\u00ad demics with little real-wor ld trading experience, I decided to put my own thoughts to paper. While I cenain ly do not proclaim to be any son of market wizard, the market insights J h<lvC gained while managing a success ful currency fund should prove valuable to readers, eve n if they are just starting their trading careers. Being a firm believer in the \"s mall is beaut iful\" mantra, I h ave therefore tried to keep this book short, and to the point.",
+      "What most of these new Pal1icipants fail to rea li ze is that they are stepp ing on to a battlefield littered wi th th e remains of day trader s and gen ius \"syste ms\". It is frequently noted that over 90 % of FX traders do not survive in the long run, yet you won't find that stat istic in any of the publicity dished out by the FX brokers.",
+      "16 Beat the Forex Dealer that the sharks will move in and actively push the market against them until they are dead in the water. Thi s acti ve \" hunting\" role is something that most model deve lopers do not t ake into acco unt, and to a large degree it can be said that their",
+      "1998, for example, were wiped oul. In general, any one-way market is bad for dea lers, since prices do not r etrace and they are forced to eventually unload their positions at a loss. However, from a dealer's perspecti ve, this is s imply seen as the",
+      "smart traders could, a nd did , make money from them. Jesse Livermore,4 for examp le, became so good aI picking stocks that h e was soon banned from all the b ucket shops in the East Coast. Cas inos do not like w inners a nd neither do",
+      "The s imple answer is \" no\". Since statistics show that most traders blow-up their acco unts before reaching their first anni versary, it is in a b roker' s best interest to gel as much as they can as qui ckly as they can. There is no s uch thing as a \"long-term \" relati onship between a mark et maker and his clients, and while the degree of dod gy ness may v ary from shop to shop. the c apital markets were founded on greed, not charit y. Stori es of big investment bank s rippin g o ff large corporate clients routin ely make the news, so is it really any surpri se to hear that retaillr aders do not fare any better? Sinc e dealers routinely change jobs and live on a daY-la-day basis (or bonUS-la-bonu s, actuall y) it should come as no surpri se to learn that they focus purely on short-term profit s. A trade is a trade and a deal is a dea l, so do not expect any sy mpathy from your broker/dealer an ytime soo n. Arter al1. he is not exac tly selling ladies shoes, either. A dealer's job is a risky one, and he knows that if you could . you would probabl y rip him off in a second , s o why s hould he treat you any differently? Although I am sure s queak y-clean shop s exist somew here, I have yet to come across any.",
+      "Since retail FX brokers do not have to offse t client transactio ns in an exchange, pricing dec isions become critica l. Large reta il FCMs have their own market makers, a Citi or Gold man for exam ple, which offer them a I pip spread or less on the most liquid pairs, which they use as their indicative price. To this rate, they add their 2 or 3 pips (or more!), which i s the rate clients see in their trading platforms, which enab les them to captu re a nice 3 or 4 p ip risk-free profit on a round-trip trade - not bad for si mpl y acting as the middle man between the FX \"wholesa lers\" and the rctail buyer.",
+      "As the Chinese genera l Sun-Tzu Ollce said. \" Keep your [riends close and your enemies even closer.\" All traders should heed this advice and keep a watchful eye on their FX broker. These days. dodgy acti vity seems 1O be more of len the norlll than the exception , so it is imperative to conduct your own due dili gence on your broker before opening an acco unt. Do not assume that beca use they proclaim to be large and \"we ll respec ted\" in the ind ustry that that makes them upstanding guys.",
+      "you go down. S ince retail off-exc hange forex trades are not guaranteed by a clear\u00ad ing organization, the fu nds that you have deposited are nOI insured and do not receive a priority in bankruptc y. Even customer funds depos ited by a dealer in an",
+      "or \"system\" has no relationsh ip with any broker. A dead giveaway is them asking you to trade with their \"preferred\" broker , which is just another way of saying that they make a pip or two out of every trade that you place. You want to steer clear of anyone making money from your trading. since at the end of the day they do not care if you win or lose money: they just want you to trade.",
+      "As a trader, you want to remain at all times objective and have as broad a view as possib le of the market , something that cannoL be accomplis hed using a single feed. Having a seco nd or third feed is your way of getting a \"seco nd opi nion'\u00b7 on the market and gives you a way to confirm the price actio n. Your platform feed should only be used for placing trades, bUL you r strategy and analysi s s hould rely on the purest, most unbiased price feed you can find. Most retai l trader s do not have the luxury of trading with a Reuters or EBS feed, but rest assu red that alternative sources can be found. Every trader should spend some time comparin g different feeds and charts to see how they perform in fast-moving markets when retail platform s regularly freeze their prices (and notice that demo feeds are different from li ve feeds). Having a stab le and faithful chart ing appl ication is espec ially vita l to all short- term trade rs.",
+      "If you feel you h ave been wronged and cannot come to a suitable agreement with your broker, do not hesitate to contact either the CFTC or the NFA. Although most brokers will usually fold when threate ned with official action. if they inste,ld choose to ca ll your bluff go directly to t hese agenc ies since both offer programs thm may help client s resolve disputes with brokers. You do not need to hire a lawyer to fi le a complaint , and usuall y laking this initial step is e noug h to scare a broker into a (reaso nable) settlement. since the last thing they want on their official record is another disgruntled trader."
+    ],
+    "evidence_quality": "extract",
+    "placeholder": false,
+    "implemented": false,
+    "headings": [
+      "Beat the Forex Dealer  An insider's look into trading today's foreign exchange market (2008, Wiley) - libgen.li",
+      "Pages 1-10 (pp. 1-10)",
+      "Pages 11-20 (pp. 11-20)",
+      "Pages 21-30 (pp. 21-30)",
+      "Pages 31-40 (pp. 31-40)",
+      "Pages 41-50 (pp. 41-50)",
+      "Pages 51-60 (pp. 51-60)",
+      "Pages 61-70 (pp. 61-70)",
+      "Pages 71-80 (pp. 71-80)",
+      "Pages 81-90 (pp. 81-90)",
+      "Pages 91-100 (pp. 91-100)",
+      "Pages 101-110 (pp. 101-110)",
+      "Pages 111-120 (pp. 111-120)",
+      "Pages 121-130 (pp. 121-130)",
+      "Pages 131-140 (pp. 131-140)",
+      "Pages 141-150 (pp. 141-150)",
+      "Pages 151-160 (pp. 151-160)",
+      "Pages 161-170 (pp. 161-170)",
+      "Pages 171-180 (pp. 171-180)",
+      "Pages 181-190 (pp. 181-190)",
+      "Pages 191-200 (pp. 191-200)",
+      "Pages 201-210 (pp. 201-210)",
+      "Pages 211-220 (pp. 211-220)",
+      "Pages 221-230 (pp. 221-230)",
+      "Pages 231-238 (pp. 231-238)"
+    ]
+  }
+}

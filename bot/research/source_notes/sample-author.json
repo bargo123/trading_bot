@@ -1,0 +1,51 @@
+{
+  "filename": "sample-author.md",
+  "title": "Sample Author",
+  "file_hash": "0cc0902e70baf89a2a6f37946d190c73ffed063ddaafe68203d3d7c4221a7e5c",
+  "byte_size": 1306,
+  "word_count": 196,
+  "label": "unavailable",
+  "placeholder": true,
+  "duplicate_of": null,
+  "timeframes": [],
+  "data_required": [],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [
+    "Stops do not guarantee fills at the intended price during gaps or fast markets.",
+    "When evidence is missing, do not invent backtest statistics or precise performance claims."
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "Sample_Author_-_Risk_Basics.md",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "sample-author.md",
+    "timeframes": [],
+    "data_required": [],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [
+      "Stops do not guarantee fills at the intended price during gaps or fast markets.",
+      "When evidence is missing, do not invent backtest statistics or precise performance claims."
+    ],
+    "evidence_quality": "extract",
+    "placeholder": true,
+    "implemented": false,
+    "headings": [
+      "Sample Author",
+      "Chapter 1 Position Sizing",
+      "Chapter 2 Stop Losses",
+      "Chapter 3 Mean Reversion Limits"
+    ]
+  }
+}

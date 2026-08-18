@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_221617_vpa_coulling_filter",
+  "ts": "2026-08-13T22:16:18.604003+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_vpa_filter": true
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_221617_vpa_coulling_filter",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "vpa_coulling_filter",
+  "hypothesis": "Coulling VPA: skip absorption (high tick-volume, tiny range) and low-volume wide bars. Tick volume is a proxy. Keep 24h firehose.",
+  "rationale": "Coulling VPA: skip absorption (high tick-volume, tiny range) and low-volume wide bars. Tick volume is a proxy. Keep 24h firehose.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "296a84a1651c669f:Kaufman",
+  "concept": "kaufman_er"
+}

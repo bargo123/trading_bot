@@ -1,0 +1,107 @@
+{
+  "filename": "quantitative-trading-how-to-build-your-own-algorithmic-trading-business-2008-wil.md",
+  "title": "Quantitative Trading  How to Build Your Own Algorithmic Trading Business (2008, Wiley) - libgen.li",
+  "file_hash": "e7bcd249e180bbb65f18ef1d46f46861116d8a4be872fd610b5c0ab831416208",
+  "byte_size": 372373,
+  "word_count": 62167,
+  "label": "research_proxy",
+  "placeholder": false,
+  "duplicate_of": null,
+  "timeframes": [
+    "H1",
+    "M1",
+    "daily",
+    "intraday",
+    "weekly"
+  ],
+  "data_required": [
+    "mt5_l2",
+    "volume_unspecified"
+  ],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "P1: JYS fm JWBK321-Chan September 24, 2008 13:43 Printer: Yet to come Contents ix Testing Your System by Paper Trading 89 Why Does Actual Performance Diverge from Expectations? 90 Summary 92 CHAPTER 6 Money and Risk Management 95 Optimal Capital Allocation and Leverage 95 Risk Management 103 Psychological Preparedness 108 Summary 111 Appendix: A Simple Derivation of the Kelly Formula when Return D",
+  "warnings": [
+    "Compared to most small businesses (other than certain dot-coms), quantitative trading is very scalable (up to a point). It is easy to \ufb01nd yourselves trading millions of dollars in the comfort of your own home, as long as your strategy is consistently pro\ufb01table. This is be- cause scaling up often just means changing a number in your pro- gram. This number is called leverage. You do not need to negotiate with a banker or a venture capitalist to borrow more capital for your business. The brokerages stand ready and willing to do that. If you are a member of a proprietary trading \ufb01rm (more on this later in",
+    "This is not to say that you will not \ufb01nd some gems if you are persistent enough, but I have found that many traders\u2019 forums or blogs may suggest simpler strategies that are equally pro\ufb01table. You might be skeptical that people would actually post truly pro\ufb01table strategies in the public space for all to see. After all, doesn\u2019t this disclosure increase the competition and decrease the pro\ufb01tability of the strategy? And you would be right: Most ready-made strategies that you may \ufb01nd in these places actually do not withstand careful",
+    "I will include a tutorial in Example 3.5 on how to compute these quantities from a table of daily pro\ufb01ts and losses using either Excel or MATLAB. One thing to keep in mind: The maximum drawdown and the maximum drawdown duration do not typically overlap over the same period.",
+    "A historical database of stock prices that does not include stocks that have disappeared due to bankruptcies, delistings, mergers, or acquisitions suffer from the so-called survivorship bias, because only \u201csurvivors\u201d of those often unpleasant events remain in the database. (The same term can be applied to mutual fund or hedge fund databases that do not include funds that went out of business.)",
+    "1,500 symbols on Excel\u2014it is possible, but quite painful.). It has nu- merous advanced statistical and mathematical modules built in, so traders do not have to reinvent the wheel if their trading algorithms involve some sophisticated but common mathematical concepts.",
+    "Now, the astute reader will notice that the adjusted close prices here do not match the adjusted close prices displayed in the Yahoo! Finance table. The reason for this is that there have been dividends distributed af- ter 6/9/2005, so the Yahoo! prices have been adjusted for all those as well. Since each adjustment is a multiplier, the aggregate adjustment is just the product of all the individual multipliers. Here are the dividends from 6/9/2005 to November 2007, together with the unadjusted closing prices of the previous trading days and the resulting individual multipliers:",
+    "Here is a toy \u201cbuy low-price stocks\u201d strategy (Warning: This toy strategy is hazardous to your \ufb01nancial health!). Let\u2019s say from a universe of the 1,000 largest stocks (based on market capitalization), we pick 10 that have the lowest closing prices at the beginning of the year and hold them (with equal initial capital) for one year. Let\u2019s look at what we would have picked if we had a good, survivorship-bias-free database:",
+    "Similarly, if you have a long-only day-trading strategy that does not hold positions overnight, you again have no need to subtract the risk-free rate from the strategy return in order to obtain the excess returns, since you do not have \ufb01nancing costs in this case, either. In general, you need to subtract the risk-free rate from your strategy returns in calculating the Sharpe ratio only if your strategy incurs \ufb01nancing cost.",
+    "If the strategy that you are testing comes from a published source, and you are just conducting a backtest to verify that the re- sults are correct, then the entire period between the time of publi- cation and the time that you tested the strategy is a genuine out-of- sample period. As long as you do not optimize the parameters of the published model on the out-of-sample period, this period is as good as paper trading the strategy.",
+    "I have not incorporated transaction costs (which I discuss in the next section) into this analysis. You can try to add that as an exercise. Since this strategy doesn\u2019t trade very frequently, transaction costs do not have a big impact on the resulting Sharpe ratio.",
+    "When one has reduced the set of parameters and conditions that trigger a trade to the minimum, and after one has ascertained that small variations in these parameters and conditions do not drasti- cally alter the out-of-sample performance, one should consider di- viding the trading capital across the different parameter values and sets of conditions. This averaging over parameters will further help ensure that the actual trading performance of the model will not de- viate too much from the backtest result.",
+    "% those stocks that do not have valid prices or"
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "[Wiley Trading] Ernie Chan - Quantitative Trading_ How to Build Your Own Algorithmic Trading Business (2008, Wiley) - libgen.li.pdf",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "quantitative-trading-how-to-build-your-own-algorithmic-trading-business-2008-wil.md",
+    "timeframes": [
+      "H1",
+      "M1",
+      "daily",
+      "intraday",
+      "weekly"
+    ],
+    "data_required": [
+      "mt5_l2",
+      "volume_unspecified"
+    ],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "P1: JYS fm JWBK321-Chan September 24, 2008 13:43 Printer: Yet to come Contents ix Testing Your System by Paper Trading 89 Why Does Actual Performance Diverge from Expectations? 90 Summary 92 CHAPTER 6 Money and Risk Management 95 Optimal Capital Allocation and Leverage 95 Risk Management 103 Psychological Preparedness 108 Summary 111 Appendix: A Simple Derivation of the Kelly Formula when Return D",
+    "warnings": [
+      "Compared to most small businesses (other than certain dot-coms), quantitative trading is very scalable (up to a point). It is easy to \ufb01nd yourselves trading millions of dollars in the comfort of your own home, as long as your strategy is consistently pro\ufb01table. This is be- cause scaling up often just means changing a number in your pro- gram. This number is called leverage. You do not need to negotiate with a banker or a venture capitalist to borrow more capital for your business. The brokerages stand ready and willing to do that. If you are a member of a proprietary trading \ufb01rm (more on this later in",
+      "This is not to say that you will not \ufb01nd some gems if you are persistent enough, but I have found that many traders\u2019 forums or blogs may suggest simpler strategies that are equally pro\ufb01table. You might be skeptical that people would actually post truly pro\ufb01table strategies in the public space for all to see. After all, doesn\u2019t this disclosure increase the competition and decrease the pro\ufb01tability of the strategy? And you would be right: Most ready-made strategies that you may \ufb01nd in these places actually do not withstand careful",
+      "I will include a tutorial in Example 3.5 on how to compute these quantities from a table of daily pro\ufb01ts and losses using either Excel or MATLAB. One thing to keep in mind: The maximum drawdown and the maximum drawdown duration do not typically overlap over the same period.",
+      "A historical database of stock prices that does not include stocks that have disappeared due to bankruptcies, delistings, mergers, or acquisitions suffer from the so-called survivorship bias, because only \u201csurvivors\u201d of those often unpleasant events remain in the database. (The same term can be applied to mutual fund or hedge fund databases that do not include funds that went out of business.)",
+      "1,500 symbols on Excel\u2014it is possible, but quite painful.). It has nu- merous advanced statistical and mathematical modules built in, so traders do not have to reinvent the wheel if their trading algorithms involve some sophisticated but common mathematical concepts.",
+      "Now, the astute reader will notice that the adjusted close prices here do not match the adjusted close prices displayed in the Yahoo! Finance table. The reason for this is that there have been dividends distributed af- ter 6/9/2005, so the Yahoo! prices have been adjusted for all those as well. Since each adjustment is a multiplier, the aggregate adjustment is just the product of all the individual multipliers. Here are the dividends from 6/9/2005 to November 2007, together with the unadjusted closing prices of the previous trading days and the resulting individual multipliers:",
+      "Here is a toy \u201cbuy low-price stocks\u201d strategy (Warning: This toy strategy is hazardous to your \ufb01nancial health!). Let\u2019s say from a universe of the 1,000 largest stocks (based on market capitalization), we pick 10 that have the lowest closing prices at the beginning of the year and hold them (with equal initial capital) for one year. Let\u2019s look at what we would have picked if we had a good, survivorship-bias-free database:",
+      "Similarly, if you have a long-only day-trading strategy that does not hold positions overnight, you again have no need to subtract the risk-free rate from the strategy return in order to obtain the excess returns, since you do not have \ufb01nancing costs in this case, either. In general, you need to subtract the risk-free rate from your strategy returns in calculating the Sharpe ratio only if your strategy incurs \ufb01nancing cost.",
+      "If the strategy that you are testing comes from a published source, and you are just conducting a backtest to verify that the re- sults are correct, then the entire period between the time of publi- cation and the time that you tested the strategy is a genuine out-of- sample period. As long as you do not optimize the parameters of the published model on the out-of-sample period, this period is as good as paper trading the strategy.",
+      "I have not incorporated transaction costs (which I discuss in the next section) into this analysis. You can try to add that as an exercise. Since this strategy doesn\u2019t trade very frequently, transaction costs do not have a big impact on the resulting Sharpe ratio.",
+      "When one has reduced the set of parameters and conditions that trigger a trade to the minimum, and after one has ascertained that small variations in these parameters and conditions do not drasti- cally alter the out-of-sample performance, one should consider di- viding the trading capital across the different parameter values and sets of conditions. This averaging over parameters will further help ensure that the actual trading performance of the model will not de- viate too much from the backtest result.",
+      "% those stocks that do not have valid prices or"
+    ],
+    "evidence_quality": "extract",
+    "placeholder": false,
+    "implemented": false,
+    "headings": [
+      "Quantitative Trading  How to Build Your Own Algorithmic Trading Business (2008, Wiley) - libgen.li",
+      "Pages 1-10 (pp. 1-10)",
+      "CHAPTER 6 Money and Risk Management 95 (pp. 11-20)",
+      "CHAPTER 1 (pp. 21-30)",
+      "CHAPTER 2 (pp. 31-40)",
+      "Pages 41-50 (pp. 41-50)",
+      "CHAPTER 3 (pp. 51-60)",
+      "Pages 61-70 (pp. 61-70)",
+      "Pages 71-80 (pp. 71-80)",
+      "Pages 81-90 (pp. 81-90)",
+      "CHAPTER 4 (pp. 91-100)",
+      "CHAPTER 5 (pp. 101-110)",
+      "Pages 111-120 (pp. 111-120)",
+      "Pages 121-130 (pp. 121-130)",
+      "Pages 131-140 (pp. 131-140)",
+      "Pages 141-150 (pp. 141-150)",
+      "Pages 151-160 (pp. 151-160)",
+      "Pages 161-170 (pp. 161-170)",
+      "Pages 171-180 (pp. 171-180)",
+      "Pages 181-190 (pp. 181-190)",
+      "Pages 191-200 (pp. 191-200)",
+      "Pages 201-204 (pp. 201-204)"
+    ]
+  }
+}

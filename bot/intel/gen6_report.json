@@ -1,0 +1,45 @@
+{
+  "source": "mt5_bars",
+  "bars": 11530,
+  "generation": "gen6",
+  "gate": "Promote only if OOS E AND full $ both beat rsi_ext-only. Path-dependent after costs. Not WR. Not TP3 stored best.",
+  "core_oos_e": -0.01958409259259595,
+  "core_pnl": -11.440213200000965,
+  "rsi_ext": {
+    "id": "intel_rsi_ext",
+    "decision": "accept",
+    "reason": "OOS E -0.0008 vs baseline -0.0196, n=44, full pnl -6.28 vs -11.44",
+    "wr": 97.26027397260275,
+    "e": -0.01433589589041437,
+    "pnl": -6.279122400001268,
+    "n": 146,
+    "oos_wr": 97.72727272727273,
+    "oos_e": -0.000833340909094742,
+    "oos_n": 44
+  },
+  "floor_chop": {
+    "id": "intel_rsi_ext_floor_chop",
+    "decision": "accept",
+    "reason": "OOS E -0.0008 vs baseline -0.0196, n=44, full pnl -6.28 vs -11.44",
+    "wr": 97.26027397260275,
+    "e": -0.01433589589041437,
+    "pnl": -6.279122400001268,
+    "n": 146,
+    "oos_wr": 97.72727272727273,
+    "oos_e": -0.000833340909094742,
+    "oos_n": 44
+  },
+  "vs_rsi_ext_accept_gate": {
+    "decision": "reject",
+    "reason": "OOS E -0.0008 vs baseline -0.0008, n=44, full pnl -6.28 vs -6.28",
+    "oos_e": -0.000833340909094742,
+    "pnl": -6.279122400001268
+  },
+  "beats_rsi_ext_oos_e": false,
+  "beats_rsi_ext_full_usd": false,
+  "promote": false,
+  "live_decision": "reject",
+  "live_reason": "Floor-chop sell gate matched rsi_ext exactly (n=146, OOS E -0.0008, $-6.28). Did not fire on the path-dependent sequence or did not change fills. YAML stays intel_skip_rsi_ext only.",
+  "db_hit_rate": "loss_db leftover: 1 floor-chop sell / 0 leftover wins. Path-dependent backtest: 0 incremental trades skipped.",
+  "not_a_100_wr_claim": true
+}

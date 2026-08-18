@@ -1,0 +1,37 @@
+{
+  "generation": "gen3",
+  "ts": "2026-08-14T17:22:08Z",
+  "gate": "OOS expectancy after costs vs CORE 1/30. Not WR. Not old TP3 stored best.",
+  "path_dependent": {
+    "source": "mt5_bars",
+    "bars": 11530,
+    "days": 8,
+    "baseline_oos_e": -0.018352596347034976,
+    "baseline_pnl": -11.291107600000885,
+    "challenger": "intel_rsi_ext",
+    "experiments": [
+      {
+        "id": "intel_rsi_ext",
+        "decision": "accept",
+        "reason": "OOS E 0.0004 vs baseline -0.0184, n=49, full pnl -6.33 vs -11.29"
+      },
+      {
+        "id": "intel_wrong_extreme",
+        "decision": "reject",
+        "reason": "OOS E -0.0404 vs baseline -0.0184, n=31, full pnl -10.60 vs -11.29"
+      },
+      {
+        "id": "intel_rsi_ext_quality_40",
+        "decision": "reject",
+        "reason": "OOS E -0.0404 vs baseline -0.0184, n=31, full pnl -10.60 vs -11.29"
+      }
+    ]
+  },
+  "replay_note": "Chronological skip of recorded CORE trades looked better (wrong_extreme OOS E +0.0102) but is not path-dependent. Slim MT5 backtest is the promotion gate. Replay over-states skip filters because it cannot fill replacement trades on freed bars.",
+  "live": {
+    "keep": ["intel_enabled", "intel_skip_rsi_ext"],
+    "do_not_enable": ["intel_quality_min", "intel_skip_wrong_edge"],
+    "wired": "quality score always computed when intel_enabled; rsi_ext reject is journaled as intel_skip; order events carry intel_quality. Quality cap 28 on loc>=0.90 buy / loc<=0.10 sell so scores cannot print 87 on the never-green SL pattern."
+  },
+  "not_a_100_wr_claim": true
+}

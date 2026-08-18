@@ -1,0 +1,104 @@
+{
+  "filename": "building-winning-algorithmic-trading-systems-website-a-trader-s-journey-from-dat.md",
+  "title": "Building Winning Algorithmic Trading Systems, + Website  A Trader\u2019s Journey from Data Mining to Monte Carlo Simulation to Live (2014, Wiley) - libgen.li",
+  "file_hash": "c45210cb20249cd0ead427b9c14f22866a65764d80af705711e53f8277c06412",
+  "byte_size": 457394,
+  "word_count": 80389,
+  "label": "research_proxy",
+  "placeholder": false,
+  "duplicate_of": null,
+  "timeframes": [
+    "daily",
+    "intraday",
+    "weekly"
+  ],
+  "data_required": [
+    "volume_unspecified"
+  ],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [
+    "I\u2019ve experienced two broker failures over the past 15 years, and some warning signs were evident with each of them\u2014warning signs I missed or ignored. I assumed the system would make me whole, and that indeed happened in the Refco case. But I am still waiting for most of my money from the PFG Best case. That really irks me, which you can see firsthand by seeing my interview on Fox Business Channel (go to www.foxbusiness.com and search for \u201cdavey\u201d and you\u2019ll see my interview).",
+    "Some very successful traders eschew all forms of back testing due to inherent conflicts and issues in such testing. These folks simply test strategies in real time, possibly even with real money. The obvious advantage to such a method is that fitting rules to past data and using hindsight bias is just not possible. One big disadvantage is that you can only gather data at market speed. It is impossible to gather statistics over many years until you have tested in real time for many years. Most people do not have the patience to wait for such a test to complete. Another disadvantage is that anytime the strategy is changed, the clock goes back to zero, and the evaluation starts fresh. This can really prolong the test period.",
+    "For the reasons cited, most people do not consider real-time testing, even with its advantages, as a viable solution. In the trading system development method shown later in this book, however, real-time analysis is used and provides useful verification of a trading system.",
+    "Obviously, just looking at an equity curve is by no means a very scientific or very rigorous way to evaluate a trading system. But it can be useful for preliminary analysis. There is no need to look at performance report details if you do not like the look of the equity curve.",
+    "In those cases, you can save a lot of time by spending a few seconds staring at the equity curve and then rejecting a system you do not like.",
+    "There is an even more fundamental reason, I believe, for entries being the focus of most traders. The time before entry is really the only time you feel in complete control. You tell the market, \u201cMr. Market, you must do this, that, and the other before I place a trade to enter. If you do not follow my rules, Mr. Market, I will not enter a trade. I am in charge here.\u201d That feels nice, as opposed to the time spent in a trade, where many times you hope and pray the market roller coaster will go your way!",
+    "Once you have your entry idea, you need to convert it to computer language. If you do not know how to program in your trading back-test software, you will likely have to hire someone to do the work for you. Before you do that, it is best to put the rule into what is called pseudo code.",
+    "Of course, that is not the case at all, practically regardless of vendor. But most people understand that data may have errors; what most do not understand is the impact behind the answers to these data-related questions:",
+    "How do you handle this? Typically, I rely heavily on daily data, especially the daily settlement prices. Pit and electronic settlements are identical. I do not like using daily highs and lows, since the average range between pit high and low will usually be less than electronic day high and low. If this sounds confusing, just think of an overnight price shock that lasts for an hour before reverting to the previous price level. In the old pit days, such a shock would never have shown up in the data, since it happened overnight. For electronic data, though, the daily high would include this price shock. Therefore, your strategy may perform quite a bit differently in the old days versus today\u2019s market.",
+    "you are crazy for testing with negative prices!), the results are accurate, provided you do not fall victim to the second pitfall.",
+    "If this seems like a subtle distinction, just imagine what happens when the price data approach zero, the other known pitfall on back-adjusted data. Dividing by zero or a number close to zero will lead to a huge result! Clearly, that would never happen in real time\u2014unless, of course, the actual price of the instrument in question went to zero. Just do not count on that ever happening!",
+    "The only way around this pitfall is to take special care that division or multiplication is not used with price data in back-adjusted continuous contracts. Both ratios of prices and percentage changes in prices are no-nos. If you choose not to follow this rule, do not be surprised when (1) your historical performance results change over time and (2) that your"
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "Kevin J. Davey - Building Winning Algorithmic Trading Systems, + Website_ A Trader\u2019s Journey from Data Mining to Monte Carlo Simulation to Live (2014, Wiley) - libgen.li.pdf",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "building-winning-algorithmic-trading-systems-website-a-trader-s-journey-from-dat.md",
+    "timeframes": [
+      "daily",
+      "intraday",
+      "weekly"
+    ],
+    "data_required": [
+      "volume_unspecified"
+    ],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [
+      "I\u2019ve experienced two broker failures over the past 15 years, and some warning signs were evident with each of them\u2014warning signs I missed or ignored. I assumed the system would make me whole, and that indeed happened in the Refco case. But I am still waiting for most of my money from the PFG Best case. That really irks me, which you can see firsthand by seeing my interview on Fox Business Channel (go to www.foxbusiness.com and search for \u201cdavey\u201d and you\u2019ll see my interview).",
+      "Some very successful traders eschew all forms of back testing due to inherent conflicts and issues in such testing. These folks simply test strategies in real time, possibly even with real money. The obvious advantage to such a method is that fitting rules to past data and using hindsight bias is just not possible. One big disadvantage is that you can only gather data at market speed. It is impossible to gather statistics over many years until you have tested in real time for many years. Most people do not have the patience to wait for such a test to complete. Another disadvantage is that anytime the strategy is changed, the clock goes back to zero, and the evaluation starts fresh. This can really prolong the test period.",
+      "For the reasons cited, most people do not consider real-time testing, even with its advantages, as a viable solution. In the trading system development method shown later in this book, however, real-time analysis is used and provides useful verification of a trading system.",
+      "Obviously, just looking at an equity curve is by no means a very scientific or very rigorous way to evaluate a trading system. But it can be useful for preliminary analysis. There is no need to look at performance report details if you do not like the look of the equity curve.",
+      "In those cases, you can save a lot of time by spending a few seconds staring at the equity curve and then rejecting a system you do not like.",
+      "There is an even more fundamental reason, I believe, for entries being the focus of most traders. The time before entry is really the only time you feel in complete control. You tell the market, \u201cMr. Market, you must do this, that, and the other before I place a trade to enter. If you do not follow my rules, Mr. Market, I will not enter a trade. I am in charge here.\u201d That feels nice, as opposed to the time spent in a trade, where many times you hope and pray the market roller coaster will go your way!",
+      "Once you have your entry idea, you need to convert it to computer language. If you do not know how to program in your trading back-test software, you will likely have to hire someone to do the work for you. Before you do that, it is best to put the rule into what is called pseudo code.",
+      "Of course, that is not the case at all, practically regardless of vendor. But most people understand that data may have errors; what most do not understand is the impact behind the answers to these data-related questions:",
+      "How do you handle this? Typically, I rely heavily on daily data, especially the daily settlement prices. Pit and electronic settlements are identical. I do not like using daily highs and lows, since the average range between pit high and low will usually be less than electronic day high and low. If this sounds confusing, just think of an overnight price shock that lasts for an hour before reverting to the previous price level. In the old pit days, such a shock would never have shown up in the data, since it happened overnight. For electronic data, though, the daily high would include this price shock. Therefore, your strategy may perform quite a bit differently in the old days versus today\u2019s market.",
+      "you are crazy for testing with negative prices!), the results are accurate, provided you do not fall victim to the second pitfall.",
+      "If this seems like a subtle distinction, just imagine what happens when the price data approach zero, the other known pitfall on back-adjusted data. Dividing by zero or a number close to zero will lead to a huge result! Clearly, that would never happen in real time\u2014unless, of course, the actual price of the instrument in question went to zero. Just do not count on that ever happening!",
+      "The only way around this pitfall is to take special care that division or multiplication is not used with price data in back-adjusted continuous contracts. Both ratios of prices and percentage changes in prices are no-nos. If you choose not to follow this rule, do not be surprised when (1) your historical performance results change over time and (2) that your"
+    ],
+    "evidence_quality": "extract",
+    "placeholder": false,
+    "implemented": false,
+    "headings": [
+      "Building Winning Algorithmic Trading Systems, + Website  A Trader\u2019s Journey from Data Mining to Monte Carlo Simulation to Live (2014, Wiley) - libgen.li",
+      "Pages 1-10 (pp. 1-10)",
+      "Chapter 20 (pp. 11-20)",
+      "CHAPTER 1 (pp. 21-30)",
+      "Pages 31-40 (pp. 31-40)",
+      "CHAPTER 4 (pp. 41-50)",
+      "Pages 51-60 (pp. 51-60)",
+      "Pages 61-70 (pp. 61-70)",
+      "Trades, 1 Year.",
+      "CHAPTER 8 (pp. 71-80)",
+      "CHAPTER 10 (pp. 81-90)",
+      "Pages 91-100 (pp. 91-100)",
+      "Pages 101-110 (pp. 101-110)",
+      "Pages 111-120 (pp. 111-120)",
+      "Pages 121-130 (pp. 121-130)",
+      "Pages 131-140 (pp. 131-140)",
+      "Pages 141-150 (pp. 141-150)",
+      "Pages 151-160 (pp. 151-160)",
+      "Pages 161-170 (pp. 161-170)",
+      "Pages 171-180 (pp. 171-180)",
+      "Pages 181-190 (pp. 181-190)",
+      "Pages 191-200 (pp. 191-200)",
+      "CHAPTER 25 (pp. 201-210)",
+      "Pages 211-220 (pp. 211-220)",
+      "Pages 221-230 (pp. 221-230)"
+    ]
+  }
+}

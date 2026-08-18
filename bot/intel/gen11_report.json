@@ -1,0 +1,279 @@
+{
+  "source": "mt5_bars",
+  "bars": 11530,
+  "generation": "gen11",
+  "gate": "Promote only if OOS E AND full $ both beat rsi_ext+doji_against+stretched_doji_buy+barbwire_sell. Hydra $ without losses_avoided is allowed but must still beat both. Tiny $ lifts allowed if both pass. Small-n. Not 100% WR.",
+  "live_combo": {
+    "flags": [
+      "intel_skip_rsi_ext",
+      "intel_skip_doji_against",
+      "intel_skip_stretched_doji_buy",
+      "intel_skip_barbwire_sell"
+    ],
+    "oos_e": 0.004242503999996646,
+    "pnl": -5.550306200001433,
+    "full_e": -0.011145193172694044,
+    "n": 166,
+    "wr": 97.59036144578313,
+    "n_loss": 4,
+    "n_win": 162
+  },
+  "remaining_losers": [
+    {
+      "entry_time": "2026-08-04 21:29:00+00:00",
+      "exit_time": "2026-08-05 14:37:00+00:00",
+      "side": "sell",
+      "outcome": "sl",
+      "pnl": -3.069146399999892,
+      "mfe": 0.0,
+      "mae": 0.003049999999999997,
+      "bars_held": 1028,
+      "quality": 69.3,
+      "body_against": false,
+      "features": {
+        "open": 1.15253,
+        "high": 1.15253,
+        "low": 1.15244,
+        "close": 1.15244,
+        "volume": null,
+        "ema_20": 1.1525132426303855,
+        "atr": null,
+        "rsi": 50.0,
+        "adx": null,
+        "kaufman_er": null,
+        "jansen_score": -0.2,
+        "harris_jump": false,
+        "brooks_in_range": false,
+        "range_loc": null,
+        "volman_doji": false,
+        "impulse_green": false,
+        "impulse_red": true,
+        "spread": null,
+        "brooks_barbwire": false,
+        "ema_side_streak": 1,
+        "atr_expand": null,
+        "close_ema_pips": -0.7324263038555046,
+        "ret3_pips": null,
+        "hour_utc": 21
+      },
+      "hits": {
+        "above_range_buy": false,
+        "stretched_buy": false,
+        "range_mid_sell": false,
+        "ret3_chase_sell": false,
+        "london_hour_12_sell": false,
+        "range_mid": false
+      }
+    },
+    {
+      "entry_time": "2026-08-06 09:48:00+00:00",
+      "exit_time": "2026-08-06 19:16:00+00:00",
+      "side": "buy",
+      "outcome": "sl",
+      "pnl": -3.0692819999998915,
+      "mfe": 0.0,
+      "mae": 0.003070000000000128,
+      "bars_held": 568,
+      "quality": 28.0,
+      "body_against": false,
+      "features": {
+        "open": 1.15466,
+        "high": 1.15472,
+        "low": 1.15466,
+        "close": 1.1547,
+        "volume": null,
+        "ema_20": 1.154562427282605,
+        "atr": 9.714285714287499e-05,
+        "rsi": 59.78758459358581,
+        "adx": 39.50074237770873,
+        "kaufman_er": 0.5094339622642142,
+        "jansen_score": 1.4428449652226074,
+        "harris_jump": false,
+        "brooks_in_range": true,
+        "range_loc": 1.0263157894738533,
+        "volman_doji": false,
+        "impulse_green": true,
+        "impulse_red": false,
+        "spread": null,
+        "brooks_barbwire": false,
+        "ema_side_streak": 4,
+        "atr_expand": 0.9710817565157824,
+        "close_ema_pips": 1.37572717395118,
+        "ret3_pips": 1.2999999999996348,
+        "hour_utc": 9
+      },
+      "hits": {
+        "above_range_buy": true,
+        "stretched_buy": true,
+        "range_mid_sell": false,
+        "ret3_chase_sell": false,
+        "london_hour_12_sell": false,
+        "range_mid": false
+      }
+    },
+    {
+      "entry_time": "2026-08-06 19:20:00+00:00",
+      "exit_time": "2026-08-07 15:30:00+00:00",
+      "side": "sell",
+      "outcome": "sl",
+      "pnl": -3.0690935999998916,
+      "mfe": 0.0,
+      "mae": 0.005310000000000148,
+      "bars_held": 1210,
+      "quality": 74.9771391416737,
+      "body_against": false,
+      "features": {
+        "open": 1.15168,
+        "high": 1.15168,
+        "low": 1.15152,
+        "close": 1.15156,
+        "volume": null,
+        "ema_20": 1.1519252055647378,
+        "atr": 0.00016357142857142165,
+        "rsi": 32.63399372716076,
+        "adx": 23.832859278095196,
+        "kaufman_er": 0.546391752577513,
+        "jansen_score": -0.8715506816872411,
+        "harris_jump": false,
+        "brooks_in_range": true,
+        "range_loc": 0.11842105263146362,
+        "volman_doji": false,
+        "impulse_green": false,
+        "impulse_red": true,
+        "spread": null,
+        "brooks_barbwire": false,
+        "ema_side_streak": 9,
+        "atr_expand": 1.0017497812773712,
+        "close_ema_pips": -3.6520556473784715,
+        "ret3_pips": -0.9999999999998899,
+        "hour_utc": 19
+      },
+      "hits": {
+        "above_range_buy": false,
+        "stretched_buy": false,
+        "range_mid_sell": false,
+        "ret3_chase_sell": false,
+        "london_hour_12_sell": false,
+        "range_mid": false
+      }
+    },
+    {
+      "entry_time": "2026-08-14 19:39:00+00:00",
+      "exit_time": "2026-08-14 21:35:00+00:00",
+      "side": "buy",
+      "outcome": "eof",
+      "pnl": -1.3194667999999734,
+      "mfe": 0.0,
+      "mae": 0.0014899999999999913,
+      "bars_held": 116,
+      "quality": 65.95735242669313,
+      "body_against": true,
+      "features": {
+        "open": 1.15781,
+        "high": 1.15784,
+        "low": 1.15778,
+        "close": 1.15778,
+        "volume": null,
+        "ema_20": 1.157705706671653,
+        "atr": 0.00010000000000003657,
+        "rsi": 52.645222933551764,
+        "adx": 25.082795317207587,
+        "kaufman_er": 0.3846153846154503,
+        "jansen_score": 0.8908407890640211,
+        "harris_jump": false,
+        "brooks_in_range": true,
+        "range_loc": 0.603448275862168,
+        "volman_doji": false,
+        "impulse_green": true,
+        "impulse_red": false,
+        "spread": null,
+        "brooks_barbwire": false,
+        "ema_side_streak": 3,
+        "atr_expand": 0.940860215054072,
+        "close_ema_pips": 0.742933283470748,
+        "ret3_pips": 1.2000000000012,
+        "hour_utc": 19
+      },
+      "hits": {
+        "above_range_buy": false,
+        "stretched_buy": false,
+        "range_mid_sell": false,
+        "ret3_chase_sell": false,
+        "london_hour_12_sell": false,
+        "range_mid": true
+      }
+    }
+  ],
+  "winner_sacrifice_replay": {
+    "intel_above_range_buy": {
+      "loss_hits": 1,
+      "sl_hits": 1,
+      "win_hits": 20
+    },
+    "intel_stretched_buy": {
+      "loss_hits": 1,
+      "sl_hits": 1,
+      "win_hits": 36
+    },
+    "intel_range_mid_sell": {
+      "loss_hits": 0,
+      "sl_hits": 0,
+      "win_hits": 12
+    },
+    "intel_ret3_chase_sell": {
+      "loss_hits": 0,
+      "sl_hits": 0,
+      "win_hits": 35
+    },
+    "intel_london_hour_12_sell": {
+      "loss_hits": 0,
+      "sl_hits": 0,
+      "win_hits": 3
+    },
+    "intel_range_mid": {
+      "loss_hits": 1,
+      "sl_hits": 0,
+      "win_hits": 31
+    }
+  },
+  "picked": "intel_above_range_buy",
+  "experiments": [
+    {
+      "id": "intel_above_range_buy",
+      "decision": "reject",
+      "reason": "OOS E 0.0038 vs baseline 0.0042, n=70, full pnl -5.46 vs -5.55",
+      "oos_e": 0.0038130019047585475,
+      "oos_n": 70,
+      "pnl": -5.458298000001466,
+      "n": 169,
+      "wr": 97.63313609467455,
+      "full_e": -0.010765873767261663,
+      "loss_removal": {
+        "losses_avoided": 0.0,
+        "winners_sacrificed": -3.0,
+        "loss_removal_efficiency": 0.0
+      },
+      "beats_live_oos_e": false,
+      "beats_live_full_usd": true,
+      "promote": false,
+      "winner_sacrifice_replay": {
+        "loss_hits": 1,
+        "sl_hits": 1,
+        "win_hits": 20
+      }
+    }
+  ],
+  "promote": null,
+  "promoted_live_yaml": false,
+  "live_yaml": "intel_skip_rsi_ext + intel_skip_doji_against + intel_skip_stretched_doji_buy + intel_skip_barbwire_sell",
+  "live_yaml_unchanged_unless_promote": true,
+  "paper_restart": false,
+  "not_a_100_wr_claim": true,
+  "honest": {
+    "small_n": "Hydra dropped Aug 7 12:31. New remaining: 3 real SLs + 1 eof. Not 100% WR.",
+    "picked": "above_range_buy hits Aug 6 09:48 (loc 1.03 non-doji, one minute after stretched_doji_buy skipped 09:47). Replay 1 SL / 20 winners.",
+    "gate": "Full $ −$5.46 vs −$5.55 (tiny hydra beat) but OOS E +0.0038 vs +0.0042 — reject. YAML unchanged.",
+    "no_ops_on_this_sequence": "range_mid_sell / ret3_chase_sell / london_hour_12_sell hit 0 remaining SLs. stretched_buy same SL but 36 winners. range_mid hits eof only.",
+    "untouched": "Aug 4 21:29 sell NaN loc/ER/ADX (skip-NaN rejected); Aug 6 19:20 sell −3.65 EMA (stretched_sell rejected); Aug 14 eof."
+  }
+}

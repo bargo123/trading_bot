@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_182514_tighten_sl_to_20",
+  "ts": "2026-08-13T18:25:14.563877+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_sl_pips": 20
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_182514_tighten_sl_to_20",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "tighten_sl_to_20",
+  "hypothesis": "Tharp/Davey dollars on firehose: cut |avg_loss| SL 25->20 without leaving every-bar 24h spray.",
+  "rationale": "Tharp/Davey dollars on firehose: cut |avg_loss| SL 25->20 without leaving every-bar 24h spray.",
+  "weakness": "high_wr_neg_e",
+  "book_file": "docs/trading/NEW_BOOKS_CORE_TWELVE.md",
+  "snippet_hash": "df34995b4f33195e:expectancy",
+  "concept": "tharp_expectancy"
+}

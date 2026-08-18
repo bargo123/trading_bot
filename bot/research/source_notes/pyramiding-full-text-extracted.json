@@ -1,0 +1,47 @@
+{
+  "filename": "pyramiding-full-text-extracted.md",
+  "title": "pyramiding full text extracted",
+  "file_hash": "4027a6115c1215108419902f4d3808333e63de9937a19683ec8b0e080e55833a",
+  "byte_size": 10028,
+  "word_count": 1861,
+  "label": "research_proxy",
+  "placeholder": false,
+  "duplicate_of": null,
+  "timeframes": [],
+  "data_required": [],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [
+    "WARNING: Just because you can scale into an open position that is in profit doesn't mean you"
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "pyramiding_full_text_extracted.pdf",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "pyramiding-full-text-extracted.md",
+    "timeframes": [],
+    "data_required": [],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [
+      "WARNING: Just because you can scale into an open position that is in profit doesn't mean you"
+    ],
+    "evidence_quality": "extract",
+    "placeholder": false,
+    "implemented": false,
+    "headings": [
+      "pyramiding full text extracted",
+      "Pages 1-4 (pp. 1-4)"
+    ]
+  }
+}

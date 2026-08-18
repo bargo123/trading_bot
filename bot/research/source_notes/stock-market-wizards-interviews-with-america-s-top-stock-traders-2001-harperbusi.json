@@ -1,0 +1,88 @@
+{
+  "filename": "stock-market-wizards-interviews-with-america-s-top-stock-traders-2001-harperbusi.md",
+  "title": "Stock Market Wizards  Interviews with America's Top Stock Traders (2001, HarperBusiness) - libgen.li",
+  "file_hash": "040a37df581f4e92d84c13e81c7017aeefc26695045a288368edd9d55de7ca07",
+  "byte_size": 712449,
+  "word_count": 126047,
+  "label": "research_proxy",
+  "placeholder": false,
+  "duplicate_of": null,
+  "timeframes": [
+    "daily",
+    "intraday",
+    "weekly"
+  ],
+  "data_required": [
+    "volume_unspecified"
+  ],
+  "setup": "",
+  "entry": "",
+  "exit": "",
+  "risk": "",
+  "warnings": [
+    "*\u2022 It is a warning flag if the market is not responding to data correctly.",
+    "Absolutely. In fact, many analysts blow out when they become fund managers because they do not have the conviction level that is essen- tial to put on a big position. I tell my guys that if we come up with a good idea, and as a firm we only buy 50,000 or 100,000 shares instead of a million plus, then that trade is a mistake. This is also the reason why we limit ourselves to a maximum of fifteen major positions (on the long side).",
+    "All five of the factors we discussed so far are defensive in nature, focused on capital preservation. They are designed to diminish risk but do not automatically translate into a significant money-making opportunity. All five could be in place and the stock may still fail to move. The key question is: What is going to make the stock go up? It is our task to identify and time that catalyst. Based on experience, the more severely depressed the valuation and the more pessimism that surrounds the stock, the less it actually takes to reverse the market's perception and trigger a price recovery.",
+    "The fact that the company negotiated aggressively for granting us less protection than is the case for our normal deals should have acted as a warning signal. The blindsiding that came from the financial restatement was really brutal, but I don't know how that could have been avoided.",
+    "Because different market participants will do research of varying qual- ity. The market price will reflect the average assessment of all investors. If you can do research that most other people do not, you might be able to discover something that most of the rest of the mar- ket doesn't know and benefit from that knowledge. There are a lot of things that I know about my companies that most other investors don't. Therefore, my evaluation of these companies is not going to be the same as theirs. Why then should a stock always trade at the right price level?",
+    "Mutual funds, but I'm not a market timer. Let's discriminate between a market timer and what I consider myself\u2014a market reactor. A market timer says, \"The market is too risky here. I think the Dow is going down to 8,000 during the next three months.\" They have a view about what is going to happen. They prognosticate the market. I do not attempt to prognosticate the market. I react to what happens in the market.",
+    "Actually, there is really no way to prove that is the case. All you can ever demonstrate is that the specific patterns being tested do not exist. You can never prove that there aren't any patterns that could beat the market."
+  ],
+  "evidence_quality": "extract",
+  "provenance": {
+    "source_file": "Jack D. Schwager - Stock Market Wizards_ Interviews with America's Top Stock Traders (2001, HarperBusiness) - libgen.li.pdf",
+    "pages_with_text": null,
+    "empty_pages": null,
+    "extractor": null,
+    "extraction_kind": "unknown"
+  },
+  "implemented": false,
+  "claims": {
+    "filename": "stock-market-wizards-interviews-with-america-s-top-stock-traders-2001-harperbusi.md",
+    "timeframes": [
+      "daily",
+      "intraday",
+      "weekly"
+    ],
+    "data_required": [
+      "volume_unspecified"
+    ],
+    "setup": "",
+    "entry": "",
+    "exit": "",
+    "risk": "",
+    "warnings": [
+      "*\u2022 It is a warning flag if the market is not responding to data correctly.",
+      "Absolutely. In fact, many analysts blow out when they become fund managers because they do not have the conviction level that is essen- tial to put on a big position. I tell my guys that if we come up with a good idea, and as a firm we only buy 50,000 or 100,000 shares instead of a million plus, then that trade is a mistake. This is also the reason why we limit ourselves to a maximum of fifteen major positions (on the long side).",
+      "All five of the factors we discussed so far are defensive in nature, focused on capital preservation. They are designed to diminish risk but do not automatically translate into a significant money-making opportunity. All five could be in place and the stock may still fail to move. The key question is: What is going to make the stock go up? It is our task to identify and time that catalyst. Based on experience, the more severely depressed the valuation and the more pessimism that surrounds the stock, the less it actually takes to reverse the market's perception and trigger a price recovery.",
+      "The fact that the company negotiated aggressively for granting us less protection than is the case for our normal deals should have acted as a warning signal. The blindsiding that came from the financial restatement was really brutal, but I don't know how that could have been avoided.",
+      "Because different market participants will do research of varying qual- ity. The market price will reflect the average assessment of all investors. If you can do research that most other people do not, you might be able to discover something that most of the rest of the mar- ket doesn't know and benefit from that knowledge. There are a lot of things that I know about my companies that most other investors don't. Therefore, my evaluation of these companies is not going to be the same as theirs. Why then should a stock always trade at the right price level?",
+      "Mutual funds, but I'm not a market timer. Let's discriminate between a market timer and what I consider myself\u2014a market reactor. A market timer says, \"The market is too risky here. I think the Dow is going down to 8,000 during the next three months.\" They have a view about what is going to happen. They prognosticate the market. I do not attempt to prognosticate the market. I react to what happens in the market.",
+      "Actually, there is really no way to prove that is the case. All you can ever demonstrate is that the specific patterns being tested do not exist. You can never prove that there aren't any patterns that could beat the market."
+    ],
+    "evidence_quality": "extract",
+    "placeholder": false,
+    "implemented": false,
+    "headings": [
+      "Stock Market Wizards  Interviews with America's Top Stock Traders (2001, HarperBusiness) - libgen.li",
+      "Pages 1-10 (pp. 1-10)",
+      "Pages 11-20 (pp. 11-20)",
+      "Pages 21-30 (pp. 21-30)",
+      "Pages 31-40 (pp. 31-40)",
+      "Pages 41-50 (pp. 41-50)",
+      "Pages 51-60 (pp. 51-60)",
+      "Pages 61-70 (pp. 61-70)",
+      "Pages 71-80 (pp. 71-80)",
+      "Pages 81-90 (pp. 81-90)",
+      "Pages 91-100 (pp. 91-100)",
+      "Pages 101-110 (pp. 101-110)",
+      "Pages 111-120 (pp. 111-120)",
+      "Pages 121-130 (pp. 121-130)",
+      "Pages 131-140 (pp. 131-140)",
+      "Pages 141-150 (pp. 141-150)",
+      "Pages 151-160 (pp. 151-160)",
+      "Pages 161-170 (pp. 161-170)",
+      "Pages 171-177 (pp. 171-177)"
+    ]
+  }
+}

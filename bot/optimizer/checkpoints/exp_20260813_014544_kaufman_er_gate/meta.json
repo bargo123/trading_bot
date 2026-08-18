@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_014544_kaufman_er_gate",
+  "ts": "2026-08-13T01:45:44.844124+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_min_er": 0.3
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_014544_kaufman_er_gate",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "kaufman_er_gate",
+  "hypothesis": "Accepted OOS still E=-0.014 after TP=2 (WR 94%, avg_win 0.039 vs |avg_loss| 0.891). Live still on TP=1 (pending promote, open=3): WR 35.3%, E=-0.029, 15 consec losses. scratch/max_pos/spread already rejected; do not stack TP=3 before TP=2 is live. Kaufman ER 0.3 skips every-bar chop (max_hold=0). Tharp: E over WR. Educational only.",
+  "rationale": "Accepted OOS still E=-0.014 after TP=2 (WR 94%, avg_win 0.039 vs |avg_loss| 0.891). Live still on TP=1 (pending promote, open=3): WR 35.3%, E=-0.029, 15 consec losses. scratch/max_pos/spread already rejected; do not stack TP=3 before TP=2 is live. Kaufman ER 0.3 skips every-bar chop (max_hold=0). Tharp: E over WR. Educational only.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "296a84a1651c669f:Kaufman",
+  "concept": "kaufman_er"
+}

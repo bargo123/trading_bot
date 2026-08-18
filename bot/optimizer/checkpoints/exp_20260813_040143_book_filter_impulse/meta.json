@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_040143_book_filter_impulse",
+  "ts": "2026-08-13T04:01:43.037762+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_book_filter": true
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_040143_book_filter_impulse",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "book_filter_impulse",
+  "hypothesis": "Accepted OOS E barely +0.013 at TP=3/SL=25 (WR 91.9%, avg_win 0.088 vs |avg_loss| 0.840). TP/SL frozen pending promote (live still TP=1/SL=30, open>0): WR 35%, E=-0.042, 15 consec losses. Untested: enable firehose_book_filter so Elder Impulse + HTF EMA censor every-bar spray without stacking TP/SL (Tharp: E over WR). ER/spread/GBPNZD/scratch/max_pos already rejected. Educational only.",
+  "rationale": "Accepted OOS E barely +0.013 at TP=3/SL=25 (WR 91.9%, avg_win 0.088 vs |avg_loss| 0.840). TP/SL frozen pending promote (live still TP=1/SL=30, open>0): WR 35%, E=-0.042, 15 consec losses. Untested: enable firehose_book_filter so Elder Impulse + HTF EMA censor every-bar spray without stacking TP/SL (Tharp: E over WR). ER/spread/GBPNZD/scratch/max_pos already rejected. Educational only.",
+  "weakness": "impulse_censor",
+  "book_file": "docs/trading/NEW_BOOKS_CORE_TWELVE.md",
+  "snippet_hash": "be289f7d8c8b9809:Impulse",
+  "concept": "elder_impulse_censor"
+}

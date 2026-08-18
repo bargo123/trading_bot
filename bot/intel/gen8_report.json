@@ -1,0 +1,119 @@
+{
+  "source": "mt5_bars",
+  "bars": 11530,
+  "generation": "gen8",
+  "gate": "Promote only if OOS E AND full $ both beat rsi_ext-only. Small-n: 4 remaining losses. Not 100% WR.",
+  "rsi_ext": {
+    "oos_e": 7.97674074030419e-05,
+    "pnl": -6.341472200001289,
+    "n": 141,
+    "wr": 97.16312056737588
+  },
+  "winner_sacrifice_replay": {
+    "doji_against": {
+      "loss_hits": 1,
+      "win_hits": 14,
+      "note": "Replay on rsi_ext fills. Path-dependent can free bars and mint new trades."
+    },
+    "ceiling_doji_buy": {
+      "loss_hits": 0,
+      "win_hits": 4,
+      "note": "Buy loc>=0.90 AND doji. GEN7 leftover #2 loc was ~0.897 so this may miss it."
+    }
+  },
+  "n_rsi_ext_losses": 4,
+  "n_rsi_ext_wins": 137,
+  "remaining_rsi_ext_losers": [
+    {
+      "entry_time": "2026-08-05 04:27:00+00:00",
+      "side": "sell",
+      "outcome": "sl",
+      "pnl": -3.0691649999998916,
+      "mfe": 0.010834999999857957,
+      "rsi": 30.65529171494805,
+      "range_loc": -0.06976744186041708,
+      "kaufman_er": 0.647058823529002,
+      "volman_doji": false,
+      "body_against": false,
+      "doji_against": false,
+      "ceiling_doji_buy": false
+    },
+    {
+      "entry_time": "2026-08-06 09:47:00+00:00",
+      "side": "buy",
+      "outcome": "sl",
+      "pnl": -3.0692795999998914,
+      "mfe": 0.0007204000000144816,
+      "rsi": 57.20707828399692,
+      "range_loc": 0.8974358974358244,
+      "kaufman_er": 0.41176470588260905,
+      "volman_doji": true,
+      "body_against": false,
+      "doji_against": false,
+      "ceiling_doji_buy": false
+    },
+    {
+      "entry_time": "2026-08-06 19:21:00+00:00",
+      "side": "sell",
+      "outcome": "sl",
+      "pnl": -3.0690941999998915,
+      "mfe": 0.0,
+      "rsi": 33.18143256870948,
+      "range_loc": 0.1315789473683903,
+      "kaufman_er": 0.6304347826087009,
+      "volman_doji": true,
+      "body_against": true,
+      "doji_against": true,
+      "ceiling_doji_buy": false
+    },
+    {
+      "entry_time": "2026-08-14 19:39:00+00:00",
+      "side": "buy",
+      "outcome": "eof",
+      "pnl": -1.3394668000001044,
+      "mfe": 0.0,
+      "rsi": 52.645222933551764,
+      "range_loc": 0.603448275862168,
+      "kaufman_er": 0.3846153846154503,
+      "volman_doji": false,
+      "body_against": true,
+      "doji_against": false,
+      "ceiling_doji_buy": false
+    }
+  ],
+  "doji_against_noop": false,
+  "experiments": [
+    {
+      "id": "intel_doji_against",
+      "decision": "accept",
+      "reason": "OOS E 0.0030 vs baseline 0.0001, n=63, full pnl -2.56 vs -6.34",
+      "oos_e": 0.002989706878302817,
+      "oos_n": 63,
+      "pnl": -2.564019600001651,
+      "n": 163,
+      "wr": 98.15950920245399,
+      "full_e": -0.005243393865034241,
+      "loss_removal": {
+        "losses_avoided": 1.0,
+        "winners_sacrificed": -23.0,
+        "loss_removal_efficiency": null
+      },
+      "beats_rsi_oos_e": true,
+      "beats_rsi_full_usd": true,
+      "promote": true
+    }
+  ],
+  "promote": "intel_doji_against",
+  "live_yaml": "intel_skip_rsi_ext + intel_skip_doji_against",
+  "promoted_live_yaml": true,
+  "paper_restart": false,
+  "paper_reload": "hot-reload existing runner; no second process",
+  "not_a_100_wr_claim": true,
+  "honest": {
+    "small_n": "4 remaining rsi_ext losses. Filter replay-hit 1 (Aug 6 19:21 sell). Not 100% WR.",
+    "replay_winner_sacrifice": 14,
+    "path_dependent": "Skipping that ~1209-bar SL freed bars; n 141→163, extra winners (sacrifice −23). Full E still negative (−0.0052).",
+    "second_idea": "Not run: doji_against was not a no-op.",
+    "ceiling_doji_buy": "Would miss leftover #2 (loc 0.897 < 0.90) and hit 0 losses / 4 winners on replay."
+  }
+}

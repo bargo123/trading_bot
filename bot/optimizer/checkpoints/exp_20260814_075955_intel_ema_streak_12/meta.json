@@ -1,0 +1,18 @@
+{
+  "id": "exp_20260814_075955_intel_ema_streak_12",
+  "ts": "2026-08-14T07:59:55.468131+00:00",
+  "status": "open",
+  "patch": {
+    "intel_enabled": true,
+    "intel_max_ema_streak": 12
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260814_075955_intel_ema_streak_12",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "intel_ema_streak_12",
+  "hypothesis": "Skip CORE when close has been on the same EMA side > 12 M1 bars. Around-core only; keep 1/30 and max_positions 40.",
+  "rationale": "Skip CORE when close has been on the same EMA side > 12 M1 bars. Around-core only; keep 1/30 and max_positions 40.",
+  "weakness": "impulse_censor",
+  "book_file": "docs/trading/NEW_BOOKS_CORE_TWELVE.md",
+  "snippet_hash": "be289f7d8c8b9809:Impulse",
+  "concept": "elder_impulse_censor"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260812_232603_scratch_losers_on",
+  "ts": "2026-08-12T23:26:03.464796+00:00",
+  "status": "open",
+  "patch": {
+    "scratch_losers": true
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260812_232603_scratch_losers_on",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "scratch_losers_on",
+  "hypothesis": "Enable scratch_losers so max-hold can exit underwater names.",
+  "rationale": "Enable scratch_losers so max-hold can exit underwater names.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "296a84a1651c669f:Kaufman",
+  "concept": "kaufman_er"
+}

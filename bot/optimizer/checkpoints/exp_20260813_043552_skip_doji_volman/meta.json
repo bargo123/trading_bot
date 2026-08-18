@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_043552_skip_doji_volman",
+  "ts": "2026-08-13T04:35:52.611640+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_skip_doji": true
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_043552_skip_doji_volman",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "skip_doji_volman",
+  "hypothesis": "Accepted OOS E only +0.029 at TP=3/SL=25 + book_filter (WR 93.4%, avg_win 0.088 vs |avg_loss| 0.815). TP/SL/book_filter frozen pending promote (live still TP=1/SL=30, open=2): WR 35%, E=-0.042, 15 consec losses \u2014 do not edit live YAML. Untested: firehose_skip_doji so Volman/Nison censor every-bar doji spray without stacking TP/SL (Tharp: E over WR). ER/spread/GBPNZD/scratch/max_pos already rejected. Educational only.",
+  "rationale": "Accepted OOS E only +0.029 at TP=3/SL=25 + book_filter (WR 93.4%, avg_win 0.088 vs |avg_loss| 0.815). TP/SL/book_filter frozen pending promote (live still TP=1/SL=30, open=2): WR 35%, E=-0.042, 15 consec losses \u2014 do not edit live YAML. Untested: firehose_skip_doji so Volman/Nison censor every-bar doji spray without stacking TP/SL (Tharp: E over WR). ER/spread/GBPNZD/scratch/max_pos already rejected. Educational only.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "296a84a1651c669f:Kaufman",
+  "concept": "kaufman_er"
+}

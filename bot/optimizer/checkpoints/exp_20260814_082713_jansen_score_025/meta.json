@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260814_082713_jansen_score_025",
+  "ts": "2026-08-14T08:27:13.285531+00:00",
+  "status": "open",
+  "patch": {
+    "jansen_score_min": 0.25
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260814_082713_jansen_score_025",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "jansen_score_025",
+  "hypothesis": "Jansen: raise side-agreement min 0.15->0.25 around CORE. Keep 1/30 and 24h firehose.",
+  "rationale": "Jansen: raise side-agreement min 0.15->0.25 around CORE. Keep 1/30 and 24h firehose.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "2668e39dd54f3e6f:efficiency ratio",
+  "concept": "kaufman_er"
+}

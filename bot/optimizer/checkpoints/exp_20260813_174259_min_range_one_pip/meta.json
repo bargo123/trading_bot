@@ -1,0 +1,17 @@
+{
+  "id": "exp_20260813_174259_min_range_one_pip",
+  "ts": "2026-08-13T17:42:59.054036+00:00",
+  "status": "open",
+  "patch": {
+    "firehose_min_range_pips": 1.0
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260813_174259_min_range_one_pip",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "min_range_one_pip",
+  "hypothesis": "Volman range filter on existing firehose: skip dead bars (H-L < 1 pip) so 3-pip takes are not sprayed into noise. Harris/Aldridge: do not scalp when spread plus a sub-1-pip bar eats the take. Tharp: hit-quality gate only \u2014 do not widen firehose_sl_pips. skip_doji and require_body already failed OOS; min_range is untested. Keep firehose_every_bar and 24h.",
+  "rationale": "Volman range filter on existing firehose: skip dead bars (H-L < 1 pip) so 3-pip takes are not sprayed into noise. Harris/Aldridge: do not scalp when spread plus a sub-1-pip bar eats the take. Tharp: hit-quality gate only \u2014 do not widen firehose_sl_pips. skip_doji and require_body already failed OOS; min_range is untested. Keep firehose_every_bar and 24h.",
+  "weakness": "chop",
+  "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md",
+  "snippet_hash": "296a84a1651c669f:Kaufman",
+  "concept": "kaufman_er"
+}

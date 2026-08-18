@@ -1,0 +1,179 @@
+{
+  "source": "mt5_bars",
+  "bars": 11530,
+  "days": 8,
+  "champion": "CORE_STRATEGY_V1",
+  "baseline_trades": 91,
+  "baseline_wr": 92.3076923076923,
+  "baseline_e": -0.061056007326010305,
+  "baseline_pnl": -16.668290000000216,
+  "pattern": {
+    "n_win": 84,
+    "n_loss": 7,
+    "n_sl": 6,
+    "n_never_green_sl": 4,
+    "avg_win_usd": 0.03078878571427469,
+    "avg_loss_usd": -2.750649714285612,
+    "loss_to_win_ratio": 89.33933737472215,
+    "breakeven_wr": 0.9889306250293595,
+    "pattern": "CORE losses are almost all 30-pip stop-outs. Most of those never went 1 pip in favor (MFE=0). Signal-bar quality/range/doji also appear on winners because the 1-pip target hits on noise. First major cause: asymmetric 1-pip/30-pip payoff plus entries into overlapping/barbwire tape.",
+    "pre_entry": {
+      "brooks_in_range": {
+        "win": {
+          "n": 84,
+          "hits": 80,
+          "frac": 0.9523809523809523
+        },
+        "loss": {
+          "n": 7,
+          "hits": 7,
+          "frac": 1.0
+        }
+      },
+      "brooks_barbwire": {
+        "win": {
+          "n": 84,
+          "hits": 8,
+          "frac": 0.09523809523809523
+        },
+        "loss": {
+          "n": 7,
+          "hits": 0,
+          "frac": 0.0
+        }
+      },
+      "volman_doji": {
+        "win": {
+          "n": 84,
+          "hits": 24,
+          "frac": 0.2857142857142857
+        },
+        "loss": {
+          "n": 7,
+          "hits": 2,
+          "frac": 0.2857142857142857
+        }
+      },
+      "chop_doji": {
+        "win": {
+          "n": 84,
+          "hits": 4,
+          "frac": 0.047619047619047616
+        },
+        "loss": {
+          "n": 7,
+          "hits": 0,
+          "frac": 0.0
+        }
+      },
+      "impulse_against": {
+        "win": {
+          "n": 84,
+          "hits": 1,
+          "frac": 0.011904761904761904
+        },
+        "loss": {
+          "n": 7,
+          "hits": 0,
+          "frac": 0.0
+        }
+      }
+    }
+  },
+  "families": {
+    "win_quick": 84,
+    "loss_stop": 3,
+    "loss_doji": 2,
+    "loss_chop_er": 1,
+    "loss_time": 1
+  },
+  "db": {
+    "wins": 84,
+    "losses": 7,
+    "loss_path": "C:\\Users\\Raqam\\trading_bot\\bot\\intel\\loss_db\\rows.jsonl",
+    "win_path": "C:\\Users\\Raqam\\trading_bot\\bot\\intel\\win_db\\rows.jsonl"
+  },
+  "challenger": null,
+  "experiments": [
+    {
+      "id": "intel_wrong_edge",
+      "decision": "reject",
+      "reason": "OOS E -0.0199 vs baseline -0.0198, n=57, full pnl -3.05 vs -16.67",
+      "wr": 98.22485207100591,
+      "e": -0.006007706903356687,
+      "pnl": -3.0459074000017314,
+      "n": 169,
+      "oos_wr": 96.49122807017544,
+      "oos_e": -0.01986067134503356,
+      "loss_removal": {
+        "losses_avoided": 4.0,
+        "winners_sacrificed": -82.0,
+        "loss_removal_efficiency": null
+      }
+    },
+    {
+      "id": "intel_rsi_streak",
+      "decision": "reject",
+      "reason": "OOS E -0.0337 vs baseline -0.0198, n=35, full pnl -2.77 vs -16.67",
+      "wr": 98.13664596273291,
+      "e": -0.005724789233958227,
+      "pnl": -2.7650732000017237,
+      "n": 161,
+      "oos_wr": 94.28571428571428,
+      "oos_e": -0.03373838666667221,
+      "loss_removal": {
+        "losses_avoided": 4.0,
+        "winners_sacrificed": -74.0,
+        "loss_removal_efficiency": null
+      }
+    },
+    {
+      "id": "intel_time_45",
+      "decision": "reject",
+      "reason": "OOS E -0.0175 vs baseline -0.0198, n=205, full pnl -46.10 vs -16.67",
+      "wr": 78.15750371471026,
+      "e": -0.022831945121351057,
+      "pnl": -46.097697200006124,
+      "n": 673,
+      "oos_wr": 80.0,
+      "oos_e": -0.017474369430896933,
+      "loss_removal": {
+        "losses_avoided": -140.0,
+        "winners_sacrificed": -442.0,
+        "loss_removal_efficiency": 0.0
+      }
+    },
+    {
+      "id": "intel_rsi_time_45",
+      "decision": "reject",
+      "reason": "OOS E -0.0153 vs baseline -0.0198, n=198, full pnl -41.21 vs -16.67",
+      "wr": 78.49293563579278,
+      "e": -0.02156675290424231,
+      "pnl": -41.214064800005566,
+      "n": 637,
+      "oos_wr": 81.31313131313132,
+      "oos_e": -0.015307405723908894,
+      "loss_removal": {
+        "losses_avoided": -130.0,
+        "winners_sacrificed": -416.0,
+        "loss_removal_efficiency": 0.0
+      }
+    },
+    {
+      "id": "intel_friday_15",
+      "decision": "reject",
+      "reason": "OOS E -0.0198 vs baseline -0.0198, n=44, full pnl -17.25 vs -16.67",
+      "wr": 90.27777777777779,
+      "e": -0.07986877500000289,
+      "pnl": -17.2516554,
+      "n": 72,
+      "oos_wr": 95.45454545454545,
+      "oos_e": -0.019811278787881716,
+      "loss_removal": {
+        "losses_avoided": 0.0,
+        "winners_sacrificed": 19.0,
+        "loss_removal_efficiency": 0.0
+      }
+    }
+  ]
+}

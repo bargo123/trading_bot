@@ -1,0 +1,25 @@
+{
+  "investigated": [
+    {
+      "concept": "kaufman_er",
+      "book_file": "docs/trading/NEW_BOOKS_KAUFMAN_VOLMAN_JOHNSON_CHAN.md"
+    },
+    {
+      "concept": "harris_spread_gate",
+      "book_file": "docs/trading/NEW_BOOKS_HFT_CARTEA_ALDRIDGE_ORESTE_NARANG_VANDERPOST.md"
+    },
+    {
+      "concept": "tharp_expectancy",
+      "book_file": "docs/trading/NEW_BOOKS_CORE_TWELVE.md"
+    },
+    {
+      "concept": "elder_impulse_censor",
+      "book_file": "docs/trading/NEW_BOOKS_CORE_TWELVE.md"
+    },
+    {
+      "concept": "davey_clenow_correlation",
+      "book_file": "docs/trading/NEW_BOOKS_CORE_TWELVE.md"
+    }
+  ],
+  "notes": "EURUSD 95% WR / negative expectancy recorded from firehose hunt."
+}

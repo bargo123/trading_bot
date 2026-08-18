@@ -1,0 +1,20 @@
+{
+  "id": "exp_20260814_173859_intel_wrong_extreme_90",
+  "ts": "2026-08-14T17:39:01.027590+00:00",
+  "status": "open",
+  "patch": {
+    "intel_enabled": true,
+    "intel_skip_wrong_edge": true,
+    "intel_wrong_buy_loc": 0.9,
+    "intel_wrong_sell_loc": 0.1
+  },
+  "checkpoint": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\checkpoints\\exp_20260814_173859_intel_wrong_extreme_90",
+  "accepted_src": "C:\\Users\\Raqam\\trading_bot\\bot\\optimizer\\accepted.yaml",
+  "hypothesis_id": "intel_wrong_extreme_90",
+  "hypothesis": "Brooks/Damir around CORE: reject buy loc>=0.90 / sell loc<=0.10 in a range. Measured 30-pip stops were at that extreme.",
+  "rationale": "Brooks/Damir around CORE: reject buy loc>=0.90 / sell loc<=0.10 in a range. Measured 30-pip stops were at that extreme.",
+  "weakness": "false_breakout",
+  "book_file": "docs/trading/NEW_BOOKS_CORE_TWELVE.md",
+  "snippet_hash": "df34995b4f33195e:expectancy",
+  "concept": "tharp_expectancy"
+}
