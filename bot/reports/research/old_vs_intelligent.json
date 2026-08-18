@@ -1,0 +1,58 @@
+{
+  "schema": "old_vs_intelligent.v1",
+  "old": {
+    "closes": 39,
+    "win_rate": 1.0,
+    "net_pnl": 1.02,
+    "expectancy": 0.026153846153846156,
+    "profit_factor": null,
+    "avg_win": 0.026153846153846153,
+    "avg_loss": null,
+    "payoff_ratio": null,
+    "cosmetic_win_rate": false,
+    "wins_erased_by_average_loss": null,
+    "tail_loss": null
+  },
+  "intelligent": {
+    "fires": 45,
+    "scales": 0,
+    "holds": 0,
+    "reduces": 0,
+    "exits": 46,
+    "skips": 545,
+    "closes": 0,
+    "win_rate": null,
+    "net_pnl": 0.0,
+    "expectancy": null,
+    "profit_factor": null,
+    "avg_win": null,
+    "avg_loss": null,
+    "payoff_ratio": null,
+    "cosmetic_win_rate": false,
+    "wins_erased_by_average_loss": null,
+    "tail_loss": null,
+    "top_skip_reasons": [
+      [
+        "hold_at_target_exposure",
+        199
+      ],
+      [
+        "no_validated_strategy_model",
+        181
+      ],
+      [
+        "redundant_information",
+        165
+      ],
+      [
+        "edge_gone:no_validated_strategy_model",
+        46
+      ]
+    ]
+  },
+  "target_gap": {
+    "objective_usd_per_day": 100.0,
+    "claim": "not_reached_unless_measured_net_is_positive_and_stable",
+    "formula": "positive_edge * opportunities * healthy_payoff * appropriate_capital"
+  }
+}

@@ -75,6 +75,43 @@ def append_journal(path: Path, event: dict) -> None:
         f.write(json.dumps(event, default=str) + "\n")
 
 
+def normalize_protective_stops(
+    *,
+    side: str,
+    entry: float,
+    sl: float | None,
+    tp: float | None,
+    spec: dict | None,
+    fallback_step: float,
+) -> tuple[float | None, float | None]:
+    """Keep SL/TP outside broker stop-distance constraints for market orders."""
+    if sl is None and tp is None:
+        return None, None
+    contract = dict(spec or {})
+    point = float(contract.get("point") or 0.0) or float(contract.get("trade_tick_size") or 0.0) or float(
+        fallback_step or 0.0
+    )
+    stops_level = max(
+        int(contract.get("trade_stops_level") or 0),
+        int(contract.get("trade_freeze_level") or 0),
+    )
+    min_distance = max(float(stops_level) * point, point * 2.0)
+    side_l = str(side or "").lower()
+    sl_out = None if sl is None else float(sl)
+    tp_out = None if tp is None else float(tp)
+    if side_l == "buy":
+        if sl_out is not None:
+            sl_out = min(sl_out, float(entry) - min_distance)
+        if tp_out is not None:
+            tp_out = max(tp_out, float(entry) + min_distance)
+    elif side_l == "sell":
+        if sl_out is not None:
+            sl_out = max(sl_out, float(entry) + min_distance)
+        if tp_out is not None:
+            tp_out = min(tp_out, float(entry) - min_distance)
+    return sl_out, tp_out
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Aegis broker-engine paper runner")
     parser.add_argument("--config", default=str(ROOT / "config_ib_paper_eurusd.yaml"))
@@ -765,6 +802,21 @@ def main() -> None:
                     )
                     return
                 order_qty = decision.lots
+            entry = float(q.ask if sig.side == "buy" else q.bid)
+            spec_map = None
+            if sl is not None or tp is not None:
+                try:
+                    spec_map = eng.symbol_spec(sym)
+                except Exception:
+                    spec_map = None
+                sl, tp = normalize_protective_stops(
+                    side=sig.side,
+                    entry=entry,
+                    sl=sl,
+                    tp=tp,
+                    spec=spec_map,
+                    fallback_step=pip,
+                )
             req = OrderRequest(
                 symbol=sym,
                 side=sig.side,
