@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "permission": {
+    "edit": "allow",
+    "bash": {
+      "*": "allow",
+      "git push*": "ask",
+      "git commit*": "ask",
+      "rm -rf*": "ask",
+      "docker*": "ask"
+    },
+    "external_directory": {
+      "*": "allow"
+    },
+    "webfetch": "allow",
+    "websearch": "allow"
+  }
+}
