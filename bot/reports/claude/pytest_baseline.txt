@@ -1,0 +1,20 @@
+﻿........................................................................ [ 15%]
+........F............................................................... [ 30%]
+........................................................................ [ 46%]
+............F..................................................F.......F [ 61%]
+F....................................................................... [ 76%]
+........................................................................ [ 92%]
+.....................................                                    [100%]
+============================== warnings summary ===============================
+bot/tests/test_ibkr_order_hygiene.py::test_bracket_sets_explicit_tif_and_atomic_transmit_chain
+  C:\Users\Zaid barghouthi\Desktop\trading_bot\.venv\Lib\site-packages\eventkit\util.py:21: DeprecationWarning: There is no current event loop
+    return asyncio.get_event_loop_policy().get_event_loop()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED bot/tests/test_hale_unit.py::test_generic_strategy_router_prepares_hale_for_paper_runner
+FAILED bot/tests/test_paper_control.py::test_ib_paper_config_defaults_to_observation_only
+FAILED bot/tests/test_process_control.py::test_start_service_preserves_virtualenv_python_launcher_path
+FAILED bot/tests/test_process_control.py::test_stop_quiesces_supervisor_before_flattening
+FAILED bot/tests/test_process_control.py::test_stop_waits_for_launchd_job_to_finish_unloading
+5 failed, 464 passed, 1 warning in 45.09s

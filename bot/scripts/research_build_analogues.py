@@ -91,6 +91,9 @@ def main() -> int:
 
     if args.synthetic:
         rows = _synthetic_records(symbols[: min(8, len(symbols))], per_symbol=80)
+        provenance = "synthetic_proxy"
+        outcome_unit = "usd_fixture"
+        source: dict = {"builder": "_synthetic_records", "note": "offline fixture; not market evidence"}
     else:
         from aegis.engines import create_engine
 
@@ -114,10 +117,27 @@ def main() -> int:
             min_bars=int(args.min_bars),
             step=int(args.step),
         )
+        provenance = "mt5_m1"
+        outcome_unit = "pips"
+        source = {
+            "builder": "build_analogues_from_m1",
+            "engine": str(cfg.get("engine") or ""),
+            "timeframe": str(cfg.get("timeframe") or ""),
+            "lookback_days": int(args.lookback_days),
+            "step": int(args.step),
+            "min_bars": int(args.min_bars),
+            "symbols": sorted(frames),
+            "bars_per_symbol": {sym: int(len(frame)) for sym, frame in sorted(frames.items())},
+        }
 
     out = Path(args.output)
-    payload = save_analogue_index(rows, out)
-    print(f"wrote {payload['n']} analogue records -> {out}")
+    payload = save_analogue_index(
+        rows, out, provenance=provenance, outcome_unit=outcome_unit, source=source
+    )
+    print(
+        f"wrote {payload['n']} analogue records -> {out} "
+        f"(provenance={payload['provenance']}, outcome_unit={payload['outcome_unit']})"
+    )
     return 0
 
 

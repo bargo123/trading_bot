@@ -10,12 +10,17 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 
 from aegis.engines import PositionSnapshot
-from aegis.intel.analogue_store import AnalogueStore
+from aegis.intel.analogue_store import AnalogueStore, is_measured_provenance
 from aegis.intel.knowledge_runtime import load_knowledge_rows, match_knowledge
 from aegis.intel.lifecycle import exposure_snapshot, pretrade_ok
 from aegis.intel.state_runtime import build_runtime_state, runtime_signature
 from aegis.intel.strategy_model import ValidatedStrategyModel, strategy_model_ready
 from aegis.intel.thesis_fire import ThesisFireDecision, evaluate_thesis_action, evaluate_thesis_fire
+from aegis.intel.trade_economics import (
+    DEFAULT_MIN_PAYOFF_RATIO,
+    TradeEconomics,
+    evaluate_trade_economics,
+)
 
 
 @dataclass
@@ -151,9 +156,22 @@ def _load_strategy(cfg: Mapping[str, Any]) -> ValidatedStrategyModel | None:
 
 
 def _bootstrap_from_evidence(cfg: Mapping[str, Any], evidence: Any) -> ValidatedStrategyModel | None:
-    """Use analogue evidence as-is. Never inflate PF or hide a cosmetic WR."""
+    """Use analogue evidence as-is. Never inflate PF or hide a cosmetic WR.
+
+    Refuses synthetic/proxy evidence outright. The committed offline index is a
+    fabricated fixture whose only two outcomes (-0.02 / +0.04) hand back a
+    "calibrated" PF of 6.0 for any query with 20 matches, which is how a live demo
+    run reached PF 0.25 while believing it had a validated edge. Measured provenance
+    is a precondition for calling anything a validated strategy model.
+    """
     if not bool(cfg.get("intelligent_firehose_bootstrap", False)):
         return None
+    if not is_measured_provenance(getattr(evidence, "provenance", "unknown")):
+        if bool(cfg.get("intelligent_allow_synthetic_evidence", False)):
+            # Explicit opt-in exists only for offline tests and shadow research.
+            pass
+        else:
+            return None
     if not evidence.eligible:
         return None
     try:
@@ -208,6 +226,47 @@ class IntelligentFirehoseBrain:
             "bootstrap": bool(self.cfg.get("intelligent_firehose_bootstrap", False)),
         }
 
+    def _trade_economics(
+        self,
+        *,
+        side: str,
+        entry: float,
+        invalidation: float | None,
+        target: float | None,
+        lots: float,
+        spec: Mapping[str, Any] | None,
+        spread_price: float | None,
+        evidence: Any,
+    ) -> TradeEconomics:
+        """Price the prospective trade. Win probability comes from analogue evidence.
+
+        The analogue win rate is only used when the evidence is measured; a proxy
+        index must not supply a probability that authorises real size. When no
+        probability survives, ``evaluate_trade_economics`` rejects on
+        ``no_win_probability_evidence`` rather than assuming a favourable one.
+        """
+        measured = is_measured_provenance(getattr(evidence, "provenance", "unknown")) or bool(
+            self.cfg.get("intelligent_allow_synthetic_evidence", False)
+        )
+        analogue_n = int(getattr(evidence, "analogue_n", 0) or 0) if measured else 0
+        analogue_losses = int(getattr(evidence, "analogue_n_losses", 0) or 0) if measured else 0
+        return evaluate_trade_economics(
+            side=side,
+            entry=entry,
+            invalidation=invalidation,
+            target=target,
+            lots=lots,
+            spec=spec,
+            spread_price=spread_price,
+            commission_round_trip_usd=float(self.cfg.get("commission_round_trip_usd", 0.0) or 0.0),
+            analogue_n=analogue_n,
+            analogue_n_losses=analogue_losses,
+            min_payoff_ratio=float(
+                self.cfg.get("intelligent_min_payoff_ratio", DEFAULT_MIN_PAYOFF_RATIO)
+            ),
+            min_expected_net_usd=float(self.cfg.get("intelligent_min_expected_net_usd", 0.0) or 0.0),
+        )
+
     def evaluate(
         self,
         *,
@@ -218,6 +277,9 @@ class IntelligentFirehoseBrain:
         equity: float,
         pip: float,
         core_side: str | None,
+        spread_price: float | None = None,
+        symbol_spec: Mapping[str, Any] | None = None,
+        entry_price: float | None = None,
     ) -> DemoDecision:
         clip_qty = float(self.cfg.get("order_quantity", 0.01))
         clip_risk = max(self._risk_budget * float(self.cfg.get("intelligent_risk_fraction", 0.08)) / 5.0, 0.01)
@@ -304,6 +366,26 @@ class IntelligentFirehoseBrain:
         )
         if weak_payoff and held.clips <= 0 and fire.action == "fire":
             fire = ThesisFireDecision("skip", "payoff_worse_than_cost", fire.expected_net_value)
+
+        # Per-trade economics. State-level expectancy says the *situation* pays;
+        # this says *this fill*, against this invalidation, toward this target,
+        # after this moment's spread, pays. Both must hold before FIRE.
+        econ = self._trade_economics(
+            side=side,
+            entry=float(entry_price if entry_price is not None else close),
+            invalidation=invalidation,
+            target=target,
+            lots=clip_qty,
+            spec=symbol_spec,
+            spread_price=spread_price,
+            evidence=evidence,
+        )
+        if fire.action == "fire" and not econ.acceptable:
+            fire = ThesisFireDecision(
+                "skip", f"trade_economics:{econ.reason}", econ.expected_net_value_usd
+            )
+        elif fire.action == "fire":
+            fire = ThesisFireDecision(fire.action, fire.reason, econ.expected_net_value_usd)
         action = evaluate_thesis_action(
             fire_decision=fire,
             information_id=info_id,
@@ -344,13 +426,19 @@ class IntelligentFirehoseBrain:
             "currency_exposure": exposure.get("currency_direction"),
             "invalidated": invalidated,
             "target_hit": target_hit,
+            "analogue_provenance": getattr(evidence, "provenance", "unknown"),
+            "analogue_measured": is_measured_provenance(getattr(evidence, "provenance", "unknown")),
+            **econ.journal(),
         }
         return DemoDecision(
             mapped,
             action.reason,
             side=side,
             sl=invalidation,
-            tp=target,
+            # Use the priced target so the order carries the geometry that was
+            # actually validated, including a synthesised one when structure gave
+            # no usable level.
+            tp=econ.target if econ.target is not None else target,
             quantity=clip_qty,
             expected_net_value=action.expected_net_value,
             information_id=info_id,

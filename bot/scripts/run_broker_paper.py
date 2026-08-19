@@ -583,6 +583,16 @@ def main() -> None:
                 hint_cfg = dict(loop_cfg)
                 hint_cfg["intel_enabled"] = False
                 hint = signal_from_row(row, hint_cfg)
+                # The brain prices the prospective trade, so it needs this moment's
+                # spread and the broker's contract spec. Without them it cannot tell
+                # a 1-pip target over a 30-pip stop from a real edge.
+                try:
+                    brain_spec = eng.symbol_spec(sym)
+                except Exception as exc:
+                    logger.warning("%s symbol_spec unavailable for economics: %s", sym, exc)
+                    brain_spec = None
+                brain_side = None if hint is None else hint.side
+                brain_entry = float(q.ask if brain_side == "buy" else q.bid) if brain_side else None
                 decision = intelligent_brain.evaluate(
                     symbol=sym,
                     row=row,
@@ -590,7 +600,10 @@ def main() -> None:
                     positions=eng.positions(),
                     equity=equity,
                     pip=pip,
-                    core_side=None if hint is None else hint.side,
+                    core_side=brain_side,
+                    spread_price=float(live_spread),
+                    symbol_spec=brain_spec,
+                    entry_price=brain_entry,
                 )
                 brain_decision = decision
                 if decision.action in {"exit", "reduce"}:

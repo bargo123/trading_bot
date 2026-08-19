@@ -1,0 +1,333 @@
+{
+  "analogue_index": {
+    "records": 640,
+    "fields": {
+      "bar_time": 640,
+      "symbol": 640,
+      "side": 640,
+      "setup": 640,
+      "regime": 640,
+      "structure": 640,
+      "volatility": 640,
+      "session": 640,
+      "h1_direction": 640,
+      "m5_direction": 640,
+      "outcome": 640,
+      "label": 640
+    },
+    "symbols": {
+      "EURUSD": 80,
+      "GBPUSD": 80,
+      "USDJPY": 80,
+      "USDCHF": 80,
+      "AUDUSD": 80,
+      "NZDUSD": 80,
+      "USDCAD": 80,
+      "EURJPY": 80
+    },
+    "sides": {
+      "buy": 320,
+      "sell": 320
+    },
+    "regimes": {
+      "trend": 216,
+      "range": 216,
+      "unknown": 208
+    },
+    "structures": {
+      "breakout": 216,
+      "retest": 216,
+      "none": 208
+    },
+    "setups": {
+      "breakout": 216,
+      "retest": 216,
+      "none": 208
+    },
+    "sessions": {
+      "asia": 160,
+      "london": 160,
+      "new_york": 160,
+      "late": 160
+    },
+    "outcome_payoff": {
+      "n": 640,
+      "n_wins": 480,
+      "n_losses": 160,
+      "win_rate": 0.75,
+      "avg_win": 0.04,
+      "avg_loss": -0.02,
+      "expectancy": 0.025,
+      "profit_factor": 5.999999999999999,
+      "net_pnl": 16.0,
+      "payoff_ratio": 2.0,
+      "breakeven_wr": 0.33333333333333337,
+      "wins_erased_by_average_loss": 0.5,
+      "wins_erased_by_tail_loss": 0.5,
+      "tail_loss": 0.02,
+      "cosmetic_win_rate": false
+    },
+    "outcome_min": -0.02,
+    "outcome_max": 0.04,
+    "bar_time_range": [
+      "2026-01-01T00:00:00+00:00",
+      "2026-01-28T07:00:00+00:00"
+    ]
+  },
+  "journals": [
+    {
+      "path": "bot\\reports\\mt5_demo_ensemble_best_journal.jsonl",
+      "lines": 1,
+      "events": {
+        "start": 1
+      },
+      "actions": {},
+      "top_reasons": {},
+      "pnl_payoff": {
+        "n": 0,
+        "n_wins": 0,
+        "n_losses": 0,
+        "win_rate": null,
+        "avg_win": null,
+        "avg_loss": null,
+        "expectancy": null,
+        "profit_factor": null,
+        "net_pnl": 0.0,
+        "payoff_ratio": null,
+        "breakeven_wr": null,
+        "wins_erased_by_average_loss": null,
+        "wins_erased_by_tail_loss": null,
+        "tail_loss": null,
+        "cosmetic_win_rate": false
+      },
+      "bytes": 102
+    },
+    {
+      "path": "bot\\reports\\mt5_demo_eurusd_hw_range_journal.jsonl",
+      "lines": 74,
+      "events": {
+        "order": 70,
+        "start": 4
+      },
+      "actions": {},
+      "top_reasons": {
+        "hw_range": 70
+      },
+      "pnl_payoff": {
+        "n": 0,
+        "n_wins": 0,
+        "n_losses": 0,
+        "win_rate": null,
+        "avg_win": null,
+        "avg_loss": null,
+        "expectancy": null,
+        "profit_factor": null,
+        "net_pnl": 0.0,
+        "payoff_ratio": null,
+        "breakeven_wr": null,
+        "wins_erased_by_average_loss": null,
+        "wins_erased_by_tail_loss": null,
+        "tail_loss": null,
+        "cosmetic_win_rate": false
+      },
+      "bytes": 16300
+    },
+    {
+      "path": "bot\\reports\\mt5_demo_firehose_hw_journal.jsonl",
+      "lines": 266913,
+      "events": {
+        "spread_skip": 233849,
+        "intel_brain_skip": 10062,
+        "order": 6344,
+        "intel_skip": 4150,
+        "flatten": 2900,
+        "open_skip": 2833,
+        "intel_brain_fire": 1615,
+        "halt": 1576,
+        "margin_skip": 1376,
+        "quote_stale": 784,
+        "intel_brain_exit": 765,
+        "oms_reject": 470,
+        "start": 49,
+        "risk_state": 43,
+        "probe": 36,
+        "adopt_positions": 34,
+        "sizing_skip": 21,
+        "intel_brain_reduce": 6
+      },
+      "actions": {
+        "open_0.01_EURUSD_buy": 1,
+        "fire": 1224,
+        "skip": 9974,
+        "exit": 853,
+        "scale": 391,
+        "reduce": 6
+      },
+      "top_reasons": {
+        "no_validated_strategy_model": 6611,
+        "redundant_information": 3019,
+        "market_closed_backoff": 2833,
+        "positive_state_ev_on_validated_strategy": 2447,
+        "firehose_bar_up": 2432,
+        "firehose_bar_dn": 2298,
+        "quick_win": 1383,
+        "never_green": 1288,
+        "wrong_edge_sell": 1066,
+        "daily_loss 3.54%": 883,
+        "new_evidence_increase_exposure": 782,
+        "doji_against": 549,
+        "structural_invalidation": 514,
+        "stops": 470,
+        "stretched_buy": 456,
+        "above_range_buy": 446,
+        "wrong_edge_buy": 438,
+        "hold_at_target_exposure": 343,
+        "er": 323,
+        "no_money_backoff": 310
+      },
+      "pnl_payoff": {
+        "n": 3672,
+        "n_wins": 1565,
+        "n_losses": 1942,
+        "win_rate": 0.42619825708061004,
+        "avg_win": 0.03471565495207668,
+        "avg_loss": -0.11060247167868177,
+        "expectancy": -0.04369825708061002,
+        "profit_factor": 0.25294473671958656,
+        "net_pnl": -160.46,
+        "payoff_ratio": 0.31387774997408124,
+        "breakeven_wr": 0.7611058182694144,
+        "wins_erased_by_average_loss": 3.185953767294993,
+        "wins_erased_by_tail_loss": 19.01159580342352,
+        "tail_loss": 0.66,
+        "cosmetic_win_rate": false
+      },
+      "bytes": 44868095
+    },
+    {
+      "path": "bot\\reports\\mt5_demo_m1_scalp_journal.jsonl",
+      "lines": 355,
+      "events": {
+        "order": 139,
+        "flatten": 118,
+        "spread_skip": 57,
+        "halt": 17,
+        "position": 14,
+        "start": 10
+      },
+      "actions": {},
+      "top_reasons": {
+        "max_hold": 117,
+        "firehose_bar_up": 71,
+        "firehose_bar_dn": 52,
+        "daily_loss 3.40%": 17,
+        "firehose_up": 9,
+        "firehose_dn": 7,
+        "quick_win": 1
+      },
+      "pnl_payoff": {
+        "n": 106,
+        "n_wins": 38,
+        "n_losses": 49,
+        "win_rate": 0.3584905660377358,
+        "avg_win": 0.02131578947368421,
+        "avg_loss": -0.09122448979591836,
+        "expectancy": -0.034528301886792456,
+        "profit_factor": 0.18120805369127518,
+        "net_pnl": -3.66,
+        "payoff_ratio": 0.23366301660190747,
+        "breakeven_wr": 0.8105941302791696,
+        "wins_erased_by_average_loss": 4.2796674225245654,
+        "wins_erased_by_tail_loss": 31.432098765432098,
+        "tail_loss": 0.67,
+        "cosmetic_win_rate": true
+      },
+      "bytes": 67930
+    },
+    {
+      "path": "bot\\reports\\mt5_demo_pa_select_journal.jsonl",
+      "lines": 1,
+      "events": {
+        "start": 1
+      },
+      "actions": {},
+      "top_reasons": {},
+      "pnl_payoff": {
+        "n": 0,
+        "n_wins": 0,
+        "n_losses": 0,
+        "win_rate": null,
+        "avg_win": null,
+        "avg_loss": null,
+        "expectancy": null,
+        "profit_factor": null,
+        "net_pnl": 0.0,
+        "payoff_ratio": null,
+        "breakeven_wr": null,
+        "wins_erased_by_average_loss": null,
+        "wins_erased_by_tail_loss": null,
+        "tail_loss": null,
+        "cosmetic_win_rate": false
+      },
+      "bytes": 102
+    },
+    {
+      "path": "bot\\reports\\mt5_live_algo_test.jsonl",
+      "lines": 21,
+      "events": {
+        "skip": 19,
+        "fill": 2
+      },
+      "actions": {},
+      "top_reasons": {
+        "firehose_bar_up": 1,
+        "aziz_vwap": 1
+      },
+      "pnl_payoff": {
+        "n": 0,
+        "n_wins": 0,
+        "n_losses": 0,
+        "win_rate": null,
+        "avg_win": null,
+        "avg_loss": null,
+        "expectancy": null,
+        "profit_factor": null,
+        "net_pnl": 0.0,
+        "payoff_ratio": null,
+        "breakeven_wr": null,
+        "wins_erased_by_average_loss": null,
+        "wins_erased_by_tail_loss": null,
+        "tail_loss": null,
+        "cosmetic_win_rate": false
+      },
+      "bytes": 1496
+    },
+    {
+      "path": "bot\\reports\\research\\shadow_decisions.jsonl",
+      "lines": 28689,
+      "events": {
+        "None": 28689
+      },
+      "actions": {},
+      "top_reasons": {},
+      "pnl_payoff": {
+        "n": 0,
+        "n_wins": 0,
+        "n_losses": 0,
+        "win_rate": null,
+        "avg_win": null,
+        "avg_loss": null,
+        "expectancy": null,
+        "profit_factor": null,
+        "net_pnl": 0.0,
+        "payoff_ratio": null,
+        "breakeven_wr": null,
+        "wins_erased_by_average_loss": null,
+        "wins_erased_by_tail_loss": null,
+        "tail_loss": null,
+        "cosmetic_win_rate": false
+      },
+      "bytes": 45191591
+    }
+  ]
+}

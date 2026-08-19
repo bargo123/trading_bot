@@ -296,11 +296,30 @@ def build_analogues_from_m1(
     return rows
 
 
-def save_analogue_index(rows: Sequence[Mapping[str, Any]], path: Path) -> dict[str, Any]:
+def save_analogue_index(
+    rows: Sequence[Mapping[str, Any]],
+    path: Path,
+    *,
+    provenance: str = "synthetic_proxy",
+    outcome_unit: str = "pips",
+    source: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Persist an analogue index with honest provenance.
+
+    This used to stamp every index ``label: "research_proxy"`` regardless of how it
+    was built, so a fabricated fixture and a real MT5-derived index were
+    indistinguishable on disk. The runtime now refuses to treat non-measured
+    provenance as a validated edge, so callers building from real history must say so
+    explicitly (``provenance="mt5_m1"``).
+    """
     payload = {
         "schema": "analogue_index.v1",
-        "label": "research_proxy",
+        # Retained so older readers keep working; provenance is the field to trust.
+        "label": provenance,
+        "provenance": str(provenance),
+        "outcome_unit": str(outcome_unit),
         "n": len(rows),
+        "source": dict(source or {}),
         "records": list(rows),
     }
     path = Path(path)

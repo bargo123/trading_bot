@@ -1,0 +1,14 @@
+﻿{
+    "mcpServers":  {
+                       "serena":  {
+                                      "args":  [
+                                                   "start-mcp-server",
+                                                   "--context",
+                                                   "ide-assistant",
+                                                   "--project",
+                                                   "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot"
+                                               ],
+                                      "command":  "C:\\Users\\Zaid barghouthi\\.local\\bin\\serena.exe"
+                                  }
+                   }
+}

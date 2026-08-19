@@ -31,6 +31,10 @@ class AnalogueEvidence:
     uncertainty: str
     eligible: bool
     similarity_score: float
+    # Provenance of the records behind this evidence. A synthetic/proxy index must
+    # never be mistaken for measured market history when authorising a trade.
+    provenance: str = "unknown"
+    outcome_unit: str = "unknown"
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -60,9 +64,33 @@ def _lower_bound(values: Sequence[float]) -> float | None:
     return avg - 1.96 * (sigma / math.sqrt(len(items)))
 
 
+#: Provenance labels that describe fabricated or placeholder evidence rather than
+#: measured market history. ``research_proxy`` is the historical label written by
+#: ``save_analogue_index`` for both synthetic and real builds, so it cannot be
+#: trusted as real either.
+SYNTHETIC_PROVENANCE = frozenset({"synthetic_proxy", "research_proxy", "unknown"})
+
+
+def is_measured_provenance(provenance: str | None) -> bool:
+    """True only for evidence built from real market history."""
+    return str(provenance or "unknown") not in SYNTHETIC_PROVENANCE
+
+
 class AnalogueStore:
-    def __init__(self, records: Sequence[Mapping[str, Any]] | None = None) -> None:
+    def __init__(
+        self,
+        records: Sequence[Mapping[str, Any]] | None = None,
+        *,
+        provenance: str = "unknown",
+        outcome_unit: str = "unknown",
+    ) -> None:
         self._records = list(records or [])
+        self.provenance = str(provenance or "unknown")
+        self.outcome_unit = str(outcome_unit or "unknown")
+
+    @property
+    def is_measured(self) -> bool:
+        return is_measured_provenance(self.provenance)
 
     @classmethod
     def load(cls, path: Path | None = None) -> "AnalogueStore":
@@ -76,7 +104,16 @@ class AnalogueStore:
         rows = payload.get("records") if isinstance(payload, dict) else payload
         if not isinstance(rows, list):
             return cls([])
-        return cls([row for row in rows if isinstance(row, dict)])
+        provenance = "unknown"
+        outcome_unit = "unknown"
+        if isinstance(payload, dict):
+            provenance = str(payload.get("provenance") or payload.get("label") or "unknown")
+            outcome_unit = str(payload.get("outcome_unit") or "unknown")
+        return cls(
+            [row for row in rows if isinstance(row, dict)],
+            provenance=provenance,
+            outcome_unit=outcome_unit,
+        )
 
     def query(
         self,
@@ -114,7 +151,11 @@ class AnalogueStore:
             except (KeyError, TypeError, ValueError):
                 continue
         if not matched:
-            return AnalogueEvidence(0, 0, None, None, None, None, None, None, None, None, None, "no_observations", False, 0.0)
+            return AnalogueEvidence(
+                0, 0, None, None, None, None, None, None, None, None, None,
+                "no_observations", False, 0.0,
+                provenance=self.provenance, outcome_unit=self.outcome_unit,
+            )
         matched.sort(key=lambda item: item[0], reverse=True)
         outcomes = [value for _, value in matched]
         stats = payoff_metrics(outcomes)
@@ -149,4 +190,6 @@ class AnalogueStore:
             uncertainty,
             eligible,
             float(matched[0][0]),
+            provenance=self.provenance,
+            outcome_unit=self.outcome_unit,
         )

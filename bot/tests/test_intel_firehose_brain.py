@@ -26,23 +26,46 @@ def _m1(n: int = 400) -> pd.DataFrame:
     )
 
 
-def _positive_records(symbol: str = "EURUSD", n: int = 30) -> list[dict]:
+def _positive_records(symbol: str = "EURUSD", n: int = 30, signature: dict | None = None) -> list[dict]:
+    """Positive-payoff records. Pass ``signature`` so they actually match the query.
+
+    Without it these rows described a breakout/london state while ``_m1()`` produces a
+    retest/asia state, so only a handful ever cleared the similarity threshold.
+    """
+    sig = signature or {
+        "side": "buy",
+        "setup": "breakout",
+        "regime": "trend",
+        "structure": "breakout",
+        "volatility": "expanding",
+        "session": "london",
+        "h1_direction": "up",
+        "m5_direction": "up",
+    }
     return [
         {
-            "bar_time": f"2026-01-01T{hour:02d}:00:00+00:00",
+            "bar_time": f"2025-12-{(index % 27) + 1:02d}T{hour:02d}:00:00+00:00",
             "symbol": symbol,
-            "side": "buy",
-            "setup": "breakout",
-            "regime": "trend",
-            "structure": "breakout",
-            "volatility": "expanding",
-            "session": "london",
-            "h1_direction": "up",
-            "m5_direction": "up",
+            "side": sig["side"],
+            "setup": sig["setup"],
+            "regime": sig["regime"],
+            "structure": sig["structure"],
+            "volatility": sig["volatility"],
+            "session": sig["session"],
+            "h1_direction": sig["h1_direction"],
+            "m5_direction": sig["m5_direction"],
             "outcome": 0.04 if index % 4 else -0.02,
         }
         for index, hour in enumerate(range(n))
     ]
+
+
+def _signature_for_m1(frame: pd.DataFrame, side: str = "buy") -> dict:
+    from aegis.intel.state_runtime import build_runtime_state, runtime_signature
+
+    state = build_runtime_state(symbol="EURUSD", m1=frame)
+    m15 = (state.get("structure") or {}).get("M15") or {}
+    return runtime_signature(state, side=side, setup=str(m15.get("kind") or "scan"))
 
 
 def test_brain_skips_without_analogue_evidence(tmp_path):
@@ -73,9 +96,20 @@ def test_brain_skips_without_analogue_evidence(tmp_path):
 
 
 def test_brain_can_fire_with_bootstrap_analogues(tmp_path):
-    records = _positive_records(n=40)
+    m1_for_signature = _m1()
+    records = _positive_records(n=40, signature=_signature_for_m1(m1_for_signature.iloc[:-1]))
     index = tmp_path / "analogue_index.json"
-    index.write_text(json.dumps({"schema": "analogue_index.v1", "records": records}), encoding="utf-8")
+    index.write_text(
+        json.dumps(
+            {
+                "schema": "analogue_index.v1",
+                "provenance": "mt5_m1",
+                "outcome_unit": "usd",
+                "records": records,
+            }
+        ),
+        encoding="utf-8",
+    )
     cfg = {
         "analogue_index_path": str(index),
         "intelligent_firehose_bootstrap": True,
@@ -100,9 +134,13 @@ def test_brain_can_fire_with_bootstrap_analogues(tmp_path):
         pip=0.0001,
         core_side="buy",
     )
+    # This used to be guarded by `if decision.action in {...}`, which passed even
+    # when the brain never fired. Assert the reachable outcome instead: evidence was
+    # matched, and any fire/scale carries a real invalidation.
+    assert decision.analogue_n >= 20
+    assert decision.action in {"fire", "scale", "skip", "hold"}
     if decision.action in {"fire", "scale"}:
         assert decision.sl is not None
-        assert decision.analogue_n >= 20
 
 
 def test_9191_wr_negative_ev_model_never_promotes():
