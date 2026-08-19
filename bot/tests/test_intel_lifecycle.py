@@ -1,5 +1,12 @@
 from aegis.engines import PositionSnapshot
-from aegis.intel.lifecycle import exposure_snapshot, ingest_deals, new_cursor, pretrade_ok
+from aegis.intel.lifecycle import (
+    exposure_snapshot,
+    ingest_deals,
+    load_cursor,
+    new_cursor,
+    pretrade_ok,
+    save_cursor,
+)
 
 
 def test_pretrade_and_exposure_snapshot():
@@ -43,3 +50,38 @@ def test_ingest_deals_is_idempotent():
     assert first
     assert first[0]["is_exit"] is True
     assert second == []
+
+
+def test_cursor_persistence_survives_restart(tmp_path):
+    deals = [
+        {
+            "ticket": "11",
+            "order": "21",
+            "position": "30",
+            "symbol": "EURUSD",
+            "entry": 1,
+            "profit": 0.08,
+            "commission": -0.02,
+            "swap": 0.0,
+            "comment": "",
+            "reason": 5,
+            "time": "2026-08-14T10:01:00.123Z",
+        }
+    ]
+    path = tmp_path / "reconcile_cursor.json"
+    cursor = new_cursor()
+    assert ingest_deals(deals, cursor)
+    save_cursor(cursor, path)
+
+    restarted = load_cursor(path)
+    assert restarted.processed_tickets == {"11"}
+    assert restarted.newest_time == "2026-08-14T10:01:00.123Z"
+    assert ingest_deals(deals, restarted) == []
+
+
+def test_load_cursor_missing_or_corrupt_yields_fresh(tmp_path):
+    missing = tmp_path / "nope.json"
+    assert load_cursor(missing).dump() == {"processed_tickets": [], "newest_time": ""}
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json", encoding="utf-8")
+    assert load_cursor(bad).dump() == {"processed_tickets": [], "newest_time": ""}

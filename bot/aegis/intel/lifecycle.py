@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from aegis.engines import PositionSnapshot
@@ -11,6 +12,21 @@ from aegis.reconcile import ReconcileCursor, reconcile_new_deals
 
 def new_cursor() -> ReconcileCursor:
     return ReconcileCursor()
+
+
+def load_cursor(path: Path) -> ReconcileCursor:
+    """Load a persisted cursor. A missing/corrupt file yields a fresh cursor."""
+    cursor = ReconcileCursor()
+    try:
+        cursor.load_json(path)
+    except Exception:
+        cursor = ReconcileCursor()
+    return cursor
+
+
+def save_cursor(cursor: ReconcileCursor, path: Path) -> None:
+    """Atomically persist the cursor so restarts do not re-ingest old deals."""
+    cursor.save_json(path)
 
 
 def pretrade_ok(

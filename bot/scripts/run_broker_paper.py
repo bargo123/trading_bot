@@ -28,6 +28,7 @@ from aegis.exits import (  # noqa: E402
     save_mfe,
     should_block_scratch_cooldown,
     should_scratch_never_green,
+    update_mae,
     update_mfe,
 )
 from aegis.execution_circuit import ExecutionCircuit  # noqa: E402
@@ -166,6 +167,8 @@ def main() -> None:
     clip_interval_s = float(cfg.get("firehose_clip_interval_s", 0) or 0)
     mfe_path = ROOT / "reports" / "firehose_mfe.json"
     mfe = load_mfe(mfe_path)
+    mae_path = ROOT / "reports" / "firehose_mae.json"
+    mae = load_mfe(mae_path)
     pa_select_mode = str(cfg.get("signal_mode") or cfg.get("algo") or "").lower() in {"pa_select"}
     day_trades = 0
     day_stamp = None
@@ -175,9 +178,10 @@ def main() -> None:
     last_mktclosed_journal = 0.0
     last_intel_journal: dict[str, float] = {}
     intelligent_brain = None
-    from aegis.intel.lifecycle import ingest_deals, new_cursor
+    from aegis.intel.lifecycle import ingest_deals, load_cursor, save_cursor
 
-    deal_cursor = new_cursor()
+    reconcile_cursor_path = ROOT / "reports" / "reconcile_cursor.json"
+    deal_cursor = load_cursor(reconcile_cursor_path)
     margin_cooldown_s = 30.0
     close_block_until = 0.0
     t2t = TickToTrade()
@@ -1095,8 +1099,13 @@ def main() -> None:
                                 from aegis.intel.outcome_log import append_outcome
 
                                 append_outcome({**event, "source": "reconcile"})
-                    except Exception:
-                        pass
+                        save_cursor(deal_cursor, reconcile_cursor_path)
+                    except Exception as exc:
+                        logger.error(
+                            "reconciliation failed: %s (cursor preserved)",
+                            exc,
+                            exc_info=True,
+                        )
                 if close_block_until > 0:
                     extra_hb["close_block_until"] = close_block_until
                     extra_hb["close_block_until_iso"] = datetime.fromtimestamp(
@@ -1124,6 +1133,11 @@ def main() -> None:
                             if prev_peak is None or peak != prev_peak:
                                 mfe[sym] = peak
                                 save_mfe(mfe_path, mfe)
+                            prev_trough = mae.get(sym)
+                            trough = update_mae(prev_trough, pnl)
+                            if prev_trough is None or trough != prev_trough:
+                                mae[sym] = trough
+                                save_mfe(mae_path, mae)
                             gb = giveback_reason(peak, pnl, cfg)
                             closed_now = False
                             pnls = [float(p.unrealized_pnl) for p in open_pos]
@@ -1145,6 +1159,8 @@ def main() -> None:
                                     else:
                                         mfe[sym] = peak_left
                                     save_mfe(mfe_path, mfe)
+                                    mae.pop(sym, None)
+                                    save_mfe(mae_path, mae)
                                     if not leftover_pos:
                                         position_opened_at.pop(sym, None)
                                         last_entry_at.pop(sym, None)
@@ -1157,6 +1173,8 @@ def main() -> None:
                                     last_scratch_at[sym] = time.time()
                                     mfe.pop(sym, None)
                                     save_mfe(mfe_path, mfe)
+                                    mae.pop(sym, None)
+                                    save_mfe(mae_path, mae)
                                     closed_now = True
                             elif (not intelligent_mode) and should_scratch_never_green(
                                 held_s=held, peak=peak, pnls=pnls, cfg=cfg
@@ -1170,6 +1188,8 @@ def main() -> None:
                                     last_scratch_at[sym] = time.time()
                                     mfe.pop(sym, None)
                                     save_mfe(mfe_path, mfe)
+                                    mae.pop(sym, None)
+                                    save_mfe(mae_path, mae)
                                     closed_now = True
                             elif max_hold > 0 and held >= max_hold:
                                 if scratch_losers or pnl >= 0:
@@ -1179,6 +1199,8 @@ def main() -> None:
                                         last_entry_at.pop(sym, None)
                                         mfe.pop(sym, None)
                                         save_mfe(mfe_path, mfe)
+                                        mae.pop(sym, None)
+                                        save_mfe(mae_path, mae)
                                         closed_now = True
                             if not closed_now:
                                 holding.append(f"{sym} {open_pos[0].side} {held:.0f}s pnl={pnl:.2f}")
@@ -1192,6 +1214,9 @@ def main() -> None:
                             if sym in mfe:
                                 mfe.pop(sym, None)
                                 save_mfe(mfe_path, mfe)
+                            if sym in mae:
+                                mae.pop(sym, None)
+                                save_mfe(mae_path, mae)
                         if len(eng.positions()) >= max_positions:
                             continue
                         if jpy_cluster_blocks(

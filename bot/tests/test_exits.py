@@ -16,6 +16,7 @@ from aegis.exits import (
     mfe_after_quick_win,
     quick_win_clips,
     should_scratch_never_green,
+    update_mae,
     update_mfe,
 )
 
@@ -57,6 +58,15 @@ def test_mfe_tracks_peak_only():
     peak = update_mfe(peak, 0.06)
     peak = update_mfe(peak, 0.02)
     assert peak == 0.06
+
+
+def test_mae_tracks_trough_only():
+    trough = update_mae(None, -0.01)
+    trough = update_mae(trough, -0.06)
+    trough = update_mae(trough, -0.02)
+    assert trough == -0.06
+    trough = update_mae(trough, 0.05)
+    assert trough == -0.06
 
 
 def test_firehose_stops_from_live_quote_not_bar_close() -> None:

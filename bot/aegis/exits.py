@@ -23,6 +23,18 @@ def update_mfe(peak: float | None, pnl: float) -> float:
     return max(float(peak), cur)
 
 
+def update_mae(trough: float | None, pnl: float) -> float:
+    """Worst adverse excursion in open P&L. Tracks the most-negative state.
+
+    Tharp: stops must be calibrated from measured adverse excursion, not from a
+    fixed 30-pip formula. MAE is the mirror of MFE and is persisted with it.
+    """
+    cur = float(pnl)
+    if trough is None:
+        return cur
+    return min(float(trough), cur)
+
+
 def working_stop(
     side: str,
     entry: float,
@@ -210,3 +222,13 @@ def load_mfe(path: Path) -> dict[str, float]:
 def save_mfe(path: Path, data: dict[str, float]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def load_excursion(path: Path) -> dict[str, float]:
+    """Load either an MFE or MAE map by shared numeric-json semantics."""
+    return load_mfe(path)
+
+
+def save_excursion(path: Path, data: dict[str, float]) -> None:
+    """Persist either an MFE or MAE map atomically."""
+    save_mfe(path, data)
