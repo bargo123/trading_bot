@@ -9,6 +9,10 @@ from aegis.indicators import enrich
 
 Side = Literal["buy", "sell"]
 
+# Heikin-Ashi Level Exhaustion families live in aegis.hale but must route through the
+# generic strategy entry points so paper/demo runners can select them by config.
+HALE_MODES = frozenset({"hale_fade", "hale_pullback"})
+
 
 @dataclass
 class Signal:
@@ -71,6 +75,10 @@ def signal_from_row(row: pd.Series, cfg: dict[str, Any]) -> Signal | None:
     mode = str(cfg.get("signal_mode") or cfg.get("algo") or "").lower()
     if mode in {"scalper_2h", "scalp_2h", "2h"}:
         return signal_scalper_2h(row, cfg)
+    if mode in HALE_MODES:
+        from aegis.hale import sig_hale_fade, sig_hale_pullback
+
+        return (sig_hale_fade if mode == "hale_fade" else sig_hale_pullback)(row, cfg)
     if mode in {"hw_range", "trend_pullback", "breakout_adx", "rsi_cross", "squeeze_bo",
                 "aziz_orb", "aziz_vwap", "steidl_ib_break", "steidl_ib_fade", "fabris_ntz",
                 "book_optimal", "hw_runner", "thomas_10r", "volman_scalp", "chan_bb_scalp",
@@ -169,4 +177,8 @@ def prepare(df: pd.DataFrame, cfg: dict[str, Any]) -> pd.DataFrame:
         from aegis.pa_select import prepare_pa_select
 
         return prepare_pa_select(df, cfg)
+    if mode in HALE_MODES:
+        from aegis.hale import prepare_hale
+
+        return prepare_hale(df, cfg)
     return enrich(df, cfg)

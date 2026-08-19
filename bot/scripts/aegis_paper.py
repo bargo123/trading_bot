@@ -110,8 +110,18 @@ def _tcp_up(host: str, port: int, timeout: float = 0.4) -> bool:
         return False
 
 
+def _gui_domain() -> str:
+    """launchd GUI domain for the current user.
+
+    ``os.getuid`` is POSIX-only; on Windows there is no launchd at all, so we fall
+    back to a placeholder that keeps payload construction importable and testable.
+    """
+    getuid = getattr(os, "getuid", None)
+    return f"gui/{getuid() if getuid else 0}"
+
+
 def _service_target() -> str:
-    return f"gui/{os.getuid()}/{service_label()}"
+    return f"{_gui_domain()}/{service_label()}"
 
 
 def _service_loaded() -> bool:
@@ -306,7 +316,7 @@ def start_service(config: Path) -> None:
     with plist_path.open("wb") as handle:
         plistlib.dump(payload, handle, sort_keys=False)
     subprocess.run(
-        ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(plist_path)],
+        ["launchctl", "bootstrap", _gui_domain(), str(plist_path)],
         check=True,
     )
     print(f"Started {service_label()} (paper observation mode follows config safety gates)")
