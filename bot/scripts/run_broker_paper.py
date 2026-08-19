@@ -39,6 +39,7 @@ from aegis.oms import (  # noqa: E402
     oms_allows,
     open_attempt_blocked,
     quote_age_s,
+    quote_future_skew_s,
     update_close_backoff,
 )
 from aegis.paper_control import (  # noqa: E402
@@ -493,6 +494,23 @@ def main() -> None:
                             "symbol": sym,
                             "age_s": age,
                             "max_s": max_age,
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
+                # quote_age_s clamps at zero, so a future-stamped tick reports age 0.0
+                # and would look perfectly fresh here. Reject it explicitly.
+                max_skew = float(cfg.get("max_quote_future_skew_s", max_age) or 0.0)
+                skew = quote_future_skew_s(q)
+                if max_skew > 0 and skew > max_skew:
+                    t2t.note_reject("future_quote")
+                    append_journal(
+                        journal,
+                        {
+                            "event": "quote_future",
+                            "symbol": sym,
+                            "skew_s": skew,
+                            "max_s": max_skew,
                             "bar": str(bar_time),
                         },
                     )

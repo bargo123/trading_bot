@@ -13,6 +13,7 @@ from aegis.engines import PositionSnapshot
 from aegis.intel.analogue_store import AnalogueStore, is_measured_provenance
 from aegis.intel.knowledge_runtime import load_knowledge_rows, match_knowledge
 from aegis.intel.lifecycle import exposure_snapshot, pretrade_ok
+from aegis.intel.paths import INTEL_DIR, resolve_bot_path
 from aegis.intel.state_runtime import build_runtime_state, runtime_signature
 from aegis.intel.strategy_model import ValidatedStrategyModel, strategy_model_ready
 from aegis.intel.thesis_fire import ThesisFireDecision, evaluate_thesis_action, evaluate_thesis_fire
@@ -122,11 +123,8 @@ def _geometry(side: str, structure: Mapping[str, Any], pip: float) -> tuple[floa
 
 
 def _load_strategy(cfg: Mapping[str, Any]) -> ValidatedStrategyModel | None:
-    path = Path(
-        str(
-            cfg.get("intelligent_champion_path")
-            or (Path(__file__).resolve().parents[2] / "intel" / "intelligent_champion.json")
-        )
+    path = resolve_bot_path(
+        cfg.get("intelligent_champion_path"), INTEL_DIR / "intelligent_champion.json"
     )
     if not path.is_file():
         return None
@@ -198,18 +196,14 @@ def _bootstrap_from_evidence(cfg: Mapping[str, Any], evidence: Any) -> Validated
 class IntelligentFirehoseBrain:
     def __init__(self, cfg: Mapping[str, Any]) -> None:
         self.cfg = dict(cfg)
-        index_path = Path(
-            str(
-                cfg.get("analogue_index_path")
-                or (Path(__file__).resolve().parents[2] / "intel" / "analogue_index.json")
-            )
+        index_path = resolve_bot_path(
+            cfg.get("analogue_index_path"), INTEL_DIR / "analogue_index.json"
         )
-        knowledge_path = Path(
-            str(
-                cfg.get("knowledge_table_path")
-                or (Path(__file__).resolve().parents[2] / "intel" / "knowledge_table.json")
-            )
+        knowledge_path = resolve_bot_path(
+            cfg.get("knowledge_table_path"), INTEL_DIR / "knowledge_table.json"
         )
+        self.index_path = index_path
+        self.knowledge_path = knowledge_path
         self.analogues = AnalogueStore.load(index_path)
         self.knowledge_rows = load_knowledge_rows(knowledge_path)
         self.strategy = _load_strategy(cfg)
@@ -218,13 +212,33 @@ class IntelligentFirehoseBrain:
         self.counts = {"fire": 0, "scale": 0, "hold": 0, "reduce": 0, "exit": 0, "skip": 0}
 
     def snapshot(self) -> dict[str, Any]:
+        records = len(getattr(self.analogues, "_records", []))
         return {
             "brain": "intelligent_firehose",
             "counts": dict(self.counts),
-            "analogue_records": len(getattr(self.analogues, "_records", [])),
+            "analogue_records": records,
+            "analogue_provenance": self.analogues.provenance,
+            "analogue_measured": self.analogues.is_measured,
+            "analogue_index_path": str(self.index_path),
             "knowledge_rows": len(self.knowledge_rows),
+            "knowledge_table_path": str(self.knowledge_path),
             "champion": None if self.strategy is None else self.strategy.strategy_id,
             "bootstrap": bool(self.cfg.get("intelligent_firehose_bootstrap", False)),
+            # An empty index means every decision is made on no evidence. That is a
+            # misconfiguration, not a quiet market, so make it visible.
+            "warnings": [
+                warning
+                for warning in (
+                    f"analogue index empty or unreadable: {self.index_path}" if records == 0 else "",
+                    f"knowledge table empty or unreadable: {self.knowledge_path}"
+                    if not self.knowledge_rows
+                    else "",
+                    f"analogue provenance is not measured market history: {self.analogues.provenance}"
+                    if records and not self.analogues.is_measured
+                    else "",
+                )
+                if warning
+            ],
         }
 
     def _trade_economics(
@@ -307,6 +321,7 @@ class IntelligentFirehoseBrain:
             before_time=row["time"],
             min_n=int(self.cfg.get("intelligent_min_analogues", 20)),
             min_similarity=float(self.cfg.get("intelligent_min_similarity", 0.55)),
+            pool_across_symbols=bool(self.cfg.get("intelligent_pool_across_symbols", False)),
         )
         books = match_knowledge(
             self.knowledge_rows,

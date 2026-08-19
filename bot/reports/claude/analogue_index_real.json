@@ -1,0 +1,24 @@
+{
+  "records": 9569,
+  "provenance": "mt5_m1",
+  "outcome_unit": "pips",
+  "symbols": 26,
+  "distinct_outcomes": 2134,
+  "payoff": {
+    "n": 9569,
+    "n_wins": 4505,
+    "n_losses": 5017,
+    "win_rate": 0.4707910962483018,
+    "avg_win": 6.7222197558268375,
+    "avg_loss": -7.103308750249153,
+    "expectancy": -0.5594837496081193,
+    "profit_factor": 0.8497725697513534,
+    "net_pnl": -5353.7000000000935,
+    "payoff_ratio": 0.9463504955477335,
+    "breakeven_wr": 0.5137820769113758,
+    "wins_erased_by_average_loss": 1.0566909455901061,
+    "wins_erased_by_tail_loss": 13.284302394695532,
+    "tail_loss": 89.30000000000007,
+    "cosmetic_win_rate": false
+  }
+}

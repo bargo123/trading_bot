@@ -105,16 +105,40 @@ def update_close_backoff(
     return max(float(prev_until or 0.0), until.timestamp())
 
 
-def quote_age_s(quote: Quote, now: datetime | None = None) -> float:
+def _quote_delta_s(quote: Quote, now: datetime | None = None) -> float | None:
+    """Signed seconds between now and the quote timestamp. Positive = quote is old."""
     now = now or datetime.now(timezone.utc)
     ts = quote.time
     if ts is None:
-        return float("inf")
+        return None
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
-    return max(0.0, (now - ts).total_seconds())
+    return (now - ts).total_seconds()
+
+
+def quote_age_s(quote: Quote, now: datetime | None = None) -> float:
+    """Age of a quote in seconds, clamped at zero. Missing timestamp is infinitely old."""
+    delta = _quote_delta_s(quote, now)
+    if delta is None:
+        return float("inf")
+    return max(0.0, delta)
+
+
+def quote_future_skew_s(quote: Quote, now: datetime | None = None) -> float:
+    """Seconds the quote timestamp runs *ahead* of now, else 0.0.
+
+    ``quote_age_s`` clamps at zero, so a quote stamped in the future reported an age
+    of 0.0 and sailed through the staleness gate as though it were perfectly fresh.
+    A future timestamp means broker clock skew or corrupt tick data, and pricing a
+    trade off it is exactly the case the staleness check exists to prevent. Missing
+    timestamps are handled by ``quote_age_s`` returning infinity, not here.
+    """
+    delta = _quote_delta_s(quote, now)
+    if delta is None:
+        return 0.0
+    return max(0.0, -delta)
 
 
 def oms_allows(
@@ -149,6 +173,11 @@ def oms_allows(
         max_age = float(cfg.get("max_quote_age_s", 5.0) or 0.0)
         if max_age > 0 and quote_age_s(quote, now) > max_age:
             return False, "stale_quote"
+        # Symmetric with the staleness gate: if now-vs-timestamp is trusted enough to
+        # reject an old quote, a quote from the future is just as untrustworthy.
+        max_skew = float(cfg.get("max_quote_future_skew_s", max_age) or 0.0)
+        if max_skew > 0 and quote_future_skew_s(quote, now) > max_skew:
+            return False, "future_quote"
     sl = req.stop_loss
     tp = req.take_profit
     if sl is not None:

@@ -186,3 +186,11 @@ intelligent_edge_sizing: true
 # Analogue evidence must be built from real market history. Leave false: the
 # offline index is a synthetic fixture that reports a fabricated PF of 6.0.
 intelligent_allow_synthetic_evidence: false
+# Pool analogue evidence across symbols for the same state. Restricting evidence to
+# one symbol splits a 759-observation state into ~30 per pair, which stops clearing
+# the 95% lower-bound test and hides the only two states that measurably have an
+# edge. Symbol still counts in the similarity score, so same-symbol analogues rank
+# first; this only stops discarding the rest.
+intelligent_pool_across_symbols: true
+# Reject ticks stamped ahead of local time (broker clock skew / corrupt ticks).
+max_quote_future_skew_s: 5

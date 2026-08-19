@@ -122,7 +122,17 @@ class AnalogueStore:
         before_time: str | pd.Timestamp,
         min_n: int = 20,
         min_similarity: float = 0.55,
+        pool_across_symbols: bool = False,
     ) -> AnalogueEvidence:
+        """Point-in-time analogue evidence for one state.
+
+        ``pool_across_symbols`` controls whether evidence is restricted to the query
+        symbol. Restricting it fragments a state's sample across 26 correlated FX
+        pairs - a state with 759 pooled observations becomes ~30 per symbol and stops
+        clearing the 95% lower-bound test, so a real edge becomes invisible. Pooling
+        keeps symbol in the similarity score, so same-symbol analogues still rank
+        first; it only stops discarding the rest outright.
+        """
         cutoff = pd.Timestamp(before_time)
         if cutoff.tzinfo is None:
             cutoff = cutoff.tz_localize("UTC")
@@ -131,7 +141,7 @@ class AnalogueStore:
         matched: list[tuple[float, float]] = []
         symbol = str(signature.get("symbol") or "").upper()
         for row in self._records:
-            if symbol and str(row.get("symbol") or "").upper() != symbol:
+            if symbol and not pool_across_symbols and str(row.get("symbol") or "").upper() != symbol:
                 continue
             try:
                 ts = pd.Timestamp(row["bar_time"])
