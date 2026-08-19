@@ -51,4 +51,7 @@ bot/intel/*
 # Research runtime (code stays in bot/aegis/research/)
 bot/research/*
 !bot/research/.gitkeep
+# Permanent book-memory knowledge records stay versioned
+!bot/research/book_memory/
+!bot/research/book_memory/knowledge_records.jsonl
 bot/optimizer/*.lock
