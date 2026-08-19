@@ -51,3 +51,4 @@ bot/intel/*
 # Research runtime (code stays in bot/aegis/research/)
 bot/research/*
 !bot/research/.gitkeep
+bot/optimizer/*.lock
