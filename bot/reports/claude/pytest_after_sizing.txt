@@ -1,0 +1,15 @@
+﻿........................................................................ [ 14%]
+........................................................................ [ 28%]
+........................................................................ [ 42%]
+........................................................................ [ 56%]
+........................................................................ [ 70%]
+........................................................................ [ 84%]
+........................................................................ [ 98%]
+.........                                                                [100%]
+============================== warnings summary ===============================
+bot/tests/test_ibkr_order_hygiene.py::test_bracket_sets_explicit_tif_and_atomic_transmit_chain
+  C:\Users\Zaid barghouthi\Desktop\trading_bot\.venv\Lib\site-packages\eventkit\util.py:21: DeprecationWarning: There is no current event loop
+    return asyncio.get_event_loop_policy().get_event_loop()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+513 passed, 1 warning in 39.07s

@@ -224,12 +224,39 @@ def test_fire_decision_reports_costs_and_probability_provenance(tmp_path):
     frame = _basing_above_support()
     signature = _signature_for(frame, "buy")
     brain = _brain(_index(tmp_path, _measured_records(signature, n=80), provenance="mt5_m1"))
-    econ = _decide(brain, frame).journal
-    # Cost is charged from the live spread, not assumed away.
-    assert econ["econ_cost_usd"] == pytest.approx(HALF_PIP_SPREAD * 1000.0)
+    decision = _decide(brain, frame)
+    econ = decision.journal
+    # Cost is charged from the live spread at the size actually being sent.
+    lots = decision.quantity
+    assert econ["econ_cost_usd"] == pytest.approx(HALF_PIP_SPREAD * 100000.0 * lots)
     # Probability is the conservative bound on the sample, not the point estimate.
     assert econ["econ_p_win_source"] == "analogue_wilson_lower_bound"
     assert econ["econ_p_win"] < 0.75
+
+
+def test_fire_size_comes_from_validated_risk_not_a_fixed_clip(tmp_path):
+    """order_quantity is a fallback, not the size of every trade."""
+    frame = _basing_above_support()
+    signature = _signature_for(frame, "buy")
+    brain = _brain(_index(tmp_path, _measured_records(signature, n=80), provenance="mt5_m1"))
+    decision = _decide(brain, frame)
+    assert decision.action == "fire"
+    assert decision.journal["size_ok"] is True
+    assert decision.journal["size_reason"] == "sized_from_validated_risk"
+    # Sized from the $100 budget x 8% validated fraction across 5 clips, not 0.01.
+    assert decision.quantity != 0.01
+    assert decision.journal["size_risk_usd"] <= decision.journal["size_clip_budget_usd"] + 1e-9
+
+
+def test_edge_sizing_can_be_disabled_back_to_the_fixed_clip(tmp_path):
+    frame = _basing_above_support()
+    signature = _signature_for(frame, "buy")
+    brain = _brain(
+        _index(tmp_path, _measured_records(signature, n=80), provenance="mt5_m1"),
+        intelligent_edge_sizing=False,
+    )
+    decision = _decide(brain, frame)
+    assert decision.quantity == pytest.approx(0.01)
 
 
 # --------------------------------------------------------------------------

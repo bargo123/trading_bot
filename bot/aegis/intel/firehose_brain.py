@@ -16,6 +16,7 @@ from aegis.intel.lifecycle import exposure_snapshot, pretrade_ok
 from aegis.intel.state_runtime import build_runtime_state, runtime_signature
 from aegis.intel.strategy_model import ValidatedStrategyModel, strategy_model_ready
 from aegis.intel.thesis_fire import ThesisFireDecision, evaluate_thesis_action, evaluate_thesis_fire
+from aegis.intel.thesis_sizing import evidence_confidence, size_thesis_clip
 from aegis.intel.trade_economics import (
     DEFAULT_MIN_PAYOFF_RATIO,
     TradeEconomics,
@@ -367,12 +368,40 @@ class IntelligentFirehoseBrain:
         if weak_payoff and held.clips <= 0 and fire.action == "fire":
             fire = ThesisFireDecision("skip", "payoff_worse_than_cost", fire.expected_net_value)
 
+        entry = float(entry_price if entry_price is not None else close)
+
+        # Size first, then price. A fixed lot silently risks 10x more behind a
+        # 50-pip stop than a 5-pip one, and the economics have to be computed for
+        # the size actually being sent - commission does not scale with lots, so
+        # pricing the wrong size can flip the EV sign.
+        sizing = None
+        if bool(self.cfg.get("intelligent_edge_sizing", True)) and strategy is not None:
+            sizing = size_thesis_clip(
+                entry=entry,
+                invalidation=invalidation,
+                spec=symbol_spec,
+                risk_budget_usd=self._risk_budget,
+                validated_risk_fraction=strategy.validated_risk_fraction,
+                current_risk_usd=held.current_risk_usd,
+                max_clips=int(self.cfg.get("intelligent_max_clips_per_thesis", 5)),
+                confidence=evidence_confidence(
+                    analogue_n=evidence.analogue_n,
+                    min_n=int(self.cfg.get("intelligent_min_analogues", 20)),
+                    uncertainty=str(evidence.uncertainty),
+                ),
+                hard_max_lots=float(self.cfg.get("mt5_max_lots") or 0.0) or None,
+            )
+            if sizing.allowed:
+                clip_qty = sizing.lots
+            elif fire.action == "fire":
+                fire = ThesisFireDecision("skip", f"sizing:{sizing.reason}", fire.expected_net_value)
+
         # Per-trade economics. State-level expectancy says the *situation* pays;
         # this says *this fill*, against this invalidation, toward this target,
         # after this moment's spread, pays. Both must hold before FIRE.
         econ = self._trade_economics(
             side=side,
-            entry=float(entry_price if entry_price is not None else close),
+            entry=entry,
             invalidation=invalidation,
             target=target,
             lots=clip_qty,
@@ -429,6 +458,7 @@ class IntelligentFirehoseBrain:
             "analogue_provenance": getattr(evidence, "provenance", "unknown"),
             "analogue_measured": is_measured_provenance(getattr(evidence, "provenance", "unknown")),
             **econ.journal(),
+            **({} if sizing is None else sizing.journal()),
         }
         return DemoDecision(
             mapped,
