@@ -193,21 +193,28 @@ def _mt5_status() -> dict[str, Any]:
 
 def _runner_pid() -> int | None:
     try:
-        return int(RUNNER_LOCK.read_text(encoding="utf-8").strip().splitlines()[0])
-    except (OSError, ValueError, IndexError):
+        # The runner holds an OS byte-lock on reports/run_broker_paper.lock, so
+        # reading the file fails on Windows with a sharing violation. Detect the
+        # runner process by command line instead (same as supervisor_keepalive).
+        proc = subprocess.run(
+            [
+                "powershell.exe", "-NoProfile", "-Command",
+                "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+                "Where-Object { $_.CommandLine -match 'run_broker_paper' } | "
+                "Select-Object -ExpandProperty ProcessId",
+            ],
+            capture_output=True, text=True, timeout=15,
+        )
+        if proc.returncode != 0:
+            return None
+        pids = [int(line.strip()) for line in proc.stdout.splitlines() if line.strip().isdigit()]
+        return pids[0] if pids else None
+    except (OSError, subprocess.SubprocessError, ValueError):
         return None
 
 
 def _runner_process_alive() -> bool:
-    pid = _runner_pid()
-    if pid is None:
-        return False
-    try:
-        proc = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"],
-                              capture_output=True, text=True, timeout=10)
-        return str(pid) in proc.stdout
-    except (OSError, subprocess.SubprocessError):
-        return False
+    return _runner_pid() is not None
 
 
 def _champion() -> dict[str, Any] | None:

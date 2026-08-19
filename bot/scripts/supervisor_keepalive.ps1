@@ -7,7 +7,8 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BotRoot = Resolve-Path (Join-Path $ScriptDir "..")
 $RepoRoot = Resolve-Path (Join-Path $BotRoot "..")
-$Python = Join-Path $BotRoot ".venv\Scripts\python.exe"
+# venv lives at repo root (bot/.venv is not created by the setup scripts)
+$Python = Join-Path $RepoRoot ".venv\Scripts\python.exe"
 $LogFile = Join-Path $BotRoot "optimizer\keepalive.log"
 $PaperCfg = "config_mt5_demo_firehose_hw.yaml"
 $Mt5Path = "C:\Program Files\MetaTrader 5\terminal64.exe"
