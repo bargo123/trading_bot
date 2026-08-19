@@ -31,15 +31,28 @@ Branch: `opencode/aegis-infra` | Baseline: 527 tests passing (trusted handoff
   pips vs 30-pip SL) is **net-negative after costs** (1-pip: WR 88.7% but
   PF 0.71) — the high-win-rate shape is a cost mirage. Strategy selection
   (60/40): 10 shortlisted, 5 validate. Ridge model: no OOS improvement.
-- **20-min fast watcher** — `bot/scripts/research_fast_watcher.py`
-  (`--once` for single cycle). Writes `aegis_cycle_status.md`.
+- **20-min fast watcher (Windows 24/7 hardened)** —
+  `bot/scripts/research_fast_watcher.py`: singleton lock
+  (`CYCLE_ALREADY_RUNNING` on duplicate), restart-safe evidence fingerprint,
+  `NO_NEW_EVIDENCE` fast exit, MT5/runner/champion heartbeat at
+  `bot/reports/opencode/heartbeat.json`. Registered as scheduled task
+  `AegisResearchWatcher` (every 20 min self-healing, WakeToRun,
+  StartWhenAvailable, restart x3, IgnoreNew) + Startup-folder launcher
+  (`aegis_research_watcher.cmd`).
+- **Power config** — active plan High performance: sleep/hibernate **never**
+  on AC (0 s), wake timers enabled. BIOS AC-power-loss recovery documented in
+  `bot/reports/opencode/BIOS_POWER_RECOVERY.md`; escalation rules in
+  `bot/reports/opencode/claude_escalation.md`.
+- **Keepalive fix** — `supervisor_keepalive.ps1` venv path corrected to
+  repo-root `.venv` (was `bot/.venv`); paper runner supervision restored.
 - **opencode config** — `.opencode/command/aegis-cycle.md`, `opencode.json`
   (permissions), `AGENTS.md` safety rules.
 
 ## Status / next
 
-- `/aegis-cycle` command + `opencode.json` + `AGENTS.md` are new — restart
-  opencode to load them.
+- Watcher loop is running via scheduled task `AegisResearchWatcher`; MT5 demo
+  connected (MetaQuotes-Demo login 111368559, trade_mode 0); single paper
+  runner alive; heartbeat writes every 20-min cycle.
 - No champion in `intel/intelligent_champion.json` (intentionally absent).
 
 ## Invariants
