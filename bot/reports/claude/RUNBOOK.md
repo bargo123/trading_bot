@@ -121,6 +121,8 @@ Work is on branch `claude/intelligent-firehose`. Upstream `main` is untouched at
 | test baseline repaired | `cc9e45e` | HALE routing, IB observation-only, portable UID. 469 passed |
 | per-trade EV gate | `7a30d8e` | `trade_economics.py`, provenance integrity. 497 passed |
 | edge-derived sizing | `bbd0722` | `thesis_sizing.py`, parallel index builder. 513 passed |
+| drawdown breaker + docs | `5d65276` | risk limits restored to 10%/25%, runbook, reports |
+| measured index + fixes | `57dc60f` | real `mt5_m1` index, `resolve_bot_path`, future-quote gate, cross-symbol pooling. 527 passed |
 
 Roll back one step:
 
