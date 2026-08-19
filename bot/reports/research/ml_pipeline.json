@@ -1,7 +1,7 @@
 {
   "schema": "ml_pipeline.v1",
   "label": "research_proxy",
-  "built_at": "2026-08-19T22:42:51.043881+00:00",
+  "built_at": "2026-08-19T22:55:44.181861+00:00",
   "provenance": "mt5_m1",
   "cost_assumptions": {
     "spread_bps": 0.2,

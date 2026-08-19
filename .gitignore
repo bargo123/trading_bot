@@ -43,6 +43,8 @@ bot/reports/execution_circuit.json
 bot/reports/paper_runner_stdout.log*
 bot/reports/*.bak
 bot/reports/research/*.log
+# OpenCode 24/7 watcher heartbeat changes every cycle; docs stay tracked
+bot/reports/opencode/heartbeat.json
 
 # Intel research runtime (code + frozen_v1.json stay in git)
 bot/intel/*
