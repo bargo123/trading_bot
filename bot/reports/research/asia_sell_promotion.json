@@ -1,0 +1,11 @@
+{
+  "status": "rejected",
+  "schema": "champion_promotion.v1",
+  "label": "research_proxy",
+  "placed_orders": false,
+  "mt5_touched": false,
+  "promoted_live_yaml": false,
+  "strategy_id": "asia_sell_range",
+  "reason": "strategy model not ready after sealed holdout: strategy_bootstrap_tail_not_positive",
+  "challenger_spec": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\research\\strategies\\asia_sell_range_challenger.json"
+}
