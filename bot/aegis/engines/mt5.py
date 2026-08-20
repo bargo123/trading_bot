@@ -83,6 +83,8 @@ class MT5Engine(BrokerEngine):
         self.deviation = int(cfg.get("mt5_deviation", 20) or 20)
         self.max_lots = float(cfg.get("mt5_max_lots", _MAX_LOTS_DEFAULT) or _MAX_LOTS_DEFAULT)
         self.path = str(cfg.get("mt5_path") or os.environ.get("MT5_PATH") or _DEFAULT_TERMINAL)
+        self._server_utc_offset_s: float | None = None
+        self._offset_samples: list[float] = []
 
     def _api(self) -> Any:
         if self._api_mod is not None:
@@ -109,6 +111,43 @@ class MT5Engine(BrokerEngine):
         if isinstance(err, tuple) and len(err) >= 2:
             return f"{err[0]} {err[1]}"
         return str(err)
+
+    def _server_utc_offset(self) -> float:
+        """Seconds to subtract from MT5 server epoch to get real UTC.
+
+        MetaQuotes demo/contest servers stamp ticks in *server time* (commonly
+        UTC+2/+3), while the staleness/future-skew gates compare against
+        datetime.now(timezone.utc). Treating server epoch as UTC made every
+        quote look ~3h in the future and the max_quote_future_skew_s gate
+        rejected the entire feed. Detect the offset from live tick times and
+        cache it.
+        """
+        if self._server_utc_offset_s is not None:
+            return self._server_utc_offset_s
+        mt5 = self._require()
+        for name in ("EURUSD", "GBPUSD", "USDJPY"):
+            try:
+                tick = mt5.symbol_info_tick(name)
+            except Exception:  # pragma: no cover - defensive
+                tick = None
+            if tick is None:
+                continue
+            ts_raw = getattr(tick, "time", None)
+            if not ts_raw:
+                continue
+            offset = float(ts_raw) - time.time()
+            self._offset_samples.append(offset)
+            if len(self._offset_samples) >= 3:
+                median = sorted(self._offset_samples)[len(self._offset_samples) // 2]
+                self._server_utc_offset_s = round(median)
+                self._offset_samples = []
+                logger.info("MT5 server->UTC offset detected: %+.0fs", self._server_utc_offset_s)
+                return self._server_utc_offset_s
+        return 0.0
+
+    def _quote_time_utc(self, ts_raw: Any) -> datetime:
+        offset = self._server_utc_offset()
+        return datetime.fromtimestamp(int(ts_raw) - offset, tz=timezone.utc)
 
     def _is_paper_mode(self, trade_mode: int) -> bool:
         mt5 = self._api()
@@ -332,7 +371,7 @@ class MT5Engine(BrokerEngine):
             ask = bid
         ts_raw = getattr(tick, "time", None)
         if ts_raw:
-            ts = datetime.fromtimestamp(int(ts_raw), tz=timezone.utc)
+            ts = self._quote_time_utc(ts_raw)
         else:
             ts = datetime.now(timezone.utc)
         return Quote(symbol=name, bid=bid, ask=ask, time=ts)
@@ -413,7 +452,7 @@ class MT5Engine(BrokerEngine):
             raise RuntimeError(f"copy_rates_from_pos failed for {name} ({self._last_error()})")
         out: list[Bar] = []
         for row in raw:
-            ts = datetime.fromtimestamp(int(row["time"] if hasattr(row, "__getitem__") else row.time), tz=timezone.utc)
+            ts = self._quote_time_utc(row["time"] if hasattr(row, "__getitem__") else row.time)
             out.append(
                 Bar(
                     time=ts,
