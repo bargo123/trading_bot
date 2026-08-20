@@ -10119,3 +10119,7 @@
 {"symbol": "USDCHF", "side": "sell", "pnl": 0.11, "reason": "edge_gone:state_not_in_validated_set", "action": "exit", "information_id": "abfa70b7227aab56", "analogue_n": 2454, "ts_utc": "2026-08-20T22:16:04.335962+00:00"}
 {"symbol": "AUDJPY", "side": "sell", "pnl": -0.08, "reason": "structural_invalidation", "action": "exit", "information_id": "f3b910bc2e00102f", "analogue_n": 5359, "ts_utc": "2026-08-20T22:35:46.608545+00:00"}
 {"symbol": "GBPCHF", "side": "sell", "pnl": -0.02, "reason": "edge_gone:state_not_in_validated_set", "action": "exit", "information_id": "443e92674cd4c6b3", "analogue_n": 2460, "ts_utc": "2026-08-20T22:37:09.496536+00:00"}
+{"symbol": "EURJPY", "side": "sell", "pnl": 0.49, "reason": "edge_gone:state_not_in_validated_set", "action": "exit", "information_id": "99fa8981efb3a11e", "analogue_n": 4646, "ts_utc": "2026-08-20T23:00:02.173995+00:00"}
+{"symbol": "EURJPY", "side": "sell", "pnl": 0.49, "reason": "edge_gone:state_not_in_validated_set", "action": "exit", "information_id": "99fa8981efb3a11e", "analogue_n": 4646, "ts_utc": "2026-08-20T23:00:02.294614+00:00"}
+{"symbol": "EURJPY", "side": "sell", "pnl": 0.49, "reason": "edge_gone:state_not_in_validated_set", "action": "exit", "information_id": "99fa8981efb3a11e", "analogue_n": 4646, "ts_utc": "2026-08-20T23:00:02.457764+00:00"}
+{"symbol": "EURJPY", "side": "sell", "pnl": 0.5, "reason": "edge_gone:state_not_in_validated_set", "action": "exit", "information_id": "99fa8981efb3a11e", "analogue_n": 4646, "ts_utc": "2026-08-20T23:00:02.607949+00:00"}

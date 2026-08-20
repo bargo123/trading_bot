@@ -46,9 +46,14 @@ def save_cursor(cursor: Mapping[str, Any], path: Path) -> Path:
     return path
 
 
-def fetch_completed_bars(eng, symbol: str, *, since_utc: str | None, max_bars: int = 3000) -> pd.DataFrame:
-    """Read-only fetch of recent M1 bars, completed bars only, strictly new."""
-    bars = eng.bars(symbol, "1m", int(max_bars))
+def fetch_completed_bars(eng, symbol: str, *, since_utc: str | None, max_bars: int = 3000, lookback_days: int = 3) -> pd.DataFrame:
+    """Read-only fetch of recent M1 bars, completed bars only, strictly new.
+
+    ``lookback_days`` bounds the fetch window (the engine takes calendar days);
+    ``max_bars`` caps how many NEW bars a single cycle will accept, so a very
+    old cursor cannot pull an unbounded history in one go.
+    """
+    bars = eng.bars(symbol, "1m", int(lookback_days))
     frame = pd.DataFrame(
         [
             {
@@ -71,6 +76,8 @@ def fetch_completed_bars(eng, symbol: str, *, since_utc: str | None, max_bars: i
     if since_utc:
         since = pd.Timestamp(since_utc)
         frame = frame[frame["time"] > since]
+    if max_bars and len(frame) > int(max_bars):
+        frame = frame.iloc[-int(max_bars):]
     return frame.reset_index(drop=True)
 
 
@@ -158,12 +165,15 @@ def ingest_symbol(
     index_path: Path,
     existing_keys: set[tuple[str, str]],
     max_bars: int = 3000,
+    lookback_days: int = 3,
 ) -> dict[str, Any]:
     """Ingest one symbol: fetch -> raw append -> label -> merge -> cursor."""
     from aegis.research.analogues import build_analogues_from_m1
 
     since = (cursor.get("symbols") or {}).get(str(symbol).upper())
-    frame = fetch_completed_bars(eng, symbol, since_utc=since, max_bars=max_bars)
+    frame = fetch_completed_bars(
+        eng, symbol, since_utc=since, max_bars=max_bars, lookback_days=lookback_days
+    )
     out: dict[str, Any] = {"symbol": str(symbol).upper(), "new_bars": int(len(frame))}
     if frame.empty:
         return out
@@ -171,13 +181,14 @@ def ingest_symbol(
     out["raw_appended"] = appended
     # Label only rows whose full forward horizon exists among completed bars.
     # build_analogues_from_m1 walks idx in [min_bars, len-5); anything it labels
-    # used only completed future bars already present in this fetch.
+    # used only completed future bars already present in this fetch. step=3 keeps
+    # the per-cycle labelling cost bounded (state construction is the hot path).
     min_bars = min(400, max(50, len(frame) // 4))
     rows = build_analogues_from_m1(
         {str(symbol).upper(): frame},
         pip_by_symbol=dict(pip_by_symbol),
         min_bars=min_bars,
-        step=1,
+        step=3,
     )
     fresh = [
         r for r in rows
