@@ -130,6 +130,9 @@ def _brain(index_path: Path, **overrides) -> IntelligentFirehoseBrain:
         "analogue_index_path": str(index_path),
         "intelligent_champion_path": str(index_path.parent / "no_such_champion.json"),
         "intelligent_firehose_bootstrap": True,
+        # These tests target the economics gates, not governance: allow the
+        # bootstrap to reach DEMO_CANARY so a genuine fire can be observed.
+        "intelligent_bootstrap_canary": True,
         "intelligent_min_analogues": 20,
         "intelligent_min_similarity": 0.5,
         "intelligent_risk_fraction": 0.08,
@@ -292,8 +295,11 @@ def test_synthetic_evidence_is_allowed_only_behind_an_explicit_opt_in(tmp_path):
         _index(tmp_path, records, provenance="research_proxy"),
         intelligent_allow_synthetic_evidence=True,
     )
-    # The opt-in exists for offline research; it must be the only way through.
-    assert _decide(brain, frame).action == "fire"
+    # The opt-in exists for OFFLINE RESEARCH ONLY: synthetic evidence may be
+    # evaluated but can never authorise a demo order (P2 governance).
+    decision = _decide(brain, frame)
+    assert decision.action != "fire"
+    assert decision.reason.startswith("shadow:not_trading_stage:")
 
 
 def test_provenance_classification():

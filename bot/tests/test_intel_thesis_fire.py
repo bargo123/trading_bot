@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 from aegis.intel.strategy_model import ValidatedStrategyModel, strategy_model_ready
-from aegis.intel.thesis_fire import evaluate_thesis_action, evaluate_thesis_fire
+from aegis.intel.thesis_fire import (
+    ThesisFireDecision,
+    evaluate_thesis_action,
+    evaluate_thesis_fire,
+)
 
 
 def _promoted_model(**overrides) -> ValidatedStrategyModel:
@@ -253,7 +257,9 @@ def test_invalidation_exits_open_thesis():
     assert decision.reason == "structural_invalidation"
 
 
-def test_lost_edge_exits_open_thesis():
+def test_lost_edge_reduces_open_thesis():
+    """Measured negative state EV de-risks an open thesis (REDUCE), it does not
+    silently liquidate: the protective stop still owns catastrophe."""
     skip = evaluate_thesis_fire(
         strategy=_promoted_model(),
         state_expected_net_value=-0.02,
@@ -271,5 +277,87 @@ def test_lost_edge_exits_open_thesis():
         target_risk_usd=1.0,
         invalidated=False,
     )
-    assert decision.action == "exit"
-    assert decision.reason.startswith("edge_gone:")
+    assert decision.action == "reduce"
+    assert decision.reason.startswith("edge_deteriorating:")
+
+
+def _open_thesis_action(reason: str):
+    fire = ThesisFireDecision("skip", reason, None)
+    return evaluate_thesis_action(
+        fire_decision=fire,
+        information_id="info-b",
+        last_information_id="info-a",
+        current_risk_usd=1.0,
+        target_risk_usd=1.0,
+        invalidated=False,
+    )
+
+
+def test_open_thesis_holds_when_entry_state_disappears():
+    """P5: OPEN + entry state no longer validated -> HOLD, never EXIT."""
+    for reason in (
+        "state_not_in_validated_set",
+        "no_validated_strategy_model",
+        "unacceptable_uncertainty",
+        "insufficient_analogue_evidence",
+        "trade_economics:payoff_below_floor",
+        "sizing:minimum_lot_exceeds_clip_budget",
+    ):
+        decision = _open_thesis_action(reason)
+        assert decision.action == "hold", f"{reason} -> {decision.action}"
+        assert decision.reason.startswith("open_thesis_holds:")
+
+
+def test_flat_thesis_skips_when_entry_state_disappears():
+    """P5: FLAT + unvalidated state -> SKIP new entry."""
+    fire = ThesisFireDecision("skip", "state_not_in_validated_set", None)
+    decision = evaluate_thesis_action(
+        fire_decision=fire,
+        information_id="info-x",
+        last_information_id=None,
+        current_risk_usd=0.0,
+        target_risk_usd=1.0,
+        invalidated=False,
+    )
+    assert decision.action == "skip"
+    assert decision.reason == "state_not_in_validated_set"
+
+
+def test_open_thesis_exits_on_structural_invalidation_and_target():
+    invalidation = evaluate_thesis_action(
+        fire_decision=ThesisFireDecision("fire", "ok", 1.0),
+        information_id="i", last_information_id=None,
+        current_risk_usd=1.0, target_risk_usd=1.0,
+        invalidated=True,
+    )
+    assert invalidation.action == "exit"
+    assert invalidation.reason == "structural_invalidation"
+    target = evaluate_thesis_action(
+        fire_decision=ThesisFireDecision("fire", "ok", 1.0),
+        information_id="i", last_information_id=None,
+        current_risk_usd=1.0, target_risk_usd=1.0,
+        invalidated=False, target_reached=True,
+    )
+    assert target.action == "exit"
+    assert target.reason == "structure_target_reached"
+
+
+def test_scale_requires_new_information_and_dedups_repeats():
+    """Same information_id cannot scale twice; new information can."""
+    fire = ThesisFireDecision("fire", "positive_state_ev_on_validated_strategy", 2.0)
+    redundant = evaluate_thesis_action(
+        fire_decision=fire,
+        information_id="same-info", last_information_id="same-info",
+        current_risk_usd=1.0, target_risk_usd=2.0,
+        invalidated=False,
+    )
+    assert redundant.action == "skip"
+    assert redundant.reason == "redundant_information"
+    fresh = evaluate_thesis_action(
+        fire_decision=fire,
+        information_id="new-info", last_information_id="same-info",
+        current_risk_usd=1.0, target_risk_usd=2.0,
+        invalidated=False,
+    )
+    assert fresh.action == "scale"
+    assert fresh.reason == "new_evidence_increase_exposure"

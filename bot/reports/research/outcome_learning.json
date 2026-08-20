@@ -1,7 +1,7 @@
 {
   "schema": "outcome_learning.v1",
   "label": "research_proxy",
-  "n_rows": 3231,
+  "n_rows": 3250,
   "n_exits": 2404,
   "metrics": {
     "n": 2404,

@@ -101,6 +101,7 @@ def test_brain_skips_without_analogue_evidence(tmp_path):
     cfg = {
         "analogue_index_path": str(index),
         "intelligent_firehose_bootstrap": True,
+        "intelligent_bootstrap_canary": True,
         "intelligent_min_analogues": 20,
         "order_quantity": 0.01,
     }
@@ -140,6 +141,7 @@ def test_brain_can_fire_with_bootstrap_analogues(tmp_path):
     cfg = {
         "analogue_index_path": str(index),
         "intelligent_firehose_bootstrap": True,
+        "intelligent_bootstrap_canary": True,
         "intelligent_min_analogues": 20,
         "intelligent_min_similarity": 0.5,
         "intelligent_risk_fraction": 0.08,
@@ -369,6 +371,7 @@ def _gated_brain(tmp_path, signature, allow_states, n=80):
         "validated_states_path": str(allowlist),
         "intelligent_gate_validated_states": True,
         "intelligent_firehose_bootstrap": True,
+        "intelligent_bootstrap_canary": True,
         "intelligent_min_analogues": 20,
         "intelligent_min_similarity": 0.5,
         "intelligent_risk_fraction": 0.08,
@@ -446,6 +449,7 @@ def test_gate_off_preserves_legacy_bootstrap(tmp_path):
     cfg = {
         "analogue_index_path": str(index),
         "intelligent_firehose_bootstrap": True,
+        "intelligent_bootstrap_canary": True,
         "intelligent_min_analogues": 20,
         "intelligent_min_similarity": 0.5,
         "intelligent_risk_fraction": 0.08,
@@ -506,6 +510,7 @@ def test_gate_uses_exact_state_evidence_not_fuzzy_pool(tmp_path):
         "validated_states_path": str(allowlist),
         "intelligent_gate_validated_states": True,
         "intelligent_firehose_bootstrap": True,
+        "intelligent_bootstrap_canary": True,
         "intelligent_min_analogues": 20,
         "intelligent_min_similarity": 0.5,
         "intelligent_risk_fraction": 0.08,
@@ -517,3 +522,139 @@ def test_gate_uses_exact_state_evidence_not_fuzzy_pool(tmp_path):
     decision = _evaluate_brain(brain, m1)
     assert decision.action == "fire", f"expected fire, got {decision.action}: {decision.reason}"
     assert decision.analogue_n >= 20
+
+
+def _bootstrap_cfg(tmp_path, index, **extra):
+    cfg = {
+        "analogue_index_path": str(index),
+        "intelligent_firehose_bootstrap": True,
+        "intelligent_min_analogues": 20,
+        "intelligent_min_similarity": 0.5,
+        "intelligent_risk_fraction": 0.08,
+        "intelligent_risk_budget_usd": 100.0,
+        "order_quantity": 0.01,
+        "max_positions": 40,
+    }
+    cfg.update(extra)
+    return cfg
+
+
+def test_bootstrap_research_stage_cannot_trade(tmp_path):
+    """P2/P14-15: a research bootstrap must NEVER behave like a champion.
+    A validated-state fire becomes a shadow skip when no canary opt-in exists."""
+    m1 = _basing_above_support()
+    signature = _signature_for_m1(m1.iloc[:-1])
+    allow_states = [{k: signature[k] for k in ("regime", "structure", "session", "side")}]
+    records = _positive_records(n=80, signature=signature)
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1",
+                                 "outcome_unit": "usd", "records": records}), encoding="utf-8")
+    allowlist = _validated_allowlist(tmp_path, allow_states)
+    cfg = _bootstrap_cfg(
+        tmp_path, index,
+        validated_states_path=str(allowlist),
+        intelligent_gate_validated_states=True,
+    )
+    brain = IntelligentFirehoseBrain(cfg)
+    decision = _evaluate_brain(brain, m1)
+    assert decision.action != "fire"
+    assert decision.reason.startswith("shadow:not_trading_stage:")
+    snap = brain.snapshot()
+    assert snap["strategy_status"] in {"UNQUALIFIED_NO_VALIDATED_MODEL", "QUALIFIED_SHADOW_ONLY"}
+    assert snap["promotion_stage"] != "DEMO_CHAMPION"
+
+
+def test_synthetic_evidence_never_reaches_trading_stage(tmp_path):
+    """P14-19: synthetic/proxy analogue evidence cannot qualify for a trading stage."""
+    from aegis.intel.firehose_brain import _bootstrap_from_evidence
+
+    class FakeEvidence:
+        provenance = "synthetic_fixture"
+        eligible = True
+        analogue_n = 60
+        analogue_n_losses = 10
+        expectancy = 0.05
+        profit_factor = 2.0
+        mean_lower_95 = 0.01
+        wins_erased_by_average_loss = 0.5
+        tail_loss = -0.02
+        avg_win = 0.04
+        avg_loss = -0.02
+
+    cfg = {
+        "intelligent_firehose_bootstrap": True,
+        "intelligent_allow_synthetic_evidence": True,
+        "intelligent_bootstrap_canary": True,  # even with canary opt-in
+        "intelligent_risk_fraction": 0.08,
+    }
+    model = _bootstrap_from_evidence(cfg, FakeEvidence())
+    assert model is not None
+    assert model.promotion_stage == "UNVALIDATED_RESEARCH"
+    assert not model.may_trade
+
+
+def test_champion_artifact_is_demo_champion_stage():
+    """A sealed-validation accepted artifact loads at DEMO_CHAMPION stage."""
+    from aegis.intel.firehose_brain import _load_strategy
+
+    payload = {
+        "id": "champ_v1",
+        "status": "accepted",
+        "n_trades": 120,
+        "n_losses": 30,
+        "expectancy": 0.03,
+        "profit_factor": 1.5,
+        "bootstrap_p05": 0.005,
+        "wins_erased_by_average_loss": 1.2,
+        "wins_erased_by_tail_loss": 3.0,
+        "validated_risk_fraction": 0.08,
+        "artifact_hash": "abc123",
+        "dataset_hash": "ds-hash",
+        "validation_hash": "val-hash",
+    }
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "intelligent_champion.json"
+        p.write_text(json.dumps(payload), encoding="utf-8")
+        model = _load_strategy({"intelligent_champion_path": str(p)})
+    assert model is not None
+    assert model.promotion_stage == "DEMO_CHAMPION"
+    assert model.may_trade
+    assert model.dataset_hash == "ds-hash"
+
+
+def test_case_a_high_wr_negative_ev_fails_promotion():
+    """P12/P14-1: WR 91.91% / PF 0.71 / negative EV MUST FAIL promotion."""
+    import pytest
+    from aegis.research.gates import GateReject
+    from aegis.research.govern import governed_accept
+
+    metrics = {
+        "win_rate": 91.91,
+        "profit_factor": 0.71,
+        "expectancy": -0.0007,
+        "n_trades": 140,
+        "net_pnl": -11.32,
+    }
+    pnls = [0.03] * 128 + [-2.5] * 12  # the classic 1-pip TP / 30-pip SL geometry
+    with pytest.raises(GateReject):
+        governed_accept(metrics, champion=None, pnls=pnls, n_searches=1)
+
+
+def test_case_b_low_wr_negative_ev_fails_promotion():
+    """P12/P14-2: 66 trades / WR 31.82% / PF~0.33 / negative EV MUST FAIL."""
+    import pytest
+    from aegis.research.gates import GateReject
+    from aegis.research.govern import governed_accept
+
+    metrics = {
+        "win_rate": 31.82,
+        "profit_factor": 0.33,
+        "expectancy": -0.0685,
+        "n_trades": 66,
+        "net_pnl": -4.52,
+    }
+    pnls = [0.04] * 21 + [-0.15] * 45
+    with pytest.raises(GateReject):
+        governed_accept(metrics, champion=None, pnls=pnls, n_searches=1)

@@ -192,6 +192,14 @@ def main() -> None:
     t2t = TickToTrade()
     fire_retry_guard = PendingRetryGuard()
     execution_status_counts: dict[str, int] = {}
+    quote_refresh_counts: dict[str, int] = {
+        "stale_observed_at_send": 0,
+        "fresh_quote_recovered": 0,
+        "candidate_invalidated_after_refresh": 0,
+        "order_sent_after_refresh": 0,
+        "margin_precheck_skip": 0,
+        "min_lot_precheck_skip": 0,
+    }
 
     def write_heartbeat(extra: Optional[dict] = None) -> None:
         payload = {
@@ -687,6 +695,7 @@ def main() -> None:
                         information_id=decision.information_id,
                         target_risk=0.0 if not leftover else max(0.0, float(decision.journal.get("expectancy") or 0.0)),
                         clips=len(leftover),
+                        setup_family=str(decision.journal.get("setup_family") or ""),
                     )
                     if firehose_consume_bar(no_signal=True):
                         last_bar_time[sym] = bar_time
@@ -973,6 +982,98 @@ def main() -> None:
                     },
                 )
                 return
+            # --- Pre-send refresh (P8): the decision was priced on quote q,
+            # fetched before the brain ran. If that quote is now stale, fetch
+            # ONE fresh tick and re-validate; never send on stale pricing and
+            # never disable stale protection to force trades through.
+            max_age_send = float(cfg.get("max_quote_age_s", 5.0) or 0.0)
+            if max_age_send > 0:
+                send_age = quote_age_s(q)
+                if send_age > max_age_send:
+                    quote_refresh_counts["stale_observed_at_send"] += 1
+                    try:
+                        q = eng.quote(sym)
+                    except Exception as exc:
+                        quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
+                        append_journal(
+                            journal,
+                            {
+                                "event": "quote_refresh_failed",
+                                "symbol": sym,
+                                "why": str(exc)[:120],
+                                "bar": str(bar_time),
+                            },
+                        )
+                        return
+                    refreshed_age = quote_age_s(q)
+                    live_spread = max(0.0, float(q.ask) - float(q.bid))
+                    if refreshed_age > max_age_send or (
+                        max_spread > 0 and live_spread > max_spread + 1e-12
+                    ):
+                        quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
+                        append_journal(
+                            journal,
+                            {
+                                "event": "quote_refresh_invalid",
+                                "symbol": sym,
+                                "age_s": refreshed_age,
+                                "spread": live_spread,
+                                "max_spread": max_spread,
+                                "bar": str(bar_time),
+                            },
+                        )
+                        return
+                    quote_refresh_counts["fresh_quote_recovered"] += 1
+                    latency.quote_ts = getattr(q, "time", 0.0) or time.time()
+            # --- Margin / min-lot pre-checks: 89% of historical order failures
+            # were 10019 No money. Check before hitting the broker.
+            try:
+                spec_pre = eng.symbol_spec(sym)
+            except Exception:
+                spec_pre = None
+            vmin = float((spec_pre or {}).get("volume_min", 0.0) or 0.0)
+            if vmin > 0 and float(order_qty) + 1e-12 < vmin:
+                quote_refresh_counts["min_lot_precheck_skip"] += 1
+                append_journal(
+                    journal,
+                    {
+                        "event": "sizing_skip",
+                        "reason": "min_lot_broker",
+                        "symbol": sym,
+                        "qty": order_qty,
+                        "volume_min": vmin,
+                        "bar": str(bar_time),
+                    },
+                )
+                return
+            try:
+                funds = float(eng.account().available_funds)
+            except Exception:
+                funds = None
+            if funds is not None:
+                contract = float((spec_pre or {}).get("trade_contract_size", 100000.0) or 100000.0)
+                ref_price = float(getattr(q, "ask", 0.0) or getattr(q, "bid", 0.0) or 0.0)
+                est_margin = ref_price * float(order_qty) * contract / 100.0
+                leverage = 100.0
+                try:
+                    leverage = float(eng.account().raw.get("leverage") or 100.0)
+                except Exception:
+                    pass
+                est_margin = ref_price * float(order_qty) * contract / max(leverage, 1.0)
+                if funds <= 0 or est_margin > funds * 0.9:
+                    quote_refresh_counts["margin_precheck_skip"] += 1
+                    append_journal(
+                        journal,
+                        {
+                            "event": "margin_precheck_skip",
+                            "symbol": sym,
+                            "est_margin": round(est_margin, 2),
+                            "funds": round(funds, 2),
+                            "qty": order_qty,
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
             latency.request_ts = time.time()
             res = eng.place_order(req)
             latency.response_ts = time.time()
@@ -1061,6 +1162,7 @@ def main() -> None:
                         information_id=brain_decision.information_id,
                         target_risk=float(brain_decision.expected_net_value or 0.0) or 1.0,
                         clips=len(eng.positions(sym)),
+                        setup_family=str(brain_decision.journal.get("setup_family") or ""),
                     )
                 if pa_select_mode:
                     day_trades += 1
@@ -1172,6 +1274,7 @@ def main() -> None:
                 extra_hb.update(t2t.snapshot())
                 if execution_status_counts:
                     extra_hb["execution_status"] = dict(execution_status_counts)
+                extra_hb["quote_refresh"] = dict(quote_refresh_counts)
                 if intelligent_brain is not None:
                     extra_hb.update(intelligent_brain.snapshot())
                     extra_hb["intelligent_firehose"] = True

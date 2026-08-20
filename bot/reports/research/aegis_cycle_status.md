@@ -1,6 +1,6 @@
 # AEGIS cycle status (fast watcher)
 
-Tick: 72  |  UTC: 2026-08-20T21:46:08.989317+00:00
+Tick: 74  |  UTC: 2026-08-20T22:26:22.223214+00:00
 
 > Research-only watcher. No orders placed, no live YAML promoted. Champion
 > promotion is reserved for the full `/aegis-cycle` run.
@@ -8,7 +8,7 @@ Tick: 72  |  UTC: 2026-08-20T21:46:08.989317+00:00
 ## Runtime health
 
 - runner process: alive
-- runner heartbeat age: 0s
+- runner heartbeat age: 3s
 - journal age: 0s
 
 ## Outcome learning
@@ -25,13 +25,13 @@ Tick: 72  |  UTC: 2026-08-20T21:46:08.989317+00:00
 ## Strategy selection + ML
 
 - status: ok
-- exit research ran: True
+- exit research ran: False
 - strategies shortlisted: 10.0
 - strategies survived validation: 2.0
 - ML improvement (expectancy): -0.0685
 
 ## Runtime
 
-- outcome script: 1.2s
+- outcome script: 1.1s
 - book memory script: 0s
-- ML script: 295.7s
+- ML script: 2.6s

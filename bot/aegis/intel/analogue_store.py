@@ -68,7 +68,7 @@ def _lower_bound(values: Sequence[float]) -> float | None:
 #: measured market history. ``research_proxy`` is the historical label written by
 #: ``save_analogue_index`` for both synthetic and real builds, so it cannot be
 #: trusted as real either.
-SYNTHETIC_PROVENANCE = frozenset({"synthetic_proxy", "research_proxy", "unknown"})
+SYNTHETIC_PROVENANCE = frozenset({"synthetic_proxy", "research_proxy", "synthetic_fixture", "unknown"})
 
 
 def is_measured_provenance(provenance: str | None) -> bool:

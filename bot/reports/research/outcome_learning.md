@@ -2,7 +2,7 @@
 
 Label: `research_proxy`. Observed demo outcomes; not a profit guarantee.
 
-- rows: 3231
+- rows: 3250
 - exits: 2404
 
 ## Payoff geometry

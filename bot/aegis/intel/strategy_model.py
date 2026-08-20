@@ -13,6 +13,22 @@ from aegis.intel.expected_value import MAX_WINS_ERASED_BY_AVERAGE_LOSS
 MIN_STRATEGY_TRADES = 20
 MIN_STRATEGY_LOSSES = 5
 
+# Explicit governance ladder. A model may only act on the market at the stage
+# its evidence supports; a research bootstrap can never behave like a champion.
+STAGE_UNVALIDATED_RESEARCH = "UNVALIDATED_RESEARCH"
+STAGE_SHADOW = "SHADOW"
+STAGE_DEMO_CANARY = "DEMO_CANARY"
+STAGE_DEMO_CHAMPION = "DEMO_CHAMPION"
+GOVERNANCE_STAGES = (
+    STAGE_UNVALIDATED_RESEARCH,
+    STAGE_SHADOW,
+    STAGE_DEMO_CANARY,
+    STAGE_DEMO_CHAMPION,
+)
+# Stages allowed to send demo orders (never live - the runner enforces that
+# separately). Research/shadow models decide but do not trade.
+TRADING_STAGES = frozenset({STAGE_DEMO_CANARY, STAGE_DEMO_CHAMPION})
+
 
 @dataclass(frozen=True)
 class ValidatedStrategyModel:
@@ -28,12 +44,21 @@ class ValidatedStrategyModel:
     validated_risk_fraction: float | None
     artifact_hash: str
     allowed_states: frozenset[frozenset[str]] = frozenset()
+    promotion_stage: str = STAGE_DEMO_CHAMPION
+    dataset_hash: str = ""
+    validation_hash: str = ""
+
+    @property
+    def may_trade(self) -> bool:
+        return self.promoted and self.promotion_stage in TRADING_STAGES
 
 
 def strategy_model_ready(model: ValidatedStrategyModel) -> tuple[bool, str]:
     """Strategy/challenger promotion requires sample size AND a sampled loss tail."""
     if not model.promoted:
         return False, "no_validated_strategy_model"
+    if model.promotion_stage not in GOVERNANCE_STAGES:
+        return False, f"unknown_promotion_stage:{model.promotion_stage}"
     if int(model.n_trades) < MIN_STRATEGY_TRADES:
         return False, f"insufficient_sample: n_trades={int(model.n_trades)}"
     if int(model.n_losses) < MIN_STRATEGY_LOSSES:

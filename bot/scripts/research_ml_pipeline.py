@@ -33,6 +33,7 @@ from aegis.intel.expected_value import payoff_metrics  # noqa: E402
 from aegis.intel.paths import INTEL_DIR, resolve_bot_path  # noqa: E402
 from aegis.research.exit_research import (  # noqa: E402
     EXIT_HORIZONS_PIPS,
+    bps_to_pips,
     recommended_exit,
     research_exit_horizons,
     exit_horizon_summary,
@@ -83,6 +84,314 @@ def _fetch_m1(symbols: list[str], bars: int) -> dict[str, pd.DataFrame]:
 
 def _costed(pnls: list[float], cost_pips: float) -> list[float]:
     return [float(p) - float(cost_pips) for p in pnls]
+
+
+def symbol_cost_pips(
+    pip_by_symbol: dict[str, float],
+    *,
+    spread_bps: float,
+    slippage_bps: float,
+    commission_round_trip_usd: float = 0.0,
+) -> dict[str, dict[str, float]]:
+    """Per-symbol round-trip cost model (P4).
+
+    One universal cost across 26 instruments is wrong: JPY pairs and crosses
+    have very different pip sizes and spreads. Cost per symbol = spread +
+    slippage converted to that symbol's pips, plus commission expressed in
+    pips via the 0.01-lot pip value. Returns
+    {symbol: {cost_pips, spread_pips, slippage_pips, commission_pips}}.
+    """
+    out: dict[str, dict[str, float]] = {}
+    for symbol, pip in pip_by_symbol.items():
+        if not pip or pip <= 0:
+            continue
+        spread_pips = bps_to_pips(spread_bps, symbol, pip)
+        slippage_pips = bps_to_pips(slippage_bps, symbol, pip)
+        # $X round-trip on a 0.01-lot clip: pips of cost = X / pip-value(0.01 lot).
+        pip_value_per_001_lot = float(pip) * 1000.0  # ~USD per pip for 0.01 lot FX
+        commission_pips = (
+            float(commission_round_trip_usd) / max(pip_value_per_001_lot, 1e-9)
+            if commission_round_trip_usd
+            else 0.0
+        )
+        out[symbol.upper()] = {
+            "cost_pips": round(spread_pips + slippage_pips + max(commission_pips, 0.0), 4),
+            "spread_pips": round(spread_pips, 4),
+            "slippage_pips": round(slippage_pips, 4),
+            "commission_pips": round(max(commission_pips, 0.0), 4),
+        }
+    return out
+
+
+def _max_drawdown_pips(pnls: list[float]) -> float:
+    equity = 0.0
+    peak = 0.0
+    dd = 0.0
+    for p in pnls:
+        equity += p
+        peak = max(peak, equity)
+        dd = min(dd, equity - peak)
+    return round(dd, 4)
+
+
+def _state_metrics(pnls: list[float]) -> dict[str, Any]:
+    metrics = payoff_metrics(pnls)
+    avg_win = metrics.get("avg_win")
+    avg_loss = metrics.get("avg_loss")
+    payoff = (
+        round(abs(float(avg_win) / float(avg_loss)), 4)
+        if avg_win and avg_loss
+        else None
+    )
+    sorted_pnls = sorted(pnls)
+    tail_n = max(1, len(sorted_pnls) // 20)
+    return {
+        "n": len(pnls),
+        "n_losses": int(metrics.get("n_losses") or 0),
+        "expectancy": metrics.get("expectancy"),
+        "profit_factor": metrics.get("profit_factor"),
+        "win_rate": metrics.get("win_rate"),
+        "payoff": payoff,
+        "tail_loss_p05": (
+            round(sum(sorted_pnls[:tail_n]) / tail_n, 5) if sorted_pnls else None
+        ),
+        "max_drawdown_pips": _max_drawdown_pips(pnls),
+        "bootstrap_p05": _mean_lower_95(pnls),
+    }
+
+
+def hierarchical_strategy_selection(
+    records: list[dict],
+    *,
+    cost_by_symbol: dict[str, float],
+    shortlist_frac: float = 0.6,
+    min_shortlist_n: int = 20,
+    min_validate_n: int = 10,
+    min_symbols_pool: int = 3,
+    max_candidates: int = 200,
+) -> dict[str, Any]:
+    """Hierarchical SYMBOL-AWARE validation (P3).
+
+    LEVEL A: symbol + regime + structure + session + side + strategy_family(setup)
+    LEVEL B: symbol + regime + structure + session + side
+    LEVEL C: cross-symbol pooled state, ONLY when every participating symbol
+             individually clears its own cost-adjusted sanity check.
+
+    A profitable pooled Asia SELL can no longer make every pair eligible to
+    sell: each symbol must earn its own place, and pooling requires
+    demonstrated homogeneity.
+    """
+    import collections
+
+    state_keys = ("regime", "structure", "session", "side")
+    records = sorted(records, key=lambda r: str(r.get("bar_time") or ""))
+    cut = int(len(records) * shortlist_frac)
+    early, late = records[:cut], records[cut:]
+
+    def cost_of(symbol: str) -> float:
+        return float(cost_by_symbol.get(str(symbol).upper(), 10.0))  # unknown: prohibitive
+
+    def collect(frame: list[dict], keys: tuple[str, ...]) -> dict[tuple, list[dict]]:
+        grouped: dict[tuple, list[dict]] = {}
+        for r in frame:
+            k = tuple(str(r.get(key) or "") for key in keys)
+            grouped.setdefault(k, []).append(r)
+        return grouped
+
+    def matches_state(r: dict, state: dict) -> bool:
+        return all(str(r.get(k) or "") == v for k, v in state.items())
+
+    opportunities: list[dict[str, Any]] = []
+
+    # ---- LEVEL A: symbol+state+family ----
+    level_a: dict[tuple, dict[str, Any]] = {}
+    for sig, rows in collect(early, ("symbol", *state_keys, "setup")).items():
+        symbol = sig[0]
+        train_pnls = _costed([float(r["outcome"]) for r in rows], cost_of(symbol))
+        if len(train_pnls) < min_shortlist_n:
+            continue
+        m = _state_metrics(train_pnls)
+        if (m["expectancy"] or 0) > 0:
+            level_a[sig] = {"train": m}
+
+    # ---- LEVEL B: symbol+state ----
+    level_b: dict[tuple, dict[str, Any]] = {}
+    for sig, rows in collect(early, ("symbol", *state_keys)).items():
+        symbol = sig[0]
+        train_pnls = _costed([float(r["outcome"]) for r in rows], cost_of(symbol))
+        if len(train_pnls) < min_shortlist_n:
+            continue
+        m = _state_metrics(train_pnls)
+        if (m["expectancy"] or 0) > 0:
+            families = collections.Counter(str(r.get("setup") or "") for r in rows)
+            dominant_family = families.most_common(1)[0][0] if families else ""
+            a_entry = level_a.get((symbol, *sig[1:], dominant_family))
+            level_b[sig] = {
+                "train": m,
+                "dominant_family": dominant_family,
+                "family_confirmed": bool(a_entry),
+                "families": dict(families.most_common(5)),
+            }
+
+    # ---- validate LEVEL A/B on the late (OOS) window ----
+    for level, table in (("A", level_a), ("B", level_b)):
+        for sig, info in table.items():
+            symbol = sig[0]
+            state = dict(zip(state_keys, sig[1:]))
+            late_rows = [
+                r for r in late
+                if str(r.get("symbol") or "") == symbol and matches_state(r, state)
+            ]
+            late_pnls = _costed([float(r["outcome"]) for r in late_rows], cost_of(symbol))
+            if len(late_pnls) < min_validate_n:
+                continue
+            vm = _state_metrics(late_pnls)
+            survives = bool(
+                (vm["expectancy"] or 0) > 0
+                and vm["bootstrap_p05"] is not None
+                and vm["bootstrap_p05"] > 0
+            )
+            opportunities.append({
+                "level": level,
+                "symbol": symbol,
+                **state,
+                "strategy_family": info.get("dominant_family", ""),
+                "family_confirmed": info.get("family_confirmed", False),
+                "families": info.get("families"),
+                "cost_pips": cost_of(symbol),
+                "n_train": info["train"]["n"],
+                "expectancy_train": info["train"]["expectancy"],
+                "n_validate": vm["n"],
+                "n_losses_validate": vm["n_losses"],
+                "expectancy_validate": vm["expectancy"],
+                "profit_factor_validate": vm["profit_factor"],
+                "win_rate_validate": vm["win_rate"],
+                "payoff_validate": vm["payoff"],
+                "tail_loss_p05_validate": vm["tail_loss_p05"],
+                "max_drawdown_pips_validate": vm["max_drawdown_pips"],
+                "bootstrap_p05_validate": vm["bootstrap_p05"],
+                "survives_validate": survives,
+            })
+
+    # ---- LEVEL C: pooled state with per-symbol homogeneity proof ----
+    for sig, rows in collect(early, state_keys).items():
+        state = dict(zip(state_keys, sig))
+        by_symbol: dict[str, list[float]] = {}
+        for r in rows:
+            by_symbol.setdefault(str(r.get("symbol") or ""), []).append(float(r["outcome"]))
+        qualified_symbols = []
+        homogeneous = True
+        for symbol, pnls in sorted(by_symbol.items()):
+            net = _costed(pnls, cost_of(symbol))
+            if len(net) < min_shortlist_n:
+                continue
+            m = _state_metrics(net)
+            if (m["expectancy"] or 0) > 0:
+                qualified_symbols.append(symbol)
+            else:
+                homogeneous = False
+        if len(qualified_symbols) < min_symbols_pool or not homogeneous:
+            continue
+        pool_late = [
+            r for r in late
+            if str(r.get("symbol") or "") in qualified_symbols and matches_state(r, state)
+        ]
+        pooled_net = [
+            float(r["outcome"]) - cost_of(str(r.get("symbol") or "")) for r in pool_late
+        ]
+        if len(pooled_net) < min_validate_n * min_symbols_pool:
+            continue
+        vm = _state_metrics(pooled_net)
+        survives = bool(
+            (vm["expectancy"] or 0) > 0
+            and vm["bootstrap_p05"] is not None
+            and vm["bootstrap_p05"] > 0
+        )
+        for symbol in qualified_symbols:
+            sym_late = [
+                float(r["outcome"]) - cost_of(str(r.get("symbol") or ""))
+                for r in pool_late
+                if str(r.get("symbol") or "") == symbol
+            ]
+            opportunities.append({
+                "level": "C",
+                "symbol": symbol,
+                **state,
+                "strategy_family": "*pooled*",
+                "pool_symbols": qualified_symbols,
+                "pool_homogeneous": True,
+                "cost_pips": cost_of(symbol),
+                "n_train_pool": sum(len(v) for v in by_symbol.values()),
+                "n_validate_pool": vm["n"],
+                "expectancy_validate_pool": vm["expectancy"],
+                "profit_factor_validate_pool": vm["profit_factor"],
+                "bootstrap_p05_validate_pool": vm["bootstrap_p05"],
+                "n_validate_symbol": len(sym_late),
+                "expectancy_validate_symbol": (
+                    round(sum(sym_late) / len(sym_late), 5) if sym_late else None
+                ),
+                "survives_validate": survives,
+            })
+
+    # Dedupe: keep the strongest record per (symbol, state): A > B > C.
+    best: dict[tuple, dict[str, Any]] = {}
+    rank = {"A": 3, "B": 2, "C": 1}
+    for opp in opportunities:
+        key = (opp["symbol"], opp["regime"], opp["structure"], opp["session"], opp["side"])
+        cur = best.get(key)
+        cur_ev = (
+            float(cur.get("expectancy_validate") or cur.get("expectancy_validate_pool") or -1e9)
+            if cur else -1e9
+        )
+        opp_ev = float(opp.get("expectancy_validate") or opp.get("expectancy_validate_pool") or -1e9)
+        if cur is None or rank[opp["level"]] > rank[cur["level"]] or (
+            rank[opp["level"]] == rank[cur["level"]] and opp_ev > cur_ev
+        ):
+            best[key] = opp
+    final = sorted(
+        best.values(),
+        key=lambda o: float(o.get("expectancy_validate") or o.get("expectancy_validate_pool") or -1e9),
+        reverse=True,
+    )[:max_candidates]
+    survivors = [o for o in final if o["survives_validate"]]
+    return {
+        "shortlist_frac": float(shortlist_frac),
+        "n_level_a_states": len(level_a),
+        "n_level_b_states": len(level_b),
+        "n_opportunities": len(final),
+        "n_survive": len(survivors),
+        "opportunities": final,
+    }
+
+
+def write_validated_opportunities(
+    selection: dict[str, Any],
+    *,
+    dataset_hash: str,
+    config_hash: str,
+    code_version: str,
+    cost_model: dict[str, Any],
+    path: Path = INTEL_DIR / "validated_opportunities.json",
+) -> Path:
+    """Persist the auditable validated-opportunity artifact (P13).
+
+    A clean clone can reproduce exactly what is allowed, from which dataset,
+    which config, which code version, and why each record was accepted.
+    """
+    survivors = [o for o in selection.get("opportunities", []) if o.get("survives_validate")]
+    payload = {
+        "schema": "validated_opportunities.v1",
+        "built_at": datetime.now(timezone.utc).isoformat(),
+        "code_version": code_version,
+        "dataset_hash": dataset_hash,
+        "config_hash": config_hash,
+        "cost_model": cost_model,
+        "n_opportunities": len(survivors),
+        "opportunities": survivors,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    return path
 
 
 def _state_signatures(records: list[dict]) -> list[dict]:
@@ -271,13 +580,82 @@ def main() -> int:
     from aegis.research.exit_research import per_trade_cost_pips
 
     sample_cost = per_trade_cost_pips(symbols[0], float(pip_by_symbol.get(symbols[0], 0.0001)), spread_bps, slippage_bps) if symbols else 0.0
-    selection = strategy_selection(records, cost_pips=sample_cost)
+
+    # P4: per-symbol cost model replaces the single sample cost.
+    commission_rt = float(cfg.get("commission_round_trip_usd", 0.0) or 0.0)
+    cost_model = symbol_cost_pips(
+        pip_by_symbol,
+        spread_bps=spread_bps,
+        slippage_bps=slippage_bps,
+        commission_round_trip_usd=commission_rt,
+    )
+    cost_by_symbol = {s: m["cost_pips"] for s, m in cost_model.items()}
+
+    # P3/P13: hierarchical symbol-aware selection with reproducible hashes.
+    import hashlib
+    import subprocess as _sp
+
+    dataset_hash = hashlib.sha256(
+        "\n".join(
+            json.dumps(r, sort_keys=True, default=str)
+            for r in sorted(records, key=lambda r: (str(r.get("symbol")), str(r.get("bar_time"))))
+        ).encode("utf-8")
+    ).hexdigest()
+    config_hash = hashlib.sha256(
+        json.dumps(
+            {
+                "spread_bps": spread_bps,
+                "slippage_bps": slippage_bps,
+                "commission_round_trip_usd": commission_rt,
+                "shortlist_frac": 0.6,
+                "min_shortlist_n": 20,
+                "min_validate_n": 10,
+                "min_symbols_pool": 3,
+            },
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    try:
+        code_version = _sp.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=str(BOT)
+        ).stdout.strip() or "unknown"
+    except Exception:
+        code_version = "unknown"
+
+    hier = hierarchical_strategy_selection(records, cost_by_symbol=cost_by_symbol)
+    opportunities_path = write_validated_opportunities(
+        hier,
+        dataset_hash=dataset_hash,
+        config_hash=config_hash,
+        code_version=code_version,
+        cost_model=cost_model,
+        path=resolve_bot_path(
+            cfg.get("validated_opportunities_path"),
+            INTEL_DIR / "validated_opportunities.json",
+        ),
+    )
+    # Legacy pooled-state allowlist: only LEVEL C survivors qualify.
+    pooled_survivors = [
+        {**{k: o.get(k) for k in ("regime", "structure", "session", "side")},
+         **{m: o.get(m) for m in (
+             "n_validate_pool", "expectancy_validate_pool",
+             "profit_factor_validate_pool", "bootstrap_p05_validate_pool")}}
+        for o in hier.get("opportunities", [])
+        if o.get("level") == "C" and o.get("survives_validate")
+    ]
     validated_states_path = write_validated_states(
-        selection,
+        {"validated": [{"survives_validate": bool(s.get("bootstrap_p05_validate_pool") and s["bootstrap_p05_validate_pool"] > 0), **s} for s in pooled_survivors]},
         path=resolve_bot_path(
             cfg.get("validated_states_path"), INTEL_DIR / "validated_states.json"
         ),
     )
+    selection = {
+        "n_shortlisted": hier.get("n_level_b_states"),
+        "n_validated": hier.get("n_opportunities"),
+        "n_survive": hier.get("n_survive"),
+        "cost_model": cost_model,
+        "hierarchical": True,
+    }
 
     report = {
         "schema": "ml_pipeline.v1",
@@ -296,6 +674,16 @@ def main() -> int:
             "recommended": recommended,
         },
         "strategy_selection": selection,
+        "hierarchical_selection": {
+            "n_level_a_states": hier.get("n_level_a_states"),
+            "n_level_b_states": hier.get("n_level_b_states"),
+            "n_opportunities": hier.get("n_opportunities"),
+            "n_survive": hier.get("n_survive"),
+        },
+        "dataset_hash": dataset_hash,
+        "config_hash": config_hash,
+        "code_version": code_version,
+        "validated_opportunities_path": str(opportunities_path),
         "validated_states_path": str(validated_states_path),
         "ml": {
             "train_n": ml["train_n"],

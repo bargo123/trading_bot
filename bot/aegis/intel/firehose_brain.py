@@ -15,7 +15,13 @@ from aegis.intel.knowledge_runtime import load_knowledge_rows, match_knowledge
 from aegis.intel.lifecycle import exposure_snapshot, pretrade_ok
 from aegis.intel.paths import INTEL_DIR, resolve_bot_path
 from aegis.intel.state_runtime import build_runtime_state, runtime_signature
-from aegis.intel.strategy_model import ValidatedStrategyModel, strategy_model_ready
+from aegis.intel.strategy_model import (
+    STAGE_DEMO_CANARY,
+    STAGE_DEMO_CHAMPION,
+    STAGE_UNVALIDATED_RESEARCH,
+    ValidatedStrategyModel,
+    strategy_model_ready,
+)
 from aegis.intel.thesis_fire import ThesisFireDecision, evaluate_thesis_action, evaluate_thesis_fire
 from aegis.intel.thesis_sizing import evidence_confidence, size_thesis_clip
 from aegis.intel.trade_economics import (
@@ -27,33 +33,72 @@ from aegis.intel.trade_economics import (
 
 @dataclass
 class ThesisMemory:
+    """One independent thesis. The reasoning unit is NOT the symbol: two
+    validated strategies on the same symbol coexist as separate theses."""
+
+    thesis_key: str
     symbol: str
     side: str | None = None
+    setup_family: str = ""
     information_id: str | None = None
     current_risk_usd: float = 0.0
     clips: int = 0
+
+
+def thesis_key(symbol: str, side: str | None, setup_family: str) -> str:
+    return "|".join([str(symbol).upper(), str(side or "").lower(), str(setup_family or "").lower()])
 
 
 @dataclass
 class DemoBrainState:
     theses: dict[str, ThesisMemory] = field(default_factory=dict)
 
-    def get(self, symbol: str) -> ThesisMemory:
-        key = str(symbol).upper()
-        return self.theses.setdefault(key, ThesisMemory(symbol=key))
+    def get(self, key: str, symbol: str | None = None) -> ThesisMemory:
+        mem = self.theses.get(key)
+        if mem is None:
+            sym = symbol or key.split("|")[0]
+            mem = ThesisMemory(thesis_key=key, symbol=str(sym).upper())
+            self.theses[key] = mem
+        return mem
 
-    def sync_from_positions(self, symbol: str, positions: Sequence[PositionSnapshot], clip_risk: float) -> ThesisMemory:
-        held = self.get(symbol)
+    def sync_from_positions(self, symbol: str, positions: Sequence[PositionSnapshot], clip_risk: float) -> list[ThesisMemory]:
+        """Reconcile open positions into per-thesis memories (symbol+side match).
+
+        Returns every thesis of this symbol that currently holds exposure.
+        Positions whose side matches no tracked thesis are adopted under a
+        generic held-key so exposure accounting never loses them.
+        """
         mine = [pos for pos in positions if str(pos.symbol).upper() == str(symbol).upper()]
-        held.clips = len(mine)
-        if not mine:
-            held.current_risk_usd = 0.0
-            held.information_id = None
-            held.side = None
-            return held
-        held.side = str(mine[0].side).lower()
-        held.current_risk_usd = max(held.current_risk_usd, float(clip_risk) * len(mine))
-        return held
+        by_side: dict[str, list[PositionSnapshot]] = {}
+        for pos in mine:
+            by_side.setdefault(str(pos.side).lower(), []).append(pos)
+        touched: list[ThesisMemory] = []
+        matched_sides: set[str] = set()
+        for key, mem in self.theses.items():
+            if mem.symbol != str(symbol).upper():
+                continue
+            side_positions = by_side.get(str(mem.side or "").lower(), [])
+            if mem.side and side_positions:
+                matched_sides.add(str(mem.side).lower())
+                mem.clips = len(side_positions)
+                mem.current_risk_usd = max(mem.current_risk_usd, float(clip_risk) * len(side_positions))
+                touched.append(mem)
+            elif mem.clips > 0:
+                # Position closed upstream (flatten/stop): clear the thesis.
+                mem.clips = 0
+                mem.current_risk_usd = 0.0
+                mem.information_id = None
+        for side, side_positions in by_side.items():
+            if side in matched_sides:
+                continue
+            key = thesis_key(symbol, side, "held")
+            mem = self.get(key, symbol)
+            mem.side = side
+            mem.setup_family = "held"
+            mem.clips = len(side_positions)
+            mem.current_risk_usd = max(mem.current_risk_usd, float(clip_risk) * len(side_positions))
+            touched.append(mem)
+        return touched
 
     def apply(
         self,
@@ -64,8 +109,10 @@ class DemoBrainState:
         information_id: str | None,
         target_risk: float,
         clips: int | None = None,
+        setup_family: str = "",
     ) -> None:
-        held = self.get(symbol)
+        key = thesis_key(symbol, side, setup_family)
+        held = self.get(key, symbol)
         if action == "exit":
             held.current_risk_usd = 0.0
             held.information_id = None
@@ -74,6 +121,7 @@ class DemoBrainState:
             return
         if action in {"fire", "scale"}:
             held.side = side
+            held.setup_family = setup_family
             held.information_id = information_id
             held.current_risk_usd = max(held.current_risk_usd, float(target_risk))
             if clips is not None:
@@ -123,6 +171,8 @@ def _geometry(side: str, structure: Mapping[str, Any], pip: float) -> tuple[floa
 
 
 def _load_strategy(cfg: Mapping[str, Any]) -> ValidatedStrategyModel | None:
+    """Load a promoted champion. Only a sealed-validation accepted artifact can
+    reach DEMO_CHAMPION stage; anything else returns None (no pseudo-champion)."""
     path = resolve_bot_path(
         cfg.get("intelligent_champion_path"), INTEL_DIR / "intelligent_champion.json"
     )
@@ -150,6 +200,9 @@ def _load_strategy(cfg: Mapping[str, Any]) -> ValidatedStrategyModel | None:
             validated_risk_fraction=payload.get("validated_risk_fraction"),
             artifact_hash=str(payload.get("artifact_hash") or ""),
             allowed_states=allowed_states_from_payload(payload),
+            promotion_stage=STAGE_DEMO_CHAMPION,
+            dataset_hash=str(payload.get("dataset_hash") or ""),
+            validation_hash=str(payload.get("validation_hash") or payload.get("artifact_hash") or ""),
         )
     except (KeyError, TypeError, ValueError):
         return None
@@ -184,25 +237,71 @@ def _load_validated_states(path: Path) -> frozenset[frozenset[str]]:
     return frozenset(out)
 
 
-def _bootstrap_from_evidence(cfg: Mapping[str, Any], evidence: Any) -> ValidatedStrategyModel | None:
-    """Use analogue evidence as-is. Never inflate PF or hide a cosmetic WR.
+def _load_validated_opportunities(path: Path) -> dict[str, dict[str, Any]]:
+    """Load symbol-aware validated opportunities written by the research pipeline.
 
-    Refuses synthetic/proxy evidence outright. The committed offline index is a
-    fabricated fixture whose only two outcomes (-0.02 / +0.04) hand back a
-    "calibrated" PF of 6.0 for any query with 20 matches, which is how a live demo
-    run reached PF 0.25 while believing it had a validated edge. Measured provenance
-    is a precondition for calling anything a validated strategy model.
+    Returns {opportunity_key: record} where key is
+    ``symbol|regime|structure|session|side`` for LEVEL A/B records and
+    ``*|regime|structure|session|side`` for LEVEL C pooled records that proved
+    cross-symbol homogeneity. Missing/corrupt file -> empty (gate closed).
+    """
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for rec in payload.get("opportunities") or []:
+        if not isinstance(rec, dict):
+            continue
+        sym = str(rec.get("symbol") or "*").upper()
+        key = "|".join([
+            sym,
+            str(rec.get("regime") or ""),
+            str(rec.get("structure") or ""),
+            str(rec.get("session") or ""),
+            str(rec.get("side") or ""),
+        ])
+        out[key] = rec
+    return out
+
+
+def _bootstrap_from_evidence(cfg: Mapping[str, Any], evidence: Any) -> ValidatedStrategyModel | None:
+    """State-evidence bootstrap. Governance: this is UNVALIDATED_RESEARCH.
+
+    It can never behave like a champion. By default the returned model is not
+    allowed to trade (shadow decisions only). Only an explicit config opt-in
+    (``intelligent_bootstrap_canary``) promotes it to DEMO_CANARY, and even then
+    every strategy_model_ready gate must pass on measured provenance.
+
+    Refuses synthetic/proxy evidence outright unless synthetic evidence is
+    explicitly allowed for offline tests - and then it still cannot trade.
     """
     if not bool(cfg.get("intelligent_firehose_bootstrap", False)):
         return None
-    if not is_measured_provenance(getattr(evidence, "provenance", "unknown")):
+    measured = is_measured_provenance(getattr(evidence, "provenance", "unknown"))
+    if not measured:
         if bool(cfg.get("intelligent_allow_synthetic_evidence", False)):
             # Explicit opt-in exists only for offline tests and shadow research.
-            pass
-        else:
-            return None
-    if not evidence.eligible:
+            # Synthetic evidence can never qualify for a trading stage.
+            return ValidatedStrategyModel(
+                strategy_id="analogue_bootstrap_synthetic",
+                promoted=True,
+                n_trades=int(getattr(evidence, "analogue_n", 0) or 0),
+                n_losses=int(getattr(evidence, "analogue_n_losses", 0) or 0),
+                expectancy=float(getattr(evidence, "expectancy", 0.0) or 0.0),
+                profit_factor=float(getattr(evidence, "profit_factor", 0.0) or 0.0),
+                bootstrap_p05=float(getattr(evidence, "mean_lower_95", 0.0) or 0.0),
+                wins_erased_by_average_loss=float(getattr(evidence, "wins_erased_by_average_loss", 99.0) or 99.0),
+                wins_erased_by_tail_loss=0.0,
+                validated_risk_fraction=float(cfg.get("intelligent_risk_fraction", 0.08)),
+                artifact_hash="bootstrap-synthetic",
+                promotion_stage=STAGE_UNVALIDATED_RESEARCH,
+            )
         return None
+    if not getattr(evidence, "eligible", False):
+        return None
+    stage = STAGE_DEMO_CANARY if bool(cfg.get("intelligent_bootstrap_canary", False)) \
+        else STAGE_UNVALIDATED_RESEARCH
     try:
         model = ValidatedStrategyModel(
             strategy_id="analogue_bootstrap",
@@ -216,6 +315,7 @@ def _bootstrap_from_evidence(cfg: Mapping[str, Any], evidence: Any) -> Validated
             wins_erased_by_tail_loss=float(evidence.tail_loss or 0.0) / max(float(evidence.avg_win or 0.0), 1e-9),
             validated_risk_fraction=float(cfg.get("intelligent_risk_fraction", 0.08)),
             artifact_hash="bootstrap",
+            promotion_stage=stage,
         )
     except (TypeError, ValueError):
         return None
@@ -242,9 +342,23 @@ class IntelligentFirehoseBrain:
         self.knowledge_rows = load_knowledge_rows(knowledge_path)
         self.strategy = _load_strategy(cfg)
         self.validated_states = _load_validated_states(validated_path)
+        self.validated_opportunities = _load_validated_opportunities(
+            resolve_bot_path(
+                cfg.get("validated_opportunities_path"),
+                INTEL_DIR / "validated_opportunities.json",
+            )
+        )
         self.memory = DemoBrainState()
         self._risk_budget = float(cfg.get("intelligent_risk_budget_usd") or cfg.get("starting_equity") or 100.0)
-        self.counts = {"fire": 0, "scale": 0, "hold": 0, "reduce": 0, "exit": 0, "skip": 0}
+        self.counts: dict[str, Any] = {
+            "fire": 0, "scale": 0, "hold": 0, "reduce": 0, "exit": 0, "skip": 0,
+            "skip_reasons": {},
+            "shadow_fires": 0,
+        }
+
+    def _note_skip(self, reason: str) -> None:
+        reasons = self.counts.setdefault("skip_reasons", {})
+        reasons[reason] = int(reasons.get(reason, 0)) + 1
 
     def refresh(self, cfg: Mapping[str, Any] | None = None) -> None:
         """Re-read the champion and validated-state allowlist.
@@ -259,12 +373,44 @@ class IntelligentFirehoseBrain:
             self.cfg.get("validated_states_path"), INTEL_DIR / "validated_states.json"
         )
         self.validated_states = _load_validated_states(validated_path)
+        self.validated_opportunities = _load_validated_opportunities(
+            resolve_bot_path(
+                self.cfg.get("validated_opportunities_path"),
+                INTEL_DIR / "validated_opportunities.json",
+            )
+        )
 
     def snapshot(self) -> dict[str, Any]:
         records = len(getattr(self.analogues, "_records", []))
+        model = self.strategy
+        if model is None:
+            strategy_identity: dict[str, Any] = {
+                "strategy_id": None,
+                "strategy_status": "UNQUALIFIED_NO_VALIDATED_MODEL",
+                "strategy_version": None,
+                "dataset_hash": None,
+                "validation_hash": None,
+                "promotion_stage": None,
+            }
+        else:
+            strategy_identity = {
+                "strategy_id": model.strategy_id,
+                "strategy_status": (
+                    "QUALIFIED_TRADING" if model.may_trade else "QUALIFIED_SHADOW_ONLY"
+                ),
+                "strategy_version": str(model.artifact_hash or "")[:16],
+                "dataset_hash": model.dataset_hash or None,
+                "validation_hash": model.validation_hash or None,
+                "promotion_stage": model.promotion_stage,
+            }
         return {
             "brain": "intelligent_firehose",
-            "counts": dict(self.counts),
+            "counts": {k: v for k, v in self.counts.items() if k != "skip_reasons"},
+            "skip_reasons": dict(
+                sorted(self.counts.get("skip_reasons", {}).items(), key=lambda kv: -kv[1])[:20]
+            ),
+            "shadow_fires": int(self.counts.get("shadow_fires", 0)),
+            **strategy_identity,
             "analogue_records": records,
             "analogue_provenance": self.analogues.provenance,
             "analogue_measured": self.analogues.is_measured,
@@ -273,8 +419,10 @@ class IntelligentFirehoseBrain:
             "knowledge_table_path": str(self.knowledge_path),
             "champion": None if self.strategy is None else self.strategy.strategy_id,
             "validated_states": len(self.validated_states),
+            "validated_opportunities": len(self.validated_opportunities),
             "gate_validated_states": bool(self.cfg.get("intelligent_gate_validated_states", False)),
             "bootstrap": bool(self.cfg.get("intelligent_firehose_bootstrap", False)),
+            "bootstrap_canary": bool(self.cfg.get("intelligent_bootstrap_canary", False)),
             # An empty index means every decision is made on no evidence. That is a
             # misconfiguration, not a quiet market, so make it visible.
             "warnings": [
@@ -349,7 +497,7 @@ class IntelligentFirehoseBrain:
     ) -> DemoDecision:
         clip_qty = float(self.cfg.get("order_quantity", 0.01))
         clip_risk = max(self._risk_budget * float(self.cfg.get("intelligent_risk_fraction", 0.08)) / 5.0, 0.01)
-        held = self.memory.sync_from_positions(symbol, positions, clip_risk)
+        self.memory.sync_from_positions(symbol, positions, clip_risk)
         state = build_runtime_state(symbol=symbol, m1=completed_m1)
         m15 = (state.get("structure") or {}).get("M15") or {}
         setup = str(m15.get("kind") or "scan")
@@ -362,14 +510,17 @@ class IntelligentFirehoseBrain:
             else:
                 prev = float(completed_m1["close"].iloc[-2]) if len(completed_m1) >= 2 else close
                 side = "buy" if close >= prev else "sell"
+        held = self.memory.get(thesis_key(symbol, side, setup), symbol)
         invalidation, target = _geometry(side, m15, pip)
         if invalidation is None and held.clips <= 0:
+            self._note_skip("no_structural_invalidation")
             self.counts["skip"] += 1
             return DemoDecision("skip", "no_structural_invalidation", side=side, journal={"brain": "intelligent_firehose"})
         signature = runtime_signature(state, side=side, setup=setup)
         gating = bool(self.cfg.get("intelligent_gate_validated_states", False))
         exact_state = None
         current_state = None
+        opportunity: dict[str, Any] | None = None
         if gating:
             from aegis.research.intelligent_champion import state_sig
 
@@ -384,7 +535,24 @@ class IntelligentFirehoseBrain:
                     "side": side,
                 }
             )
-            if current_state in allowed:
+            # Symbol-aware opportunities first (LEVEL A/B), then pooled LEVEL C.
+            opp_key = "|".join([
+                str(symbol).upper(),
+                str(signature.get("regime") or ""),
+                str(signature.get("structure") or ""),
+                str(signature.get("session") or ""),
+                side,
+            ])
+            opportunity = self.validated_opportunities.get(opp_key)
+            if opportunity is not None:
+                exact_state = {
+                    "regime": signature.get("regime") or "",
+                    "structure": signature.get("structure") or "",
+                    "session": signature.get("session") or "",
+                    "side": side,
+                }
+                allowed.add(current_state)
+            elif current_state in allowed:
                 exact_state = {
                     "regime": signature.get("regime") or "",
                     "structure": signature.get("structure") or "",
@@ -511,6 +679,20 @@ class IntelligentFirehoseBrain:
             )
         elif fire.action == "fire":
             fire = ThesisFireDecision(fire.action, fire.reason, econ.expected_net_value_usd)
+        # Governance: a model without a trading stage (research bootstrap, or
+        # canary disabled) may decide in shadow but never send an order. The
+        # latent demand is journaled so throughput analysis sees it.
+        shadow_action: str | None = None
+        if fire.action in {"fire", "scale"} and (strategy is None or not strategy.may_trade):
+            shadow_action = fire.action
+            stage = "none" if strategy is None else str(strategy.promotion_stage)
+            fire = ThesisFireDecision(
+                "skip",
+                f"shadow:not_trading_stage:{stage}",
+                fire.expected_net_value,
+            )
+        if shadow_action is not None:
+            self.counts["shadow_fires"] = int(self.counts.get("shadow_fires", 0)) + 1
         action = evaluate_thesis_action(
             fire_decision=fire,
             information_id=info_id,
@@ -533,10 +715,15 @@ class IntelligentFirehoseBrain:
             mapped = "exit"
             close_clips = held.clips
         self.counts[mapped] = int(self.counts.get(mapped, 0)) + 1
+        if mapped == "skip":
+            self._note_skip(str(action.reason))
         exposure = exposure_snapshot(positions)
         journal = {
             "brain": "intelligent_firehose",
             "action": mapped,
+            "shadow_action": shadow_action,
+            "setup_family": setup,
+            "thesis_key": held.thesis_key,
             "analogue_n": evidence.analogue_n,
             "expectancy": evidence.expectancy,
             "uncertainty": evidence.uncertainty,
