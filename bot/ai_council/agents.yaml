@@ -8,6 +8,12 @@ agents:
     provider: "opencode"
     cli: "opencode"
     ask_cmd: ["run"]
+    # Free-model fallbacks when the default model is rate-limited (never paid).
+    models:
+      - "opencode/x-preview-f-free"
+      - "opencode/nemotron-3.5-lightning-free"
+      - "opencode/hy3-free"
+      - "opencode/mimo-v2.5-free"
     available_default: true
     hint: "opencode is the orchestrator shell; used for council rounds."
   claude:

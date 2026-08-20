@@ -50,13 +50,13 @@
   "opencode": {
     "agent": "opencode",
     "cli": "native-exe",
-    "duration_s": 76.68,
-    "error": "quota/rate-limit blocked",
-    "model": null,
-    "probed_utc": "2026-08-20T21:54:15.384293+00:00",
+    "duration_s": 96.24,
+    "error": null,
+    "model": "opencode/x-preview-f-free",
+    "probed_utc": "2026-08-20T23:20:18.283657+00:00",
     "provider": "opencode",
-    "returncode": 1,
-    "status": "UNAVAILABLE_QUOTA",
+    "returncode": 0,
+    "status": "AVAILABLE",
     "tool_version": null
   }
 }

@@ -13,7 +13,7 @@ import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 BOT_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BOT_ROOT.parent
@@ -70,6 +70,14 @@ DEFAULT_AGENTS = {
         "provider": "opencode",
         "cli": "opencode",
         "ask_cmd": ["run"],
+        # Free-model fallbacks: if the default model is rate-limited, retry
+        # the same prompt on these (in order). All are local/free - never paid.
+        "models": [
+            "opencode/x-preview-f-free",
+            "opencode/nemotron-3.5-lightning-free",
+            "opencode/hy3-free",
+            "opencode/mimo-v2.5-free",
+        ],
         "available_default": True,
         "hint": "opencode is the orchestrator shell; used for council rounds.",
     },
@@ -234,7 +242,12 @@ def _auth_required(stdout: str, stderr: str) -> bool:
 
 
 def ask_agent(name: str, prompt: str, *, timeout_s: int = 240, cwd: Path | None = None) -> dict[str, Any]:
-    """Run one non-interactive ask against an agent. Never blocks the cycle."""
+    """Run one non-interactive ask against an agent. Never blocks the cycle.
+
+    If the config lists alternative ``models``, a quota/timeout failure on the
+    default model retries once per fallback model (free/local only - never a
+    paid credential). The model that actually answered is recorded.
+    """
     import time
 
     config = load_agents_config().get(name) or {}
@@ -246,8 +259,43 @@ def ask_agent(name: str, prompt: str, *, timeout_s: int = 240, cwd: Path | None 
         base.update({"status": "UNAVAILABLE_CLI", "error": "CLI not found",
                      "finished_utc": started_utc, "duration_s": 0.0})
         return base
-    cmd = argv + list(config.get("ask_cmd") or []) + [prompt]
-    base.update({"cli_class": _cli_class(argv), "provider": config.get("provider")})
+    variants: list[str | None] = [None] + [str(m) for m in (config.get("models") or [])]
+    result: dict[str, Any] | None = None
+    for attempt_index, variant in enumerate(variants):
+        cmd = argv + list(config.get("ask_cmd") or [])
+        if variant:
+            cmd += ["--model", variant]
+        cmd += [prompt]
+        result = _run_ask(
+            name, cmd, argv=argv, config=config, prompt=prompt,
+            timeout_s=timeout_s, cwd=cwd, started=started,
+            started_utc=started_utc, requested_model=variant,
+        )
+        if result.get("ok") or attempt_index == len(variants) - 1:
+            break
+        # Only quota/timeout failures justify burning a fallback attempt.
+        if result.get("status") not in {"UNAVAILABLE_QUOTA", "TIMEOUT"}:
+            break
+    assert result is not None
+    return result
+
+
+def _run_ask(
+    name: str,
+    cmd: list[str],
+    *,
+    argv: list[str],
+    config: Mapping[str, Any],
+    prompt: str,
+    timeout_s: int,
+    cwd: Path | None,
+    started: float,
+    started_utc: str,
+    requested_model: str | None,
+) -> dict[str, Any]:
+    import time
+
+    base: dict[str, Any] = {"agent": name, "ok": False, "started_utc": started_utc}
     try:
         proc = subprocess.run(
             cmd, capture_output=True, text=True, encoding="utf-8",
@@ -273,7 +321,9 @@ def ask_agent(name: str, prompt: str, *, timeout_s: int = 240, cwd: Path | None 
         "finished_utc": finished_utc,
         "duration_s": duration,
         "returncode": proc.returncode,
-        "model": _extract_model(f"{out}\n{err}", name),
+        "model": requested_model or _extract_model(f"{out}\n{err}", name),
+        "cli_class": _cli_class(argv),
+        "provider": config.get("provider"),
         "tool_version": _tool_version(f"{err}\n{out}"),
         "output": out[:20000],
         "stdout_tail": out[-2000:],
