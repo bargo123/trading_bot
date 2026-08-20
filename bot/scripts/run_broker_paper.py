@@ -986,45 +986,56 @@ def main() -> None:
             # fetched before the brain ran. If that quote is now stale, fetch
             # ONE fresh tick and re-validate; never send on stale pricing and
             # never disable stale protection to force trades through.
+            from aegis.intel.send_guard import (
+                margin_precheck_ok,
+                estimate_margin,
+                min_lot_ok,
+                needs_quote_refresh,
+                refresh_verdict,
+            )
+
             max_age_send = float(cfg.get("max_quote_age_s", 5.0) or 0.0)
-            if max_age_send > 0:
-                send_age = quote_age_s(q)
-                if send_age > max_age_send:
-                    quote_refresh_counts["stale_observed_at_send"] += 1
-                    try:
-                        q = eng.quote(sym)
-                    except Exception as exc:
-                        quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
-                        append_journal(
-                            journal,
-                            {
-                                "event": "quote_refresh_failed",
-                                "symbol": sym,
-                                "why": str(exc)[:120],
-                                "bar": str(bar_time),
-                            },
-                        )
-                        return
-                    refreshed_age = quote_age_s(q)
-                    live_spread = max(0.0, float(q.ask) - float(q.bid))
-                    if refreshed_age > max_age_send or (
-                        max_spread > 0 and live_spread > max_spread + 1e-12
-                    ):
-                        quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
-                        append_journal(
-                            journal,
-                            {
-                                "event": "quote_refresh_invalid",
-                                "symbol": sym,
-                                "age_s": refreshed_age,
-                                "spread": live_spread,
-                                "max_spread": max_spread,
-                                "bar": str(bar_time),
-                            },
-                        )
-                        return
-                    quote_refresh_counts["fresh_quote_recovered"] += 1
-                    latency.quote_ts = getattr(q, "time", 0.0) or time.time()
+            if needs_quote_refresh(quote_age_s(q), max_age_s=max_age_send):
+                quote_refresh_counts["stale_observed_at_send"] += 1
+                try:
+                    q = eng.quote(sym)
+                except Exception as exc:
+                    quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
+                    append_journal(
+                        journal,
+                        {
+                            "event": "quote_refresh_failed",
+                            "symbol": sym,
+                            "why": str(exc)[:120],
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
+                refreshed_age = quote_age_s(q)
+                live_spread = max(0.0, float(q.ask) - float(q.bid))
+                verdict = refresh_verdict(
+                    new_age_s=refreshed_age,
+                    new_spread=live_spread,
+                    max_age_s=max_age_send,
+                    max_spread=max_spread,
+                )
+                if not verdict.ok:
+                    quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
+                    append_journal(
+                        journal,
+                        {
+                            "event": "quote_refresh_invalid",
+                            "symbol": sym,
+                            "reason": verdict.reason,
+                            "age_s": refreshed_age,
+                            "spread": live_spread,
+                            "max_spread": max_spread,
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
+                quote_refresh_counts["fresh_quote_recovered"] += 1
+                latency.quote_ts = getattr(q, "time", 0.0) or time.time()
             # --- Margin / min-lot pre-checks: 89% of historical order failures
             # were 10019 No money. Check before hitting the broker.
             try:
@@ -1032,7 +1043,7 @@ def main() -> None:
             except Exception:
                 spec_pre = None
             vmin = float((spec_pre or {}).get("volume_min", 0.0) or 0.0)
-            if vmin > 0 and float(order_qty) + 1e-12 < vmin:
+            if not min_lot_ok(float(order_qty), vmin):
                 quote_refresh_counts["min_lot_precheck_skip"] += 1
                 append_journal(
                     journal,
@@ -1047,20 +1058,20 @@ def main() -> None:
                 )
                 return
             try:
-                funds = float(eng.account().available_funds)
+                acct_pre = eng.account()
+                funds = float(acct_pre.available_funds)
+                leverage = float((getattr(acct_pre, "raw", {}) or {}).get("leverage") or 100.0)
             except Exception:
                 funds = None
+                leverage = 100.0
             if funds is not None:
                 contract = float((spec_pre or {}).get("trade_contract_size", 100000.0) or 100000.0)
                 ref_price = float(getattr(q, "ask", 0.0) or getattr(q, "bid", 0.0) or 0.0)
-                est_margin = ref_price * float(order_qty) * contract / 100.0
-                leverage = 100.0
-                try:
-                    leverage = float(eng.account().raw.get("leverage") or 100.0)
-                except Exception:
-                    pass
-                est_margin = ref_price * float(order_qty) * contract / max(leverage, 1.0)
-                if funds <= 0 or est_margin > funds * 0.9:
+                est_margin = estimate_margin(
+                    price=ref_price, lots=float(order_qty),
+                    contract_size=contract, leverage=leverage,
+                )
+                if not margin_precheck_ok(funds, est_margin):
                     quote_refresh_counts["margin_precheck_skip"] += 1
                     append_journal(
                         journal,

@@ -1,7 +1,7 @@
 {
   "schema": "ml_pipeline.v1",
   "label": "research_proxy",
-  "built_at": "2026-08-20T22:26:22.064001+00:00",
+  "built_at": "2026-08-20T22:46:28.071151+00:00",
   "provenance": "mt5_m1",
   "cost_assumptions": {
     "spread_bps": 0.2,
@@ -20,246 +20,179 @@
     "recommended": null
   },
   "strategy_selection": {
-    "cost_pips_assumed": 0.3,
-    "shortlist_frac": 0.6,
-    "n_shortlisted": 10,
-    "n_validated": 10,
-    "n_survive": 2,
-    "candidates": [
-      {
-        "state": {
-          "regime": "range",
-          "structure": "retest",
-          "session": "newyork",
-          "side": "sell"
-        },
-        "n_shortlist": 25,
-        "expectancy_shortlist": 4.335999999999689
+    "n_shortlisted": 34,
+    "n_validated": 15,
+    "n_survive": 1,
+    "cost_model": {
+      "EURUSD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
       },
-      {
-        "state": {
-          "regime": "range",
-          "structure": "retest",
-          "session": "newyork",
-          "side": "buy"
-        },
-        "n_shortlist": 56,
-        "expectancy_shortlist": 1.567857142856998
+      "GBPUSD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
       },
-      {
-        "state": {
-          "regime": "trend",
-          "structure": "retest",
-          "session": "asia",
-          "side": "sell"
-        },
-        "n_shortlist": 49,
-        "expectancy_shortlist": 1.2040816326530905
+      "USDJPY": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
       },
-      {
-        "state": {
-          "regime": "noise",
-          "structure": "none",
-          "session": "london",
-          "side": "buy"
-        },
-        "n_shortlist": 23,
-        "expectancy_shortlist": 1.1652173913042463
+      "USDCHF": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
       },
-      {
-        "state": {
-          "regime": "trend",
-          "structure": "none",
-          "session": "newyork",
-          "side": "buy"
-        },
-        "n_shortlist": 385,
-        "expectancy_shortlist": 0.7810389610389156
+      "AUDUSD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
       },
-      {
-        "state": {
-          "regime": "trend",
-          "structure": "none",
-          "session": "asia",
-          "side": "sell"
-        },
-        "n_shortlist": 463,
-        "expectancy_shortlist": 0.1762419006479612
+      "NZDUSD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
       },
-      {
-        "state": {
-          "regime": "range",
-          "structure": "retest",
-          "session": "london",
-          "side": "buy"
-        },
-        "n_shortlist": 54,
-        "expectancy_shortlist": 0.17592592592578146
+      "USDCAD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
       },
-      {
-        "state": {
-          "regime": "range",
-          "structure": "none",
-          "session": "newyork",
-          "side": "buy"
-        },
-        "n_shortlist": 356,
-        "expectancy_shortlist": 0.17162921348315824
+      "EURJPY": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
       },
-      {
-        "state": {
-          "regime": "range",
-          "structure": "none",
-          "session": "asia",
-          "side": "sell"
-        },
-        "n_shortlist": 522,
-        "expectancy_shortlist": 0.1534482758621386
+      "GBPJPY": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
       },
-      {
-        "state": {
-          "regime": "range",
-          "structure": "retest",
-          "session": "asia",
-          "side": "sell"
-        },
-        "n_shortlist": 54,
-        "expectancy_shortlist": 0.1425925925926056
+      "AUDJPY": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "CADJPY": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "NZDJPY": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "EURGBP": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "EURAUD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "EURCHF": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "EURCAD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "EURNZD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "GBPAUD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "GBPCAD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "GBPCHF": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "GBPNZD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "AUDCAD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "AUDCHF": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "AUDNZD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "CADCHF": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
+      },
+      "AUDSGD": {
+        "cost_pips": 0.3,
+        "spread_pips": 0.2,
+        "slippage_pips": 0.1,
+        "commission_pips": 0.0
       }
-    ],
-    "validated": [
-      {
-        "regime": "range",
-        "structure": "none",
-        "session": "asia",
-        "side": "sell",
-        "n_validate": 237,
-        "n_losses_validate": 85,
-        "expectancy_validate": 3.149367088607608,
-        "profit_factor_validate": 2.7796852646637746,
-        "win_rate_validate": 0.6413502109704642,
-        "bootstrap_p05_validate": 2.1029628490330174,
-        "survives_validate": true
-      },
-      {
-        "regime": "range",
-        "structure": "retest",
-        "session": "newyork",
-        "side": "buy",
-        "n_validate": 16,
-        "n_losses_validate": 5,
-        "expectancy_validate": 1.8062499999996682,
-        "profit_factor_validate": 2.111538461538196,
-        "win_rate_validate": 0.6875,
-        "bootstrap_p05_validate": -1.9162373315562147,
-        "survives_validate": false
-      },
-      {
-        "regime": "noise",
-        "structure": "none",
-        "session": "london",
-        "side": "buy",
-        "n_validate": 14,
-        "n_losses_validate": 6,
-        "expectancy_validate": 1.7857142857142303,
-        "profit_factor_validate": 2.543209876543059,
-        "win_rate_validate": 0.5714285714285714,
-        "bootstrap_p05_validate": -0.971316000662817,
-        "survives_validate": false
-      },
-      {
-        "regime": "range",
-        "structure": "retest",
-        "session": "asia",
-        "side": "sell",
-        "n_validate": 7,
-        "n_losses_validate": 4,
-        "expectancy_validate": 1.4714285714289155,
-        "profit_factor_validate": 2.2409638554223266,
-        "win_rate_validate": 0.42857142857142855,
-        "bootstrap_p05_validate": -3.02598757564916,
-        "survives_validate": false
-      },
-      {
-        "regime": "trend",
-        "structure": "none",
-        "session": "asia",
-        "side": "sell",
-        "n_validate": 211,
-        "n_losses_validate": 88,
-        "expectancy_validate": 1.3962085308057415,
-        "profit_factor_validate": 1.6104434314132192,
-        "win_rate_validate": 0.5829383886255924,
-        "bootstrap_p05_validate": 0.2628242996016279,
-        "survives_validate": true
-      },
-      {
-        "regime": "range",
-        "structure": "retest",
-        "session": "london",
-        "side": "buy",
-        "n_validate": 27,
-        "n_losses_validate": 16,
-        "expectancy_validate": -0.9629629629629822,
-        "profit_factor_validate": 0.6264367816091901,
-        "win_rate_validate": 0.4074074074074074,
-        "bootstrap_p05_validate": -2.9886773884178592,
-        "survives_validate": false
-      },
-      {
-        "regime": "range",
-        "structure": "retest",
-        "session": "newyork",
-        "side": "sell",
-        "n_validate": 14,
-        "n_losses_validate": 7,
-        "expectancy_validate": -1.0285714285711232,
-        "profit_factor_validate": 0.8289786223278379,
-        "win_rate_validate": 0.5,
-        "bootstrap_p05_validate": -8.704081574483238,
-        "survives_validate": false
-      },
-      {
-        "regime": "trend",
-        "structure": "none",
-        "session": "newyork",
-        "side": "buy",
-        "n_validate": 368,
-        "n_losses_validate": 205,
-        "expectancy_validate": -2.24266304347814,
-        "profit_factor_validate": 0.6630603413080894,
-        "win_rate_validate": 0.4429347826086957,
-        "bootstrap_p05_validate": -3.9606437251501356,
-        "survives_validate": false
-      },
-      {
-        "regime": "range",
-        "structure": "none",
-        "session": "newyork",
-        "side": "buy",
-        "n_validate": 367,
-        "n_losses_validate": 210,
-        "expectancy_validate": -3.613623978201644,
-        "profit_factor_validate": 0.5430678059536929,
-        "win_rate_validate": 0.42779291553133514,
-        "bootstrap_p05_validate": -5.419723847833731,
-        "survives_validate": false
-      },
-      {
-        "regime": "trend",
-        "structure": "retest",
-        "session": "asia",
-        "side": "sell",
-        "n_validate": 1,
-        "n_losses_validate": 1,
-        "expectancy_validate": -4.400000000000214,
-        "profit_factor_validate": 0.0,
-        "win_rate_validate": 0.0,
-        "bootstrap_p05_validate": null,
-        "survives_validate": false
-      }
-    ]
+    },
+    "hierarchical": true
   },
+  "hierarchical_selection": {
+    "n_level_a_states": 34,
+    "n_level_b_states": 34,
+    "n_opportunities": 15,
+    "n_survive": 1
+  },
+  "dataset_hash": "97fe809b9a40ed598f0ea2f40f7dac0039b7571d234a087dd9cf26587a21e2de",
+  "config_hash": "a8c3eea5229a44c04d6abeb643e66cd001bfa3c2d93173c5591b32e61e3d6fa1",
+  "code_version": "acc9a95529223682a57b6822c6aee6b11096183a",
+  "validated_opportunities_path": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\validated_opportunities.json",
   "validated_states_path": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\validated_states.json",
   "ml": {
     "train_n": 6698,

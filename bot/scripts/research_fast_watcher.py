@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -433,17 +434,44 @@ def _report_val(report: Path, group: str, key: str) -> str:
         return "?"
 
 
-def run_cycle(tick: int, *, fetch_exit: bool, council_every: int = 0) -> dict[str, Any]:
+def run_cycle(
+    tick: int,
+    *,
+    fetch_exit: bool,
+    council_every: int = 0,
+    ingest_enabled: bool = True,
+) -> dict[str, Any]:
     evidence_changed, new_outcome_lines = _evidence_changed()
     notes_changed = _notes_changed()
     stale = staleness_report()
 
+    # P9: ingest NEW completed market observations BEFORE the fast-exit check -
+    # ingestion is what creates new evidence, so it must run every cycle.
+    ingest: dict[str, Any] | None = None
+    throughput: dict[str, Any] | None = None
+    ingest_added = 0
+    if ingest_enabled:
+        ingest = _run_script("research_incremental_ingest.py", timeout_s=1200)
+        try:
+            ingest_added = int((ingest.get("stdout_json") or {}).get("added_total", 0))
+        except (AttributeError, TypeError, ValueError):
+            ingest_added = 0
+        if ingest_added > 0:
+            evidence_changed = True
+    # P7: refresh the throughput/degradation report cheaply.
+    throughput = _run_script("firehose_throughput.py", timeout_s=300)
+
+    # P10: autonomous REAL council round on meaningful triggers only.
     council: dict[str, Any] | None = None
+    trigger = None
     if council_every > 0 and tick > 0 and tick % council_every == 0:
-        if evidence_changed or notes_changed:
-            council = _run_council_round()
-        else:
-            council = {"skipped": "no_new_evidence"}
+        trigger = "scheduled_cadence"
+    else:
+        trigger = _evidence_trigger()
+    if trigger and (evidence_changed or notes_changed or trigger != "scheduled_cadence"):
+        council = _run_council_round(trigger=trigger)
+    elif council_every > 0:
+        council = {"skipped": "no_new_evidence"}
 
     # Recover a dead/hung runner via the keepalive (deduped by our singleton lock).
     keepalive: dict[str, Any] | None = None
@@ -470,7 +498,7 @@ def run_cycle(tick: int, *, fetch_exit: bool, council_every: int = 0) -> dict[st
             tick=tick, watcher_alive=True, last_cycle=_now(),
             no_new_evidence=True, new_outcome_lines=new_outcome_lines,
             skipped="outcome_learning,book_memory,ml_pipeline",
-            council=council,
+            council=council, ingest=ingest,
         )
         return {
             "tick": tick,
@@ -480,10 +508,11 @@ def run_cycle(tick: int, *, fetch_exit: bool, council_every: int = 0) -> dict[st
             "heartbeat": str(heartbeat),
             "placed_orders": False,
             "promoted_live_yaml": False,
-            "mt5_touched": False,
+            "mt5_touched": bool(ingest_added > 0),
             "staleness": stale,
             "keepalive_invoked": keepalive,
             "council": council,
+            "ingest": ingest,
         }
 
     outcome = _run_script("research_outcome_learning.py")
@@ -503,7 +532,7 @@ def run_cycle(tick: int, *, fetch_exit: bool, council_every: int = 0) -> dict[st
     heartbeat = write_heartbeat(
         tick=tick, watcher_alive=True, last_cycle=_now(),
         no_new_evidence=False, new_outcome_lines=new_outcome_lines,
-        council=council,
+        council=council, ingest=ingest,
     )
     return {
         "tick": tick,
@@ -514,23 +543,80 @@ def run_cycle(tick: int, *, fetch_exit: bool, council_every: int = 0) -> dict[st
         "outcome": outcome,
         "book_memory": book,
         "ml": ml,
-        "mt5_touched": fetch_exit,
+        "mt5_touched": fetch_exit or ingest_added > 0,
         "placed_orders": False,
         "promoted_live_yaml": False,
         "staleness": stale,
         "keepalive_invoked": keepalive,
         "council": council,
+        "ingest": ingest,
     }
 
 
-def _run_council_round() -> dict[str, Any]:
+def _evidence_trigger() -> str | None:
+    """Meaningful-evidence triggers for an autonomous council round (P10).
+
+    Returns a trigger name or None. Triggers:
+      new_closed_trades   - enough closed trades since the last council marker
+      strategy_degradation- PF/EV materially worse than at the last marker
+    """
+    import json as _json
+
+    marker_path = BOT / "reports" / "research" / "council_marker.json"
+    marker: dict[str, Any] = {}
+    try:
+        marker = _json.loads(marker_path.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError):
+        pass
+    last_ts = marker.get("last_utc") or ""
+    min_trades = int(os.environ.get("AEGIS_COUNCIL_MIN_TRADES", "20"))
+    degradation = float(os.environ.get("AEGIS_COUNCIL_DEGRADATION", "0.2"))
+
+    closed = 0
+    outcome_log = BOT / "intel" / "outcome_log.jsonl"
+    try:
+        with outcome_log.open(encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                try:
+                    row = _json.loads(line)
+                except _json.JSONDecodeError:
+                    continue
+                if not row.get("is_exit"):
+                    continue
+                ts = str(row.get("ts_utc") or "")
+                if last_ts and ts <= last_ts:
+                    continue
+                closed += 1
+    except OSError:
+        return None
+    if closed >= min_trades:
+        return "new_closed_trades"
+
+    ol_path = BOT / "reports" / "research" / "outcome_learning.json"
+    try:
+        ol = _json.loads(ol_path.read_text(encoding="utf-8"))
+        pf = float(ol.get("profit_factor") or 0.0)
+        prev_pf = float(marker.get("profit_factor") or 0.0)
+        if prev_pf > 0 and pf > 0 and pf < prev_pf * (1.0 - degradation):
+            return "strategy_degradation"
+    except (OSError, _json.JSONDecodeError, TypeError, ValueError):
+        pass
+    return None
+
+
+def _run_council_round(*, trigger: str | None = None) -> dict[str, Any]:
     """Run ONE real council round (REAL mode) on the current champion state.
 
-    Runs at most once per council cadence (never every 20 min). Uses only
-    AVAILABLE agents; unavailable agents are recorded with their real status.
+    Triggered only by meaningful evidence (P10). Uses ONLY free/local agents -
+    Claude/Anthropic paid credentials are never used autonomously; unavailable
+    agents are recorded truthfully.
     """
     from ai_council.cycle import dump_live, run_council_cycle
 
+    agents_env = os.environ.get("AEGIS_COUNCIL_AGENTS", "opencode,gemini,codex,cursor")
+    agents = [a.strip() for a in agents_env.split(",") if a.strip()]
     question = (
         "The AEGIS MT5 DEMO bot is running the intelligent firehose with the "
         "validated-state gate. Given the current measured evidence, identify ONE "
@@ -539,15 +625,35 @@ def _run_council_round() -> dict[str, Any]:
     )
     started = time.time()
     try:
-        result = run_council_cycle(question, dry_run=False, timeout_s=300)
+        result = run_council_cycle(question, dry_run=False, timeout_s=300, agents=agents)
         result["watcher_triggered"] = True
+        result["trigger"] = trigger
         try:
             from ai_council.cases import load_case
 
             dump_live(result, case=load_case(result["id"]))
         except Exception:
             pass
+        # Advance the marker so triggers measure since this round.
+        try:
+            import json as _json
+
+            marker_path = BOT / "reports" / "research" / "council_marker.json"
+            ol_path = BOT / "reports" / "research" / "outcome_learning.json"
+            pf = None
+            try:
+                pf = _json.loads(ol_path.read_text(encoding="utf-8")).get("profit_factor")
+            except Exception:
+                pass
+            marker_path.parent.mkdir(parents=True, exist_ok=True)
+            marker_path.write_text(
+                _json.dumps({"last_utc": _now(), "profit_factor": pf, "trigger": trigger}),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
         return {"ok": True, "mode": result.get("mode"), "id": result.get("id"),
+                "trigger": trigger,
                 "elapsed_s": round(time.time() - started, 1),
                 "n_proposals": result.get("n_proposals"),
                 "n_critiques": result.get("n_critiques"),
@@ -555,6 +661,7 @@ def _run_council_round() -> dict[str, Any]:
                 "agents": [a.get("agent") for a in result.get("round_log", [])]}
     except Exception as exc:
         return {"ok": False, "mode": "REAL", "error": str(exc),
+                "trigger": trigger,
                 "elapsed_s": round(time.time() - started, 1)}
 
 
