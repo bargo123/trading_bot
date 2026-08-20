@@ -1,0 +1,177 @@
+{
+  "created_utc": "2026-08-20T20:31:38.729764+00:00",
+  "critiques": {
+    "claude": [
+      {
+        "agent": "opencode",
+        "submitted_utc": "2026-08-20T20:31:42.591415+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "submitted_utc": "2026-08-20T20:31:42.591415+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "submitted_utc": "2026-08-20T20:31:42.591415+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "submitted_utc": "2026-08-20T20:31:42.591415+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "codex": [
+      {
+        "agent": "opencode",
+        "submitted_utc": "2026-08-20T20:31:42.607104+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "claude",
+        "submitted_utc": "2026-08-20T20:31:42.607104+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "submitted_utc": "2026-08-20T20:31:42.607104+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "submitted_utc": "2026-08-20T20:31:42.607104+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "cursor": [
+      {
+        "agent": "opencode",
+        "submitted_utc": "2026-08-20T20:31:42.607104+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "claude",
+        "submitted_utc": "2026-08-20T20:31:42.607104+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "submitted_utc": "2026-08-20T20:31:42.607104+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "submitted_utc": "2026-08-20T20:31:42.607104+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "gemini": [
+      {
+        "agent": "opencode",
+        "submitted_utc": "2026-08-20T20:31:42.591415+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "claude",
+        "submitted_utc": "2026-08-20T20:31:42.591415+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "submitted_utc": "2026-08-20T20:31:42.607104+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "submitted_utc": "2026-08-20T20:31:42.607104+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "claude",
+        "submitted_utc": "2026-08-20T20:31:42.591415+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "submitted_utc": "2026-08-20T20:31:42.591415+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "submitted_utc": "2026-08-20T20:31:42.591415+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "submitted_utc": "2026-08-20T20:31:42.591415+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-20T20:31:42.622818+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "n_critiques": 20,
+      "n_proposals": 5
+    },
+    "rationale": "council round complete; final decision requires measured validation evidence"
+  },
+  "id": "analyze-the-current-mt5-demo-champion-us_d8bff8",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "submitted_utc": "2026-08-20T20:31:39.268652+00:00",
+      "text": "Local deterministic proposal by opencode: treat 'Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every available agent propose independently, critique each other, revise, then create the strongest falsifiable challenger. Do not modify the champion directly. Advance candidates only through the existing validation pipeline and permanently record failures.' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "claude",
+      "submitted_utc": "2026-08-20T20:31:40.017020+00:00",
+      "text": "Local deterministic proposal by claude: treat 'Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every available agent propose independently, critique each other, revise, then create the strongest falsifiable challenger. Do not modify the champion directly. Advance candidates only through the existing validation pipeline and permanently record failures.' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "gemini",
+      "submitted_utc": "2026-08-20T20:31:40.860715+00:00",
+      "text": "Local deterministic proposal by gemini: treat 'Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every available agent propose independently, critique each other, revise, then create the strongest falsifiable challenger. Do not modify the champion directly. Advance candidates only through the existing validation pipeline and permanently record failures.' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "codex",
+      "submitted_utc": "2026-08-20T20:31:41.702800+00:00",
+      "text": "Local deterministic proposal by codex: treat 'Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every available agent propose independently, critique each other, revise, then create the strongest falsifiable challenger. Do not modify the champion directly. Advance candidates only through the existing validation pipeline and permanently record failures.' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "cursor",
+      "submitted_utc": "2026-08-20T20:31:42.575574+00:00",
+      "text": "Local deterministic proposal by cursor: treat 'Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every available agent propose independently, critique each other, revise, then create the strongest falsifiable challenger. Do not modify the champion directly. Advance candidates only through the existing validation pipeline and permanently record failures.' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    }
+  ],
+  "question": "Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every available agent propose independently, critique each other, revise, then create the strongest falsifiable challenger. Do not modify the champion directly. Advance candidates only through the existing validation pipeline and permanently record failures.",
+  "revisions": {
+    "claude": {
+      "revised_utc": "2026-08-20T20:31:42.607104+00:00",
+      "text": "revised: Local deterministic proposal by claude: treat 'Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every availa"
+    },
+    "codex": {
+      "revised_utc": "2026-08-20T20:31:42.622818+00:00",
+      "text": "revised: Local deterministic proposal by codex: treat 'Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every availab"
+    },
+    "cursor": {
+      "revised_utc": "2026-08-20T20:31:42.622818+00:00",
+      "text": "revised: Local deterministic proposal by cursor: treat 'Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every availa"
+    },
+    "gemini": {
+      "revised_utc": "2026-08-20T20:31:42.622818+00:00",
+      "text": "revised: Local deterministic proposal by gemini: treat 'Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every availa"
+    },
+    "opencode": {
+      "revised_utc": "2026-08-20T20:31:42.607104+00:00",
+      "text": "revised: Local deterministic proposal by opencode: treat 'Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every avai"
+    }
+  },
+  "status": "decided"
+}

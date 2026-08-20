@@ -1,0 +1,12 @@
+{
+  "created_utc": "2026-08-20T21:03:13.240572+00:00",
+  "critiques": {},
+  "decision": null,
+  "id": "analyze-the-current-mt5-demo-champion-us_2e409e",
+  "mode": "REAL",
+  "phase": "proposal",
+  "proposals": [],
+  "question": "Analyze the current MT5 DEMO champion using all available live trade and market evidence. Determine why the bot is still losing or failing to produce robust positive expectancy. Analyze expectancy, profit factor, payoff ratio, average win/loss, MFE/MAE, entries, exits, regime classification, spread/slippage, stacking, correlation exposure, analogue quality and calibration. Retrieve relevant original passages from the trading books. Have every available agent propose independently, critique each other, revise, then create the strongest falsifiable challenger. Do not modify the champion directly. Advance candidates only through the existing validation pipeline and permanently record failures.",
+  "revisions": {},
+  "status": "open"
+}

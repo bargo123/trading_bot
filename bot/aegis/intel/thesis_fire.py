@@ -16,6 +16,7 @@ EDGE_GONE_REASONS = frozenset(
     {
         "state_ev_not_positive",
         "no_validated_strategy_model",
+        "state_not_in_validated_set",
         "strategy_expectancy_not_positive",
         "strategy_profit_factor_not_above_one",
         "strategy_bootstrap_tail_not_positive",

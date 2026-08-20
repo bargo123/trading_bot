@@ -135,6 +135,8 @@ def _load_strategy(cfg: Mapping[str, Any]) -> ValidatedStrategyModel | None:
     if str(payload.get("status") or "") != "accepted":
         return None
     try:
+        from aegis.research.intelligent_champion import allowed_states_from_payload
+
         model = ValidatedStrategyModel(
             strategy_id=str(payload.get("id") or ""),
             promoted=True,
@@ -147,11 +149,39 @@ def _load_strategy(cfg: Mapping[str, Any]) -> ValidatedStrategyModel | None:
             wins_erased_by_tail_loss=float(payload.get("wins_erased_by_tail_loss") or 0.0),
             validated_risk_fraction=payload.get("validated_risk_fraction"),
             artifact_hash=str(payload.get("artifact_hash") or ""),
+            allowed_states=allowed_states_from_payload(payload),
         )
     except (KeyError, TypeError, ValueError):
         return None
     ready, _ = strategy_model_ready(model)
     return model if ready else None
+
+
+def _load_validated_states(path: Path) -> frozenset[frozenset[str]]:
+    """Load the validated-state allowlist written by the research ML pipeline.
+
+    Each entry is a state signature (regime, structure, session, side). An empty
+    or missing file means no states are currently validated, so a gated brain
+    must not fire on anything.
+    """
+    from aegis.research.intelligent_champion import STATE_KEYS, state_sig
+
+    target = Path(path)
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return frozenset()
+    rows = payload.get("states") if isinstance(payload, dict) else payload
+    if not isinstance(rows, list):
+        return frozenset()
+    out = set()
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        if not all(key in item for key in STATE_KEYS):
+            continue
+        out.add(state_sig(item))
+    return frozenset(out)
 
 
 def _bootstrap_from_evidence(cfg: Mapping[str, Any], evidence: Any) -> ValidatedStrategyModel | None:
@@ -202,14 +232,33 @@ class IntelligentFirehoseBrain:
         knowledge_path = resolve_bot_path(
             cfg.get("knowledge_table_path"), INTEL_DIR / "knowledge_table.json"
         )
+        validated_path = resolve_bot_path(
+            cfg.get("validated_states_path"), INTEL_DIR / "validated_states.json"
+        )
         self.index_path = index_path
         self.knowledge_path = knowledge_path
+        self.validated_path = validated_path
         self.analogues = AnalogueStore.load(index_path)
         self.knowledge_rows = load_knowledge_rows(knowledge_path)
         self.strategy = _load_strategy(cfg)
+        self.validated_states = _load_validated_states(validated_path)
         self.memory = DemoBrainState()
         self._risk_budget = float(cfg.get("intelligent_risk_budget_usd") or cfg.get("starting_equity") or 100.0)
         self.counts = {"fire": 0, "scale": 0, "hold": 0, "reduce": 0, "exit": 0, "skip": 0}
+
+    def refresh(self, cfg: Mapping[str, Any] | None = None) -> None:
+        """Re-read the champion and validated-state allowlist.
+
+        The runner calls this each poll so a watcher-regenerated allowlist takes
+        effect without a restart. Memory and counts are preserved.
+        """
+        if cfg is not None:
+            self.cfg.update(dict(cfg))
+        self.strategy = _load_strategy(self.cfg)
+        validated_path = resolve_bot_path(
+            self.cfg.get("validated_states_path"), INTEL_DIR / "validated_states.json"
+        )
+        self.validated_states = _load_validated_states(validated_path)
 
     def snapshot(self) -> dict[str, Any]:
         records = len(getattr(self.analogues, "_records", []))
@@ -223,6 +272,8 @@ class IntelligentFirehoseBrain:
             "knowledge_rows": len(self.knowledge_rows),
             "knowledge_table_path": str(self.knowledge_path),
             "champion": None if self.strategy is None else self.strategy.strategy_id,
+            "validated_states": len(self.validated_states),
+            "gate_validated_states": bool(self.cfg.get("intelligent_gate_validated_states", False)),
             "bootstrap": bool(self.cfg.get("intelligent_firehose_bootstrap", False)),
             # An empty index means every decision is made on no evidence. That is a
             # misconfiguration, not a quiet market, so make it visible.
@@ -316,12 +367,37 @@ class IntelligentFirehoseBrain:
             self.counts["skip"] += 1
             return DemoDecision("skip", "no_structural_invalidation", side=side, journal={"brain": "intelligent_firehose"})
         signature = runtime_signature(state, side=side, setup=setup)
+        gating = bool(self.cfg.get("intelligent_gate_validated_states", False))
+        exact_state = None
+        current_state = None
+        if gating:
+            from aegis.research.intelligent_champion import state_sig
+
+            allowed = set(self.validated_states)
+            if self.strategy is not None and self.strategy.allowed_states:
+                allowed |= set(self.strategy.allowed_states)
+            current_state = state_sig(
+                {
+                    "regime": signature.get("regime") or "",
+                    "structure": signature.get("structure") or "",
+                    "session": signature.get("session") or "",
+                    "side": side,
+                }
+            )
+            if current_state in allowed:
+                exact_state = {
+                    "regime": signature.get("regime") or "",
+                    "structure": signature.get("structure") or "",
+                    "session": signature.get("session") or "",
+                    "side": side,
+                }
         evidence = self.analogues.query(
             signature=signature,
             before_time=row["time"],
             min_n=int(self.cfg.get("intelligent_min_analogues", 20)),
             min_similarity=float(self.cfg.get("intelligent_min_similarity", 0.55)),
             pool_across_symbols=bool(self.cfg.get("intelligent_pool_across_symbols", False)),
+            exact_state=exact_state,
         )
         books = match_knowledge(
             self.knowledge_rows,
@@ -351,6 +427,11 @@ class IntelligentFirehoseBrain:
             portfolio_ok=portfolio_ok,
             portfolio_reason=portfolio_reason,
         )
+        # Gate to validated states. The full analogue index has no edge after costs;
+        # only the states the research pipeline validated may fire. When gating is on
+        # and no states are validated, nothing fires.
+        if gating and current_state not in allowed:
+            fire = ThesisFireDecision("skip", "state_not_in_validated_set", None)
         info_id = _information_id(
             symbol=symbol,
             side=side,

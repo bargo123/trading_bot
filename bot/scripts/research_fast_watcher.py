@@ -217,6 +217,76 @@ def _runner_process_alive() -> bool:
     return _runner_pid() is not None
 
 
+KEEPALIVE_SCRIPT = BOT / "scripts" / "supervisor_keepalive.ps1"
+
+
+def _invoke_keepalive() -> dict[str, Any]:
+    """Run the keepalive once (restarts MT5/runner if down). Never loops."""
+    if not KEEPALIVE_SCRIPT.exists():
+        return {"ok": False, "error": f"missing {KEEPALIVE_SCRIPT}"}
+    try:
+        proc = subprocess.run(
+            [
+                "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                "-File", str(KEEPALIVE_SCRIPT),
+            ],
+            capture_output=True, text=True, timeout=300,
+        )
+        return {"ok": proc.returncode == 0, "returncode": proc.returncode,
+                "stderr_tail": (proc.stderr or "").strip().splitlines()[-3:]}
+    except (OSError, subprocess.SubprocessError):
+        return {"ok": False, "error": "keepalive invocation failed"}
+
+
+RUNNER_HEARTBEAT = BOT / "reports" / "bot_heartbeat.json"
+RUNNER_STALE_S = 5 * 60  # runner writes heartbeat every ~60s; flag if older than 5min
+
+
+def _runner_heartbeat_age() -> float | None:
+    """Age in seconds of the runner heartbeat file, or None if missing/unreadable."""
+    try:
+        payload = json.loads(RUNNER_HEARTBEAT.read_text(encoding="utf-8"))
+        ts = float(payload.get("ts", 0) or 0)
+        if ts <= 0:
+            return None
+        return max(0.0, time.time() - ts)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
+def _journal_stale_s() -> float | None:
+    """Age in seconds of the firehose journal, or None if missing/unreadable."""
+    try:
+        return max(0.0, time.time() - FIREHOSE_JOURNAL.stat().st_mtime)
+    except OSError:
+        return None
+
+
+def staleness_report() -> dict[str, Any]:
+    """Health signals: runner process, runner heartbeat freshness, journal growth."""
+    heartbeat_age = _runner_heartbeat_age()
+    journal_age = _journal_stale_s()
+    runner_alive = _runner_process_alive()
+    stale_flags: list[str] = []
+    if not runner_alive:
+        stale_flags.append("runner_process_down")
+    if heartbeat_age is None:
+        stale_flags.append("runner_heartbeat_missing")
+    elif heartbeat_age > RUNNER_STALE_S:
+        stale_flags.append(f"runner_heartbeat_stale_{int(heartbeat_age)}s")
+    if journal_age is None:
+        stale_flags.append("journal_missing")
+    elif journal_age > RUNNER_STALE_S:
+        stale_flags.append(f"journal_stale_{int(journal_age)}s")
+    return {
+        "runner_process_alive": runner_alive,
+        "runner_heartbeat_age_s": heartbeat_age,
+        "journal_age_s": journal_age,
+        "stale": bool(stale_flags),
+        "alerts": stale_flags,
+    }
+
+
 def _champion() -> dict[str, Any] | None:
     if not CHAMPION_ARTIFACT.exists():
         return None
@@ -228,9 +298,11 @@ def _champion() -> dict[str, Any] | None:
 
 def write_heartbeat(*, tick: int, watcher_alive: bool, last_cycle: str,
                     no_new_evidence: bool, new_outcome_lines: int,
-                    last_error: str | None = None, skipped: str | None = None) -> Path:
+                    last_error: str | None = None, skipped: str | None = None,
+                    council: dict[str, Any] | None = None) -> Path:
     mt5 = _mt5_status()
     champion = _champion() or {}
+    stale = staleness_report()
     payload = {
         "timestamp": _now(),
         "watcher_alive": watcher_alive,
@@ -245,6 +317,8 @@ def write_heartbeat(*, tick: int, watcher_alive: bool, last_cycle: str,
             "alive": _runner_process_alive(),
             "lock": str(RUNNER_LOCK),
         },
+        "staleness": stale,
+        "council": council,
         "champion": champion.get("champion") or champion.get("id") or None,
         "skipped": skipped,
         "last_error": last_error,
@@ -274,7 +348,19 @@ def write_status(
         "> Research-only watcher. No orders placed, no live YAML promoted. Champion",
         "> promotion is reserved for the full `/aegis-cycle` run.",
         "",
+        "## Runtime health",
+        "",
     ]
+    stale = staleness_report()
+    if stale["alerts"]:
+        lines += ["- STALE: " + "; ".join(stale["alerts"]), ""]
+    else:
+        lines += [
+            "- runner process: alive",
+            "- runner heartbeat age: " + _fmt_age(stale.get("runner_heartbeat_age_s")),
+            "- journal age: " + _fmt_age(stale.get("journal_age_s")),
+            "",
+        ]
     if no_new_evidence:
         lines += [
             "## Fast exit",
@@ -319,6 +405,10 @@ def write_status(
     return CYCLE_STATUS
 
 
+def _fmt_age(age: float | None) -> str:
+    return f"{int(age)}s" if age is not None else "missing"
+
+
 def _report_count(report: Path, key: str) -> str:
     try:
         payload = json.loads(report.read_text(encoding="utf-8"))
@@ -343,9 +433,25 @@ def _report_val(report: Path, group: str, key: str) -> str:
         return "?"
 
 
-def run_cycle(tick: int, *, fetch_exit: bool) -> dict[str, Any]:
+def run_cycle(tick: int, *, fetch_exit: bool, council_every: int = 0) -> dict[str, Any]:
     evidence_changed, new_outcome_lines = _evidence_changed()
     notes_changed = _notes_changed()
+    stale = staleness_report()
+
+    council: dict[str, Any] | None = None
+    if council_every > 0 and tick > 0 and tick % council_every == 0:
+        if evidence_changed or notes_changed:
+            council = _run_council_round()
+        else:
+            council = {"skipped": "no_new_evidence"}
+
+    # Recover a dead/hung runner via the keepalive (deduped by our singleton lock).
+    keepalive: dict[str, Any] | None = None
+    if stale["alerts"] and any(
+        a.startswith(("runner_process_down", "runner_heartbeat_stale", "journal_stale"))
+        for a in stale["alerts"]
+    ):
+        keepalive = _invoke_keepalive()
 
     # Fast exit: no new evidence, no notes change, and not a fetch cadence tick.
     if not evidence_changed and not notes_changed and not fetch_exit:
@@ -364,6 +470,7 @@ def run_cycle(tick: int, *, fetch_exit: bool) -> dict[str, Any]:
             tick=tick, watcher_alive=True, last_cycle=_now(),
             no_new_evidence=True, new_outcome_lines=new_outcome_lines,
             skipped="outcome_learning,book_memory,ml_pipeline",
+            council=council,
         )
         return {
             "tick": tick,
@@ -374,6 +481,9 @@ def run_cycle(tick: int, *, fetch_exit: bool) -> dict[str, Any]:
             "placed_orders": False,
             "promoted_live_yaml": False,
             "mt5_touched": False,
+            "staleness": stale,
+            "keepalive_invoked": keepalive,
+            "council": council,
         }
 
     outcome = _run_script("research_outcome_learning.py")
@@ -393,6 +503,7 @@ def run_cycle(tick: int, *, fetch_exit: bool) -> dict[str, Any]:
     heartbeat = write_heartbeat(
         tick=tick, watcher_alive=True, last_cycle=_now(),
         no_new_evidence=False, new_outcome_lines=new_outcome_lines,
+        council=council,
     )
     return {
         "tick": tick,
@@ -406,7 +517,45 @@ def run_cycle(tick: int, *, fetch_exit: bool) -> dict[str, Any]:
         "mt5_touched": fetch_exit,
         "placed_orders": False,
         "promoted_live_yaml": False,
+        "staleness": stale,
+        "keepalive_invoked": keepalive,
+        "council": council,
     }
+
+
+def _run_council_round() -> dict[str, Any]:
+    """Run ONE real council round (REAL mode) on the current champion state.
+
+    Runs at most once per council cadence (never every 20 min). Uses only
+    AVAILABLE agents; unavailable agents are recorded with their real status.
+    """
+    from ai_council.cycle import dump_live, run_council_cycle
+
+    question = (
+        "The AEGIS MT5 DEMO bot is running the intelligent firehose with the "
+        "validated-state gate. Given the current measured evidence, identify ONE "
+        "concrete, falsifiable improvement candidate for the next research cycle. "
+        "Do not modify code or the champion. Cite book corpus passages if relevant."
+    )
+    started = time.time()
+    try:
+        result = run_council_cycle(question, dry_run=False, timeout_s=300)
+        result["watcher_triggered"] = True
+        try:
+            from ai_council.cases import load_case
+
+            dump_live(result, case=load_case(result["id"]))
+        except Exception:
+            pass
+        return {"ok": True, "mode": result.get("mode"), "id": result.get("id"),
+                "elapsed_s": round(time.time() - started, 1),
+                "n_proposals": result.get("n_proposals"),
+                "n_critiques": result.get("n_critiques"),
+                "n_revisions": result.get("n_revisions"),
+                "agents": [a.get("agent") for a in result.get("round_log", [])]}
+    except Exception as exc:
+        return {"ok": False, "mode": "REAL", "error": str(exc),
+                "elapsed_s": round(time.time() - started, 1)}
 
 
 def main() -> int:
@@ -414,6 +563,11 @@ def main() -> int:
     parser.add_argument("--once", action="store_true", help="run a single cycle and exit")
     parser.add_argument("--interval", type=int, default=CYCLE_INTERVAL_S, help="seconds between cycles")
     parser.add_argument("--fetch-exit", action="store_true", help="force M1 fetch for exit research every cycle")
+    parser.add_argument(
+        "--council-every", type=int,
+        default=int(os.environ.get("AEGIS_COUNCIL_EVERY_TICKS", "0") or 0),
+        help="run a REAL council round every N ticks (default 0=off; 72 ~= 24h)",
+    )
     args = parser.parse_args()
 
     STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -437,7 +591,7 @@ def main() -> int:
             tick = _tick_count()
             fetch_exit = bool(args.fetch_exit) or (tick % EXIT_RESEARCH_EVERY_N == 0)
             try:
-                result = run_cycle(tick, fetch_exit=fetch_exit)
+                result = run_cycle(tick, fetch_exit=fetch_exit, council_every=args.council_every)
             except Exception as exc:  # keep the watcher alive across transient failures
                 result = {"tick": tick, "utc": _now(), "error": str(exc)}
                 write_heartbeat(tick=tick, watcher_alive=True, last_cycle=_now(),

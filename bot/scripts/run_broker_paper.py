@@ -19,6 +19,11 @@ sys.path.insert(0, str(ROOT))
 
 from aegis.config import configured_symbols, load_config, max_spread_for, pip_size_for  # noqa: E402
 from aegis.engines import OrderRequest, OrderResult, create_engine  # noqa: E402
+from aegis.execution_audit import (  # noqa: E402
+    FireLatency,
+    PendingRetryGuard,
+    classify as classify_execution,
+)
 from aegis.exits import (  # noqa: E402
     giveback_reason,
     live_firehose_stops,
@@ -185,6 +190,8 @@ def main() -> None:
     margin_cooldown_s = 30.0
     close_block_until = 0.0
     t2t = TickToTrade()
+    fire_retry_guard = PendingRetryGuard()
+    execution_status_counts: dict[str, int] = {}
 
     def write_heartbeat(extra: Optional[dict] = None) -> None:
         payload = {
@@ -895,6 +902,17 @@ def main() -> None:
                 sig.reason,
                 live_spread,
             )
+            client_tag = req.client_tag or f"aegis_{sig.reason}"[:40]
+            req = OrderRequest(
+                symbol=req.symbol,
+                side=req.side,
+                quantity=req.quantity,
+                kind=req.kind,
+                limit_price=req.limit_price,
+                stop_loss=req.stop_loss,
+                take_profit=req.take_profit,
+                client_tag=client_tag,
+            )
             if brain_decision is not None:
                 append_journal(
                     journal,
@@ -923,7 +941,56 @@ def main() -> None:
                 if firehose_consume_bar(order_ok=True, stack_more=stack_clips):
                     last_bar_time[sym] = bar_time
                 return
+            latency = FireLatency(decision_ts=t0, quote_ts=getattr(q, "time", 0.0) or t0)
+            positions_before = list(eng.positions(sym))
+            if fire_retry_guard.was_sent(sym, client_tag, now=time.time()):
+                # Same thesis was already sent within the window. Do not blindly
+                # resend: reconcile first. If exposure appeared, treat as done.
+                grew = len(eng.positions(sym)) > len(positions_before)
+                if grew:
+                    latency.confirmed_ts = time.time()
+                    append_journal(
+                        journal,
+                        {
+                            "event": "fire_dedup_reconciled",
+                            "symbol": sym,
+                            "client_tag": client_tag,
+                            "status": "POSITION_CONFIRMED",
+                            "bar": str(bar_time),
+                        },
+                    )
+                    if firehose_consume_bar(order_ok=True, stack_more=stack_clips):
+                        last_bar_time[sym] = bar_time
+                    return
+                append_journal(
+                    journal,
+                    {
+                        "event": "fire_dedup_skip",
+                        "symbol": sym,
+                        "client_tag": client_tag,
+                        "status": "TIMEOUT_NO_EXPOSURE",
+                        "bar": str(bar_time),
+                    },
+                )
+                return
+            latency.request_ts = time.time()
             res = eng.place_order(req)
+            latency.response_ts = time.time()
+            audit = classify_execution(
+                ok=res.ok,
+                message=res.message,
+                filled=res.filled,
+                positions_before=positions_before,
+                positions_after=list(eng.positions(sym)),
+            )
+            status = audit["status"]
+            execution_status_counts[status] = int(execution_status_counts.get(status, 0)) + 1
+            if status in {"POSITION_CONFIRMED", "DEAL_EXECUTED"}:
+                latency.confirmed_ts = time.time()
+            # Only uncertain outcomes arm the dedup guard. Definitive rejections
+            # (e.g. 10016 invalid stops from a stale quote) are safe to retry.
+            if status == "TIMEOUT":
+                fire_retry_guard.mark_sent(sym, client_tag, time.time())
             t2t_ms = (time.perf_counter() - t0) * 1000.0
             t2t.record_ms(t2t_ms)
             intel_q = None
@@ -961,16 +1028,25 @@ def main() -> None:
                     "sl": req.stop_loss,
                     "tp": req.take_profit,
                     "reason": sig.reason,
+                    "client_tag": client_tag,
                     "spread": live_spread,
                     "bar": str(bar_time),
                     "t2t_ms": round(t2t_ms, 3),
                     "quote_age_s": round(quote_age_s(q), 3),
                     "intel_quality": intel_q,
+                    "execution_status": status,
+                    "execution_detail": audit.get("detail"),
+                    "execution_retcode": audit.get("retcode"),
+                    "duplicate_risk": bool(audit.get("duplicate_risk")),
+                    "information_id": (
+                        brain_decision.information_id if brain_decision is not None else None
+                    ),
+                    **latency.as_dict(),
                     **mkt_closed_extra,
                 },
             )
-            print(f"order {sym} ok={res.ok} id={res.broker_order_id} {res.message}")
-            if res.ok:
+            print(f"order {sym} ok={res.ok} id={res.broker_order_id} {res.message} status={status}")
+            if status in {"POSITION_CONFIRMED", "DEAL_EXECUTED"}:
                 circuit.observe(res.message or "", now=time.time(), ok=True)
                 if firehose_consume_bar(order_ok=True, stack_more=stack_clips):
                     last_bar_time[sym] = bar_time
@@ -1006,7 +1082,12 @@ def main() -> None:
                             msg,
                         )
                     else:
-                        logger.warning("%s order not accepted — will retry this bar. %s", sym, msg)
+                        logger.warning(
+                            "%s order status=%s — will retry this bar (dedup-guarded). %s",
+                            sym,
+                            status,
+                            msg,
+                        )
 
         cfg_path = Path(args.config)
         cfg_mtime = 0.0
@@ -1063,6 +1144,8 @@ def main() -> None:
         while True:
             try:
                 reload_live_yaml()
+                if intelligent_brain is not None:
+                    intelligent_brain.refresh()
                 poll = float(cfg.get("poll_seconds", 60))
                 acct = eng.account()
                 equity = acct.equity
@@ -1087,6 +1170,8 @@ def main() -> None:
                 if not _c_ok:
                     extra_hb["circuit_reason"] = _c_why
                 extra_hb.update(t2t.snapshot())
+                if execution_status_counts:
+                    extra_hb["execution_status"] = dict(execution_status_counts)
                 if intelligent_brain is not None:
                     extra_hb.update(intelligent_brain.snapshot())
                     extra_hb["intelligent_firehose"] = True

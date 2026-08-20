@@ -95,19 +95,20 @@ def build_runtime_state(*, symbol: str, m1: pd.DataFrame) -> dict[str, Any]:
 
 
 def _session(ts: pd.Timestamp) -> str:
+    """Session label. Must match aegis.research.dataplane.session_label so runtime
+    signatures line up with the analogue index and validated-state allowlists.
+    """
     stamp = pd.Timestamp(ts)
     if stamp.tzinfo is None:
         stamp = stamp.tz_localize("UTC")
     else:
         stamp = stamp.tz_convert("UTC")
     hour = stamp.hour
-    if 0 <= hour < 7:
-        return "asia"
     if 7 <= hour < 13:
         return "london"
     if 13 <= hour < 21:
-        return "new_york"
-    return "late"
+        return "newyork"
+    return "asia"
 
 
 def runtime_signature(state: Mapping[str, Any], *, side: str, setup: str) -> dict[str, str]:

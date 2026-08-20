@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,7 +30,7 @@ sys.path.insert(0, str(BOT))
 
 from aegis.config import configured_symbols, load_config, pip_size_for  # noqa: E402
 from aegis.intel.expected_value import payoff_metrics  # noqa: E402
-from aegis.intel.paths import INTEL_DIR  # noqa: E402
+from aegis.intel.paths import INTEL_DIR, resolve_bot_path  # noqa: E402
 from aegis.research.exit_research import (  # noqa: E402
     EXIT_HORIZONS_PIPS,
     recommended_exit,
@@ -112,6 +113,61 @@ def _matches(record: dict, sig: dict) -> bool:
     return all(str(record.get(k) or "") == v for k, v in sig.items())
 
 
+def _mean_lower_95(pnls: list[float]) -> float | None:
+    """95% CI lower bound on mean outcome, matching the live readiness gate."""
+    values = [float(v) for v in pnls]
+    if len(values) < 2:
+        return None
+    avg = sum(values) / len(values)
+    sigma = math.sqrt(sum((v - avg) ** 2 for v in values) / len(values))
+    return avg - 1.96 * (sigma / math.sqrt(len(values)))
+
+
+def write_validated_states(
+    selection: dict[str, Any],
+    *,
+    path: Path = INTEL_DIR / "validated_states.json",
+) -> Path:
+    """Write the validated-state allowlist the live brain gates on.
+
+    Only states that survived out-of-sample validation - including a positive 95%
+    CI lower bound on the OOS window - enter the list, so an allowlisted state is
+    guaranteed to clear the live ``strategy_model_ready`` gate. An empty list (or
+    a missing file) means nothing is currently validated, so a gated brain refuses
+    to fire on anything - the full analogue index is net-negative after costs, so
+    firing outside validated states is the losing behavior.
+    """
+    state_keys = ("regime", "structure", "session", "side")
+    survivors = [c for c in selection.get("validated", []) if c.get("survives_validate")]
+    metric_keys = (
+        "n_validate",
+        "n_losses_validate",
+        "expectancy_validate",
+        "profit_factor_validate",
+        "win_rate_validate",
+        "bootstrap_p05_validate",
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "validated_states.v2",
+                "built_at": datetime.now(timezone.utc).isoformat(),
+                "n_survive": len(survivors),
+                "source": "strategy_selection",
+                "states": [
+                    {**{k: str(c.get(k) or "") for k in state_keys},
+                     **{m: c.get(m) for m in metric_keys if c.get(m) is not None}}
+                    for c in survivors
+                ],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 def strategy_selection(
     records: list[dict],
     *,
@@ -151,14 +207,21 @@ def strategy_selection(
             continue
         net = _costed(late_pnls, cost_pips)
         metrics = payoff_metrics(net)
+        p05 = _mean_lower_95(net)
         validated.append(
             {
                 **sig,
                 "n_validate": len(late_pnls),
+                "n_losses_validate": int(metrics.get("n_losses") or 0),
                 "expectancy_validate": metrics["expectancy"],
                 "profit_factor_validate": metrics["profit_factor"],
                 "win_rate_validate": metrics["win_rate"],
-                "survives_validate": bool((metrics.get("expectancy") or 0) > 0),
+                "bootstrap_p05_validate": p05,
+                "survives_validate": bool(
+                    (metrics.get("expectancy") or 0) > 0
+                    and p05 is not None
+                    and p05 > 0
+                ),
             }
         )
     validated.sort(key=lambda c: float(c["expectancy_validate"] or -1e9), reverse=True)
@@ -209,6 +272,12 @@ def main() -> int:
 
     sample_cost = per_trade_cost_pips(symbols[0], float(pip_by_symbol.get(symbols[0], 0.0001)), spread_bps, slippage_bps) if symbols else 0.0
     selection = strategy_selection(records, cost_pips=sample_cost)
+    validated_states_path = write_validated_states(
+        selection,
+        path=resolve_bot_path(
+            cfg.get("validated_states_path"), INTEL_DIR / "validated_states.json"
+        ),
+    )
 
     report = {
         "schema": "ml_pipeline.v1",
@@ -227,6 +296,7 @@ def main() -> int:
             "recommended": recommended,
         },
         "strategy_selection": selection,
+        "validated_states_path": str(validated_states_path),
         "ml": {
             "train_n": ml["train_n"],
             "holdout_n": ml["holdout_n"],
@@ -295,6 +365,7 @@ def main() -> int:
                     "shortlisted": selection["n_shortlisted"],
                     "validated": selection["n_validated"],
                     "survive": selection["n_survive"],
+                    "validated_states_path": str(validated_states_path),
                 },
                 "ml": {
                     "train_n": ml["train_n"],

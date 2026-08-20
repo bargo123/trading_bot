@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-20T21:49:58.355492+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-20T21:50:31.628270+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_independently-identify-the-single-most-i_8bf5cf",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_independently-identify-the-single-most-i_8bf5cf for the validation pipeline"
+  },
+  "id": "independently-identify-the-single-most-i_436cf1",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "claude",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_independently-identify-the-single-most-i_436cf1\\proposals\\claude.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 31.9,
+        "finished_utc": "2026-08-20T21:50:30.870543+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": null,
+        "returncode": 0,
+        "started_utc": "2026-08-20T21:49:58.972816+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-20T21:50:30.873580+00:00",
+      "text": "The single most important current Aegis research problem is exit attribution, not entry selection: `bot/reports/research/outcome_learning.md` shows a 68.4% win rate but \u22120.0112 expectancy and PF 0.75, because payoff_ratio is 0.318 while breakeven at that win rate requires >0.462 \u2014 and 1891 of 2404 reconciled exits (79%) are labeled `manual` with expectancy \u22120.0165, so we currently cannot say *why* any losing trade closed. Proposal: instrument every close path to emit a mutually exclusive reason code (`tp`, `sl`, `trail`, `time_stop`, `session_flat`, `risk_gate`, `reconcile_orphan`) written into the journal at exit time, then re-run outcome learning bucketed by that code. Falsifiable prediction: \u226560% of the current `manual` bucket's negative expectancy will concentrate in one or two codes (most likely session-flat/time-stop cutting winners short while unstopped adverse excursions run into the 1.1R tail_loss that erases 22 average wins), rather than being spread evenly across codes. Test: if after re-labelling no single code accounts for \u226530% of total negative expectancy, the exit-taxonomy hypothesis is wrong and the problem is entry edge, and we should redirect research there. Van Tharp's *Trade Your Way to Financial Freedom* is the relevant corpus anchor \u2014 R-multiple distributions are uninterpretable until each exit's cause is recorded, so no ML expectancy work (currently \u22120.0685 improvement) can be trusted before this lands."
+    }
+  ],
+  "question": "Independently identify the single most important current Aegis research problem. Do not modify code.",
+  "revisions": {},
+  "status": "decided"
+}

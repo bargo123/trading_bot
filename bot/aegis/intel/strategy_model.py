@@ -27,6 +27,7 @@ class ValidatedStrategyModel:
     wins_erased_by_tail_loss: float
     validated_risk_fraction: float | None
     artifact_hash: str
+    allowed_states: frozenset[frozenset[str]] = frozenset()
 
 
 def strategy_model_ready(model: ValidatedStrategyModel) -> tuple[bool, str]:

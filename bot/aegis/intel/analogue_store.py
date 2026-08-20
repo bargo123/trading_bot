@@ -123,6 +123,7 @@ class AnalogueStore:
         min_n: int = 20,
         min_similarity: float = 0.55,
         pool_across_symbols: bool = False,
+        exact_state: Mapping[str, str] | None = None,
     ) -> AnalogueEvidence:
         """Point-in-time analogue evidence for one state.
 
@@ -132,6 +133,13 @@ class AnalogueStore:
         clearing the 95% lower-bound test, so a real edge becomes invisible. Pooling
         keeps symbol in the similarity score, so same-symbol analogues still rank
         first; it only stops discarding the rest outright.
+
+        ``exact_state`` switches the match to the research validation definition: a
+        record counts only if every state key (regime, structure, session, side)
+        equals the query exactly, pooled across symbols. The fuzzy 9-key similarity
+        pool mixes in records that differ on the state keys and can drown a small
+        validated edge, so a gated brain must evaluate the same population the
+        research pipeline validated.
         """
         cutoff = pd.Timestamp(before_time)
         if cutoff.tzinfo is None:
@@ -140,9 +148,11 @@ class AnalogueStore:
             cutoff = cutoff.tz_convert("UTC")
         matched: list[tuple[float, float]] = []
         symbol = str(signature.get("symbol") or "").upper()
+        exact = dict(exact_state or {})
         for row in self._records:
-            if symbol and not pool_across_symbols and str(row.get("symbol") or "").upper() != symbol:
-                continue
+            if not exact:
+                if symbol and not pool_across_symbols and str(row.get("symbol") or "").upper() != symbol:
+                    continue
             try:
                 ts = pd.Timestamp(row["bar_time"])
                 if ts.tzinfo is None:
@@ -153,9 +163,14 @@ class AnalogueStore:
                 continue
             if ts >= cutoff:
                 continue
-            sim = _similarity(signature, row)
-            if sim < min_similarity:
-                continue
+            if exact:
+                if not all(str(row.get(key) or "") == value for key, value in exact.items()):
+                    continue
+                sim = 1.0
+            else:
+                sim = _similarity(signature, row)
+                if sim < min_similarity:
+                    continue
             try:
                 matched.append((sim, float(row["outcome"])))
             except (KeyError, TypeError, ValueError):
