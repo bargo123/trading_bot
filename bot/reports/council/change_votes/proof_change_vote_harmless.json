@@ -1,0 +1,54 @@
+{
+  "change_id": "proof_change_vote_harmless",
+  "degraded_real_council": true,
+  "final_decision": "REJECTED_SAFETY",
+  "finished_utc": "2026-08-21T19:13:10.082248+00:00",
+  "pack": {
+    "affected_files": "bot/config_mt5_demo_firehose_hw.yaml",
+    "change_id": "proof_change_vote_harmless",
+    "current_evidence": "heartbeat shows PM decisions but pm_* config keys lack comments",
+    "expected_mechanism": "operators understand the knobs",
+    "falsification_criteria": "n/a - documentation only",
+    "problem": "PM thresholds undocumented in config",
+    "proposed_change": "add explanatory comments to exploration_* and pm_* config keys",
+    "risks": "none (documentation only)",
+    "rollback": "revert commit",
+    "safety_impact": "none",
+    "tests": "none needed (comments only)"
+  },
+  "rationale": "council member cast VETO_SAFETY",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-21T19:12:16.322735+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 1,
+    "reject": 0,
+    "revise_and_resubmit": 0
+  },
+  "votes": [
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Target file matches the PROTECTED_LIVE_YAML / bot/config*.yaml immutability rule",
+        "Proposal self-certifies zero risk and waives tests/falsification entirely, removing all verification gates",
+        "Even comment-only edits can break config checksums or drift comparisons used by promotion/governance tooling"
+      ],
+      "confidence": 0.95,
+      "model": null,
+      "reason": "Documentation-only framing does not exempt the change from Rule 2: 'bot/config*.yaml' (including bot/config_mt5_demo_firehose_hw.yaml) is protected live YAML and immutable. Adding comments is still a byte-level edit to a governed file, which can invalidate any config-hash/integrity checks and sets precedent that protected files may be touched for 'harmless' reasons.",
+      "requested_revisions": [
+        "Document exploration_* and pm_* key semantics in a separate unprotected artifact (e.g., bot/docs/config_reference.md or bot/research/config_notes.md)",
+        "Optionally maintain an annotated research-side mirror of the config under a non-protected path; never edit bot/config*.yaml in place"
+      ],
+      "vote": "VETO_SAFETY"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    }
+  ]
+}

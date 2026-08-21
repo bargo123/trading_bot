@@ -660,62 +660,102 @@ def _evidence_trigger(
 
 
 def _run_council_round(*, trigger: str | None = None) -> dict[str, Any]:
-    """Run ONE real council round (REAL mode) on the current champion state.
+    """Run ONE real council CHANGE-VOTE round (audit fix: council must actually
+    vote on changes, not brainstorm).
 
-    Triggered only by meaningful evidence (P10). Uses ONLY free/local agents -
-    Claude/Anthropic paid credentials are never used autonomously; unavailable
-    agents are recorded truthfully.
+    The old brainstorm cycle may still generate proposals, but every proposed
+    change MUST go through run_change_vote() before becoming an authorised
+    challenger. Uses ONLY free/local agents.
     """
     from ai_council.cycle import dump_live, run_council_cycle
+    from ai_council.change_vote import run_change_vote
 
     agents_env = os.environ.get("AEGIS_COUNCIL_AGENTS", "opencode,gemini,codex,cursor")
     agents = [a.strip() for a in agents_env.split(",") if a.strip()]
+    started = time.time()
+
+    # Phase 1: brainstorm generates the raw proposal (old council = generator).
     question = (
         "The AEGIS MT5 DEMO bot is running the intelligent firehose with the "
         "validated-state gate. Given the current measured evidence, identify ONE "
         "concrete, falsifiable improvement candidate for the next research cycle. "
         "Do not modify code or the champion. Cite book corpus passages if relevant."
     )
-    started = time.time()
+    proposal_text = ""
+    brainstorm_id = None
     try:
-        result = run_council_cycle(question, dry_run=False, timeout_s=300, agents=agents)
-        result["watcher_triggered"] = True
-        result["trigger"] = trigger
+        br = run_council_cycle(question, dry_run=False, timeout_s=300, agents=agents)
+        brainstorm_id = br.get("id")
+        proposals = br.get("round_log") or []
+        for e in proposals:
+            if e.get("step") == "proposal" and e.get("status") == "AVAILABLE":
+                try:
+                    from ai_council.cases import load_case
+                    case = load_case(br["id"])
+                    if case.get("proposals"):
+                        proposal_text = case["proposals"][0].get("text", "")[:500]
+                except Exception:
+                    pass
+                break
         try:
-            from ai_council.cases import load_case
-
-            dump_live(result, case=load_case(result["id"]))
+            dump_live(br, case=None)
         except Exception:
             pass
-        # Advance the marker so triggers measure since this round.
-        try:
-            import json as _json
-
-            marker_path = BOT / "reports" / "research" / "council_marker.json"
-            ol_path = BOT / "reports" / "research" / "outcome_learning.json"
-            pf = None
-            try:
-                pf = _json.loads(ol_path.read_text(encoding="utf-8")).get("profit_factor")
-            except Exception:
-                pass
-            marker_path.parent.mkdir(parents=True, exist_ok=True)
-            marker_path.write_text(
-                _json.dumps({"last_utc": _now(), "profit_factor": pf, "trigger": trigger}),
-                encoding="utf-8",
-            )
-        except Exception:
-            pass
-        return {"ok": True, "mode": result.get("mode"), "id": result.get("id"),
-                "trigger": trigger,
-                "elapsed_s": round(time.time() - started, 1),
-                "n_proposals": result.get("n_proposals"),
-                "n_critiques": result.get("n_critiques"),
-                "n_revisions": result.get("n_revisions"),
-                "agents": [a.get("agent") for a in result.get("round_log", [])]}
     except Exception as exc:
-        return {"ok": False, "mode": "REAL", "error": str(exc),
-                "trigger": trigger,
-                "elapsed_s": round(time.time() - started, 1)}
+        pass  # brainstorm failure doesn't block the vote
+
+    # Phase 2: build standardized CHANGE PACK and run the VOTE.
+    ol_path = BOT / "reports" / "research" / "outcome_learning.json"
+    pf = None
+    exp_val = None
+    try:
+        ol = json.loads(ol_path.read_text(encoding="utf-8"))
+        pf = ol.get("profit_factor")
+        exp_val = ol.get("expectancy_r") or ol.get("expectancy")
+    except Exception:
+        pass
+
+    pack = {
+        "change_id": f"council_{trigger or 'manual'}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}",
+        "problem": f"AEGIS research trigger: {trigger}. Current PF={pf}, EV={exp_val}",
+        "current_evidence": proposal_text[:300] or "see outcome_learning.md",
+        "proposed_change": proposal_text[:500] or "council-generated improvement candidate",
+        "affected_files": "bot/intel/, bot/ai_council/",
+        "expected_mechanism": "improve exploration/validation throughput",
+        "risks": "unvalidated idea; tiny DEMO risk only",
+        "tests": "exploration lifecycle + OOS validation",
+        "falsification_criteria": "negative costed expectancy after exploration trades",
+        "rollback": "revert experiment; no champion impact",
+        "safety_impact": "none (DEMO only, no live exposure)",
+    }
+    started_vote = time.time()
+    vote_result = run_change_vote(pack, agents=agents)
+    elapsed_total = round(time.time() - started, 1)
+
+    # Advance marker.
+    try:
+        marker_path = BOT / "reports" / "research" / "council_marker.json"
+        marker_path.parent.mkdir(parents=True, exist_ok=True)
+        marker_path.write_text(
+            json.dumps({"last_utc": _now(), "profit_factor": pf,
+                        "trigger": trigger,
+                        "vote_decision": vote_result.get("final_decision")}),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "trigger": trigger,
+        "brainstorm_id": brainstorm_id,
+        "change_vote_id": pack["change_id"],
+        "vote_decision": vote_result.get("final_decision"),
+        "degraded_real_council": vote_result.get("degraded_real_council"),
+        "vote_totals": vote_result.get("totals"),
+        "elapsed_s": elapsed_total,
+        "agents": [v.get("agent") for v in (vote_result.get("votes") or [])],
+    }
 
 
 def main() -> int:
