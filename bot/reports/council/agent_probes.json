@@ -14,10 +14,10 @@
   "codex": {
     "agent": "codex",
     "cli": "node-script",
-    "duration_s": 11.57,
+    "duration_s": 8.83,
     "error": "quota/rate-limit blocked",
     "model": "gpt-5.6-sol",
-    "probed_utc": "2026-08-21T07:53:47.186989+00:00",
+    "probed_utc": "2026-08-21T08:24:46.723940+00:00",
     "provider": "OpenAI",
     "returncode": 1,
     "status": "UNAVAILABLE_QUOTA",
@@ -25,14 +25,14 @@
   },
   "cursor": {
     "agent": "cursor",
-    "cli": null,
-    "duration_s": 118.73,
-    "error": "timed out after 90s",
+    "cli": "cmd-shim",
+    "duration_s": 26.75,
+    "error": "quota/rate-limit blocked",
     "model": null,
-    "probed_utc": "2026-08-21T07:55:45.966020+00:00",
+    "probed_utc": "2026-08-21T08:25:13.530398+00:00",
     "provider": "cursor",
-    "returncode": null,
-    "status": "TIMEOUT",
+    "returncode": 1,
+    "status": "UNAVAILABLE_QUOTA",
     "tool_version": null
   },
   "gemini": {

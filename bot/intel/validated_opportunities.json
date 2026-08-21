@@ -1,6 +1,6 @@
 {
-  "built_at": "2026-08-21T07:03:25.876137+00:00",
-  "code_version": "a23878a02c696a05d583ebc7dbff2e96086238ba",
+  "built_at": "2026-08-21T08:45:28.698320+00:00",
+  "code_version": "fb9081ad41440ed035c58fee45ea01155abbb9e4",
   "config_hash": "a8c3eea5229a44c04d6abeb643e66cd001bfa3c2d93173c5591b32e61e3d6fa1",
   "cost_model": {
     "AUDCAD": {
@@ -212,8 +212,61 @@
       "spread_pips": 0.2
     }
   },
-  "dataset_hash": "ec494f9bb0884bce89eb7c54d14c19636c45c91aff02b4901ab7ef68e3e64d83",
-  "n_opportunities": 0,
-  "opportunities": [],
+  "dataset_hash": "fc2ed8d632100a2e266b4783d4668968ab08c62faeb24866261c3252eacc7e47",
+  "n_opportunities": 2,
+  "opportunities": [
+    {
+      "bootstrap_p05_validate": 0.43366222141390987,
+      "cost_pips": 1.2,
+      "expectancy_train": 2.8464285714287523,
+      "expectancy_validate": 1.8242424242422526,
+      "families": null,
+      "family_confirmed": false,
+      "gate_reason": "ok",
+      "level": "A",
+      "max_drawdown_pips_validate": -27.0,
+      "n_losses_validate": 9,
+      "n_train": 28,
+      "n_validate": 33,
+      "payoff_validate": 1.1351,
+      "profit_factor_validate": 3.0269360269358727,
+      "regime": "trend",
+      "session": "asia",
+      "side": "buy",
+      "strategy_family": "none",
+      "structure": "none",
+      "survives_validate": true,
+      "symbol": "GBPUSD",
+      "tail_loss_p05_validate": -10.2,
+      "win_rate_validate": 0.7272727272727273
+    },
+    {
+      "bootstrap_p05_validate": 0.43366222141390987,
+      "cost_pips": 1.2,
+      "expectancy_train": 2.8464285714287523,
+      "expectancy_validate": 1.8242424242422526,
+      "families": {
+        "none": 28
+      },
+      "family_confirmed": true,
+      "gate_reason": "ok",
+      "level": "B",
+      "max_drawdown_pips_validate": -27.0,
+      "n_losses_validate": 9,
+      "n_train": 28,
+      "n_validate": 33,
+      "payoff_validate": 1.1351,
+      "profit_factor_validate": 3.0269360269358727,
+      "regime": "trend",
+      "session": "asia",
+      "side": "buy",
+      "strategy_family": "none",
+      "structure": "none",
+      "survives_validate": true,
+      "symbol": "GBPUSD",
+      "tail_loss_p05_validate": -10.2,
+      "win_rate_validate": 0.7272727272727273
+    }
+  ],
   "schema": "validated_opportunities.v1"
 }

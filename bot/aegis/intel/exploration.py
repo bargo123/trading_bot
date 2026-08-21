@@ -308,6 +308,18 @@ class ExperimentStore:
         ).isoformat()
         self.save()
 
+    # -- broker-side close attribution ---------------------------------------
+
+    def remember_position(self, position_id: str, hypothesis_id: str) -> None:
+        """Map an open position to its experiment so SL/TP closes (whose deal
+        comment MT5 overwrites with '[sl ...]'/'[tp ...]') still attribute."""
+        if not position_id or not hypothesis_id:
+            return
+        self.data.setdefault("position_map", {})[str(position_id)] = str(hypothesis_id)
+
+    def hypothesis_for_position(self, position_id: str) -> str | None:
+        return (self.data.get("position_map") or {}).get(str(position_id))
+
     def cooldown_active(self, hypothesis_id: str, cooldown_s: int) -> bool:
         rec = self.data["experiments"].get(hypothesis_id)
         if not rec:

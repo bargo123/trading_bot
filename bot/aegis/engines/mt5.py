@@ -490,6 +490,7 @@ class MT5Engine(BrokerEngine):
                     ticket=str(int(getattr(pos, "ticket", 0) or 0) or ""),
                     stop_loss=float(getattr(pos, "sl", 0) or 0),
                     take_profit=float(getattr(pos, "tp", 0) or 0),
+                    comment=str(getattr(pos, "comment", "") or ""),
                 )
             )
         return out
@@ -517,6 +518,7 @@ class MT5Engine(BrokerEngine):
                     "commission": float(getattr(row, "commission", 0) or 0),
                     "swap": float(getattr(row, "swap", 0) or 0),
                     "entry": int(getattr(row, "entry", 0) or 0),
+                    "position_id": str(int(getattr(row, "position_id", 0) or 0) or ""),
                     "magic": int(getattr(row, "magic", 0) or 0),
                     "comment": str(getattr(row, "comment", "") or ""),
                     "time": datetime.fromtimestamp(ts, tz=timezone.utc).isoformat() if ts else "",

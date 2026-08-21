@@ -52,6 +52,7 @@ class PositionSnapshot:
     ticket: str = ""
     stop_loss: float = 0.0
     take_profit: float = 0.0
+    comment: str = ""
 
 
 @dataclass(frozen=True)

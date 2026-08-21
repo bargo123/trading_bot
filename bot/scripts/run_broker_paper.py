@@ -1022,14 +1022,24 @@ def main() -> None:
                     },
                 )
                 return
-            # --- Exploration hard limits enforced against brain state that
-            # includes in-flight reservations AND bound tickets.
+            # --- Exploration hard limits enforced against BROKER truth
+            # (position comments survive runner restarts) plus brain pending
+            # reservations for the in-flight window.
             if brain_decision is not None and brain_decision.journal.get("exploration"):
                 from aegis.intel.exploration import ExplorationLimits
 
                 limits_run = ExplorationLimits.from_cfg(cfg)
-                hyp_id = str(brain_decision.journal.get("hypothesis_id") or "")
+                exp_positions = [
+                    p for p in eng.positions()
+                    if "EXP" in str(getattr(p, "comment", "") or "")
+                ]
                 total_exp, sym_exp = intelligent_brain.exploration_open_counts(sym)
+                total_exp = max(total_exp, len(exp_positions))
+                sym_exp = max(
+                    sym_exp,
+                    len([p for p in exp_positions
+                         if str(p.symbol).upper() == str(sym).upper()]),
+                )
                 skip_reason = None
                 if total_exp > limits_run.max_positions:
                     skip_reason = f"exploration_max_positions:{total_exp}"
@@ -1042,7 +1052,7 @@ def main() -> None:
                             "event": "exploration_limit_skip",
                             "reason": skip_reason,
                             "symbol": sym,
-                            "hypothesis_id": hyp_id,
+                            "hypothesis_id": str(brain_decision.journal.get("hypothesis_id") or ""),
                             "bar": str(bar_time),
                         },
                     )
@@ -1372,6 +1382,24 @@ def main() -> None:
                 if hasattr(eng, "history_deals"):
                     try:
                         for event in ingest_deals(eng.history_deals(1), deal_cursor):
+                            # Attribution map: ENTRY deals carry the original
+                            # EXP comment; SL/TP exit deals get theirs overwritten
+                            # by MT5 ('[sl ...]'/'[tp ...]'), so match via
+                            # position_id instead of the comment.
+                            exp_store = (
+                                intelligent_brain.experiments
+                                if intelligent_brain is not None else None
+                            )
+                            if exp_store is not None:
+                                tag = str(event.get("comment") or "")
+                                idx = tag.find("EXP")
+                                if int(event.get("entry") or 0) == 0 and idx >= 0:
+                                    rec = intelligent_brain.find_experiment_by_tag(tag)
+                                    if rec is not None:
+                                        exp_store.remember_position(
+                                            str(event.get("position_id") or ""),
+                                            str(rec["hypothesis_id"]),
+                                        )
                             if event.get("is_exit"):
                                 from aegis.intel.outcome_log import append_outcome
 
@@ -1382,17 +1410,24 @@ def main() -> None:
                                         "source": "reconcile",
                                     }
                                 )
-                                # Attribute broker-side SL/TP closes of
-                                # exploration orders back to their experiment.
-                                if intelligent_brain is not None:
-                                    exp_rec = intelligent_brain.find_experiment_by_tag(
-                                        str(event.get("comment") or "")
+                                if exp_store is not None:
+                                    hyp_id = exp_store.hypothesis_for_position(
+                                        str(event.get("position_id") or "")
                                     )
-                                    if exp_rec is not None:
+                                    if not hyp_id:
+                                        exp_rec = intelligent_brain.find_experiment_by_tag(
+                                            str(event.get("comment") or "")
+                                        )
+                                        hyp_id = (
+                                            str(exp_rec["hypothesis_id"]) if exp_rec else None
+                                        )
+                                    if hyp_id:
                                         try:
                                             intelligent_brain.record_exploration_close(
-                                                hypothesis_id=str(exp_rec["hypothesis_id"]),
+                                                hypothesis_id=hyp_id,
                                                 pnl=float(event.get("pnl") or 0.0),
+                                                session="",
+                                                regime="",
                                             )
                                         except Exception:
                                             pass
