@@ -619,6 +619,9 @@ class IntelligentFirehoseBrain:
         regime_label: str = "",
         evidence: Any = None,
         spread_price: float | None = None,
+        row: Any = None,
+        completed_m1: Any = None,
+        state: Mapping[str, Any] | None = None,
     ) -> tuple[DemoDecision | None, str | None]:
         """Exploration Firehose gate chain. Returns (fire_decision, skip_reason).
 
@@ -739,37 +742,72 @@ class IntelligentFirehoseBrain:
         if not portfolio_ok:
             return None, portfolio_reason or "portfolio_risk"
 
-        # --- FAST_TURNOVER_FIREHOSE: build REAL market context, generate
-        # micro candidates, evaluate each independently with entry economics,
-        # select strongest, recompute ALL identity from FINAL candidate.
+        # --- FAST_TURNOVER_FIREHOSE: build REAL FastMarketContext from
+        # genuine point-in-time M1/M5/M15 data. NO fabricated values.
         from aegis.intel.fast_firehose import (
             FastMarketContext,
             check_entry_economics,
             generate_micro_candidates,
         )
 
-        m1_atr_est = max(abs(entry - float(invalidation)) * 0.3, pip * 2)
         bid_px = entry - (spread_price or 0) / 2
         ask_px = entry + (spread_price or 0) / 2
-        m15_mid = (entry + float(invalidation or entry)) / 2.0
-        m15_hw = abs(entry - float(invalidation or entry)) / 2.0
+
+        # Genuine M1 OHLCV from the completed bar.
+        m1_o = float(row["open"]) if row is not None and "open" in row.index else None
+        m1_h = float(row["high"]) if row is not None and "high" in row.index else None
+        m1_l = float(row["low"]) if row is not None and "low" in row.index else None
+        m1_c = float(row["close"]) if row is not None and "close" in row.index else entry
+        m1_vol = float(row.get("volume", 0) or 0) if row is not None and hasattr(row, 'get') else None
+
+        # ATR proxy from recent completed bars (genuine, point-in-time).
+        m1_atr = None
+        if completed_m1 is not None and len(completed_m1) >= 5:
+            highs = completed_m1["high"].iloc[-5:].astype(float)
+            lows = completed_m1["low"].iloc[-5:].astype(float)
+            closes = completed_m1["close"].iloc[-5:].astype(float)
+            prev_closes = completed_m1["close"].iloc[-6:-1].astype(float) if len(completed_m1) >= 6 else closes
+            trs = pd.Series([
+                max(h - l, abs(h - pc), abs(l - pc))
+                for h, l, pc in zip(highs, lows, prev_closes)
+            ])
+            m1_atr = round(float(trs.mean()), 8)
+
+        prev_close = None
+        if completed_m1 is not None and len(completed_m1) >= 2:
+            prev_close = float(completed_m1["close"].iloc[-2])
+
+        # M5/M15 structure from runtime state (passed from evaluate).
+        st = state or {}
+        structure = st.get("structure") or {}
+        m15_struct = structure.get("M15") or {}
+        m5_struct = structure.get("M5") or {}
+        regime_raw = st.get("regime")
+        regime_label_str = str(regime_raw.get("label", "") if isinstance(regime_raw, dict) else regime_raw or "")
 
         ctx = FastMarketContext(
             symbol=symbol,
             timestamp=datetime.now(timezone.utc).isoformat(),
             bid=bid_px, ask=ask_px,
             spread_pips=round((spread_price or 0) / max(pip, 1e-10), 1),
-            m1_close=entry, m1_open=bid_px,
-            m1_low=entry - pip * 3, m1_high=ask_px + pip * 3,
-            m1_prev_close=entry - pip,
-            m1_atr=m1_atr_est, m1_range=ask_px - bid_px + pip * 6,
-            m15_direction=str(signature.get("m15_direction") or ""),
-            m5_direction="up" if side == "buy" else "down",
-            m15_support=float(invalidation) if invalidation else None,
-            m15_resistance=target,
-            m15_range_mid=m15_mid, m15_range_half_width=m15_hw,
-            return_30s=(entry - float(invalidation)) * 0.1 / max(pip, 1e-10),
-            session=session or None, regime=regime_label or regime or None,
+            m1_open=m1_o, m1_high=m1_h, m1_low=m1_l,
+            m1_close=m1_c, m1_prev_close=prev_close,
+            m1_atr=m1_atr, m1_volume=m1_vol,
+            m1_range=(m1_h - m1_l) if m1_h and m1_l else None,
+            m1_body=abs(m1_c - m1_o) if m1_c and m1_o else None,
+            m15_direction=str(m15_struct.get("direction") or signature.get("m15_direction") or ""),
+            m15_structure=str(m15_struct.get("kind") or ""),
+            m15_support=float(m15_struct["support"]) if m15_struct.get("support") is not None else None,
+            m15_resistance=float(m15_struct["resistance"]) if m15_struct.get("resistance") is not None else None,
+            m15_range_mid=(float(m15_struct["support"]) + float(m15_struct["resistance"])) / 2.0
+                if m15_struct.get("support") and m15_struct.get("resistance") else None,
+            m15_range_half_width=abs(float(m15_struct["resistance"]) - float(m15_struct["support"])) / 2.0
+                if m15_struct.get("support") and m15_struct.get("resistance") else None,
+            m5_direction=str(m5_struct.get("direction") or ""),
+            m5_structure=str(m5_struct.get("kind") or ""),
+            return_30s=None,  # requires tick history; skip if unavailable
+            session=session or None,
+            regime=regime_label_str or regime_label or regime or None,
         )
         micro_cands = generate_micro_candidates(ctx)
         if not micro_cands:
@@ -1419,6 +1457,9 @@ class IntelligentFirehoseBrain:
                                  else (state.get("regime") or "")),
                 evidence=evidence,
                 spread_price=spread_price,
+                row=row,
+                completed_m1=completed_m1,
+                state=state,
             )
             if exp_decision is not None:
                 # Explicit exploration classification (audited fix, defect 6).

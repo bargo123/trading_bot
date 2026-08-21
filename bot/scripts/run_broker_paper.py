@@ -206,6 +206,10 @@ def main() -> None:
     profit_manager = ProfitManager(
         cfg, persist_path=ROOT / "intel" / "pm_tickets.json"
     )
+    # Fast exit state machine for FAST_TURNOVER_FIREHOSE tickets.
+    from aegis.intel.fast_firehose import FastExitStateMachine
+
+    fast_exit_sm = FastExitStateMachine()
     last_inventory_journal: dict[str, float] = {"ts": 0.0}
 
     def write_heartbeat(extra: Optional[dict] = None) -> None:
@@ -1681,6 +1685,65 @@ def main() -> None:
                                 remaining_ev=_rem_ev,
                                 remaining_ev_status=_rem_status,
                             )
+                            # Fast exit state machine governs FAST tickets.
+                            _is_fast = bool(meta_by_ticket.get(tk, {}).get("hypothesis_id")
+                                            and "EXP" in str(getattr(pos, "comment", "")))
+                            if _is_fast and intelligent_brain is not None:
+                                try:
+                                    _sym = str(getattr(pos, "symbol", ""))
+                                    _marks = live_marks.get(_sym, {})
+                                    if _track is not None and _track.opened_ts > 0:
+                                        _pip_sz = pip_size_for(_sym, cfg) if sym_l else 0.0001
+                                        _side_l = str(getattr(pos, "side", "")).lower()
+                                        _entry_px = float(getattr(pos, "avg_price", 0) or 0)
+                                        _mark = (_marks.get("bid") if _side_l == "buy"
+                                                 else marks.get("ask")) or _cur
+                                        _pnl_pips = ((_cur - _entry_px) / max(_pip_sz, 1e-10)
+                                                     * (1 if _side_l == "buy" else -1))
+                                        _mfe_pips = abs(float(_track.mfe_usd or 0)) / max(
+                                            _pip_sz * 100000 * float(getattr(pos, "quantity", .01)), 1e-9)
+                                        _mae_pips = abs(float(_track.mae_usd or 0)) / max(
+                                            _pip_sz * 100000 * float(getattr(pos, "quantity", .01)), 1e-9)
+                                        _stop_dist_pips = abs(
+                                            float(getattr(pos, "avg_price", 0) or 0) -
+                                            float(getattr(pos, "stop_loss", 0) or 0)
+                                        ) / max(_pip_sz, 1e-10) if getattr(pos, 'stop_loss', 0) else 10.0
+                                        _tgt_px = None
+                                        for _exp in intelligent_brain.experiments.data.get("experiments", {}).values():
+                                            if str(_exp.get("hypothesis_id")) == str(meta_by_ticket.get(tk, {}).get("hypothesis_id") or ""):
+                                                _tgt_str = str(_exp.get("target_rule") or "")
+                                                import re as _re2
+                                                _px_match = _re2.search(r"([\d.]+)", _tgt_str)
+                                                if _px_match:
+                                                    _tgt_px = float(_px_match.group(1))
+                                                break
+                                        fast_verdict = fast_exit_sm.evaluate(
+                                            side=_side_l,
+                                            entry_price=_entry_px,
+                                            current_mark=_cur,
+                                            stop_loss=float(getattr(pos, "stop_loss", 0) or 0),
+                                            target=_tgt_px or _entry_px + _pip_sz * 10 * (1 if _side_l == "buy" else -1),
+                                            opened_ts=_track.opened_ts,
+                                            now=time.time(),
+                                            pnl_pips=_pnl_pips,
+                                            mfe_pips=_mfe_pips,
+                                            mae_pips=_mae_pips,
+                                            stop_pips=max(_stop_dist_pips, 1.0),
+                                            pip=_pip_sz,
+                                            regime_now=intelligent_brain.regime_by_symbol.get(_sym, ""),
+                                            regime_at_entry=_track.regime_at_entry,
+                                            remaining_ev=_rem_ev,
+                                            remaining_ev_status=_rem_status,
+                                        )
+                                        if fast_verdict["action"] in {"TAKE", "SCRATCH", "ABORT", "TIME_EXIT"}:
+                                            verdict = {
+                                                "action": "EXIT",
+                                                "reason": f"fast_{fast_verdict['action'].lower()}:{fast_verdict['reason']}",
+                                                "why": fast_verdict["why"],
+                                                "policy": f"fast_{fast_verdict['policy']}",
+                                            }
+                                except Exception:
+                                    pass
                             if verdict["action"] == "EXIT" and hasattr(eng, "close_ticket"):
                                 res_close = eng.close_ticket(tk)
                                 summary = profit_manager.close_summary(

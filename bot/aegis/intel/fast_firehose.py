@@ -178,8 +178,11 @@ def micro_momentum_burst(ctx: FastMarketContext) -> MicroCandidate | None:
         return None
     direction = "buy" if m1_ret > 0 else "sell"
     m15d = ctx.m15_direction or ""
-    if (direction == "buy" and m15d not in ("up",)) or \
-       (direction == "sell" and m15d not in ("down",)):
+    m5d = ctx.m5_direction or ""
+    # BOTH M15 and M5 must align with the intended momentum direction.
+    if direction == "buy" and (m15d != "up" or m5d != "up"):
+        return None
+    if direction == "sell" and (m15d != "down" or m5d != "down"):
         return None
     entry = ctx.ask if direction == "buy" else ctx.bid
     inv = _micro_invalidation(side=direction, entry=entry,
