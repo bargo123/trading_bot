@@ -725,7 +725,9 @@ def main() -> int:
     parser.add_argument("--fetch-exit", action="store_true", help="force M1 fetch for exit research every cycle")
     parser.add_argument(
         "--council-every", type=int,
-        default=int(os.environ.get("AEGIS_COUNCIL_EVERY_TICKS", "0") or 0),
+        # Re-enabled: autonomous REAL council rounds every 3 ticks (~1h),
+        # still gated by evidence triggers. Env var overrides.
+        default=int(os.environ.get("AEGIS_COUNCIL_EVERY_TICKS", "3") or 3),
         help="run a REAL council round every N ticks (default 0=off; 72 ~= 24h)",
     )
     args = parser.parse_args()
