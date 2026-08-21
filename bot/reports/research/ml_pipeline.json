@@ -1,7 +1,7 @@
 {
   "schema": "ml_pipeline.v1",
   "label": "research_proxy",
-  "built_at": "2026-08-20T23:06:45.487108+00:00",
+  "built_at": "2026-08-20T23:53:44.385525+00:00",
   "provenance": "mt5_m1",
   "cost_assumptions": {
     "spread_bps": 0.2,
@@ -20,178 +20,230 @@
     "recommended": null
   },
   "strategy_selection": {
-    "n_shortlisted": 34,
-    "n_validated": 15,
-    "n_survive": 1,
+    "n_shortlisted": 25,
+    "n_validated": 22,
+    "n_survive": 0,
     "cost_model": {
       "EURUSD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.7,
+        "cost_source": "measured_p75"
       },
       "GBPUSD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 1.2,
+        "cost_source": "measured_p75"
       },
       "USDJPY": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 1.6,
+        "cost_source": "measured_p75"
       },
       "USDCHF": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 1.3,
+        "cost_source": "measured_p75"
       },
       "AUDUSD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 2.0,
+        "cost_source": "measured_p75"
       },
       "NZDUSD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 1.3,
+        "cost_source": "measured_p75"
       },
       "USDCAD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 1.3,
+        "cost_source": "measured_p75"
       },
       "EURJPY": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.5,
+        "cost_source": "measured_p75"
       },
       "GBPJPY": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 1.0,
+        "cost_source": "measured_p75"
       },
       "AUDJPY": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.7,
+        "cost_source": "measured_p75"
       },
       "CADJPY": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.8,
+        "cost_source": "measured_p75"
       },
       "NZDJPY": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.6,
+        "cost_source": "measured_p75"
       },
       "EURGBP": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 2.1,
+        "cost_source": "measured_p75"
       },
       "EURAUD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.7,
+        "cost_source": "measured_p75"
       },
       "EURCHF": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 7.2,
+        "cost_source": "measured_p75"
       },
       "EURCAD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.6,
+        "cost_source": "measured_p75"
       },
       "EURNZD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 1.1,
+        "cost_source": "measured_p75"
       },
       "GBPAUD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 1.0,
+        "cost_source": "measured_p75"
       },
       "GBPCAD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.8,
+        "cost_source": "measured_p75"
       },
       "GBPCHF": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.6,
+        "cost_source": "measured_p75"
       },
       "GBPNZD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 1.1,
+        "cost_source": "measured_p75"
       },
       "AUDCAD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.7,
+        "cost_source": "measured_p75"
       },
       "AUDCHF": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.5,
+        "cost_source": "measured_p75"
       },
       "AUDNZD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 0.6,
+        "cost_source": "measured_p75"
       },
       "CADCHF": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 1.0,
+        "cost_source": "measured_p75"
       },
       "AUDSGD": {
         "cost_pips": 0.3,
         "spread_pips": 0.2,
         "slippage_pips": 0.1,
-        "commission_pips": 0.0
+        "commission_pips": 0.0,
+        "measured_cost_pips": 1.0,
+        "cost_source": "measured_p75"
       }
     },
     "hierarchical": true
   },
   "hierarchical_selection": {
-    "n_level_a_states": 34,
-    "n_level_b_states": 34,
-    "n_opportunities": 15,
-    "n_survive": 1
+    "n_level_a_states": 25,
+    "n_level_b_states": 25,
+    "n_opportunities": 22,
+    "n_survive": 0
   },
   "dataset_hash": "ec494f9bb0884bce89eb7c54d14c19636c45c91aff02b4901ab7ef68e3e64d83",
   "config_hash": "a8c3eea5229a44c04d6abeb643e66cd001bfa3c2d93173c5591b32e61e3d6fa1",
-  "code_version": "1aafa85c76f5cd1cc66df4683230dcca3c437b05",
+  "code_version": "583e55998c94e3e23cc6e6d7eba764d9b7c01762",
   "validated_opportunities_path": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\validated_opportunities.json",
   "validated_states_path": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\validated_states.json",
   "ml": {
@@ -201,6 +253,7 @@
     "all_holdout_expectancy": -0.9227025187201928,
     "model_taken_expectancy": -0.8761742682096934,
     "improvement_expectancy": 0.04652825051049947,
+    "ml_advances": false,
     "equity_curve": [
       11.10000000000042,
       17.599999999998595,

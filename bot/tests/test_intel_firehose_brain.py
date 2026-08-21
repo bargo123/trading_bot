@@ -1,7 +1,9 @@
 """Intelligent Firehose demo brain tests."""
 from __future__ import annotations
 
+import hashlib
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -10,6 +12,25 @@ from aegis.intel.analogue_store import AnalogueStore
 from aegis.intel.firehose_brain import IntelligentFirehoseBrain
 from aegis.intel.strategy_model import ValidatedStrategyModel, strategy_model_ready
 from aegis.intel.expected_value import payoff_metrics
+
+
+def _write_canary(index_path: Path, *, symbol: str = "EURUSD") -> Path:
+    """A valid DEMO_CANARY artifact bound to this tmp index (defect 16)."""
+    canary = {
+        "schema": "demo_canary.v1",
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "expires_utc": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
+        "strategy_id": f"canary_{symbol}_test",
+        "opportunity": {"symbol": symbol},
+        "metrics": {"expectancy_validate": 0.05},
+        "dataset_hash": "test",
+        "validation_hash": "test",
+        "index_file_sha256": hashlib.sha256(index_path.read_bytes()).hexdigest(),
+        "risk_fraction": 0.08,
+    }
+    path = index_path.parent / "demo_canary.json"
+    path.write_text(json.dumps(canary), encoding="utf-8")
+    return path
 
 
 def _m1(n: int = 400) -> pd.DataFrame:
@@ -366,12 +387,14 @@ def _gated_brain(tmp_path, signature, allow_states, n=80):
         encoding="utf-8",
     )
     allowlist = _validated_allowlist(tmp_path, allow_states)
+    canary_path = _write_canary(index)
     cfg = {
         "analogue_index_path": str(index),
         "validated_states_path": str(allowlist),
         "intelligent_gate_validated_states": True,
         "intelligent_firehose_bootstrap": True,
         "intelligent_bootstrap_canary": True,
+        "demo_canary_path": str(canary_path),
         "intelligent_min_analogues": 20,
         "intelligent_min_similarity": 0.5,
         "intelligent_risk_fraction": 0.08,
@@ -511,6 +534,7 @@ def test_gate_uses_exact_state_evidence_not_fuzzy_pool(tmp_path):
         "intelligent_gate_validated_states": True,
         "intelligent_firehose_bootstrap": True,
         "intelligent_bootstrap_canary": True,
+        "demo_canary_path": str(_write_canary(index_path)),
         "intelligent_min_analogues": 20,
         "intelligent_min_similarity": 0.5,
         "intelligent_risk_fraction": 0.08,
@@ -525,6 +549,7 @@ def test_gate_uses_exact_state_evidence_not_fuzzy_pool(tmp_path):
 
 
 def _bootstrap_cfg(tmp_path, index, **extra):
+    canary_path = _write_canary(index)
     cfg = {
         "analogue_index_path": str(index),
         "intelligent_firehose_bootstrap": True,
@@ -534,6 +559,7 @@ def _bootstrap_cfg(tmp_path, index, **extra):
         "intelligent_risk_budget_usd": 100.0,
         "order_quantity": 0.01,
         "max_positions": 40,
+        "demo_canary_path": str(canary_path),
     }
     cfg.update(extra)
     return cfg
@@ -554,6 +580,9 @@ def test_bootstrap_research_stage_cannot_trade(tmp_path):
         tmp_path, index,
         validated_states_path=str(allowlist),
         intelligent_gate_validated_states=True,
+        # Defect 16 regression: with NO canary artifact the bootstrap stays
+        # shadow-only even when evidence and state gates pass.
+        demo_canary_path=str(tmp_path / "no_canary.json"),
     )
     brain = IntelligentFirehoseBrain(cfg)
     decision = _evaluate_brain(brain, m1)

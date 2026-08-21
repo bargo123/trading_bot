@@ -223,25 +223,67 @@ def test_two_independent_theses_coexist_on_one_symbol():
     from aegis.intel.firehose_brain import DemoBrainState
 
     state = DemoBrainState()
-    long_key = "EURUSD|buy|retest"
-    short_key = "EURUSD|sell|breakout"
+    long_key = "EURUSD|buy|retest|range|asia"
+    short_key = "EURUSD|sell|breakout|range|asia"
     state.apply("EURUSD", "fire", side="buy", information_id="info-l",
-                target_risk=1.0, setup_family="retest")
+                target_risk=1.0, setup_family="retest", regime="range", session="asia")
     state.apply("EURUSD", "fire", side="sell", information_id="info-s",
-                target_risk=1.0, setup_family="breakout")
+                target_risk=1.0, setup_family="breakout", regime="range", session="asia")
     assert state.get(long_key).current_risk_usd == 1.0
     assert state.get(short_key).current_risk_usd == 1.0
     # Exiting one thesis leaves the other intact.
     state.apply("EURUSD", "exit", side="buy", information_id=None,
-                target_risk=0.0, setup_family="retest")
+                target_risk=0.0, setup_family="retest", regime="range", session="asia")
     assert state.get(long_key).current_risk_usd == 0.0
     assert state.get(short_key).current_risk_usd == 1.0
 
 
+def test_two_same_side_theses_own_distinct_tickets():
+    """Defect 15: two independent EURUSD BUY theses each own distinct positions;
+    closing/reducing thesis A must not mutate thesis B."""
+    from aegis.intel.firehose_brain import DemoBrainState
+
+    class _Pos:
+        def __init__(self, symbol, side, ticket):
+            self.symbol = symbol
+            self.side = side
+            self.ticket = ticket
+            self.unrealized_pnl = 0.0
+
+    state = DemoBrainState()
+    key_a = "EURUSD|buy|retest|range|asia"
+    key_b = "EURUSD|buy|breakout|trend|london"
+    state.apply("EURUSD", "fire", side="buy", information_id="a1",
+                target_risk=1.0, key=key_a)
+    state.apply("EURUSD", "fire", side="buy", information_id="b1",
+                target_risk=1.0, key=key_b)
+    state.bind_tickets(key_a, "EURUSD", ["101", "102"])
+    state.bind_tickets(key_b, "EURUSD", ["201"])
+    positions = [_Pos("EURUSD", "buy", "101"), _Pos("EURUSD", "buy", "102"),
+                 _Pos("EURUSD", "buy", "201")]
+    state.sync_from_positions("EURUSD", positions, clip_risk=0.5)
+    assert state.get(key_a).clips == 2
+    assert state.get(key_b).clips == 1
+    # Close thesis A's tickets only: B keeps its clip and risk.
+    state.apply("EURUSD", "exit", side="buy", information_id=None,
+                target_risk=0.0, key=key_a)
+    remaining = [p for p in positions if p.ticket != "101" and p.ticket != "102"]
+    state.sync_from_positions("EURUSD", remaining, clip_risk=0.5)
+    mem_b = state.get(key_b)
+    assert mem_b.clips == 1
+    assert mem_b.current_risk_usd > 0
+    assert mem_b.information_id == "b1"
+    # Ticket rebinding cannot steal: binding 201 to A removes it from B.
+    state.bind_tickets(key_a, "EURUSD", ["201"])
+    assert "201" not in state.get(key_b).tickets
+    assert "201" in state.get(key_a).tickets
+
+
 class _Pos:
-    def __init__(self, symbol, side):
+    def __init__(self, symbol, side, ticket=""):
         self.symbol = symbol
         self.side = side
+        self.ticket = ticket
         self.unrealized_pnl = 0.0
 
 
@@ -249,16 +291,18 @@ def test_sync_from_positions_adopts_and_clears_theses():
     from aegis.intel.firehose_brain import DemoBrainState
 
     state = DemoBrainState()
+    key = "EURUSD|sell|retest|range|asia"
     state.apply("EURUSD", "fire", side="sell", information_id="s1",
-                target_risk=1.0, setup_family="retest")
-    touched = state.sync_from_positions("EURUSD", [_Pos("EURUSD", "sell")], clip_risk=0.5)
-    sell = [m for m in touched if m.side == "sell"][0]
+                target_risk=1.0, key=key)
+    state.bind_tickets(key, "EURUSD", ["501"])
+    touched = state.sync_from_positions("EURUSD", [_Pos("EURUSD", "sell", "501")], clip_risk=0.5)
+    sell = [m for m in touched if m.side == "sell" and m.tickets][0]
     assert sell.clips == 1
     # Position gone upstream -> thesis cleared.
-    touched = state.sync_from_positions("EURUSD", [], clip_risk=0.5)
-    assert state.get("EURUSD|sell|retest").clips == 0
+    state.sync_from_positions("EURUSD", [], clip_risk=0.5)
+    assert state.get(key).clips == 0
     # Unknown position adopted under held-key so exposure is never lost.
-    touched = state.sync_from_positions("EURUSD", [_Pos("EURUSD", "buy")], clip_risk=0.5)
+    touched = state.sync_from_positions("EURUSD", [_Pos("EURUSD", "buy", "601")], clip_risk=0.5)
     assert any(m.side == "buy" and m.clips == 1 for m in touched)
 
 

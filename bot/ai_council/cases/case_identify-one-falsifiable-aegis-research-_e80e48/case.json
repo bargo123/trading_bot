@@ -1,0 +1,80 @@
+{
+  "created_utc": "2026-08-20T23:53:58.773969+00:00",
+  "critiques": {
+    "gemini": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_identify-one-falsifiable-aegis-research-_e80e48\\critiques\\gemini--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 111.25,
+          "finished_utc": "2026-08-21T00:00:20.014066+00:00",
+          "mode": "REAL",
+          "model": "opencode/x-preview-f-free",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-20T23:58:28.765747+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-21T00:00:20.030256+00:00",
+        "text": "The 0.30 Pearson cutoff and \"top decile of ATR\" are arbitrary thresholds that smell post-hoc, and defining the regime from the *full-sample* ATR distribution is lookahead contamination \u2014 pre-register the cutoff and derive deciles walk-forward. Pearson on a high-vol subsample (rare by construction, so tiny n) produces enormous confidence intervals you never commit to reporting, and tail co-movement requires rank/tail-dependence measures, not a linear coefficient computed on backtest outputs from `all_algos_bakeoff.csv` that aren't stated to be net of spread/slippage per council rules. The Volman citation is an unmeasurable appeal to authority rather than validation, and \"hidden tail-risk\" is unfalsifiable as phrased. Finally, no ExperimentRegistry entry is specified, violating the mandatory experiment-recording rule."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-21T00:00:25.469514+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_identify-one-falsifiable-aegis-research-_ed3553",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 1,
+      "n_proposals": 2,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_identify-one-falsifiable-aegis-research-_ed3553 for the validation pipeline"
+  },
+  "id": "identify-one-falsifiable-aegis-research-_e80e48",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_identify-one-falsifiable-aegis-research-_e80e48\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 115.04,
+        "finished_utc": "2026-08-20T23:57:26.769305+00:00",
+        "mode": "REAL",
+        "model": "opencode/x-preview-f-free",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-20T23:55:31.729580+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-20T23:57:26.769305+00:00",
+      "text": "Proposal: The promotion path's family-wise-error correction (`governed_accept` \u2192 `family_wise_ok` in `bot/aegis/research/govern.py:75`) trusts a caller-supplied `n_searches`, which defaults to 1 and is read from the challenger spec itself (`research_promote_champion.py:53`, and `asia_sell_range_challenger.json` records `n_searches: 1`) \u2014 so selection bias from unreported variant searches silently passes the gate. Falsifiable test, research-only: mine `bot/research/experiments.sqlite` for the true count of distinct challenger configs evaluated per strategy family over the last N cycles, recompute the Bonferroni-corrected p-values for every accepted promotion, and check whether any would flip to reject. Concrete prediction: at least one historically accepted challenger's holdout p-value exceeds alpha once registry-derived search counts replace the self-reported ones. If no accepted promotion flips, the self-reporting convention is validated and we record that as a negative result in the registry. No runtime files are touched; this uses only the experiment ledger and existing research modules."
+    },
+    {
+      "agent": "gemini",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_identify-one-falsifiable-aegis-research-_e80e48\\proposals\\gemini.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 20.42,
+        "finished_utc": "2026-08-20T23:57:52.846575+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "Google",
+        "returncode": 0,
+        "started_utc": "2026-08-20T23:57:32.425089+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-20T23:57:52.846575+00:00",
+      "text": "I propose that the current AEGIS research pipeline has a weakness in failing to account for \"correlation collapse\" between the HALE and CAFB strategies during high-volatility regimes. This proposal will be falsified if a statistical analysis of the `all_algos_bakeoff.csv` data shows that their Pearson correlation coefficient remains below 0.30 during the top decile of historical ATR. We will conduct this research to ensure the ensemble maintains the structural diversification advantages cited in *Volman's Understanding Price Action*. This audit requires no runtime modifications and focuses strictly on historical performance validation to prevent hidden tail-risk in the ensemble."
+    }
+  ],
+  "question": "Identify one falsifiable AEGIS research weakness. Do not modify runtime.",
+  "revisions": {},
+  "status": "decided"
+}

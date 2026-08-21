@@ -49,6 +49,15 @@ bot/reports/opencode/heartbeat.json
 # Intel research runtime (code + frozen_v1.json stay in git)
 bot/intel/*
 !bot/intel/.gitkeep
+# Deterministic decision artifacts: the runtime brain state MUST be
+# reproducible from a clean clone (audit defects 13/14).
+!bot/intel/validated_opportunities.json
+!bot/intel/validated_states.json
+!bot/intel/cost_profiles.json
+!bot/intel/demo_canary.json
+# Execution journal exceeded GitHub's 100 MB hard limit (blocked pushes).
+# Rotated archives stay local; the runner recreates a fresh journal.
+bot/reports/mt5_demo_firehose_hw_journal*.jsonl
 
 # Research runtime (code stays in bot/aegis/research/)
 bot/research/*

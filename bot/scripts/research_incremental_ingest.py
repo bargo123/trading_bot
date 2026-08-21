@@ -70,7 +70,10 @@ def main() -> int:
     # each cycle bounded and the cursor persists after EVERY symbol so a kill
     # mid-run never repeats work.
     def _freshness(sym: str):
-        return (cursor.get("symbols") or {}).get(str(sym).upper()) or ""
+        entry = (cursor.get("symbols") or {}).get(str(sym).upper()) or {}
+        if isinstance(entry, dict):
+            return str(entry.get("raw_cursor") or "")
+        return str(entry or "")
 
     ordered = sorted(symbols, key=_freshness)
     budget_s = float(args.time_budget_s)

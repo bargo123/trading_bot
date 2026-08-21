@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -34,7 +35,8 @@ from aegis.intel.trade_economics import (
 @dataclass
 class ThesisMemory:
     """One independent thesis. The reasoning unit is NOT the symbol: two
-    validated strategies on the same symbol coexist as separate theses."""
+    validated strategies on the same symbol coexist as separate theses, and a
+    thesis owns ONLY the position tickets bound to it (defect 15)."""
 
     thesis_key: str
     symbol: str
@@ -43,10 +45,21 @@ class ThesisMemory:
     information_id: str | None = None
     current_risk_usd: float = 0.0
     clips: int = 0
+    tickets: set[str] = field(default_factory=set)
 
 
-def thesis_key(symbol: str, side: str | None, setup_family: str) -> str:
-    return "|".join([str(symbol).upper(), str(side or "").lower(), str(setup_family or "").lower()])
+def thesis_key(symbol: str, side: str | None, setup_family: str,
+               regime: str = "", session: str = "") -> str:
+    """Stable thesis identity: symbol + side + strategy/setup family + state.
+
+    Two genuinely independent same-side strategies on one symbol produce
+    different keys via family and/or state identity.
+    """
+    return "|".join([
+        str(symbol).upper(), str(side or "").lower(),
+        str(setup_family or "").lower(), str(regime or "").lower(),
+        str(session or "").lower(),
+    ])
 
 
 @dataclass
@@ -61,42 +74,78 @@ class DemoBrainState:
             self.theses[key] = mem
         return mem
 
-    def sync_from_positions(self, symbol: str, positions: Sequence[PositionSnapshot], clip_risk: float) -> list[ThesisMemory]:
-        """Reconcile open positions into per-thesis memories (symbol+side match).
+    def bind_tickets(self, key: str, symbol: str, tickets: Sequence[str]) -> None:
+        """Bind freshly opened position tickets to exactly one thesis."""
+        mem = self.get(key, symbol)
+        wanted = {str(t) for t in tickets if str(t).strip()}
+        for other in self.theses.values():
+            if other is mem:
+                continue
+            other.tickets -= wanted
+        mem.tickets |= wanted
 
-        Returns every thesis of this symbol that currently holds exposure.
-        Positions whose side matches no tracked thesis are adopted under a
-        generic held-key so exposure accounting never loses them.
+    def sync_from_positions(self, symbol: str, positions: Sequence[PositionSnapshot], clip_risk: float) -> list[ThesisMemory]:
+        """Reconcile open positions into per-thesis memories.
+
+        A thesis owns only its bound tickets. Positions no thesis claims are
+        adopted under a single generic held-key per side so exposure accounting
+        never loses them - the same positions are never assigned to multiple
+        theses (defect 15).
         """
-        mine = [pos for pos in positions if str(pos.symbol).upper() == str(symbol).upper()]
-        by_side: dict[str, list[PositionSnapshot]] = {}
-        for pos in mine:
-            by_side.setdefault(str(pos.side).lower(), []).append(pos)
+        sym_up = str(symbol).upper()
+        open_tickets: dict[str, PositionSnapshot] = {}
+        for pos in positions:
+            if str(pos.symbol).upper() == sym_up:
+                ticket = str(getattr(pos, "ticket", "") or "").strip()
+                if ticket:
+                    open_tickets[ticket] = pos
         touched: list[ThesisMemory] = []
-        matched_sides: set[str] = set()
-        for key, mem in self.theses.items():
-            if mem.symbol != str(symbol).upper():
+        claimed: set[str] = set()
+        for key, mem in list(self.theses.items()):
+            if mem.symbol != sym_up:
                 continue
-            side_positions = by_side.get(str(mem.side or "").lower(), [])
-            if mem.side and side_positions:
-                matched_sides.add(str(mem.side).lower())
-                mem.clips = len(side_positions)
-                mem.current_risk_usd = max(mem.current_risk_usd, float(clip_risk) * len(side_positions))
-                touched.append(mem)
+            mine = [t for t in mem.tickets if t in open_tickets]
+            if mem.tickets:
+                # Owned thesis: exactly its own surviving tickets.
+                mem.tickets = set(mine)
+                mem.clips = len(mine)
+                mem.current_risk_usd = float(clip_risk) * len(mine) if mine else 0.0
+                claimed.update(mine)
+                if mine:
+                    touched.append(mem)
+                else:
+                    mem.information_id = None
+                    mem.side = None
             elif mem.clips > 0:
-                # Position closed upstream (flatten/stop): clear the thesis.
-                mem.clips = 0
-                mem.current_risk_usd = 0.0
-                mem.information_id = None
-        for side, side_positions in by_side.items():
-            if side in matched_sides:
+                # Legacy/unbound exposure: keep counting until it closes.
+                still_open = sum(
+                    1 for t, pos in open_tickets.items()
+                    if t not in claimed and str(pos.side).lower() == str(mem.side or "").lower()
+                )
+                if still_open:
+                    mem.clips = still_open
+                    mem.current_risk_usd = max(mem.current_risk_usd, float(clip_risk) * still_open)
+                    touched.append(mem)
+                else:
+                    mem.clips = 0
+                    mem.current_risk_usd = 0.0
+                    mem.information_id = None
+        # Adopt unclaimed positions under ONE held-key per side.
+        unclaimed_by_side: dict[str, int] = {}
+        sample_side_ticket: dict[str, str] = {}
+        for ticket, pos in open_tickets.items():
+            if ticket in claimed:
                 continue
-            key = thesis_key(symbol, side, "held")
-            mem = self.get(key, symbol)
+            side = str(pos.side).lower()
+            unclaimed_by_side[side] = unclaimed_by_side.get(side, 0) + 1
+            sample_side_ticket.setdefault(side, ticket)
+        for side, count in unclaimed_by_side.items():
+            key = thesis_key(sym_up, side, "held")
+            mem = self.get(key, sym_up)
             mem.side = side
             mem.setup_family = "held"
-            mem.clips = len(side_positions)
-            mem.current_risk_usd = max(mem.current_risk_usd, float(clip_risk) * len(side_positions))
+            mem.clips = count
+            mem.current_risk_usd = max(mem.current_risk_usd, float(clip_risk) * count)
             touched.append(mem)
         return touched
 
@@ -110,14 +159,17 @@ class DemoBrainState:
         target_risk: float,
         clips: int | None = None,
         setup_family: str = "",
+        regime: str = "",
+        session: str = "",
+        key: str | None = None,
     ) -> None:
-        key = thesis_key(symbol, side, setup_family)
-        held = self.get(key, symbol)
+        held = self.get(key or thesis_key(symbol, side, setup_family, regime, session), symbol)
         if action == "exit":
             held.current_risk_usd = 0.0
             held.information_id = None
             held.side = None
             held.clips = 0
+            held.tickets.clear()
             return
         if action in {"fire", "scale"}:
             held.side = side
@@ -134,6 +186,7 @@ class DemoBrainState:
                 held.information_id = None
                 held.side = None
                 held.clips = 0
+                held.tickets.clear()
 
 
 @dataclass(frozen=True)
@@ -250,6 +303,15 @@ def _load_validated_opportunities(path: Path) -> dict[str, dict[str, Any]]:
     except (OSError, json.JSONDecodeError):
         return {}
     out: dict[str, dict[str, Any]] = {}
+    rank = {"A": 3, "B": 2, "C": 1}
+
+    def _rank(rec: dict[str, Any]) -> int:
+        return rank.get(str(rec.get("level") or "C"), 0)
+
+    def _ev(rec: dict[str, Any]) -> float:
+        return float(rec.get("expectancy_validate")
+                     or rec.get("expectancy_validate_pool") or -1e9)
+
     for rec in payload.get("opportunities") or []:
         if not isinstance(rec, dict):
             continue
@@ -261,11 +323,47 @@ def _load_validated_opportunities(path: Path) -> dict[str, dict[str, Any]]:
             str(rec.get("session") or ""),
             str(rec.get("side") or ""),
         ])
-        out[key] = rec
+        cur = out.get(key)
+        # Runtime preference on collision: higher level, then higher OOS EV.
+        if cur is None or (_rank(rec), _ev(rec)) > (_rank(cur), _ev(cur)):
+            out[key] = rec
     return out
 
 
-def _bootstrap_from_evidence(cfg: Mapping[str, Any], evidence: Any) -> ValidatedStrategyModel | None:
+def _load_canary(path: Path) -> dict[str, Any] | None:
+    """Defect 16: load the DEMO_CANARY permission artifact (schema + expiry).
+
+    Index-hash freshness is checked separately against the live analogue index
+    via :func:`_canary_index_hash_matches`, so stale validation can never
+    authorise orders.
+    """
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if str(payload.get("schema") or "") != "demo_canary.v1":
+        return None
+    expires = str(payload.get("expires_utc") or "")
+    try:
+        if datetime.fromisoformat(expires) <= datetime.now(timezone.utc):
+            return None
+    except ValueError:
+        return None
+    return payload
+
+
+def _canary_index_hash_matches(canary: Mapping[str, Any], index_path: Path) -> bool:
+    expected = str(canary.get("index_file_sha256") or "")
+    if not expected:
+        return False
+    try:
+        return hashlib.sha256(Path(index_path).read_bytes()).hexdigest() == expected
+    except OSError:
+        return False
+
+
+def _bootstrap_from_evidence(cfg: Mapping[str, Any], evidence: Any,
+                             *, canary_allows: bool = False) -> ValidatedStrategyModel | None:
     """State-evidence bootstrap. Governance: this is UNVALIDATED_RESEARCH.
 
     It can never behave like a champion. By default the returned model is not
@@ -300,8 +398,9 @@ def _bootstrap_from_evidence(cfg: Mapping[str, Any], evidence: Any) -> Validated
         return None
     if not getattr(evidence, "eligible", False):
         return None
-    stage = STAGE_DEMO_CANARY if bool(cfg.get("intelligent_bootstrap_canary", False)) \
-        else STAGE_UNVALIDATED_RESEARCH
+    # Defect 16: the canary STAGE comes from the explicit generated artifact,
+    # never from a global config flag alone.
+    stage = STAGE_DEMO_CANARY if canary_allows else STAGE_UNVALIDATED_RESEARCH
     try:
         model = ValidatedStrategyModel(
             strategy_id="analogue_bootstrap",
@@ -348,6 +447,10 @@ class IntelligentFirehoseBrain:
                 INTEL_DIR / "validated_opportunities.json",
             )
         )
+        self.canary_path = resolve_bot_path(
+            cfg.get("demo_canary_path"), INTEL_DIR / "demo_canary.json"
+        )
+        self.canary = _load_canary(self.canary_path)
         self.memory = DemoBrainState()
         self._risk_budget = float(cfg.get("intelligent_risk_budget_usd") or cfg.get("starting_equity") or 100.0)
         self.counts: dict[str, Any] = {
@@ -379,6 +482,7 @@ class IntelligentFirehoseBrain:
                 INTEL_DIR / "validated_opportunities.json",
             )
         )
+        self.canary = _load_canary(self.canary_path)
 
     def snapshot(self) -> dict[str, Any]:
         records = len(getattr(self.analogues, "_records", []))
@@ -510,13 +614,24 @@ class IntelligentFirehoseBrain:
             else:
                 prev = float(completed_m1["close"].iloc[-2]) if len(completed_m1) >= 2 else close
                 side = "buy" if close >= prev else "sell"
-        held = self.memory.get(thesis_key(symbol, side, setup), symbol)
+        held = self.memory.get(
+            thesis_key(symbol, side, setup,
+                       regime=str(state.get("regime") or ""),
+                       session=str(state.get("session") or "")),
+            symbol,
+        )
         invalidation, target = _geometry(side, m15, pip)
         if invalidation is None and held.clips <= 0:
             self._note_skip("no_structural_invalidation")
             self.counts["skip"] += 1
             return DemoDecision("skip", "no_structural_invalidation", side=side, journal={"brain": "intelligent_firehose"})
         signature = runtime_signature(state, side=side, setup=setup)
+        # Keep the thesis identity consistent with the memory lookup above.
+        held.thesis_key = thesis_key(
+            symbol, side, setup,
+            regime=str(signature.get("regime") or ""),
+            session=str(signature.get("session") or ""),
+        )
         gating = bool(self.cfg.get("intelligent_gate_validated_states", False))
         exact_state = None
         current_state = None
@@ -584,7 +699,15 @@ class IntelligentFirehoseBrain:
                 "max_per_symbol": int(self.cfg.get("intelligent_max_clips_per_thesis", 5)),
             },
         )
-        strategy = self.strategy or _bootstrap_from_evidence(self.cfg, evidence)
+        strategy = self.strategy or _bootstrap_from_evidence(
+            self.cfg,
+            evidence,
+            canary_allows=(
+                bool(self.cfg.get("intelligent_bootstrap_canary", True))
+                and self.canary is not None
+                and _canary_index_hash_matches(self.canary, self.index_path)
+            ),
+        )
         fire = evaluate_thesis_fire(
             strategy=strategy,
             state_expected_net_value=evidence.expectancy if evidence.eligible else None,

@@ -645,10 +645,24 @@ def main() -> None:
                 brain_decision = decision
                 if decision.action in {"exit", "reduce"}:
                     open_pos = list(eng.positions(sym))
+                    thesis_key_now = str(decision.journal.get("thesis_key") or "")
+                    owned_tickets: set[str] = set()
+                    if intelligent_brain is not None and thesis_key_now:
+                        mem = intelligent_brain.memory.theses.get(thesis_key_now)
+                        if mem is not None and mem.tickets:
+                            owned_tickets = {
+                                t for t in mem.tickets
+                                if any(str(getattr(p, "ticket", "") or "") == t for p in open_pos)
+                            }
                     close_n = int(decision.close_clips or (len(open_pos) if decision.action == "exit" else 1))
                     closed = 0
                     if hasattr(eng, "close_ticket") and open_pos:
-                        ranked = sorted(open_pos, key=lambda pos: float(pos.unrealized_pnl))
+                        if owned_tickets:
+                            # Defect 15: a thesis closes ONLY its own clips.
+                            ranked = [p for p in open_pos
+                                      if str(getattr(p, "ticket", "") or "") in owned_tickets]
+                        else:
+                            ranked = sorted(open_pos, key=lambda pos: float(pos.unrealized_pnl))
                         for pos in ranked[: max(close_n, 0)]:
                             ticket = str(getattr(pos, "ticket", "") or "").strip()
                             if not ticket:
@@ -676,6 +690,8 @@ def main() -> None:
 
                                     append_outcome(
                                         {
+                                            "event_type": "position_exit",
+                                            "is_exit": True,
                                             "symbol": sym,
                                             "side": pos.side,
                                             "pnl": float(pos.unrealized_pnl),
@@ -695,7 +711,7 @@ def main() -> None:
                         information_id=decision.information_id,
                         target_risk=0.0 if not leftover else max(0.0, float(decision.journal.get("expectancy") or 0.0)),
                         clips=len(leftover),
-                        setup_family=str(decision.journal.get("setup_family") or ""),
+                        key=thesis_key_now or None,
                     )
                     if firehose_consume_bar(no_signal=True):
                         last_bar_time[sym] = bar_time
@@ -1166,6 +1182,19 @@ def main() -> None:
                 last_entry_at[sym] = now_s
                 position_opened_at[sym] = now_s
                 if intelligent_mode and intelligent_brain is not None and brain_decision is not None:
+                    # Defect 15: bind the tickets this order actually opened to
+                    # THIS thesis, so no other thesis can close them.
+                    before_tickets = {
+                        str(getattr(p, "ticket", "") or "") for p in positions_before
+                    }
+                    new_tickets = [
+                        str(getattr(p, "ticket", "") or "")
+                        for p in eng.positions(sym)
+                        if str(getattr(p, "ticket", "") or "") not in before_tickets
+                    ]
+                    thesis_key_now = str(brain_decision.journal.get("thesis_key") or "") or None
+                    if new_tickets and thesis_key_now:
+                        intelligent_brain.memory.bind_tickets(thesis_key_now, sym, new_tickets)
                     intelligent_brain.memory.apply(
                         sym,
                         brain_decision.action,
@@ -1173,7 +1202,7 @@ def main() -> None:
                         information_id=brain_decision.information_id,
                         target_risk=float(brain_decision.expected_net_value or 0.0) or 1.0,
                         clips=len(eng.positions(sym)),
-                        setup_family=str(brain_decision.journal.get("setup_family") or ""),
+                        key=thesis_key_now,
                     )
                 if pa_select_mode:
                     day_trades += 1
@@ -1297,7 +1326,13 @@ def main() -> None:
                             if event.get("is_exit"):
                                 from aegis.intel.outcome_log import append_outcome
 
-                                append_outcome({**event, "source": "reconcile"})
+                                append_outcome(
+                                    {
+                                        **event,
+                                        "event_type": "position_exit",
+                                        "source": "reconcile",
+                                    }
+                                )
                         save_cursor(deal_cursor, reconcile_cursor_path)
                     except Exception as exc:
                         logger.error(

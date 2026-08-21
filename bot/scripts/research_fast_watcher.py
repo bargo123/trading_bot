@@ -63,6 +63,42 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _parse_stdout_json(stdout: str | None) -> dict[str, Any] | None:
+    """Extract the last complete JSON object from a script's stdout.
+
+    Scripts print human-readable lines around their JSON summary; scan
+    line-blocks from the end so noise never breaks structured parsing.
+    """
+    if not stdout:
+        return None
+    text = stdout.strip()
+    if not text:
+        return None
+    # Fast path: the whole output is one JSON document.
+    try:
+        obj = json.loads(text)
+        return obj if isinstance(obj, dict) else None
+    except json.JSONDecodeError:
+        pass
+    decoder = json.JSONDecoder()
+    for idx in range(len(text) - 1, -1, -1):
+        if text[idx] != "}":
+            continue
+        for start in range(idx - 1, -1, -1):
+            ch = text[start]
+            if ch == "{" and start < idx:
+                candidate = text[start : idx + 1]
+                try:
+                    obj = json.loads(candidate)
+                    if isinstance(obj, dict):
+                        return obj
+                except json.JSONDecodeError:
+                    continue
+            elif ch == "\n" and start < idx - 1:
+                break
+    return None
+
+
 def _run_script(name: str, *extra: str, timeout_s: int = 900) -> dict[str, Any]:
     cmd = [sys.executable, str(BOT / "scripts" / name), *extra]
     started = time.time()
@@ -76,9 +112,11 @@ def _run_script(name: str, *extra: str, timeout_s: int = 900) -> dict[str, Any]:
             "elapsed_s": round(time.time() - started, 1),
             "stdout_tail": tail,
             "stderr_tail": (proc.stderr or "").strip().splitlines()[-4:],
+            "stdout_json": _parse_stdout_json(proc.stdout),
         }
     except subprocess.TimeoutExpired:
-        return {"ok": False, "returncode": -1, "elapsed_s": round(time.time() - started, 1), "timeout": True}
+        return {"ok": False, "returncode": -1, "elapsed_s": round(time.time() - started, 1),
+                "timeout": True, "stdout_json": None}
 
 
 def _notes_changed() -> bool:
@@ -300,7 +338,9 @@ def _champion() -> dict[str, Any] | None:
 def write_heartbeat(*, tick: int, watcher_alive: bool, last_cycle: str,
                     no_new_evidence: bool, new_outcome_lines: int,
                     last_error: str | None = None, skipped: str | None = None,
-                    council: dict[str, Any] | None = None) -> Path:
+                    council: dict[str, Any] | None = None,
+                    ingest: dict[str, Any] | None = None,
+                    throughput: dict[str, Any] | None = None) -> Path:
     mt5 = _mt5_status()
     champion = _champion() or {}
     stale = staleness_report()
@@ -320,6 +360,8 @@ def write_heartbeat(*, tick: int, watcher_alive: bool, last_cycle: str,
         },
         "staleness": stale,
         "council": council,
+        "ingest": ingest,
+        "throughput": throughput,
         "champion": champion.get("champion") or champion.get("id") or None,
         "skipped": skipped,
         "last_error": last_error,
@@ -498,7 +540,7 @@ def run_cycle(
             tick=tick, watcher_alive=True, last_cycle=_now(),
             no_new_evidence=True, new_outcome_lines=new_outcome_lines,
             skipped="outcome_learning,book_memory,ml_pipeline",
-            council=council, ingest=ingest,
+            council=council, ingest=ingest, throughput=throughput,
         )
         return {
             "tick": tick,
@@ -532,7 +574,7 @@ def run_cycle(
     heartbeat = write_heartbeat(
         tick=tick, watcher_alive=True, last_cycle=_now(),
         no_new_evidence=False, new_outcome_lines=new_outcome_lines,
-        council=council, ingest=ingest,
+        council=council, ingest=ingest, throughput=throughput,
     )
     return {
         "tick": tick,
@@ -553,7 +595,12 @@ def run_cycle(
     }
 
 
-def _evidence_trigger() -> str | None:
+def _evidence_trigger(
+    *,
+    outcome_log_path: Path | None = None,
+    marker_path: Path | None = None,
+    outcome_learning_path: Path | None = None,
+) -> str | None:
     """Meaningful-evidence triggers for an autonomous council round (P10).
 
     Returns a trigger name or None. Triggers:
@@ -562,7 +609,11 @@ def _evidence_trigger() -> str | None:
     """
     import json as _json
 
-    marker_path = BOT / "reports" / "research" / "council_marker.json"
+    marker_path = marker_path or (BOT / "reports" / "research" / "council_marker.json")
+    outcome_log_path = outcome_log_path or (BOT / "intel" / "outcome_log.jsonl")
+    outcome_learning_path = outcome_learning_path or (
+        BOT / "reports" / "research" / "outcome_learning.json"
+    )
     marker: dict[str, Any] = {}
     try:
         marker = _json.loads(marker_path.read_text(encoding="utf-8"))
@@ -573,9 +624,10 @@ def _evidence_trigger() -> str | None:
     degradation = float(os.environ.get("AEGIS_COUNCIL_DEGRADATION", "0.2"))
 
     closed = 0
-    outcome_log = BOT / "intel" / "outcome_log.jsonl"
     try:
-        with outcome_log.open(encoding="utf-8", errors="replace") as fh:
+        from aegis.intel.outcome_log import is_exit_row
+
+        with outcome_log_path.open(encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 if not line.strip():
                     continue
@@ -583,7 +635,9 @@ def _evidence_trigger() -> str | None:
                     row = _json.loads(line)
                 except _json.JSONDecodeError:
                     continue
-                if not row.get("is_exit"):
+                # Defect 12: explicit event_type first, safe inference for
+                # historical rows (is_exit / exit-action / reconcile+pnl).
+                if not is_exit_row(row):
                     continue
                 ts = str(row.get("ts_utc") or "")
                 if last_ts and ts <= last_ts:
@@ -594,9 +648,8 @@ def _evidence_trigger() -> str | None:
     if closed >= min_trades:
         return "new_closed_trades"
 
-    ol_path = BOT / "reports" / "research" / "outcome_learning.json"
     try:
-        ol = _json.loads(ol_path.read_text(encoding="utf-8"))
+        ol = _json.loads(outcome_learning_path.read_text(encoding="utf-8"))
         pf = float(ol.get("profit_factor") or 0.0)
         prev_pf = float(marker.get("profit_factor") or 0.0)
         if prev_pf > 0 and pf > 0 and pf < prev_pf * (1.0 - degradation):

@@ -17,10 +17,11 @@ Research-only. Bar fetching is read-only; no orders and no live YAML edits.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -134,6 +135,34 @@ def _max_drawdown_pips(pnls: list[float]) -> float:
     return round(dd, 4)
 
 
+# Out-of-sample qualification gates (defect 8): consistent with runtime/champion
+# safety. expectancy>0 AND p05>0 alone are NOT enough - sample size, loss tail,
+# profit factor and payoff symmetry must all hold.
+MIN_OOS_N = 10
+MIN_OOS_LOSSES = 5
+MIN_OOS_PAYOFF = 0.25  # avg_loss may not erase more than 4x avg_win
+
+
+def oos_gate(vm: dict[str, Any]) -> tuple[bool, str]:
+    """Deterministic OOS qualification gate for one candidate metrics dict."""
+    if int(vm.get("n") or 0) < MIN_OOS_N:
+        return False, f"insufficient_oos_n:{vm.get('n')}"
+    if int(vm.get("n_losses") or 0) < MIN_OOS_LOSSES:
+        return False, f"insufficient_loss_tail:{vm.get('n_losses')}"
+    if float(vm.get("expectancy") or 0.0) <= 0:
+        return False, "expectancy_not_positive"
+    pf = vm.get("profit_factor")
+    if pf is None or float(pf) <= 1.0:
+        return False, "profit_factor_not_above_one"
+    p05 = vm.get("bootstrap_p05")
+    if p05 is None or float(p05) <= 0:
+        return False, "bootstrap_p05_not_positive"
+    payoff = vm.get("payoff")
+    if payoff is not None and float(payoff) < MIN_OOS_PAYOFF:
+        return False, f"payoff_below_floor:{payoff}"
+    return True, "ok"
+
+
 def _state_metrics(pnls: list[float]) -> dict[str, Any]:
     metrics = payoff_metrics(pnls)
     avg_win = metrics.get("avg_win")
@@ -212,7 +241,7 @@ def hierarchical_strategy_selection(
             continue
         m = _state_metrics(train_pnls)
         if (m["expectancy"] or 0) > 0:
-            level_a[sig] = {"train": m}
+            level_a[sig] = {"train": m, "dominant_family": str(sig[5] or "")}
 
     # ---- LEVEL B: symbol+state ----
     level_b: dict[tuple, dict[str, Any]] = {}
@@ -237,20 +266,27 @@ def hierarchical_strategy_selection(
     for level, table in (("A", level_a), ("B", level_b)):
         for sig, info in table.items():
             symbol = sig[0]
-            state = dict(zip(state_keys, sig[1:]))
+            # LEVEL A sigs are (symbol, *state_keys, setup): the state part is
+            # still exactly the 4 state keys; setup rides along as sig[5].
+            state = dict(zip(state_keys, sig[1:1 + len(state_keys)]))
             late_rows = [
                 r for r in late
                 if str(r.get("symbol") or "") == symbol and matches_state(r, state)
             ]
+            if level == "A":
+                # Defect 6: LEVEL A trains on symbol+state+FAMILY, so the OOS
+                # window must test the SAME family; mixing setups contaminates
+                # family validation.
+                family = str(info.get("dominant_family") or "")
+                late_rows = [
+                    r for r in late_rows
+                    if str(r.get("setup") or "") == family
+                ]
             late_pnls = _costed([float(r["outcome"]) for r in late_rows], cost_of(symbol))
             if len(late_pnls) < min_validate_n:
                 continue
             vm = _state_metrics(late_pnls)
-            survives = bool(
-                (vm["expectancy"] or 0) > 0
-                and vm["bootstrap_p05"] is not None
-                and vm["bootstrap_p05"] > 0
-            )
+            gate_ok, gate_reason = oos_gate(vm)
             opportunities.append({
                 "level": level,
                 "symbol": symbol,
@@ -270,7 +306,8 @@ def hierarchical_strategy_selection(
                 "tail_loss_p05_validate": vm["tail_loss_p05"],
                 "max_drawdown_pips_validate": vm["max_drawdown_pips"],
                 "bootstrap_p05_validate": vm["bootstrap_p05"],
-                "survives_validate": survives,
+                "gate_reason": gate_reason,
+                "survives_validate": bool(gate_ok),
             })
 
     # ---- LEVEL C: pooled state with per-symbol homogeneity proof ----
@@ -302,17 +339,18 @@ def hierarchical_strategy_selection(
         if len(pooled_net) < min_validate_n * min_symbols_pool:
             continue
         vm = _state_metrics(pooled_net)
-        survives = bool(
-            (vm["expectancy"] or 0) > 0
-            and vm["bootstrap_p05"] is not None
-            and vm["bootstrap_p05"] > 0
-        )
+        pool_gate_ok, pool_gate_reason = oos_gate(vm)
         for symbol in qualified_symbols:
             sym_late = [
                 float(r["outcome"]) - cost_of(str(r.get("symbol") or ""))
                 for r in pool_late
                 if str(r.get("symbol") or "") == symbol
             ]
+            # Defect 7: pooled survival is NOT inheritable by itself. Each
+            # symbol must independently clear the same OOS sanity gates on its
+            # own late-window outcomes before it receives the opportunity.
+            sym_vm = _state_metrics(sym_late) if sym_late else {"n": 0}
+            sym_ok, sym_reason = oos_gate(sym_vm)
             opportunities.append({
                 "level": "C",
                 "symbol": symbol,
@@ -326,17 +364,28 @@ def hierarchical_strategy_selection(
                 "expectancy_validate_pool": vm["expectancy"],
                 "profit_factor_validate_pool": vm["profit_factor"],
                 "bootstrap_p05_validate_pool": vm["bootstrap_p05"],
-                "n_validate_symbol": len(sym_late),
-                "expectancy_validate_symbol": (
-                    round(sum(sym_late) / len(sym_late), 5) if sym_late else None
-                ),
-                "survives_validate": survives,
+                "pool_gate_reason": pool_gate_reason,
+                "n_validate_symbol": sym_vm.get("n", 0),
+                "n_losses_validate_symbol": sym_vm.get("n_losses"),
+                "expectancy_validate_symbol": sym_vm.get("expectancy"),
+                "profit_factor_validate_symbol": sym_vm.get("profit_factor"),
+                "payoff_validate_symbol": sym_vm.get("payoff"),
+                "bootstrap_p05_validate_symbol": sym_vm.get("bootstrap_p05"),
+                "symbol_gate_reason": sym_reason,
+                "survives_validate": bool(pool_gate_ok and sym_ok),
             })
 
-    # Dedupe: keep the strongest record per (symbol, state): A > B > C.
+    # Dedupe: LEVEL A records are family-scoped and all stay visible; B/C
+    # collapse per (symbol, state) with A > B > C preference.
     best: dict[tuple, dict[str, Any]] = {}
     rank = {"A": 3, "B": 2, "C": 1}
     for opp in opportunities:
+        if opp["level"] == "A":
+            best[(
+                opp["symbol"], opp["regime"], opp["structure"], opp["session"],
+                opp["side"], "A", str(opp.get("strategy_family") or ""),
+            )] = opp
+            continue
         key = (opp["symbol"], opp["regime"], opp["structure"], opp["session"], opp["side"])
         cur = best.get(key)
         cur_ev = (
@@ -545,6 +594,65 @@ def strategy_selection(
     }
 
 
+def write_demo_canary(
+    opportunity: dict[str, Any],
+    *,
+    dataset_hash: str,
+    index_file_sha256: str,
+    risk_fraction: float,
+    path: Path = INTEL_DIR / "demo_canary.json",
+    validity_days: float = 7.0,
+) -> Path | None:
+    """Defect 16: a DEMO_CANARY permission artifact tied to ONE validated
+    opportunity. No artifact => no canary orders; the research bootstrap stays
+    shadow-only. Expires unless regenerated from fresh validation."""
+    if not opportunity or not opportunity.get("survives_validate"):
+        if path.exists():
+            path.unlink()
+        return None
+    metrics = {
+        k: opportunity.get(k) for k in (
+            "expectancy_validate", "profit_factor_validate",
+            "bootstrap_p05_validate", "n_validate", "n_losses_validate")
+        if opportunity.get(k) is not None
+    }
+    payload = {
+        "schema": "demo_canary.v1",
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "expires_utc": (datetime.now(timezone.utc) + timedelta(days=validity_days)).isoformat(),
+        "strategy_id": "canary_" + "_".join(
+            str(opportunity.get(k, "")) for k in ("symbol", "regime", "structure", "session", "side")
+        ),
+        "opportunity": {
+            k: opportunity.get(k)
+            for k in ("level", "symbol", "regime", "structure", "session", "side",
+                      "strategy_family", "cost_pips")
+        },
+        "metrics": metrics,
+        "dataset_hash": dataset_hash,
+        "validation_hash": hashlib.sha256(
+            json.dumps(metrics, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:16],
+        "index_file_sha256": index_file_sha256,
+        "risk_fraction": float(risk_fraction),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    return path
+
+
+def ml_advances(absolute_expectancy: float | None, improvement: float | None) -> bool:
+    """Defect 10: relative improvement is NOT success.
+
+    An ML model may only advance when its ABSOLUTE costed out-of-sample
+    expectancy is > 0. A positive improvement over a negative baseline while
+    still net-negative is a failed candidate, permanently.
+    """
+    if absolute_expectancy is None:
+        return False
+    return float(absolute_expectancy) > 0.0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="ML research pipeline (research-only)")
     parser.add_argument("--index", type=Path, default=INTEL_DIR / "analogue_index.json")
@@ -580,9 +688,10 @@ def main() -> int:
     from aegis.research.exit_research import per_trade_cost_pips
 
     sample_cost = per_trade_cost_pips(symbols[0], float(pip_by_symbol.get(symbols[0], 0.0001)), spread_bps, slippage_bps) if symbols else 0.0
-
-    # P4: per-symbol cost model replaces the single sample cost.
     commission_rt = float(cfg.get("commission_round_trip_usd", 0.0) or 0.0)
+
+    # P4/defect 9: measured per-symbol/session cost profiles override the
+    # config formula wherever journal evidence is sufficient.
     cost_model = symbol_cost_pips(
         pip_by_symbol,
         spread_bps=spread_bps,
@@ -590,6 +699,19 @@ def main() -> int:
         commission_round_trip_usd=commission_rt,
     )
     cost_by_symbol = {s: m["cost_pips"] for s, m in cost_model.items()}
+    profiles_path = resolve_bot_path(
+        cfg.get("cost_profiles_path"), INTEL_DIR / "cost_profiles.json"
+    )
+    try:
+        profiles = json.loads(profiles_path.read_text(encoding="utf-8"))
+        for sym, prof in (profiles.get("symbols") or {}).items():
+            measured = prof.get("validation_cost_pips")
+            if measured:
+                cost_by_symbol[str(sym).upper()] = float(measured)
+                cost_model.setdefault(str(sym).upper(), {})["measured_cost_pips"] = float(measured)
+                cost_model[str(sym).upper()]["cost_source"] = prof.get("cost_source")
+    except (OSError, json.JSONDecodeError):
+        pass  # no profiles yet: formula costs remain the documented fallback
 
     # P3/P13: hierarchical symbol-aware selection with reproducible hashes.
     import hashlib
@@ -633,6 +755,21 @@ def main() -> int:
             cfg.get("validated_opportunities_path"),
             INTEL_DIR / "validated_opportunities.json",
         ),
+    )
+    # Defect 16: DEMO_CANARY permission artifact for the single best survivor,
+    # bound to dataset + validation hashes. No survivor => artifact removed.
+    index_file = resolve_bot_path(cfg.get("analogue_index_path"), INTEL_DIR / "analogue_index.json")
+    try:
+        index_file_sha = hashlib.sha256(index_file.read_bytes()).hexdigest()
+    except OSError:
+        index_file_sha = ""
+    survivors_all = [o for o in hier.get("opportunities", []) if o.get("survives_validate")]
+    canary_path = write_demo_canary(
+        survivors_all[0] if survivors_all else {},
+        dataset_hash=dataset_hash,
+        index_file_sha256=index_file_sha,
+        risk_fraction=float(cfg.get("intelligent_risk_fraction", 0.08) or 0.08),
+        path=resolve_bot_path(cfg.get("demo_canary_path"), INTEL_DIR / "demo_canary.json"),
     )
     # Legacy pooled-state allowlist: only LEVEL C survivors qualify.
     pooled_survivors = [
@@ -692,6 +829,7 @@ def main() -> int:
             "all_holdout_expectancy": ml["all_holdout"]["expectancy"],
             "model_taken_expectancy": ml["model_taken"]["expectancy"],
             "improvement_expectancy": ml["improvement_expectancy"],
+            "ml_advances": ml_advances(ml["model_taken"]["expectancy"], ml["improvement_expectancy"]),
             "equity_curve": ml["equity_curve"],
             "drawdown": ml["drawdown"],
             "model_equity_curve": ml["model_equity_curve"],

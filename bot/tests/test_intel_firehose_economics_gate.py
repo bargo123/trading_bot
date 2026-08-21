@@ -126,13 +126,31 @@ def _index(tmp_path: Path, records: list[dict], *, provenance: str) -> Path:
 
 
 def _brain(index_path: Path, **overrides) -> IntelligentFirehoseBrain:
+    import hashlib as _hashlib
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+
+    canary = {
+        "schema": "demo_canary.v1",
+        "created_utc": _dt.now(_tz.utc).isoformat(),
+        "expires_utc": (_dt.now(_tz.utc) + _td(days=1)).isoformat(),
+        "strategy_id": "canary_test",
+        "opportunity": {"symbol": "EURUSD"},
+        "metrics": {},
+        "dataset_hash": "test",
+        "validation_hash": "test",
+        "index_file_sha256": _hashlib.sha256(index_path.read_bytes()).hexdigest(),
+        "risk_fraction": 0.08,
+    }
+    canary_path = index_path.parent / "demo_canary.json"
+    canary_path.write_text(json.dumps(canary), encoding="utf-8")
     cfg = {
         "analogue_index_path": str(index_path),
         "intelligent_champion_path": str(index_path.parent / "no_such_champion.json"),
         "intelligent_firehose_bootstrap": True,
-        # These tests target the economics gates, not governance: allow the
-        # bootstrap to reach DEMO_CANARY so a genuine fire can be observed.
+        # These tests target the economics gates, not governance: a valid
+        # DEMO_CANARY artifact lets the bootstrap reach the trading stage.
         "intelligent_bootstrap_canary": True,
+        "demo_canary_path": str(canary_path),
         "intelligent_min_analogues": 20,
         "intelligent_min_similarity": 0.5,
         "intelligent_risk_fraction": 0.08,
