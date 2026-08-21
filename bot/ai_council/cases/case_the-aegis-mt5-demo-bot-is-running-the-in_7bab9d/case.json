@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-21T22:02:13.632748+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7bab9d\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 25.26,
+          "finished_utc": "2026-08-21T22:06:23.536217+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-21T22:05:58.261628+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-21T22:06:23.537487+00:00",
+        "text": "A single sealed cycle is far too small a sample to certify a 10% expectancy gain\u2014no significance test, bootstrap, or variance estimate is specified, so you'd be accepting noise dressed as signal. The three acceptance knobs (5% margin band, +10% expectancy, 80% retention) are suspiciously round and unpre-registered, which smells like thresholds reverse-engineered from prior peeking rather than fixed ex ante; and \"without worsening max drawdown\" is unmeasurable without a tolerance band since drawdown estimates are wildly sample-dependent. There's also no evidence the gate scores are calibrated\u2014the filter presumes proximity-to-threshold implies marginal quality, which is asserted, not validated\u2014and with 80% retention on an unknown baseline trade count, per-bucket sample sizes could be too thin to conclude anything. Safety-wise it's clean (DEMO-only, champion frozen, registry logged), but the experiment must be registered in ExperimentRegistry *before* the run, not after, per house rules."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7bab9d\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 14.8,
+          "finished_utc": "2026-08-21T22:05:58.245016+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-21T22:05:43.446507+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-21T22:05:58.245016+00:00",
+        "text": "The proposal is selection-biased and overfit: it targets buckets and exit rules chosen after inspecting the same 2,517 outcomes, then tries unspecified values of N and loss caps, with no nested validation or multiple-testing correction. The outcome log may not contain intratrade bar paths needed to replay counterfactual time-stops or tightened stops, making the claimed results unmeasurable unless reconstructed from point-in-time market data with spread, slippage, and stop-execution modeling. A single sealed-holdout pass after tuning is insufficient, and the \u201cwin rate not materially hurt\u201d claim lacks a predefined threshold, sample-size/power requirement, and bucket-level stability gates. Safety is acceptable only if the work remains offline, every trial\u2014including failures\u2014is registered, protected live YAML is untouched, and promotion occurs exclusively through the governed scripts."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-21T22:07:19.444832+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_73b6a4",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_73b6a4 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_7bab9d",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7bab9d\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 134.45,
+        "finished_utc": "2026-08-21T22:04:42.534522+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T22:02:28.085351+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T22:04:42.551197+00:00",
+      "text": "Proposal: Run an offline exit-research experiment testing whether a hard time-stop or loss-cap on the champion's rare losing trades can flip expectancy positive without materially hurting win rate \u2014 motivated by the measured evidence that CORE_STRATEGY_V1 has a cosmetic 95.7% win rate with expectancy_r of -0.036 (IS) / -0.019 (OOS) because avg_loss (-$2.57) is ~84x avg_win ($0.031), and the outcome-learning log shows the 96 stop-out exits alone account for -$52.50 while average tail losses erase ~20 wins per trade. Concretely: replay the existing 2,517-exit outcome log and backtest variants (e.g., time-stop at N bars, or SL tightened to 2x avg_win) restricted to the buckets flagged cosmetic_win_rate=true (EURCHF|sell, GBPCHF|sell, EURCAD|buy/sell, EURUSD|buy, EURGBP), then register the challenger via ExperimentRegistry and submit it to all promote.py gates including the sealed holdout. Falsification criterion: if no variant lifts sealed-holdout net-of-cost expectancy above +0.01R with PF > 1.0 and drawdown not worse than the incumbent's 5.4%, reject and keep the challenger on record un-promoted. This follows the risk-control principle in *The New Trading for a Living* (2014) and Carver's stop-sizing discussion in *Systematic Trading* (2015): fix the loss side before touching entry throughput, even though 79% of firehose opportunities are currently gated out by state_not_in_validated_set."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7bab9d\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 10.26,
+        "finished_utc": "2026-08-21T22:05:19.755588+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-21T22:05:09.495276+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T22:05:19.755588+00:00",
+      "text": "Test a validated-state confidence-margin filter that skips DEMO signals whose gate score lies within 5% of the acceptance threshold. Evaluate it on the next sealed, walk-forward cycle using the existing spread and slippage assumptions. Accept the candidate only if net expectancy improves by at least 10% while retaining at least 80% of baseline trades and without worsening maximum drawdown; otherwise reject it. Record the result in the ExperimentRegistry and leave the champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7bab9d\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.64,
+        "finished_utc": "2026-08-21T22:07:19.394434+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-21T22:07:07.749704+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-21T22:07:19.394434+00:00",
+      "text": "Pre-register the 5% margin band, 10% net-expectancy target, 80% trade-retention floor, drawdown tolerance, minimum trade and score-bucket sample sizes, and analysis plan in ExperimentRegistry before examining sealed results. First validate that gate-score distance predicts out-of-sample net outcomes using reliability buckets and a monotonicity test; if calibration or sample-size requirements fail, reject the filter. Evaluate the frozen candidate across multiple untouched walk-forward folds using existing spread and slippage assumptions, and estimate expectancy uplift and drawdown differences with block-bootstrap confidence intervals. Accept only if the lower confidence bound supports a positive uplift consistent with the pre-registered 10% target, retention remains at least 80%, and the upper confidence bound for drawdown deterioration stays within the pre-registered tolerance; otherwise reject it and leave the champion unchanged."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7bab9d\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 44.18,
+        "finished_utc": "2026-08-21T22:07:07.732990+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T22:06:23.554379+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-21T22:07:07.732990+00:00",
+      "text": "To address the selection-bias concern, the full variant grid and bucket list are pre-registered here before any further outcome inspection\u2014time-stops at N \u2208 {4, 8, 16} bars post-entry and hard loss-caps at 2\u00d7 and 3\u00d7 the champion's measured $0.031 avg_win, applied uniformly to all six cosmetic_win_rate buckets plus an untreated control set, with Holm\u2013Bonferroni correction across all tested variants. A data-feasibility audit comes first: since the 2,517-exit outcome log may lack intratrade bar paths, counterfactuals will be reconstructed from point-in-time M1 bars with explicit spread, slippage, and worst-case gap-through-stop execution modeling, and if faithful reconstruction proves impossible the experiment is registered as failed and abandoned rather than approximated. Selection uses nested validation: the in-sample window splits into tuning folds (where the grid is searched under the corrected tests) and a validation fold touched exactly once per surviving variant, followed by a single sealed-holdout pass with no re-tuning or resubmission afterward. Success requires meeting all predefined thresholds simultaneously: sealed-holdout net-of-cost expectancy \u2265 +0.01R, PF > 1.0, max drawdown no worse than the incumbent's 5.4%, win-rate decline \u2264 2 percentage points absolute versus 95.7%, \u2265 150 exits per evaluated bucket (sized for power against the observed exit-level variance), and bucket-level stability\u2014positive expectancy in at least five of six buckets with none below \u22120.02R; failing any gate rejects the challenger, which remains on record un-promoted. The work stays strictly offline throughout: every trial, including failures and the feasibility audit itself, is logged in ExperimentRegistry, protected live YAML and runner configs are never touched, and any promotion proceeds exclusively through the governed `research_promote_champion.py` / `promote.py` pipeline."
+    }
+  },
+  "status": "decided"
+}

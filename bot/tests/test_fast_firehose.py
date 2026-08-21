@@ -12,6 +12,7 @@ from aegis.intel.fast_firehose import (  # noqa: E402
     ExitAction,
     FastExitConfig,
     FastExitStateMachine,
+    FastMarketContext,
     MicroCandidate,
     check_entry_economics,
     classify_firehose_mode,
@@ -23,6 +24,26 @@ from aegis.intel.fast_firehose import (  # noqa: E402
 )
 
 
+def _ctx(**overrides) -> FastMarketContext:
+    """Build a test FastMarketContext with reasonable defaults."""
+    base = dict(
+        symbol="EURUSD", timestamp="2026-08-21T12:00:00Z",
+        bid=1.1000, ask=1.10002, spread_pips=0.2,
+        m1_open=1.09998, m1_high=1.10008, m1_low=1.09990,
+        m1_close=1.10000, m1_prev_close=1.09995, m1_atr=0.0015,
+        m1_range=0.00018, m1_body=0.00005, m1_volume=100,
+        m5_direction="up", m5_structure="none",
+        m5_support=1.0950, m5_resistance=1.1050, m5_atr=0.002,
+        m15_direction="up", m15_structure="none",
+        m15_support=1.0950, m15_resistance=1.1050,
+        m15_range_mid=1.1000, m15_range_half_width=0.0040,
+        return_30s=0.0008, return_15s=0.0004, return_60s=0.001,
+        session="london", regime="trend",
+    )
+    base.update(overrides)
+    return FastMarketContext(**base)
+
+
 def test_pip_value_jpy_vs_standard():
     assert pip_value("EURUSD") == 0.0001
     assert pip_value("USDJPY") == 0.01
@@ -31,12 +52,10 @@ def test_pip_value_jpy_vs_standard():
 
 
 def test_micro_momentum_burst_generates_on_compression_release():
-    c = micro_momentum_burst(
-        symbol="EURUSD", regime="trend", session="london",
+    c = micro_momentum_burst(_ctx(
         m15_direction="up", m5_direction="up",
-        m1_return_30s=0.0008, m1_atr=0.0015,
-        compression_ratio=0.4, bid=1.1000, ask=1.10002,
-        m1_low=1.0998, m1_high=1.1001, spread_pips=0.2)
+        return_30s=0.0008, m1_atr=0.0015,
+        m1_low=1.0998, m1_high=1.1001, spread_pips=0.2))
     assert c is not None
     assert c.family == "micro_momentum_burst"
     assert c.side == "buy"
@@ -44,32 +63,30 @@ def test_micro_momentum_burst_generates_on_compression_release():
 
 
 def test_micro_momentum_rejects_when_no_impulse():
-    c = micro_momentum_burst(
-        symbol="EURUSD", regime="trend", session="london",
+    c = micro_momentum_burst(_ctx(
         m15_direction="up", m5_direction="up",
-        m1_return_30s=0.00001, m1_atr=0.0015,
-        compression_ratio=0.9, bid=1.1000, ask=1.10002,
-        m1_low=1.0998, m1_high=1.1001, spread_pips=0.2)
+        return_30s=0.00001, m1_atr=0.0015,
+        m1_low=1.0998, m1_high=1.1001, spread_pips=0.2))
     assert c is None
 
 
 def test_failed_breakout_fade_generates_on_trap():
-    c = failed_breakout_fade(
-        symbol="GBPUSD", regime="range", session="london",
+    c = failed_breakout_fade(_ctx(
+        regime="range", session="london",
         m15_resistance=1.2750, m15_support=1.2700,
-        m1_close=1.2748, prev_m1_close=1.2752,
+        m1_close=1.2748, m1_prev_close=1.2752,
         bid=1.2747, ask=1.2749, m1_atr=0.0020,
-        m1_low=1.2740, m1_high=1.2755, spread_pips=0.3)
+        m1_low=1.2740, m1_high=1.2755, spread_pips=0.3))
     assert c is not None
-    assert c.side == "sell"  # fade the trapped breakout buyers
+    assert c.side == "sell"
 
 
 def test_fair_value_snapback_generates_at_range_edge():
-    c = fair_value_snapback(
-        symbol="AUDUSD", regime="range", session="asia",
-        range_mid=0.6500, range_half_width=0.0030,
+    c = fair_value_snapback(_ctx(
+        regime="range", session="asia",
+        m15_range_mid=0.6500, m15_range_half_width=0.0030,
         m1_close=0.6535, m1_atr=0.0015,
-        bid=0.6534, ask=0.6536, spread_pips=0.2)
+        bid=0.6534, ask=0.6536, spread_pips=0.2))
     assert c is not None
     assert c.side == "sell"
     assert c.required_regime == "range"
@@ -77,18 +94,17 @@ def test_fair_value_snapback_generates_at_range_edge():
 
 def test_generate_multiple_independent_candidates():
     """Multiple families can produce candidates simultaneously."""
-    results = generate_micro_candidates(
-        symbol="EURUSD", regime="range", session="asia",
-        m15_direction="up", m5_direction="up",
+    results = generate_micro_candidates(_ctx(
+        regime="range", session="asia",
+        m15_direction="down", m5_direction="down",
         m15_resistance=1.1050, m15_support=1.0950,
-        range_mid=1.1000, range_half_width=0.0040,
-        m1_close=1.1042, prev_m1_close=1.1052,
-        m1_open=1.1030, m1_low=1.1028, m1_high=1.1053,
-        m1_atr=0.0020, m1_return_30s=0.0008,
-        compression_ratio=0.4, bid=1.1041, ask=1.1043,
-        spread_pips=0.2)
+        m15_range_mid=1.1000, m15_range_half_width=0.0040,
+        m1_close=1.1042, m1_prev_close=1.1052,
+        m1_low=1.1028, m1_high=1.1053,
+        m1_atr=0.0020, return_30s=-0.0012,
+        bid=1.1041, ask=1.1043, spread_pips=0.2))
     families = {c.family for c in results}
-    assert len(families) >= 2, f"expected multiple independent families, got: {families}"
+    assert len(families) >= 2, f"expected multiple families, got: {families}"
 
 
 def test_entry_economics_blocks_min_lot_risk_exceeding_budget():

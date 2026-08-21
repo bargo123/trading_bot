@@ -199,7 +199,7 @@ intelligent_exploration_enabled: true
 exploration_max_positions: 2
 exploration_max_positions_per_symbol: 1
 exploration_max_daily_loss_usd: 1.0
-exploration_max_risk_per_trade_usd: 1.00
+exploration_max_risk_per_trade_usd: 0.15
 exploration_max_trades_per_hypothesis: 5
 exploration_cooldown_after_failure_s: 1800
 exploration_inactivity_warn_min: 90

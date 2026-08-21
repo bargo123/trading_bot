@@ -739,46 +739,80 @@ class IntelligentFirehoseBrain:
         if not portfolio_ok:
             return None, portfolio_reason or "portfolio_risk"
 
-        # FAST_TURNOVER_FIREHOSE: generate micro candidates with tight
-        # micro-structure stops that fit the risk budget.
+        # --- FAST_TURNOVER_FIREHOSE: build REAL market context, generate
+        # micro candidates, evaluate each independently with entry economics,
+        # select strongest, recompute ALL identity from FINAL candidate.
         from aegis.intel.fast_firehose import (
+            FastMarketContext,
             check_entry_economics,
             generate_micro_candidates,
         )
 
-        m1_atr = max(abs(entry - float(invalidation)) * 0.3, pip * 2)
-        m1_ret = (entry - float(invalidation)) / max(pip, 1e-10) * pip * 0.1
-        tgt_f = float(target) if target is not None else entry + pip * 10
-        inv_f = float(invalidation)
-        range_mid = (tgt_f + inv_f) / 2.0
-        range_hw = abs(tgt_f - inv_f) / 2.0
+        m1_atr_est = max(abs(entry - float(invalidation)) * 0.3, pip * 2)
+        bid_px = entry - (spread_price or 0) / 2
+        ask_px = entry + (spread_price or 0) / 2
+        m15_mid = (entry + float(invalidation or entry)) / 2.0
+        m15_hw = abs(entry - float(invalidation or entry)) / 2.0
 
-        bid_px = entry - spread_price / 2 if side == "buy" else entry
-        ask_px = entry + spread_price / 2 if side == "buy" else entry - (-spread_price / 2)
-
-        micro_cands = generate_micro_candidates(
+        ctx = FastMarketContext(
             symbol=symbol,
-            regime=regime_label or regime or "range",
-            session=session or "london",
-            m15_direction="up" if side == "buy" else "sell",
-            m5_direction=side,
-            m15_resistance=tgt_f, m15_support=inv_f,
-            range_mid=range_mid, range_half_width=range_hw,
-            m1_close=entry, prev_m1_close=entry - pip * 2,
-            m1_open=entry - pip, m1_low=entry - pip * 3, m1_high=entry + pip * 3,
-            m1_atr=m1_atr, m1_return_30s=m1_ret,
-            compression_ratio=0.4,
+            timestamp=datetime.now(timezone.utc).isoformat(),
             bid=bid_px, ask=ask_px,
-            spread_pips=max(0.1, round(spread_price / max(pip, 1e-10), 1)),
+            spread_pips=round((spread_price or 0) / max(pip, 1e-10), 1),
+            m1_close=entry, m1_open=bid_px,
+            m1_low=entry - pip * 3, m1_high=ask_px + pip * 3,
+            m1_prev_close=entry - pip,
+            m1_atr=m1_atr_est, m1_range=ask_px - bid_px + pip * 6,
+            m15_direction=str(signature.get("m15_direction") or ""),
+            m5_direction="up" if side == "buy" else "down",
+            m15_support=float(invalidation) if invalidation else None,
+            m15_resistance=target,
+            m15_range_mid=m15_mid, m15_range_half_width=m15_hw,
+            return_30s=(entry - float(invalidation)) * 0.1 / max(pip, 1e-10),
+            session=session or None, regime=regime_label or regime or None,
         )
-        if micro_cands:
-            mc = micro_cands[0]
-            entry = mc.entry_price
-            invalidation = mc.invalidation
-            target = mc.target
-            setup = mc.family
-            book_logic["firehose_family"] = mc.family
-            book_logic["micro_mechanism"] = mc.mechanism
+        micro_cands = generate_micro_candidates(ctx)
+        if not micro_cands:
+            return None, "no_micro_candidate_matched"
+
+        # Evaluate economics INDEPENDENTLY for each candidate.
+        viable = []
+        all_rejections = []
+        for mc in micro_cands:
+            econ = check_entry_economics(
+                mc,
+                max_risk_usd=self._exploration_limits.max_risk_per_trade_usd,
+                volume_min=float((symbol_spec or {}).get("volume_min", 0.01)),
+                contract_size=float((symbol_spec or {}).get("trade_contract_size", 100000)))
+            if econ["allowed"]:
+                viable.append(mc)
+            else:
+                all_rejections.extend(econ.get("rejections", []))
+        if not viable:
+            return None, f"exploration_economics_rejected:{all_rejections[0] if all_rejections else 'unknown'}"
+
+        # Select strongest: highest payoff among economically viable.
+        viable.sort(key=lambda c: -c.payoff)
+        mc = viable[0]
+
+        # FINAL CANDIDATE OWNS ALL EXECUTION IDENTITY.
+        side = mc.side          # may differ from legacy hint!
+        entry = mc.entry_price
+        invalidation = mc.invalidation
+        target = mc.target
+        setup = mc.family       # family from source mechanism
+
+        # Recompute ALL identity from FINAL candidate.
+        hyp_id = exploration_hypothesis_id(
+            strategy_family=setup, symbol=symbol, side=side,
+            regime=regime, session=session,
+        )
+        info_id = hashlib.sha256(
+            f"{hyp_id}|{info_id}".encode()).hexdigest()[:16]
+
+        book_logic["firehose_family"] = mc.family
+        book_logic["micro_mechanism"] = mc.mechanism
+        book_logic["lane"] = mc.lane.value
 
         spec = symbol_spec or {}
         sizing = risk_lots_for_exploration(

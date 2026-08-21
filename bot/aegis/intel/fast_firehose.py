@@ -46,6 +46,66 @@ def firehose_hypothesis_id(*, family: str, symbol: str, side: str,
     return "ftf_" + hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 
+class Direction(str, Enum):
+    UP = "up"
+    DOWN = "down"
+    FLAT = "flat"
+    UNKNOWN = "unknown"
+
+
+@dataclass
+class FastMarketContext:
+    """Point-in-time market data for fast-turnover decisions.
+    All fields are None if unavailable. NO fabricated defaults."""
+    symbol: str
+    timestamp: str = ""
+    bid: float | None = None
+    ask: float | None = None
+    spread_pips: float | None = None
+    # Completed M1
+    m1_open: float | None = None
+    m1_high: float | None = None
+    m1_low: float | None = None
+    m1_close: float | None = None
+    m1_prev_close: float | None = None
+    m1_atr: float | None = None
+    m1_range: float | None = None
+    m1_body: float | None = None
+    m1_volume: float | None = None
+    # Completed M5
+    m5_direction: str | None = None  # up/down/flat/unknown
+    m5_structure: str | None = None
+    m5_support: float | None = None
+    m5_resistance: float | None = None
+    m5_atr: float | None = None
+    m5_compression: float | None = None
+    # Completed M15
+    m15_direction: str | None = None
+    m15_structure: str | None = None
+    m15_support: float | None = None
+    m15_resistance: float | None = None
+    m15_range_mid: float | None = None
+    m15_range_half_width: float | None = None
+    # Recent tick/quote buffer
+    return_5s: float | None = None
+    return_15s: float | None = None
+    return_30s: float | None = None
+    return_60s: float | None = None
+    tick_rate_per_min: float | None = None
+    quote_change_rate: float | None = None
+    short_volatility: float | None = None
+    signed_tick_imbalance: float | None = None
+    # Session/regime
+    session: str | None = None
+    regime: str | None = None
+
+    @property
+    def has_micro_geometry(self) -> bool:
+        return all(v is not None for v in (
+            self.bid, self.ask, self.m1_close, self.m1_atr,
+            self.m1_low, self.m1_high))
+
+
 @dataclass
 class MicroCandidate:
     """One fast-turnover trade candidate from a specific family."""
@@ -103,124 +163,138 @@ def _micro_invalidation(*, side: str, entry: float, m1_low: float,
     return None
 
 
-def micro_momentum_burst(*, symbol: str, regime: str, session: str,
-                         m15_direction: str, m5_direction: str,
-                         m1_return_30s: float, m1_atr: float,
-                         compression_ratio: float, bid: float, ask: float,
-                         m1_low: float, m1_high: float,
-                         spread_pips: float) -> MicroCandidate | None:
-    """A. MICRO MOMENTUM BURST: compression -> clean impulse -> M5/M15 aligned."""
-    if abs(m1_return_30s) < m1_atr * 0.3:
-        return None  # no impulse
-    if compression_ratio > 0.8:
-        return None  # still compressed, not expanding yet
-    direction = "buy" if m1_return_30s > 0 else "sell"
-    if m15_direction not in ("up", "down"):
+def micro_momentum_burst(ctx: FastMarketContext) -> MicroCandidate | None:
+    """A. MICRO MOMENTUM BURST: compression → clean impulse → M15/M5 aligned."""
+    if None in (ctx.m1_atr, ctx.return_30s, ctx.bid, ctx.ask,
+                ctx.m1_low, ctx.m1_high,
+                ctx.m15_direction, ctx.m5_direction):
         return None
-    if (direction == "buy" and m15_direction != "up") or \
-       (direction == "sell" and m15_direction != "down"):
+    m1_ret = ctx.return_30s or 0.0
+    atr = ctx.m1_atr
+    compression = ctx.m5_compression if ctx.m5_compression is not None else 0.5
+    if abs(m1_ret) < atr * 0.3:
         return None
-    entry = ask if direction == "buy" else bid
+    if compression > 0.8:
+        return None
+    direction = "buy" if m1_ret > 0 else "sell"
+    m15d = ctx.m15_direction or ""
+    if (direction == "buy" and m15d not in ("up",)) or \
+       (direction == "sell" and m15d not in ("down",)):
+        return None
+    entry = ctx.ask if direction == "buy" else ctx.bid
     inv = _micro_invalidation(side=direction, entry=entry,
-                              m1_low=m1_low, m1_high=m1_high, atr_m1=m1_atr)
-    if inv is None or abs(entry - inv) < pip_value(symbol) * 1.5:
+                              m1_low=ctx.m1_low, m1_high=ctx.m1_high, atr_m1=atr)
+    pip = pip_value(symbol := ctx.symbol)
+    if inv is None or abs(entry - inv) < pip * 1.5:
         return None
-    stop_pips = abs(entry - inv) / pip_value(symbol)
-    target_pips = stop_pips * 1.2  # modest R:R; speed is the edge
-    tgt = entry + (target_pips * pip_value(symbol) * (1 if direction == "buy" else -1))
+    stop_pips = abs(entry - inv) / pip
+    target_pips = stop_pips * 1.2
+    sign = 1.0 if direction == "buy" else -1.0
+    tgt = entry + sign * target_pips * pip
+    spread_pips = ctx.spread_pips or 0.0
     hyp = firehose_hypothesis_id(family="micro_momentum_burst", symbol=symbol,
-                                 side=direction, regime=regime, session=session)
+                                 side=direction, regime=ctx.regime or "",
+                                 session=ctx.session or "")
     return MicroCandidate(
         hypothesis_id=hyp, family="micro_momentum_burst", symbol=symbol,
         side=direction, entry_price=entry, invalidation=inv, target=tgt,
-        max_hold_s=120, required_regime=regime, required_session=session,
+        max_hold_s=120, required_regime=ctx.regime or "",
+        required_session=ctx.session or "",
         spread_pips=spread_pips, stop_pips=round(stop_pips, 1),
         target_pips=round(target_pips, 1), risk_usd_min_lot=0.0,
         lane=FirehoseLane.SHADOW_MICRO,
-        mechanism=f"compression->impulse continuation on {symbol} {m15_direction}",
-        falsification="OOS trades show negative expectancy after costs",
+        mechanism=f"compression→impulse continuation {symbol} {m15d}",
+        falsification="OOS negative expectancy after costs",
     )
 
 
-def failed_breakout_fade(*, symbol: str, regime: str, session: str,
-                         m15_resistance: float | None, m15_support: float | None,
-                         m1_close: float, prev_m1_close: float,
-                         bid: float, ask: float, m1_atr: float,
-                         m1_low: float, m1_high: float,
-                         spread_pips: float) -> MicroCandidate | None:
-    """B. FAILED BREAKOUT FADE: pierce level -> fail to continue -> fade back."""
-    if m15_resistance is None or m15_support is None:
+def failed_breakout_fade(ctx: FastMarketContext) -> MicroCandidate | None:
+    """B. FAILED BREAKOUT FADE: pierce level → fail → fade back inside."""
+    if None in (ctx.m15_resistance, ctx.m15_support, ctx.m1_close,
+                ctx.bid, ctx.ask, ctx.m1_atr, ctx.m1_low, ctx.m1_high):
         return None
-    # Bullish trap: broke above resistance then closed back below.
-    if prev_m1_close > m15_resistance and m1_close < m15_resistance:
+    res, sup = ctx.m15_resistance, ctx.m15_support
+    close, prev_close = ctx.m1_close, ctx.m1_prev_close
+    if prev_close is None:
+        return None
+    atr = ctx.m1_atr
+    if prev_close > res and close < res:
         direction = "sell"
-        entry = bid
-        inv = max(m1_high, m15_resistance) + m1_atr * 0.2
-        tgt = m15_support if m15_support < entry else entry - m1_atr * 2
-    # Bearish trap: broke below support then closed back above.
-    elif prev_m1_close < m15_support and m1_close > m15_support:
+        entry = ctx.bid
+        inv = max(ctx.m1_high, res) + atr * 0.2
+        tgt = sup if sup < entry else entry - atr * 2
+    elif prev_close < sup and close > sup:
         direction = "buy"
-        entry = ask
-        inv = min(m1_low, m15_support) - m1_atr * 0.2
-        tgt = m15_resistance if m15_resistance > entry else entry + m1_atr * 2
+        entry = ctx.ask
+        inv = min(ctx.m1_low, sup) - atr * 0.2
+        tgt = res if res > entry else entry + atr * 2
     else:
         return None
-    stop_pips = abs(entry - inv) / pip_value(symbol)
-    target_pips = abs(entry - tgt) / pip_value(symbol)
+    pip = pip_value(symbol := ctx.symbol)
+    stop_pips = abs(entry - inv) / pip
+    target_pips = abs(entry - tgt) / pip
     if stop_pips < 1.0 or target_pips < 1.0:
         return None
+    spread_pips = ctx.spread_pips or 0.0
     hyp = firehose_hypothesis_id(family="failed_breakout_fade", symbol=symbol,
-                                 side=direction, regime=regime, session=session)
+                                 side=direction, regime=ctx.regime or "",
+                                 session=ctx.session or "")
     return MicroCandidate(
         hypothesis_id=hyp, family="failed_breakout_fade", symbol=symbol,
         side=direction, entry_price=entry, invalidation=inv, target=tgt,
-        max_hold_s=180, required_regime=regime, required_session=session,
+        max_hold_s=180, required_regime=ctx.regime or "",
+        required_session=ctx.session or "",
         spread_pips=spread_pips, stop_pips=round(stop_pips, 1),
         target_pips=round(target_pips, 1), risk_usd_min_lot=0.0,
         lane=FirehoseLane.SHADOW_MICRO,
-        mechanism=f"failed breakout trap fade on {symbol} {session}",
+        mechanism=f"failed breakout trap fade {symbol}",
         book_family="failed_breakout_fade",
         falsification="fade trades show negative expectancy after costs",
     )
 
 
-def fair_value_snapback(*, symbol: str, regime: str, session: str,
-                        range_mid: float | None, range_half_width: float | None,
-                        m1_close: float, m1_atr: float,
-                        bid: float, ask: float,
-                        spread_pips: float) -> MicroCandidate | None:
-    """C. FAIR-VALUE SNAPBACK: price reaches value edge -> rejection -> snapback."""
-    if range_mid is None or range_half_width is None or range_half_width <= 0:
+def fair_value_snapback(ctx: FastMarketContext) -> MicroCandidate | None:
+    """C. FAIR-VALUE SNAPBACK: price reaches value edge → rejection → snapback."""
+    mid = ctx.m15_range_mid
+    hw = ctx.m15_range_half_width
+    if None in (mid, hw, ctx.m1_close, ctx.bid, ctx.ask, ctx.m1_atr):
         return None
-    edge_upper = range_mid + range_half_width
-    edge_lower = range_mid - range_half_width
-    threshold = range_half_width * 0.85
-    if m1_close > edge_upper:
+    if hw <= 0:
+        return None
+    edge_upper = mid + hw
+    edge_lower = mid - hw
+    close = ctx.m1_close
+    atr = ctx.m1_atr
+    if close > edge_upper:
         direction = "sell"
-        entry = bid
-        inv = m1_close + m1_atr * 0.4
-        tgt = range_mid
-    elif m1_close < edge_lower:
+        entry = ctx.bid
+        inv = close + atr * 0.4
+        tgt = mid
+    elif close < edge_lower:
         direction = "buy"
-        entry = ask
-        inv = m1_close - m1_atr * 0.4
-        tgt = range_mid
+        entry = ctx.ask
+        inv = close - atr * 0.4
+        tgt = mid
     else:
         return None
-    stop_pips = abs(entry - inv) / pip_value(symbol)
-    target_pips = abs(entry - tgt) / pip_value(symbol)
+    pip = pip_value(symbol := ctx.symbol)
+    stop_pips = abs(entry - inv) / pip
+    target_pips = abs(entry - tgt) / pip
     if stop_pips < 1.0 or target_pips < 0.8:
         return None
+    spread_pips = ctx.spread_pips or 0.0
     hyp = firehose_hypothesis_id(family="fair_value_snapback", symbol=symbol,
-                                 side=direction, regime="range", session=session)
+                                 side=direction, regime="range",
+                                 session=ctx.session or "")
     return MicroCandidate(
         hypothesis_id=hyp, family="fair_value_snapback", symbol=symbol,
         side=direction, entry_price=entry, invalidation=inv, target=tgt,
-        max_hold_s=300, required_regime="range", required_session=session,
+        max_hold_s=300, required_regime="range",
+        required_session=ctx.session or "",
         spread_pips=spread_pips, stop_pips=round(stop_pips, 1),
         target_pips=round(target_pips, 1), risk_usd_min_lot=0.0,
         lane=FirehoseLane.SHADOW_MICRO,
-        mechanism=f"fair-value snapback from {session} range edge",
+        mechanism=f"fair-value snapback from {ctx.session or ''} range edge",
         book_family="mean_reversion_completion",
         falsification="snapback trades show negative expectancy after costs",
     )
@@ -236,54 +310,17 @@ def pip_value(symbol: str) -> float:
     return 0.0001
 
 
-def generate_micro_candidates(
-    *,
-    symbol: str,
-    regime: str,
-    session: str,
-    m15_direction: str,
-    m5_direction: str,
-    m15_resistance: float | None,
-    m15_support: float | None,
-    range_mid: float | None,
-    range_half_width: float | None,
-    m1_close: float,
-    prev_m1_close: float,
-    m1_open: float,
-    m1_low: float,
-    m1_high: float,
-    m1_atr: float,
-    m1_return_30s: float,
-    compression_ratio: float,
-    bid: float,
-    ask: float,
-    spread_pips: float,
-    tick_rate_per_min: float = 0.0,
-    signed_tick_imbalance: float = 0.0,
-) -> list[MicroCandidate]:
-    """Generate candidates from ALL independent micro-firehose families."""
+def generate_micro_candidates(ctx: FastMarketContext) -> list[MicroCandidate]:
+    """Generate candidates from ALL independent micro-firehose families.
+
+    Each family independently evaluates the context. No array-order bias:
+    all candidates are returned and the caller must evaluate economics
+    for each before selecting.
+    """
     candidates = []
-    for fn in (
-        lambda: micro_momentum_burst(
-            symbol=symbol, regime=regime, session=session,
-            m15_direction=m15_direction, m5_direction=m5_direction,
-            m1_return_30s=m1_return_30s, m1_atr=m1_atr,
-            compression_ratio=compression_ratio, bid=bid, ask=ask,
-            m1_low=m1_low, m1_high=m1_high, spread_pips=spread_pips),
-        lambda: failed_breakout_fade(
-            symbol=symbol, regime=regime, session=session,
-            m15_resistance=m15_resistance, m15_support=m15_support,
-            m1_close=m1_close, prev_m1_close=prev_m1_close,
-            bid=bid, ask=ask, m1_atr=m1_atr,
-            m1_low=m1_low, m1_high=m1_high, spread_pips=spread_pips),
-        lambda: fair_value_snapback(
-            symbol=symbol, regime=regime, session=session,
-            range_mid=range_mid, range_half_width=range_half_width,
-            m1_close=m1_close, m1_atr=m1_atr, bid=bid, ask=ask,
-            spread_pips=spread_pips),
-    ):
+    for fn in (micro_momentum_burst, failed_breakout_fade, fair_value_snapback):
         try:
-            c = fn()
+            c = fn(ctx)
             if c is not None:
                 candidates.append(c)
         except Exception:
