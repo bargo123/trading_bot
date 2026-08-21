@@ -295,8 +295,10 @@ def test_synthetic_proxy_evidence_cannot_authorise_a_fire(tmp_path):
     signature = _signature_for(frame, "buy")
     records = _measured_records(signature, n=80)
 
-    real = _decide(_brain(_index(tmp_path, records, provenance="mt5_m1")), frame)
-    proxy = _decide(_brain(_index(tmp_path, records, provenance="research_proxy")), frame)
+    real = _decide(_brain(_index(tmp_path, records, provenance="mt5_m1"),
+                          intelligent_exploration_enabled=False), frame)
+    proxy = _decide(_brain(_index(tmp_path, records, provenance="research_proxy"),
+                           intelligent_exploration_enabled=False), frame)
 
     # Identical records and geometry; only the provenance differs.
     assert real.action == "fire"
@@ -312,6 +314,7 @@ def test_synthetic_evidence_is_allowed_only_behind_an_explicit_opt_in(tmp_path):
     brain = _brain(
         _index(tmp_path, records, provenance="research_proxy"),
         intelligent_allow_synthetic_evidence=True,
+        intelligent_exploration_enabled=False,
     )
     # The opt-in exists for OFFLINE RESEARCH ONLY: synthetic evidence may be
     # evaluated but can never authorise a demo order (P2 governance).

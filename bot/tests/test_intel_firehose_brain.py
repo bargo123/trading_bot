@@ -566,8 +566,9 @@ def _bootstrap_cfg(tmp_path, index, **extra):
 
 
 def test_bootstrap_research_stage_cannot_trade(tmp_path):
-    """P2/P14-15: a research bootstrap must NEVER behave like a champion.
-    A validated-state fire becomes a shadow skip when no canary opt-in exists."""
+    """P2/P14-15 + exploration: a research bootstrap can NEVER trade as a
+    validated stage. An unvalidated state becomes a REGISTERED tiny-risk
+    EXPLORATION_CANARY experiment instead - never a pseudo-champion."""
     m1 = _basing_above_support()
     signature = _signature_for_m1(m1.iloc[:-1])
     allow_states = [{k: signature[k] for k in ("regime", "structure", "session", "side")}]
@@ -580,17 +581,21 @@ def test_bootstrap_research_stage_cannot_trade(tmp_path):
         tmp_path, index,
         validated_states_path=str(allowlist),
         intelligent_gate_validated_states=True,
-        # Defect 16 regression: with NO canary artifact the bootstrap stays
-        # shadow-only even when evidence and state gates pass.
+        # No canary artifact: the bootstrap itself stays UNVALIDATED_RESEARCH.
         demo_canary_path=str(tmp_path / "no_canary.json"),
     )
     brain = IntelligentFirehoseBrain(cfg)
     decision = _evaluate_brain(brain, m1)
-    assert decision.action != "fire"
-    assert decision.reason.startswith("shadow:not_trading_stage:")
     snap = brain.snapshot()
     assert snap["strategy_status"] in {"UNQUALIFIED_NO_VALIDATED_MODEL", "QUALIFIED_SHADOW_ONLY"}
     assert snap["promotion_stage"] != "DEMO_CHAMPION"
+    if decision.action == "fire":
+        # Only lawful exploration shape: registered hypothesis, tiny risk.
+        assert decision.reason == "exploration_hypothesis_test"
+        assert decision.journal.get("promotion_stage") == "EXPLORATION_CANARY"
+        assert decision.journal.get("hypothesis_id")
+        assert decision.journal.get("hypothesis_id") in brain.experiments.data["experiments"]
+        assert float(decision.quantity) <= 0.05
 
 
 def test_synthetic_evidence_never_reaches_trading_stage(tmp_path):

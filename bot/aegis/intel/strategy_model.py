@@ -17,17 +17,26 @@ MIN_STRATEGY_LOSSES = 5
 # its evidence supports; a research bootstrap can never behave like a champion.
 STAGE_UNVALIDATED_RESEARCH = "UNVALIDATED_RESEARCH"
 STAGE_SHADOW = "SHADOW"
+# EXPLORATION_CANARY: DEMO-only tiny-risk stage for actively testing
+# registered falsifiable hypotheses BEFORE champion-level sample size exists.
+# It is NOT profitable, NOT validated, and carries independent hard limits.
+STAGE_EXPLORATION_CANARY = "EXPLORATION_CANARY"
 STAGE_DEMO_CANARY = "DEMO_CANARY"
 STAGE_DEMO_CHAMPION = "DEMO_CHAMPION"
 GOVERNANCE_STAGES = (
     STAGE_UNVALIDATED_RESEARCH,
     STAGE_SHADOW,
+    STAGE_EXPLORATION_CANARY,
     STAGE_DEMO_CANARY,
     STAGE_DEMO_CHAMPION,
 )
 # Stages allowed to send demo orders (never live - the runner enforces that
 # separately). Research/shadow models decide but do not trade.
-TRADING_STAGES = frozenset({STAGE_DEMO_CANARY, STAGE_DEMO_CHAMPION})
+TRADING_STAGES = frozenset({
+    STAGE_EXPLORATION_CANARY,
+    STAGE_DEMO_CANARY,
+    STAGE_DEMO_CHAMPION,
+})
 
 
 @dataclass(frozen=True)

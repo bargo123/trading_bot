@@ -685,6 +685,23 @@ def main() -> None:
                             )
                             if res.ok:
                                 closed += 1
+                                # Sequential learning: exploration closes
+                                # update their experiment's evidence.
+                                exp_hyp = str(decision.journal.get("hypothesis_id") or "")
+                                if (
+                                    decision.journal.get("exploration")
+                                    and exp_hyp
+                                    and intelligent_brain is not None
+                                ):
+                                    try:
+                                        intelligent_brain.record_exploration_close(
+                                            hypothesis_id=exp_hyp,
+                                            pnl=float(pos.unrealized_pnl),
+                                            session=str(decision.journal.get("session") or ""),
+                                            regime=str(decision.journal.get("regime") or ""),
+                                        )
+                                    except Exception:
+                                        pass
                                 try:
                                     from aegis.intel.outcome_log import append_outcome
 
@@ -891,7 +908,14 @@ def main() -> None:
                 kind="market",
                 stop_loss=sl,
                 take_profit=tp,
-                client_tag=f"aegis_{sig.reason}"[:40],
+                client_tag=(
+                    # Exploration orders carry a compact hypothesis tag so
+                    # broker-side SL/TP closes can be attributed back to the
+                    # experiment (MT5 comments are short).
+                    f"EXP{str(brain_decision.journal.get('hypothesis_id') or '')[-12:]}"
+                    if brain_decision is not None and brain_decision.journal.get("exploration")
+                    else f"aegis_{sig.reason}"[:40]
+                ),
             )
             oms_ok, oms_why = oms_allows(
                 req,
@@ -998,6 +1022,31 @@ def main() -> None:
                     },
                 )
                 return
+            # --- Exploration hard limits enforced against brain state that
+            # includes in-flight reservations AND bound tickets.
+            if brain_decision is not None and brain_decision.journal.get("exploration"):
+                from aegis.intel.exploration import ExplorationLimits
+
+                limits_run = ExplorationLimits.from_cfg(cfg)
+                hyp_id = str(brain_decision.journal.get("hypothesis_id") or "")
+                total_exp, sym_exp = intelligent_brain.exploration_open_counts(sym)
+                skip_reason = None
+                if total_exp > limits_run.max_positions:
+                    skip_reason = f"exploration_max_positions:{total_exp}"
+                elif sym_exp > limits_run.max_positions_per_symbol:
+                    skip_reason = "exploration_max_positions_per_symbol"
+                if skip_reason:
+                    append_journal(
+                        journal,
+                        {
+                            "event": "exploration_limit_skip",
+                            "reason": skip_reason,
+                            "symbol": sym,
+                            "hypothesis_id": hyp_id,
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
             # --- Pre-send refresh (P8): the decision was priced on quote q,
             # fetched before the brain ran. If that quote is now stale, fetch
             # ONE fresh tick and re-validate; never send on stale pricing and
@@ -1333,6 +1382,20 @@ def main() -> None:
                                         "source": "reconcile",
                                     }
                                 )
+                                # Attribute broker-side SL/TP closes of
+                                # exploration orders back to their experiment.
+                                if intelligent_brain is not None:
+                                    exp_rec = intelligent_brain.find_experiment_by_tag(
+                                        str(event.get("comment") or "")
+                                    )
+                                    if exp_rec is not None:
+                                        try:
+                                            intelligent_brain.record_exploration_close(
+                                                hypothesis_id=str(exp_rec["hypothesis_id"]),
+                                                pnl=float(event.get("pnl") or 0.0),
+                                            )
+                                        except Exception:
+                                            pass
                         save_cursor(deal_cursor, reconcile_cursor_path)
                     except Exception as exc:
                         logger.error(

@@ -43,6 +43,7 @@ def main() -> int:
     orders = collections.Counter()
     reject_msgs = collections.Counter()
     brain_events = 0
+    funnel = collections.Counter()
 
     with args.journal.open(encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -69,10 +70,19 @@ def main() -> int:
                     shadow = row.get("shadow_action")
                     if shadow:
                         skip_reasons[f"shadow_suppressed:{action}"] += 1
+                    # Funnel stage attribution (exploration vs validated).
+                    if row.get("exploration") or row.get("promotion_stage") == "EXPLORATION_CANARY":
+                        funnel["EXPLORATION_FIRE"] += 1
+                    elif row.get("promotion_stage") == "DEMO_CANARY":
+                        funnel["DEMO_CANARY"] += 1
+                    elif row.get("promotion_stage") == "DEMO_CHAMPION":
+                        funnel["CHAMPION_FIRE"] += 1
             elif ev == "order":
                 orders["sent"] += 1
                 if row.get("ok"):
                     orders["executed"] += 1
+                    if str(row.get("client_tag") or "").startswith("EXP"):
+                        funnel["EXPLORATION_EXECUTED"] += 1
                 else:
                     orders["rejected"] += 1
                     reject_msgs[str(row.get("msg") or "")[:80]] += 1
@@ -86,12 +96,13 @@ def main() -> int:
 
     eligible = decisions["fire"] + decisions["scale"] + decisions["skip"]
     report = {
-        "schema": "firehose_throughput.v1",
+        "schema": "firehose_throughput.v2",
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "scanned_opportunities": brain_events,
         "eligible_opportunities": eligible,
         "fire_candidates": decisions["fire"],
         "scale_candidates": decisions["scale"],
+        "funnel": dict(funnel),
         "orders_sent": orders["sent"],
         "executed": orders["executed"],
         "rejected": orders["rejected"] + orders["oms_rejected"],

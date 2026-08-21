@@ -12,6 +12,13 @@ import pandas as pd
 
 from aegis.engines import PositionSnapshot
 from aegis.intel.analogue_store import AnalogueStore, is_measured_provenance
+from aegis.intel.exploration import (
+    ExperimentStore,
+    ExplorationLimits,
+    check_exploration_limits,
+    hypothesis_id as exploration_hypothesis_id,
+    risk_lots_for_exploration,
+)
 from aegis.intel.knowledge_runtime import load_knowledge_rows, match_knowledge
 from aegis.intel.lifecycle import exposure_snapshot, pretrade_ok
 from aegis.intel.paths import INTEL_DIR, resolve_bot_path
@@ -65,6 +72,23 @@ def thesis_key(symbol: str, side: str | None, setup_family: str,
 @dataclass
 class DemoBrainState:
     theses: dict[str, ThesisMemory] = field(default_factory=dict)
+    # In-flight exploration fires: thesis_key -> [reservation timestamps].
+    # A reservation becomes ownership at bind_tickets() or expires (order
+    # lifecycle) so the exposure cap cannot be raced within the bar loop.
+    exploration_pending: dict[str, list[float]] = field(default_factory=dict)
+
+    PENDING_TTL_S = 180.0
+
+    def expire_pending(self) -> None:
+        import time as _time
+
+        now = _time.time()
+        for key in list(self.exploration_pending.keys()):
+            live = [t for t in self.exploration_pending[key] if now - t <= self.PENDING_TTL_S]
+            if live:
+                self.exploration_pending[key] = live
+            else:
+                self.exploration_pending.pop(key, None)
 
     def get(self, key: str, symbol: str | None = None) -> ThesisMemory:
         mem = self.theses.get(key)
@@ -83,6 +107,8 @@ class DemoBrainState:
                 continue
             other.tickets -= wanted
         mem.tickets |= wanted
+        # Fill confirmed: the in-flight reservation becomes real ownership.
+        self.exploration_pending.pop(key, None)
 
     def sync_from_positions(self, symbol: str, positions: Sequence[PositionSnapshot], clip_risk: float) -> list[ThesisMemory]:
         """Reconcile open positions into per-thesis memories.
@@ -451,6 +477,20 @@ class IntelligentFirehoseBrain:
             cfg.get("demo_canary_path"), INTEL_DIR / "demo_canary.json"
         )
         self.canary = _load_canary(self.canary_path)
+        # Exploration Firehose: registered falsifiable experiments + limits.
+        self.experiments = ExperimentStore(
+            resolve_bot_path(
+                cfg.get("exploration_experiments_path"),
+                INTEL_DIR / "exploration_experiments.json",
+            )
+        )
+        self._exploration_limits = ExplorationLimits.from_cfg(cfg)
+        self._exploration_theses: set[str] = set()
+        self._seen_hypotheses: dict[str, float] = {}
+        self._stage_events: dict[str, list[float]] = {
+            "candidate": [], "shadow": [], "exploration_fire": [],
+            "demo_canary_fire": [], "champion_fire": [],
+        }
         self.memory = DemoBrainState()
         self._risk_budget = float(cfg.get("intelligent_risk_budget_usd") or cfg.get("starting_equity") or 100.0)
         self.counts: dict[str, Any] = {
@@ -462,6 +502,214 @@ class IntelligentFirehoseBrain:
     def _note_skip(self, reason: str) -> None:
         reasons = self.counts.setdefault("skip_reasons", {})
         reasons[reason] = int(reasons.get(reason, 0)) + 1
+
+    def _note_stage(self, stage: str) -> None:
+        import time as _time
+
+        self._stage_events.setdefault(stage, []).append(_time.time())
+
+    def _rate_per_hour(self, stage: str) -> float:
+        import time as _time
+
+        now = _time.time()
+        events = [t for t in self._stage_events.get(stage, []) if now - t <= 3600.0]
+        self._stage_events[stage] = events
+        return float(len(events))
+
+    def _minutes_since(self, stage: str) -> float | None:
+        import time as _time
+
+        events = self._stage_events.get(stage) or []
+        if not events:
+            return None
+        return round((_time.time() - max(events)) / 60.0, 1)
+
+    def exploration_open_counts(self, symbol: str | None = None) -> tuple[int, int]:
+        """(exploration open total, exploration open for symbol).
+
+        Counts BOUND tickets plus in-flight reservations (decision sent, fill
+        not yet confirmed) so the cap cannot be raced within the bar loop.
+        """
+        self.memory.expire_pending()
+        total = 0
+        sym_count = 0
+        sym_up = str(symbol or "").upper()
+        live_keys = set(self._exploration_theses) | set(self.memory.exploration_pending)
+        for key in live_keys:
+            mem = self.memory.theses.get(key)
+            n = len(mem.tickets) if mem is not None else 0
+            n = max(n, len(self.memory.exploration_pending.get(key) or []))
+            total += n
+            key_symbol = str(key.split("|")[0] or "").upper()
+            if key_symbol == sym_up:
+                sym_count += n
+        return total, sym_count
+
+    def record_exploration_close(self, *, hypothesis_id: str, pnl: float,
+                                 **meta: Any) -> dict[str, Any] | None:
+        """Sequential-learning hook: every closed exploration trade updates its
+        experiment's evidence; losses arm the per-hypothesis cooldown."""
+        rec = self.experiments.record_close(
+            hypothesis_id=hypothesis_id, pnl=pnl, **meta,
+        )
+        if rec is not None and float(pnl) <= 0:
+            self.experiments.note_failure(
+                hypothesis_id, self._exploration_limits.cooldown_after_failure_s,
+            )
+        return rec
+
+    def find_experiment_by_tag(self, tag: str) -> dict[str, Any] | None:
+        """Attribute a broker-side close via its compact EXP tag.
+
+        Brokers may prepend their own prefix to the comment (e.g. ``aegisEXP…``),
+        so match on the EXP marker anywhere in the string.
+        """
+        tag = str(tag or "")
+        idx = tag.find("EXP")
+        if idx < 0:
+            return None
+        suffix = tag[idx + 3 :].strip()
+        if len(suffix) < 6:
+            return None
+        for rec in self.experiments.data.get("experiments", {}).values():
+            if str(rec.get("hypothesis_id") or "").endswith(suffix):
+                return rec
+        return None
+
+    def _maybe_explore(
+        self,
+        *,
+        symbol: str,
+        side: str,
+        setup: str,
+        signature: Mapping[str, Any],
+        entry: float,
+        invalidation: float,
+        target: float | None,
+        pip: float,
+        info_id: str,
+        portfolio_ok: bool,
+        portfolio_reason: str,
+        symbol_spec: Mapping[str, Any] | None,
+        question: str,
+    ) -> tuple[DemoDecision | None, str | None]:
+        """Exploration Firehose gate chain. Returns (fire_decision, skip_reason).
+
+        Plausibility only - NOT profitability: valid geometry, no absurd payoff
+        asymmetry, portfolio room, no known-failed identical hypothesis, hard
+        independent limits. Champion validation is NOT required here and this
+        NEVER weakens champion requirements.
+        """
+        if not bool(self.cfg.get("intelligent_exploration_enabled", True)):
+            return None, None
+        regime = str(signature.get("regime") or "")
+        session = str(signature.get("session") or "")
+        hyp_id = exploration_hypothesis_id(
+            strategy_family=setup, symbol=symbol, side=side,
+            regime=regime, session=session,
+        )
+        # Candidate counted once per brain lifetime per hypothesis.
+        import time as _time
+
+        if hyp_id not in self._seen_hypotheses:
+            self._seen_hypotheses[hyp_id] = _time.time()
+            self.counts["candidates"] = int(self.counts.get("candidates", 0)) + 1
+            self._note_stage("candidate")
+
+        failed = self.experiments.has_failed_identity(
+            strategy_family=setup, symbol=symbol, side=side,
+            regime=regime, session=session,
+        )
+        if failed is not None:
+            return None, f"known_failed_hypothesis:{failed.get('hypothesis_id', '')[:16]}"
+
+        sl_dist = abs(float(entry) - float(invalidation))
+        if sl_dist <= 0:
+            return None, "exploration_no_invalidation"
+        if target is not None:
+            tp_dist = abs(float(target) - float(entry))
+            if tp_dist / sl_dist < 0.25:
+                return None, "exploration_absurd_payoff"
+        if not portfolio_ok:
+            return None, portfolio_reason or "portfolio_risk"
+
+        exp_open_total, exp_open_symbol = self.exploration_open_counts(symbol)
+        ok, reason = check_exploration_limits(
+            self._exploration_limits,
+            self.experiments,
+            hypothesis_id=hyp_id,
+            open_positions_total=0,
+            open_positions_symbol=0,
+            exploration_open_total=exp_open_total,
+            exploration_open_symbol=exp_open_symbol,
+        )
+        if not ok:
+            return None, reason
+
+        spec = symbol_spec or {}
+        record, created = self.experiments.register(
+            {
+                "hypothesis_id": hyp_id,
+                "strategy_family": setup,
+                "symbol": symbol,
+                "side": side,
+                "entry_rule": f"{setup} {side} on {regime}/{session} state at market",
+                "invalidation": f"close beyond {invalidation:.5f}",
+                "target": (f"structure target {target:.5f}" if target is not None
+                           else "runner structure/quick-win exit"),
+                "regime": regime,
+                "session": session,
+                "information_id": info_id,
+            },
+            reason=question or "state candidate offered by the firehose scan",
+            mechanism=f"{setup} {side} edge in {regime}/{session}; "
+                      "tiny DEMO risk to buy information, not profit",
+            provenance="market_state+analogue_index",
+        )
+        lots = risk_lots_for_exploration(
+            max_risk_usd=self._exploration_limits.max_risk_per_trade_usd,
+            entry=entry,
+            invalidation=invalidation,
+            pip=pip,
+            min_lot=float(spec.get("volume_min", 0.01) or 0.01),
+            lot_step=float(spec.get("volume_step", 0.01) or 0.01),
+        )
+        thesis_key_exp = thesis_key(symbol, side, setup, regime=regime, session=session)
+        self._exploration_theses.add(thesis_key_exp)
+        # Reserve in-flight exposure BEFORE returning the decision so parallel
+        # bar evaluations cannot race past max_positions.
+        self.memory.exploration_pending.setdefault(thesis_key_exp, []).append(
+            datetime.now(timezone.utc).timestamp()
+        )
+        self.counts["exploration_eligible"] = int(self.counts.get("exploration_eligible", 0)) + 1
+        journal = {
+            "brain": "intelligent_firehose",
+            "action": "fire",
+            "shadow_action": None,
+            "setup_family": setup,
+            "thesis_key": thesis_key_exp,
+            "exploration": True,
+            "promotion_stage": "EXPLORATION_CANARY",
+            "hypothesis_id": hyp_id,
+            "experiment_created": created,
+            "experiment_status": record.get("status"),
+            "regime": regime,
+            "session": session,
+            "max_risk_usd": self._exploration_limits.max_risk_per_trade_usd,
+        }
+        decision = DemoDecision(
+            "fire",
+            "exploration_hypothesis_test",
+            side=side,
+            sl=invalidation,
+            tp=target,
+            quantity=lots,
+            information_id=info_id,
+            analogue_n=0,
+            close_clips=0,
+            journal=journal,
+        )
+        return decision, None
 
     def refresh(self, cfg: Mapping[str, Any] | None = None) -> None:
         """Re-read the champion and validated-state allowlist.
@@ -483,6 +731,7 @@ class IntelligentFirehoseBrain:
             )
         )
         self.canary = _load_canary(self.canary_path)
+        self._exploration_limits = ExplorationLimits.from_cfg(self.cfg)
 
     def snapshot(self) -> dict[str, Any]:
         records = len(getattr(self.analogues, "_records", []))
@@ -507,13 +756,73 @@ class IntelligentFirehoseBrain:
                 "validation_hash": model.validation_hash or None,
                 "promotion_stage": model.promotion_stage,
             }
+        funnel = {
+            "scans": int(self.counts.get("scans", 0)),
+            "candidates": int(self.counts.get("candidates", 0)),
+            "shadow": int(self.counts.get("shadow_fires", 0)),
+            "exploration_eligible": int(self.counts.get("exploration_eligible", 0)),
+            "exploration_fire": int(self.counts.get("exploration_fire", 0)),
+            "demo_canary_fire": int(self.counts.get("demo_canary_fire", 0)),
+            "champion_fire": int(self.counts.get("champion_fire", 0)),
+            "skip": int(self.counts.get("skip", 0)),
+        }
+        rates = {
+            "candidate_rate_per_hour": self._rate_per_hour("candidate"),
+            "shadow_candidates_per_hour": self._rate_per_hour("shadow"),
+            "exploration_fires_per_hour": self._rate_per_hour("exploration_fire"),
+            "demo_canary_fires_per_hour": self._rate_per_hour("demo_canary_fire"),
+            "champion_fires_per_hour": self._rate_per_hour("champion_fire"),
+        }
+        recency = {
+            "minutes_since_last_candidate": self._minutes_since("candidate"),
+            "minutes_since_last_exploration_fire": self._minutes_since("exploration_fire"),
+            "minutes_since_last_validated_fire": self._minutes_since("demo_canary_fire")
+            if (self._minutes_since("demo_canary_fire") or 1e9)
+            < (self._minutes_since("champion_fire") or 1e9)
+            else self._minutes_since("champion_fire"),
+        }
+        warnings = [
+            warning
+            for warning in (
+                f"analogue index empty or unreadable: {self.index_path}" if records == 0 else "",
+                f"knowledge table empty or unreadable: {self.knowledge_path}"
+                if not self.knowledge_rows
+                else "",
+                f"analogue provenance is not measured market history: {self.analogues.provenance}"
+                if records and not self.analogues.is_measured
+                else "",
+            )
+            if warning
+        ]
+        inactivity_min = float(self.cfg.get("exploration_inactivity_warn_min", 90) or 90)
+        msc = recency["minutes_since_last_candidate"]
+        if funnel["scans"] > 50 and (msc is None or msc > inactivity_min):
+            warnings.append(
+                f"FIREHOSE_CANDIDATE_INACTIVITY: no candidates for {msc} min; "
+                "diagnose candidate generation"
+            )
         return {
             "brain": "intelligent_firehose",
             "counts": {k: v for k, v in self.counts.items() if k != "skip_reasons"},
+            "funnel": funnel,
+            **rates,
+            **recency,
             "skip_reasons": dict(
                 sorted(self.counts.get("skip_reasons", {}).items(), key=lambda kv: -kv[1])[:20]
             ),
             "shadow_fires": int(self.counts.get("shadow_fires", 0)),
+            "experiments_active": sum(
+                1 for r in self.experiments.data.get("experiments", {}).values()
+                if r.get("status") == "ACTIVE"
+            ),
+            "experiments_rejected": sum(
+                1 for r in self.experiments.data.get("experiments", {}).values()
+                if r.get("status") == "REJECTED"
+            ),
+            "experiments_promising": sum(
+                1 for r in self.experiments.data.get("experiments", {}).values()
+                if r.get("status") == "PROMISING"
+            ),
             **strategy_identity,
             "analogue_records": records,
             "analogue_provenance": self.analogues.provenance,
@@ -527,21 +836,10 @@ class IntelligentFirehoseBrain:
             "gate_validated_states": bool(self.cfg.get("intelligent_gate_validated_states", False)),
             "bootstrap": bool(self.cfg.get("intelligent_firehose_bootstrap", False)),
             "bootstrap_canary": bool(self.cfg.get("intelligent_bootstrap_canary", False)),
+            "exploration_enabled": bool(self.cfg.get("intelligent_exploration_enabled", True)),
             # An empty index means every decision is made on no evidence. That is a
             # misconfiguration, not a quiet market, so make it visible.
-            "warnings": [
-                warning
-                for warning in (
-                    f"analogue index empty or unreadable: {self.index_path}" if records == 0 else "",
-                    f"knowledge table empty or unreadable: {self.knowledge_path}"
-                    if not self.knowledge_rows
-                    else "",
-                    f"analogue provenance is not measured market history: {self.analogues.provenance}"
-                    if records and not self.analogues.is_measured
-                    else "",
-                )
-                if warning
-            ],
+            "warnings": warnings,
         }
 
     def _trade_economics(
@@ -601,6 +899,7 @@ class IntelligentFirehoseBrain:
     ) -> DemoDecision:
         clip_qty = float(self.cfg.get("order_quantity", 0.01))
         clip_risk = max(self._risk_budget * float(self.cfg.get("intelligent_risk_fraction", 0.08)) / 5.0, 0.01)
+        self.counts["scans"] = int(self.counts.get("scans", 0)) + 1
         self.memory.sync_from_positions(symbol, positions, clip_risk)
         state = build_runtime_state(symbol=symbol, m1=completed_m1)
         m15 = (state.get("structure") or {}).get("M15") or {}
@@ -816,6 +1115,58 @@ class IntelligentFirehoseBrain:
             )
         if shadow_action is not None:
             self.counts["shadow_fires"] = int(self.counts.get("shadow_fires", 0)) + 1
+            self._note_stage("shadow")
+        # Exploration Firehose: with no validated trading model, a flat thesis
+        # with valid geometry can still become a REGISTERED tiny-risk DEMO
+        # experiment. This never bypasses champion validation - it buys
+        # information while capital stays protected.
+        exploration_journal: dict[str, Any] | None = None
+        if (
+            fire.action == "skip"
+            and held.clips <= 0
+            and invalidation is not None
+            and bool(self.cfg.get("intelligent_exploration_enabled", True))
+        ):
+            book_family = str((books[0] or {}).get("strategy_family") or "") if books else ""
+            exp_decision, exp_skip = self._maybe_explore(
+                symbol=symbol,
+                side=side,
+                setup=setup,
+                signature=signature,
+                entry=float(entry_price if entry_price is not None else close),
+                invalidation=float(invalidation),
+                target=target,
+                pip=pip,
+                info_id=info_id,
+                portfolio_ok=portfolio_ok,
+                portfolio_reason=portfolio_reason,
+                symbol_spec=symbol_spec,
+                question=(f"book-derived family {book_family}" if book_family
+                          else "firehose scan candidate"),
+            )
+            if exp_decision is not None:
+                self.counts["exploration_fire"] = int(self.counts.get("exploration_fire", 0)) + 1
+                self._note_stage("exploration_fire")
+                self.counts["fire"] = int(self.counts.get("fire", 0)) + 1
+                exposure = exposure_snapshot(positions)
+                return DemoDecision(
+                    "fire",
+                    exp_decision.reason,
+                    side=exp_decision.side,
+                    sl=exp_decision.sl,
+                    tp=exp_decision.tp,
+                    quantity=exp_decision.quantity,
+                    expected_net_value=None,
+                    information_id=info_id,
+                    analogue_n=evidence.analogue_n,
+                    close_clips=0,
+                    journal={**exp_decision.journal,
+                             "equity": equity,
+                             "currency_exposure": exposure.get("currency_direction"),
+                             **econ.journal()},
+                )
+            if exp_skip:
+                self._note_skip(exp_skip)
         action = evaluate_thesis_action(
             fire_decision=fire,
             information_id=info_id,
@@ -840,6 +1191,14 @@ class IntelligentFirehoseBrain:
         self.counts[mapped] = int(self.counts.get(mapped, 0)) + 1
         if mapped == "skip":
             self._note_skip(str(action.reason))
+        if mapped == "fire" and strategy is not None:
+            # Validated-stage fires (exploration fires return earlier).
+            if strategy.promotion_stage == "DEMO_CANARY":
+                self.counts["demo_canary_fire"] = int(self.counts.get("demo_canary_fire", 0)) + 1
+                self._note_stage("demo_canary_fire")
+            elif strategy.promotion_stage == "DEMO_CHAMPION":
+                self.counts["champion_fire"] = int(self.counts.get("champion_fire", 0)) + 1
+                self._note_stage("champion_fire")
         exposure = exposure_snapshot(positions)
         journal = {
             "brain": "intelligent_firehose",

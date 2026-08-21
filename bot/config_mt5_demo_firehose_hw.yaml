@@ -190,6 +190,20 @@ intelligent_gate_validated_states: true
 # per-trade economics after live spread+commission, and portfolio room.
 intelligent_bootstrap_canary: true
 
+# --- Exploration Firehose (DEMO-only tiny-risk hypothesis testing) ---
+# Actively tests many registered falsifiable hypotheses with bounded tiny
+# exposure. NOT profitable, NOT validated; information gain only. These limits
+# are independent of champion/canary limits and never bypass portfolio,
+# spread, stale-quote, or live-account protections.
+intelligent_exploration_enabled: true
+exploration_max_positions: 2
+exploration_max_positions_per_symbol: 1
+exploration_max_daily_loss_usd: 1.0
+exploration_max_risk_per_trade_usd: 0.15
+exploration_max_trades_per_hypothesis: 5
+exploration_cooldown_after_failure_s: 1800
+exploration_inactivity_warn_min: 90
+
 # --- Per-trade economics (the WR 91.91% / PF 0.71 fix) ---
 # Reward must be at least this multiple of the structural invalidation distance.
 # 1.0 kills the 1-pip-target / 30-pip-stop shape without throttling throughput.
