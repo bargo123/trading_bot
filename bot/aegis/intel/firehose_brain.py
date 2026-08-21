@@ -622,6 +622,8 @@ class IntelligentFirehoseBrain:
         row: Any = None,
         completed_m1: Any = None,
         state: Mapping[str, Any] | None = None,
+        actual_bid: float | None = None,
+        actual_ask: float | None = None,
     ) -> tuple[DemoDecision | None, str | None]:
         """Exploration Firehose gate chain. Returns (fire_decision, skip_reason).
 
@@ -750,8 +752,8 @@ class IntelligentFirehoseBrain:
             generate_micro_candidates,
         )
 
-        bid_px = entry - (spread_price or 0) / 2
-        ask_px = entry + (spread_price or 0) / 2
+        bid_px = float(actual_bid) if actual_bid is not None else entry
+        ask_px = float(actual_ask) if actual_ask is not None else entry + (spread_price or 0)
 
         # Genuine M1 OHLCV from the completed bar.
         m1_o = float(row["open"]) if row is not None and "open" in row.index else None
@@ -780,8 +782,14 @@ class IntelligentFirehoseBrain:
         # M5/M15 structure from runtime state (passed from evaluate).
         st = state or {}
         structure = st.get("structure") or {}
+        mtf = st.get("multi_timeframe") or {}
         m15_struct = structure.get("M15") or {}
         m5_struct = structure.get("M5") or {}
+        # Direction lives under multi_timeframe, not structure (contract fix).
+        m15_mtf = mtf.get("M15") or {}
+        m5_mtf = mtf.get("M5") or {}
+        m15_dir = str(m15_mtf.get("direction") or "")
+        m5_dir = str(m5_mtf.get("direction") or "")
         regime_raw = st.get("regime")
         regime_label_str = str(regime_raw.get("label", "") if isinstance(regime_raw, dict) else regime_raw or "")
 
@@ -795,7 +803,7 @@ class IntelligentFirehoseBrain:
             m1_atr=m1_atr, m1_volume=m1_vol,
             m1_range=(m1_h - m1_l) if m1_h and m1_l else None,
             m1_body=abs(m1_c - m1_o) if m1_c and m1_o else None,
-            m15_direction=str(m15_struct.get("direction") or signature.get("m15_direction") or ""),
+            m15_direction=m15_dir,
             m15_structure=str(m15_struct.get("kind") or ""),
             m15_support=float(m15_struct["support"]) if m15_struct.get("support") is not None else None,
             m15_resistance=float(m15_struct["resistance"]) if m15_struct.get("resistance") is not None else None,
@@ -803,7 +811,7 @@ class IntelligentFirehoseBrain:
                 if m15_struct.get("support") and m15_struct.get("resistance") else None,
             m15_range_half_width=abs(float(m15_struct["resistance"]) - float(m15_struct["support"])) / 2.0
                 if m15_struct.get("support") and m15_struct.get("resistance") else None,
-            m5_direction=str(m5_struct.get("direction") or ""),
+            m5_direction=m5_dir,
             m5_structure=str(m5_struct.get("kind") or ""),
             return_30s=None,  # requires tick history; skip if unavailable
             session=session or None,
@@ -817,11 +825,16 @@ class IntelligentFirehoseBrain:
         viable = []
         all_rejections = []
         for mc in micro_cands:
+            spec_tick_val = (symbol_spec or {}).get("trade_tick_value")
+            spec_tick_sz = (symbol_spec or {}).get("trade_tick_size")
             econ = check_entry_economics(
                 mc,
                 max_risk_usd=self._exploration_limits.max_risk_per_trade_usd,
                 volume_min=float((symbol_spec or {}).get("volume_min", 0.01)),
-                contract_size=float((symbol_spec or {}).get("trade_contract_size", 100000)))
+                contract_size=float((symbol_spec or {}).get("trade_contract_size", 100000)),
+                tick_value=spec_tick_val,
+                tick_size=spec_tick_sz,
+            )
             if econ["allowed"]:
                 viable.append(mc)
             else:
@@ -938,6 +951,9 @@ class IntelligentFirehoseBrain:
         }
         record["exit_plan"] = exit_plan
         record["book_logic"] = book_logic
+        record["target_price"] = target
+        record["initial_stop_price"] = invalidation
+        record["max_hold_s"] = mc.max_hold_s if micro_cands else 120
         self.experiments.save()
         thesis_key_exp = thesis_key(symbol, side, setup, regime=regime, session=session)
         self._exploration_theses.add(thesis_key_exp)
@@ -1169,6 +1185,8 @@ class IntelligentFirehoseBrain:
         spread_price: float | None = None,
         symbol_spec: Mapping[str, Any] | None = None,
         entry_price: float | None = None,
+        actual_bid: float | None = None,
+        actual_ask: float | None = None,
     ) -> DemoDecision:
         clip_qty = float(self.cfg.get("order_quantity", 0.01))
         clip_risk = max(self._risk_budget * float(self.cfg.get("intelligent_risk_fraction", 0.08)) / 5.0, 0.01)
@@ -1460,6 +1478,8 @@ class IntelligentFirehoseBrain:
                 row=row,
                 completed_m1=completed_m1,
                 state=state,
+                actual_bid=actual_bid,
+                actual_ask=actual_ask,
             )
             if exp_decision is not None:
                 # Explicit exploration classification (audited fix, defect 6).

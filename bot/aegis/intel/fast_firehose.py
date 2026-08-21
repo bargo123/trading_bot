@@ -340,21 +340,28 @@ def check_entry_economics(candidate: MicroCandidate, *,
                           max_risk_usd: float,
                           volume_min: float = 0.01,
                           contract_size: float = 100000.0,
+                          tick_value: float | None = None,
+                          tick_size: float | None = None,
                           commission_rt_usd: float = 0.0,
                           slippage_pips: float = 0.3,
                           measured_spread_percentile: float | None = None,
                           spread_p90: float | None = None) -> dict[str, Any]:
-    """Full pre-entry economics check. Hard reject any violation."""
+    """Broker-native pre-entry economics. Uses tick_value/tick_size when
+    available for correct JPY/cross pricing; falls back to contract*pip."""
     rejections = []
-    pv = pip_value(candidate.symbol)
-    usd_per_pip_per_lot = contract_size * pv
-    stop_dist = candidate.stop_pips
-    min_lot_risk = stop_dist * usd_per_pip_per_lot * volume_min
+    pip = pip_value(candidate.symbol)
+    stop_dist_price = abs(candidate.entry_price - candidate.invalidation)
+    if tick_value and tick_size and tick_size > 0:
+        usd_per_price_unit_per_lot = float(tick_value) / float(tick_size)
+    else:
+        usd_per_price_unit_per_lot = contract_size
+    min_lot_risk = stop_dist_price * usd_per_price_unit_per_lot * volume_min
     budget = max_risk_usd
     if min_lot_risk > budget:
         rejections.append("RISK_GRANULARITY_BLOCKED")
     total_cost_pips = candidate.spread_pips + slippage_pips + \
-        (commission_rt_usd / (usd_per_pip_per_lot * volume_min) if volume_min > 0 else 0)
+        (commission_rt_usd / (usd_per_price_unit_per_lot * pip * volume_min)
+         if volume_min > 0 else 0)
     net_target = candidate.target_pips - total_cost_pips
     if net_target <= 0:
         rejections.append("NEGATIVE_EXPECTED_NET_AFTER_COST")
@@ -375,7 +382,7 @@ def check_entry_economics(candidate: MicroCandidate, *,
         "risk_budget_usd": budget,
         "total_cost_pips": round(total_cost_pips, 2),
         "net_target_pips": round(net_target, 2),
-        "payoff_net": round(net_target / max(stop_dist, 0.1), 3),
+        "payoff_net": round(net_target / max(stop_dist_price / pip, 0.1), 3),
     }
 
 

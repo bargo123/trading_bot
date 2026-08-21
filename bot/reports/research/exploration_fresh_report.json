@@ -1,6 +1,6 @@
 {
   "schema": "exploration_fresh_report.v2",
-  "generated_utc": "2026-08-21T22:54:23.902773+00:00",
+  "generated_utc": "2026-08-21T23:57:58.323591+00:00",
   "runner_pid": 6604,
   "runner_status": "running",
   "mt5_demo": true,
@@ -16,9 +16,9 @@
     "skip": 144
   },
   "pm_decisions": {
-    "HOLD": 1708,
+    "HOLD": 2453,
     "LOCK": 1,
-    "EXIT": 2,
+    "EXIT": 3,
     "REDUCE": 0
   },
   "pm_tickets": [
@@ -38,7 +38,7 @@
       "remaining_ev": 0.0,
       "remaining_ev_status": "ESTIMATED",
       "exit_state": "open",
-      "age_s": 2955.0
+      "age_s": 1361.2
     }
   ],
   "exposure": {

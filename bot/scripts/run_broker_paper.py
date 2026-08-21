@@ -652,6 +652,8 @@ def main() -> None:
                     spread_price=float(live_spread),
                     symbol_spec=brain_spec,
                     entry_price=brain_entry,
+                    actual_bid=float(q.bid),
+                    actual_ask=float(q.ask),
                 )
                 brain_decision = decision
                 if decision.action in {"exit", "reduce"}:
@@ -1709,13 +1711,10 @@ def main() -> None:
                                             float(getattr(pos, "stop_loss", 0) or 0)
                                         ) / max(_pip_sz, 1e-10) if getattr(pos, 'stop_loss', 0) else 10.0
                                         _tgt_px = None
+                                        # Structured numeric target from experiment record.
                                         for _exp in intelligent_brain.experiments.data.get("experiments", {}).values():
                                             if str(_exp.get("hypothesis_id")) == str(meta_by_ticket.get(tk, {}).get("hypothesis_id") or ""):
-                                                _tgt_str = str(_exp.get("target_rule") or "")
-                                                import re as _re2
-                                                _px_match = _re2.search(r"([\d.]+)", _tgt_str)
-                                                if _px_match:
-                                                    _tgt_px = float(_px_match.group(1))
+                                                _tgt_px = _exp.get("target_price")
                                                 break
                                         fast_verdict = fast_exit_sm.evaluate(
                                             side=_side_l,
@@ -1742,8 +1741,15 @@ def main() -> None:
                                                 "why": fast_verdict["why"],
                                                 "policy": f"fast_{fast_verdict['policy']}",
                                             }
-                                except Exception:
-                                    pass
+                                except Exception as fast_exc:
+                                    append_journal(journal, {
+                                        "event": "fast_exit_error",
+                                        "ticket": tk,
+                                        "symbol": str(getattr(pos, "symbol", "")),
+                                        "error_type": type(fast_exc).__name__,
+                                        "message": str(fast_exc)[:200],
+                                        "bar": str(bar_time),
+                                    })
                             if verdict["action"] == "EXIT" and hasattr(eng, "close_ticket"):
                                 res_close = eng.close_ticket(tk)
                                 summary = profit_manager.close_summary(
