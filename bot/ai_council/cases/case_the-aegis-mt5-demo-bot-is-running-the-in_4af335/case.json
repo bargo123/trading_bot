@@ -1,12 +1,43 @@
 {
   "created_utc": "2026-08-21T14:31:33.337517+00:00",
   "critiques": {},
-  "decision": null,
+  "decision": {
+    "decided_utc": "2026-08-21T14:34:13.364397+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_11c35d",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_11c35d for the validation pipeline"
+  },
   "id": "the-aegis-mt5-demo-bot-is-running-the-in_4af335",
   "mode": "REAL",
-  "phase": "proposal",
-  "proposals": [],
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4af335\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 107.16,
+        "finished_utc": "2026-08-21T14:33:34.785896+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T14:31:47.628489+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T14:33:34.790053+00:00",
+      "text": "Proposal: Run a point-in-time counterfactual exit-policy study as the next cycle's headline experiment. Measured evidence shows aggregate demo performance of ~2,471 trades at WR 67.8% but PF 0.77 / expectancy \u22120.011 (net \u2248 \u221227 USD), with the entire loss concentrated in `manual` closes (n=1,917, PF 0.60, net \u221231) and `sl` closes (n=94, expectancy \u22120.55), while `tp` closes are the only positive bucket (n=446, expectancy +0.106) \u2014 a payoff-geometry failure (avg win 0.058 vs avg loss \u22120.170), not an entry-selection failure. Since every close already records MFE/MAE/giveback and per-policy counterfactual profits (`cf_*` fields), replay the same ~2,400-trade sample under one mechanical alternative \u2014 hold-to-TP with a cost-plus breakeven lock once MFE \u2265 $0.30 and giveback \u2265 50% (parameters already config-driven in `profit_management.py`) \u2014 and pre-register the falsifiable claim that this flips aggregate net expectancy from \u22120.011 to \u2265 +0.01 after measured per-symbol/session costs. If the counterfactual fails, or the improvement does not survive purged/time-aware out-of-sample evaluation, register the rejection in `ExperimentRegistry` and block rediscovery; if it passes all gates in `promote.py`, route it solely as a challenger via the governed promotion path (the profit-management layer must not weaken champion gates). This follows the test-everything discipline of *Evidence-Based Technical Analysis* (Aronson) and the let-winners-run/mechanical-exit principles in *Following the Trend* (Wiley, 2023)."
+    }
+  ],
   "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
   "revisions": {},
-  "status": "open"
+  "status": "decided"
 }
