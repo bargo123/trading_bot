@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-21T11:18:35.052817+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-21T11:21:17.655129+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_948648",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_948648 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_090b85",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_090b85\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 101.29,
+        "finished_utc": "2026-08-21T11:20:26.770475+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T11:18:45.477727+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T11:20:26.786233+00:00",
+      "text": "Proposal: Run one governed exit-side experiment \u2014 replace the unconditional `quick_win`/`never_green` flatten (the `manual` close bucket: n=1916, expectancy \u22120.015, PF 0.60, avg win $0.034 vs avg loss $0.106 in outcome_learning.json / intelligent_firehose_failure_audit.md) with a conditional exit that holds the position only while the bar's market state stays aligned with the entry side, otherwise flattening as today. Falsifiable prediction: on replayed bars plus the sealed holdout, the manual-bucket expectancy moves from \u22120.015 to \u2265 0 net of the runner's 0.3-pip cost assumption and overall PF rises from 0.76 toward \u2265 1.0, while tail loss per SL close stays at or below the measured $1.10 and win rate does not drop below ~55%; if either fails on the untouched holdout, the challenger is rejected and recorded, not promoted. This targets the measured payoff-geometry defect (payoff ratio 0.33, wins erased by tail losses \u2248 20\u00d7) rather than adding trades, consistent with letting winners run as in *Following the Trend* (Clenow) and with the strict falsification discipline of *Evidence-Based Technical Analysis* (Aronson). No code, config, or champion changes \u2014 deliverable is a registry-recorded experiment and a report under `bot/reports/research/`."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

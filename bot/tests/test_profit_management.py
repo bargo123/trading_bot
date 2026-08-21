@@ -100,9 +100,11 @@ def test_margin_pressure_blocks_only_nonpositive_ev():
     pm = _manager()
     pm.sync([_Pos("win", "EURUSD", "sell", 0.50), _Pos("ev0", "GBPUSD", "buy", -0.02)])
     v_win = pm.evaluate(ticket="win", volume=0.01, volume_min=0.01,
-                        margin_pressure=True, remaining_ev=0.4)
+                        margin_pressure=True, remaining_ev=0.4,
+                        remaining_ev_status="ESTIMATED")
     v_ev0 = pm.evaluate(ticket="ev0", volume=0.01, volume_min=0.01,
-                        margin_pressure=True, remaining_ev=-0.1)
+                        margin_pressure=True, remaining_ev=-0.1,
+                        remaining_ev_status="ESTIMATED")
     # Never close a high-EV winner to make room; exit the non-positive EV one.
     assert v_win["action"] != "EXIT" or v_win.get("policy") != "portfolio_pressure"
     assert v_ev0["action"] == "EXIT" and v_ev0["policy"] == "portfolio_pressure"
@@ -187,8 +189,9 @@ def test_screenshot_regression_scenario():
     for t, sym, side, p in screenshot:
         decisions[t] = pm.evaluate(
             ticket=t, volume=0.01, volume_min=0.01,
-            margin_pressure=True,  # screenshot showed margin level ~157%
-            remaining_ev=0.3 if p > 0 else -0.1,
+            margin_pressure=True,
+            remaining_ev=(0.3 if p > 0 else -0.1),
+            remaining_ev_status=("ESTIMATED" if p > 0 else "UNKNOWN"),
         )
     # Every PROFITABLE ticket got an explicit decision with a reason.
     for t, _s, _sd, p in screenshot:
@@ -196,8 +199,14 @@ def test_screenshot_regression_scenario():
             v = decisions[t]
             assert v["action"] in {"HOLD", "LOCK", "EXIT"}, t
             assert v["why"], f"ticket {t} has no explanation"
-    # The losing EURUSD BUY under margin pressure with negative EV -> EXIT.
-    assert decisions["b1"]["action"] == "EXIT"
+    # The losing EURUSD BUY: margin pressure + ESTIMATED negative EV -> EXIT.
+    # (UNKNOWN status must NOT masquerade as evidence - defect 7.)
+    assert decisions["b1"]["action"] == "HOLD"
+    v_estimated = pm.evaluate(ticket="b1", volume=0.01, volume_min=0.01,
+                              margin_pressure=True, remaining_ev=-0.10,
+                              remaining_ev_status="ESTIMATED")
+    assert v_estimated["action"] == "EXIT"
+    assert v_estimated["policy"] == "portfolio_pressure"
     # Winners within giveback limits remain HOLD with justification.
     assert decisions["e1"]["action"] == "HOLD"
     # Snapshot reports aggregate floating stats across ALL six tickets.

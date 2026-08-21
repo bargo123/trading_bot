@@ -28,9 +28,19 @@ from typing import Any, Mapping
 EXPERIMENT_SCHEMA = "exploration_experiments.v1"
 
 # Sequential-learning thresholds (per experiment).
-MIN_N_TO_JUDGE = 8          # judged after this many closed exploration trades
+# INVARIANT (audited): MIN_N_TO_JUDGE must be <= max_trades_per_hypothesis,
+# otherwise runtime judgement is unreachable. Judgement happens at 4 trades;
+# the per-hypothesis cap (5) then EXHAUSTS anything still UNCERTAIN.
+MIN_N_TO_JUDGE = 4
 REJECT_EXPECTANCY = 0.0     # expectancy <= this at judgement -> REJECTED
 PROMISE_P05 = 0.0           # bootstrap-ish lower bound > this -> PROMISING
+
+LIFECYCLE_NEW = "NEW"
+LIFECYCLE_ACTIVE = "ACTIVE"
+LIFECYCLE_UNCERTAIN = "UNCERTAIN"
+LIFECYCLE_PROMISING = "PROMISING"
+LIFECYCLE_REJECTED = "REJECTED"
+LIFECYCLE_EXHAUSTED = "EXHAUSTED"
 
 
 def _utcnow() -> datetime:
@@ -153,7 +163,7 @@ class ExperimentStore:
             "reason_for_experiment": reason,
             "expected_mechanism": mechanism,
             "provenance": provenance,
-            "status": "ACTIVE",
+            "status": LIFECYCLE_NEW,
             "created_utc": _utcnow().isoformat(),
             "updated_utc": _utcnow().isoformat(),
             "trades": [],
@@ -182,9 +192,12 @@ class ExperimentStore:
                      spread: float | None = None, slippage: float | None = None,
                      duration_min: float | None = None,
                      session: str = "", regime: str = "",
+                     max_trades: int | None = None,
                      **extra: Any) -> dict[str, Any] | None:
         """Update one experiment's evidence after a closed trade, then judge it.
 
+        ``max_trades`` passes the runtime per-hypothesis cap so EXHAUSTED is
+        reachable in the SAME lifecycle that enforces the cap (audited fix).
         ``extra`` carries point-in-time exit-learning fields (pl_1m..pl_60m,
         cf_* counterfactual policy profits) stored on the trade row (EF-112).
         """
@@ -250,27 +263,46 @@ class ExperimentStore:
             round(_p05_lower_bound(pnls), 5) if len(pnls) >= 2 else None
         )
         rec["updated_utc"] = _utcnow().isoformat()
-        self._judge(rec)
+        self._judge(rec, max_trades=max_trades)
         self._track_daily(pnl)
         self.save()
         return rec
 
-    def _judge(self, rec: dict[str, Any]) -> None:
-        """Sequential decision: BAD -> REJECT permanently; PROMISING flagged."""
+    def _judge(self, rec: dict[str, Any], *, max_trades: int | None = None) -> None:
+        """Sequential decision with a REACHABLE lifecycle (audited fix).
+
+        NEW -> ACTIVE (first close)
+        at n >= MIN_N_TO_JUDGE:
+            expectancy <= 0                  -> REJECTED (permanent)
+            p05 > 0 and PF > 1               -> PROMISING (route to validation)
+            otherwise                        -> UNCERTAIN
+        UNCERTAIN at the per-hypothesis cap  -> EXHAUSTED (information spent)
+        """
         ev = rec["evidence"]
-        if rec.get("status") != "ACTIVE":
+        if rec.get("status") in {LIFECYCLE_REJECTED, LIFECYCLE_PROMISING,
+                                 LIFECYCLE_EXHAUSTED}:
             return
+        if ev["n"] >= 1 and rec.get("status") == LIFECYCLE_NEW:
+            rec["status"] = LIFECYCLE_ACTIVE
         if ev["n"] >= MIN_N_TO_JUDGE:
             if float(ev["expectancy"] or 0.0) <= REJECT_EXPECTANCY:
-                rec["status"] = "REJECTED"
+                rec["status"] = LIFECYCLE_REJECTED
                 rec["reject_reason"] = (
                     f"negative expectancy {ev['expectancy']} after {ev['n']} trades"
                 )
                 return
             p05 = ev.get("bootstrap_p05")
-            if p05 is not None and float(p05) > PROMISE_P05:
-                rec["status"] = "PROMISING"  # route to shadow/OOS validation
-            # else: UNCERTAIN -> keep exploring while information value remains
+            pf = ev.get("profit_factor")
+            if p05 is not None and float(p05) > PROMISE_P05 and pf and float(pf) > 1:
+                rec["status"] = LIFECYCLE_PROMISING
+                return
+            rec["status"] = LIFECYCLE_UNCERTAIN
+        if max_trades is not None and ev["n"] >= max_trades \
+                and rec.get("status") in {LIFECYCLE_ACTIVE, LIFECYCLE_UNCERTAIN}:
+            rec["status"] = LIFECYCLE_EXHAUSTED
+            rec["exhaust_reason"] = (
+                f"reached per-hypothesis cap ({max_trades}) without promising evidence"
+            )
 
     def _track_daily(self, pnl: float) -> None:
         today = date.today().isoformat()
@@ -365,6 +397,25 @@ def check_exploration_limits(
     return True, "ok"
 
 
+def exploration_room_reason(
+    *,
+    total_open: int,
+    symbol_open: int,
+    limits: ExplorationLimits,
+) -> str | None:
+    """Prospective-exposure guard (audited defect 3).
+
+    Pre-send semantics: if broker/brain confirmed exposure ALREADY equals the
+    cap, there is NO room for the current order - even before counting its own
+    reservation. Returns a rejection reason or None when room exists.
+    """
+    if int(total_open) >= int(limits.max_positions):
+        return f"exploration_max_positions:{int(total_open)}"
+    if int(symbol_open) >= int(limits.max_positions_per_symbol):
+        return "exploration_max_positions_per_symbol"
+    return None
+
+
 def risk_lots_for_exploration(
     *,
     max_risk_usd: float,
@@ -372,22 +423,46 @@ def risk_lots_for_exploration(
     invalidation: float,
     pip: float,
     contract_size: float = 100000.0,
-    min_lot: float = 0.01,
-    lot_step: float = 0.01,
-) -> float:
-    """Tiny fixed-risk sizing: risk per trade capped, never scaled up.
+    tick_value: float | None = None,
+    tick_size: float | None = None,
+    volume_min: float = 0.01,
+    volume_step: float = 0.01,
+) -> dict[str, Any]:
+    """Broker-native exploration sizing with a HARD risk budget (spec-correct).
 
-    Lots = risk_usd / stop_distance_usd_per_lot, floored to min lot step and
-    capped so a single exploration clip can never exceed its budget.
+    Risk per lot = stop_distance_price * (tick_value / tick_size) when broker
+    tick fields are available, else stop_pips * (pip * contract_size).
+    The FINAL order quantity must satisfy
+        actual_stop_risk_usd <= max_risk_usd
+    or the trade is REJECTED - rounding UP to volume_min that would exceed the
+    budget is a refusal, never an order.
     """
+    desired = abs(float(max_risk_usd))
     stop_dist = abs(float(entry) - float(invalidation))
     if stop_dist <= 0 or pip <= 0:
-        return min_lot
-    usd_per_lot_per_pip = float(pip) * float(contract_size)
-    stop_pips = stop_dist / float(pip)
-    risk_per_lot = stop_pips * usd_per_lot_per_pip
-    if risk_per_lot <= 0:
-        return min_lot
-    lots = float(max_risk_usd) / risk_per_lot
-    lots = max(min_lot, float(lot_step) * int(lots / float(lot_step)))
-    return round(lots, 2)
+        return {"allowed": False, "reason": "exploration_invalid_geometry",
+                "lots": 0.0, "desired_risk_usd": desired,
+                "actual_min_lot_risk_usd": None}
+    if tick_value and tick_size:
+        usd_per_price_unit_per_lot = float(tick_value) / float(tick_size)
+    else:
+        usd_per_price_unit_per_lot = float(contract_size)
+    risk_per_lot = stop_dist * usd_per_price_unit_per_lot
+    min_lot_risk = risk_per_lot * float(volume_min)
+    if min_lot_risk > desired + 1e-12:
+        return {"allowed": False,
+                "reason": "exploration_min_lot_exceeds_risk_budget",
+                "lots": 0.0, "desired_risk_usd": round(desired, 4),
+                "actual_min_lot_risk_usd": round(min_lot_risk, 4)}
+    step = float(volume_step) or float(volume_min) or 0.01
+    lots = int(desired / risk_per_lot / step) * step
+    lots = max(float(volume_min), round(lots, 2))
+    actual = risk_per_lot * lots
+    if actual > desired + 1e-9:  # step rounding must never breach budget
+        return {"allowed": False,
+                "reason": "exploration_min_lot_exceeds_risk_budget",
+                "lots": 0.0, "desired_risk_usd": round(desired, 4),
+                "actual_min_lot_risk_usd": round(actual, 4)}
+    return {"allowed": True, "reason": "ok", "lots": round(lots, 2),
+            "desired_risk_usd": round(desired, 4),
+            "actual_min_lot_risk_usd": round(min_lot_risk, 4)}

@@ -492,6 +492,9 @@ class IntelligentFirehoseBrain:
             "demo_canary_fire": [], "champion_fire": [],
         }
         self.memory = DemoBrainState()
+        # Current regime label per symbol (consumed by runner profit-management
+        # pre-pass for regime_change policy).
+        self.regime_by_symbol: dict[str, str] = {}
         self._risk_budget = float(cfg.get("intelligent_risk_budget_usd") or cfg.get("starting_equity") or 100.0)
         self.counts: dict[str, Any] = {
             "fire": 0, "scale": 0, "hold": 0, "reduce": 0, "exit": 0, "skip": 0,
@@ -550,7 +553,9 @@ class IntelligentFirehoseBrain:
         """Sequential-learning hook: every closed exploration trade updates its
         experiment's evidence; losses arm the per-hypothesis cooldown."""
         rec = self.experiments.record_close(
-            hypothesis_id=hypothesis_id, pnl=pnl, **meta,
+            hypothesis_id=hypothesis_id, pnl=pnl,
+            max_trades=self._exploration_limits.max_trades_per_hypothesis,
+            **meta,
         )
         if rec is not None and float(pnl) <= 0:
             self.experiments.note_failure(
@@ -592,6 +597,10 @@ class IntelligentFirehoseBrain:
         portfolio_reason: str,
         symbol_spec: Mapping[str, Any] | None,
         question: str,
+        volatility: str = "",
+        regime_label: str = "",
+        evidence: Any = None,
+        spread_price: float | None = None,
     ) -> tuple[DemoDecision | None, str | None]:
         """Exploration Firehose gate chain. Returns (fire_decision, skip_reason).
 
@@ -610,39 +619,38 @@ class IntelligentFirehoseBrain:
         )
         # Book-derived logic (spec A): retrieve relevant source concepts for
         # THIS state and attach real derived rules - never just a label.
+        # Programming errors here MUST surface (audited fix): only the
+        # expected "no knowledge available" case yields empty logic.
         book_logic: dict[str, Any] = {}
-        try:
-            from aegis.intel import knowledge_retrieval
+        from aegis.intel import knowledge_retrieval
 
-            state_ctx = {
-                "regime": regime,
-                "session": session,
-                "structure": str(signature.get("structure") or setup),
-                "volatility": str(state.get("volatility") or ""),
-                "family": setup,
-                "symbol": symbol,
-                "side": side,
+        state_ctx = {
+            "regime": regime_label or regime,
+            "session": session,
+            "structure": str(signature.get("structure") or setup),
+            "volatility": str(volatility or ""),
+            "family": setup,
+            "symbol": symbol,
+            "side": side,
+        }
+        hits = knowledge_retrieval.retrieve_for_state(state_ctx, limit=6)
+        if hits:
+            top = hits[0]
+            book_logic = {
+                "source_book": top.get("book"),
+                "source_author": top.get("author"),
+                "source_passage_hash": top.get("passage_hash"),
+                "source_location": top.get("location"),
+                "concept_type": top.get("concept_type"),
+                "polarity": top.get("polarity"),
+                "conflict_topic": top.get("conflict_topic"),
+                "exit_plan": knowledge_retrieval.exit_plan_for_state(state_ctx),
+                "matched_records": [
+                    {k: h.get(k) for k in ("book", "concept_type",
+                                           "passage_hash", "_score")}
+                    for h in hits[:4]
+                ],
             }
-            hits = knowledge_retrieval.retrieve_for_state(state_ctx, limit=6)
-            if hits:
-                top = hits[0]
-                book_logic = {
-                    "source_book": top.get("book"),
-                    "source_author": top.get("author"),
-                    "source_passage_hash": top.get("passage_hash"),
-                    "source_location": top.get("location"),
-                    "concept_type": top.get("concept_type"),
-                    "polarity": top.get("polarity"),
-                    "conflict_topic": top.get("conflict_topic"),
-                    "exit_plan": knowledge_retrieval.exit_plan_for_state(state_ctx),
-                    "matched_records": [
-                        {k: h.get(k) for k in ("book", "concept_type",
-                                               "passage_hash", "_score")}
-                        for h in hits[:4]
-                    ],
-                }
-        except Exception:
-            book_logic = {}
         # Candidate counted once per brain lifetime per hypothesis.
         import time as _time
 
@@ -664,9 +672,22 @@ class IntelligentFirehoseBrain:
         if target is not None:
             tp_dist = abs(float(target) - float(entry))
             if tp_dist / sl_dist < 0.25:
-                return None, "exploration_absurd_payoff"
-        # Self-hedge audit (spec J): opposing exposure on the same symbol is
-        # legitimate ONLY with a genuinely different mechanism (family).
+                return None, "exploration_destructive_payoff"
+            # SPREAD_FAILURE: target must clear the live spread with room.
+            if spread_price is not None and tp_dist <= 2.0 * float(spread_price):
+                return None, "exploration_spread_failure"
+        # NEGATIVE_STATE_EV: measured analogue evidence against this state is
+        # a HARD rejection - economics never returns through exploration.
+        ev_obj = evidence
+        if ev_obj is not None and getattr(ev_obj, "eligible", False):
+            exp_val = getattr(ev_obj, "expectancy", None)
+            if exp_val is not None and float(exp_val) <= 0:
+                return None, "state_ev_not_positive"
+        # Self-hedge audit (spec J, audited fix): opposing exposure on the
+        # same symbol requires INDEPENDENT mechanism evidence - different
+        # family AND different polarity/mechanism class. Same family is
+        # always blocked; different family must also differ in polarity
+        # (continuation vs fade) to prove a distinct thesis.
         opposite_side = "sell" if side == "buy" else "buy"
         for key in self._exploration_theses:
             mem = self.memory.theses.get(key)
@@ -677,12 +698,42 @@ class IntelligentFirehoseBrain:
                 and (len(mem.tickets) > 0
                      or len(self.memory.exploration_pending.get(key) or []) > 0)
             ):
-                if str(mem.setup_family or "").lower() == str(setup).lower():
-                    return None, "self_hedge_blocked_same_family"
-                # Different family = different mechanism/horizon: allowed, but
-                # the double-spread cost must be acknowledged in the record.
+                same_family = str(mem.setup_family or "").lower() == str(setup).lower()
+                polarity_map = {"breakout": "continuation", "momentum": "continuation",
+                                "pullback": "fade", "retest": "fade",
+                                "reversal": "fade", "mean_reversion": "fade"}
+                my_pol = polarity_map.get(str(setup).lower(), "")
+                their_pol = polarity_map.get(str(mem.setup_family or "").lower(), "")
+                independent = (
+                    not same_family
+                    and my_pol and their_pol and my_pol != their_pol
+                )
+                if not independent:
+                    return None, (
+                        "self_hedge_blocked_same_family" if same_family
+                        else "self_hedge_blocked_insufficient_independence"
+                    )
+                # Independent mechanisms allowed; double-spread cost of the
+                # internal hedge is acknowledged in the experiment record.
         if not portfolio_ok:
             return None, portfolio_reason or "portfolio_risk"
+
+        spec = symbol_spec or {}
+        sizing = risk_lots_for_exploration(
+            max_risk_usd=self._exploration_limits.max_risk_per_trade_usd,
+            entry=entry,
+            invalidation=invalidation,
+            pip=pip,
+            contract_size=float(spec.get("trade_contract_size", 100000.0) or 100000.0),
+            tick_value=spec.get("trade_tick_value"),
+            tick_size=spec.get("trade_tick_size"),
+            volume_min=float(spec.get("volume_min", 0.01) or 0.01),
+            volume_step=float(spec.get("volume_step", 0.01) or 0.01),
+        )
+        if not sizing.get("allowed"):
+            # Hard risk rejection: broker-minimum lot would breach the budget.
+            return None, str(sizing.get("reason"))
+        lots = float(sizing["lots"])
 
         exp_open_total, exp_open_symbol = self.exploration_open_counts(symbol)
         ok, reason = check_exploration_limits(
@@ -741,14 +792,6 @@ class IntelligentFirehoseBrain:
         record["exit_plan"] = exit_plan
         record["book_logic"] = book_logic
         self.experiments.save()
-        lots = risk_lots_for_exploration(
-            max_risk_usd=self._exploration_limits.max_risk_per_trade_usd,
-            entry=entry,
-            invalidation=invalidation,
-            pip=pip,
-            min_lot=float(spec.get("volume_min", 0.01) or 0.01),
-            lot_step=float(spec.get("volume_step", 0.01) or 0.01),
-        )
         thesis_key_exp = thesis_key(symbol, side, setup, regime=regime, session=session)
         self._exploration_theses.add(thesis_key_exp)
         # Reservation must be visible to audits: record side/family on the
@@ -777,6 +820,7 @@ class IntelligentFirehoseBrain:
             "regime": regime,
             "session": session,
             "max_risk_usd": self._exploration_limits.max_risk_per_trade_usd,
+            "sizing": sizing,
             "exit_plan": exit_plan,
             "book_logic": book_logic,
         }
@@ -1008,6 +1052,9 @@ class IntelligentFirehoseBrain:
             self.counts["skip"] += 1
             return DemoDecision("skip", "no_structural_invalidation", side=side, journal={"brain": "intelligent_firehose"})
         signature = runtime_signature(state, side=side, setup=setup)
+        self.regime_by_symbol[str(symbol).upper()] = str(
+            signature.get("regime") or ""
+        )
         # Keep the thesis identity consistent with the memory lookup above.
         held.thesis_key = thesis_key(
             symbol, side, setup,
@@ -1203,9 +1250,39 @@ class IntelligentFirehoseBrain:
         # with valid geometry can still become a REGISTERED tiny-risk DEMO
         # experiment. This never bypasses champion validation - it buys
         # information while capital stays protected.
+        #
+        # Audited fix (spec-defect 6): exploration is a CLASSIFIED path, not a
+        # generic skip-fallthrough. Hard economic rejections can NEVER return
+        # through exploration.
+        _HARD_REJECT_BASES = (
+            "trade_economics",          # NEGATIVE_EXPECTED_NET_AFTER_COST /
+                                        # SPREAD_FAILURE / DESTRUCTIVE_PAYOFF
+            "state_ev_not_positive",    # NEGATIVE_STATE_EV
+            "destructive_payoff",
+            "payoff_worse_than_cost",
+            "sizing:",                  # RISK_FAILURE
+        )
+        _EXPLORATION_ALLOWED_BASES = (
+            "no_validated_strategy_model",      # INSUFFICIENT_EVIDENCE
+            "state_not_in_validated_set",       # UNDERCOVERED_STATE
+            "unacceptable_uncertainty",         # UNCERTAIN_PLAUSIBLE_MECHANISM
+            "insufficient_analogue_evidence",   # INSUFFICIENT_EVIDENCE
+            "shadow:not_trading_stage",         # research-stage demand
+        )
+        fire_base = str(fire.reason or "").split(":", 1)[0]
+        exploration_classified = (
+            fire.action == "skip"
+            and (fire_base in _EXPLORATION_ALLOWED_BASES
+                 or str(fire.reason or "").startswith("shadow:"))
+        )
+        economics_hard_reject = (
+            fire.action == "skip" and fire_base in _HARD_REJECT_BASES
+        )
+        if economics_hard_reject:
+            self._note_skip(str(fire.reason))
         exploration_journal: dict[str, Any] | None = None
         if (
-            fire.action == "skip"
+            exploration_classified
             and held.clips <= 0
             and invalidation is not None
             and bool(self.cfg.get("intelligent_exploration_enabled", True))
@@ -1226,8 +1303,32 @@ class IntelligentFirehoseBrain:
                 symbol_spec=symbol_spec,
                 question=(f"book-derived family {book_family}" if book_family
                           else "firehose scan candidate"),
+                volatility=str((state.get("volatility") or {}).get("phase")
+                               if isinstance(state.get("volatility"), Mapping)
+                               else (state.get("volatility") or "")),
+                regime_label=str((state.get("regime") or {}).get("label", "")
+                                 if isinstance(state.get("regime"), Mapping)
+                                 else (state.get("regime") or "")),
+                evidence=evidence,
+                spread_price=spread_price,
             )
             if exp_decision is not None:
+                # Explicit exploration classification (audited fix, defect 6).
+                _trigger_map = {
+                    "no_validated_strategy_model": "INSUFFICIENT_EVIDENCE",
+                    "insufficient_analogue_evidence": "INSUFFICIENT_EVIDENCE",
+                    "state_not_in_validated_set": "UNDERCOVERED_STATE",
+                    "unacceptable_uncertainty": "UNCERTAIN_PLAUSIBLE_MECHANISM",
+                }
+                _base = str(fire.reason or "").split(":", 1)[0]
+                _trigger = _trigger_map.get(
+                    _base,
+                    ("NEW_BOOK_HYPOTHESIS"
+                     if (exp_decision.journal.get("book_logic")
+                         and (exp_decision.journal["book_logic"].get("source_book")))
+                     else "NEW_DATA_HYPOTHESIS"),
+                )
+                exp_decision.journal["exploration_trigger"] = _trigger
                 self.counts["exploration_fire"] = int(self.counts.get("exploration_fire", 0)) + 1
                 self._note_stage("exploration_fire")
                 self.counts["fire"] = int(self.counts.get("fire", 0)) + 1

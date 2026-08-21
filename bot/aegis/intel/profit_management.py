@@ -23,9 +23,12 @@ open - no lookahead.
 """
 from __future__ import annotations
 
+import json
 import statistics
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Mapping
 
 
@@ -81,6 +84,8 @@ class TicketTrack:
     peak_pnl: float = 0.0
     last_pnl: float = 0.0
     entry_ev_at_open: float | None = None
+    current_remaining_ev: float | None = None
+    remaining_ev_status: str = "UNKNOWN"   # ESTIMATED | UNKNOWN
     regime_at_open: str = ""
     session_at_open: str = ""
     spread_at_entry: float | None = None
@@ -125,17 +130,72 @@ class TicketTrack:
     def age_s(self, now: float) -> float:
         return max(0.0, now - self.opened_ts) if self.opened_ts else 0.0
 
+    # -- persistence (spec defect 9: PM must survive restart) ----------------
+
+    def to_dict(self) -> dict[str, Any]:
+        d = self.__dict__.copy()
+        d["samples"] = self.samples[-256:]  # recent granularity is enough
+        return d
+
+    @classmethod
+    def from_dict(cls, d: Mapping[str, Any]) -> "TicketTrack":
+        track = cls(ticket=str(d.get("ticket") or ""))
+        for key, value in d.items():
+            if key in {"samples"}:
+                continue
+            if hasattr(track, key):
+                setattr(track, key, value)
+        track.samples = [
+            (float(ts), float(pnl)) for ts, pnl in (d.get("samples") or [])
+        ]
+        return track
+
 
 class ProfitManager:
     """Evaluates policies per ticket and produces decisions + explanations."""
 
-    def __init__(self, cfg: Mapping[str, Any]):
+    def __init__(self, cfg: Mapping[str, Any], *, persist_path: Path | None = None):
         self.cfg = ProfitPolicyConfig.from_cfg(cfg)
         self.tracks: dict[str, TicketTrack] = {}
         self.winner_to_loser_count = 0
         self.winner_to_loser_usd_given_back = 0.0
         self.decision_counts: dict[str, int] = {"HOLD": 0, "LOCK": 0, "EXIT": 0,
                                                 "REDUCE": 0}
+        # Restart survival (spec defect 9): per-ticket state persists so a
+        # restart never grants a stale trade a fresh time-decay window.
+        self.persist_path = Path(persist_path) if persist_path else None
+        if self.persist_path and self.persist_path.exists():
+            try:
+                payload = json.loads(self.persist_path.read_text(encoding="utf-8"))
+                for tid, td in (payload.get("tracks") or {}).items():
+                    self.tracks[str(tid)] = TicketTrack.from_dict(td)
+                stats = payload.get("stats") or {}
+                self.winner_to_loser_count = int(stats.get("winner_to_loser_count") or 0)
+                self.winner_to_loser_usd_given_back = float(
+                    stats.get("winner_to_loser_usd_given_back") or 0.0)
+            except (OSError, json.JSONDecodeError):
+                pass
+
+    def _persist(self) -> None:
+        if not self.persist_path:
+            return
+        try:
+            self.persist_path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "schema": "pm_tickets.v1",
+                "saved_utc": datetime.now(timezone.utc).isoformat(),
+                "stats": {
+                    "winner_to_loser_count": self.winner_to_loser_count,
+                    "winner_to_loser_usd_given_back":
+                        self.winner_to_loser_usd_given_back,
+                },
+                "tracks": {tid: t.to_dict() for tid, t in self.tracks.items()},
+            }
+            tmp = self.persist_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(payload, default=str), encoding="utf-8")
+            tmp.replace(self.persist_path)
+        except OSError:
+            pass
 
     # -- lifecycle -----------------------------------------------------------
 
@@ -146,10 +206,17 @@ class ProfitManager:
         meta_by_ticket: Mapping[str, Mapping[str, Any]] | None = None,
         now: float | None = None,
     ) -> None:
-        """Update tracks from live positions; drop closed ones (recording stats)."""
+        """Update tracks from live positions; drop closed ones (recording stats).
+
+        Spec defect 8: current_sl comes from explicit metadata IF present,
+        otherwise from the broker PositionSnapshot.stop_loss. Target likewise
+        falls back to take_profit. Spec defect 9: previously-seen tickets keep
+        their persisted opened_ts/MFE/MAE across restarts.
+        """
         now = now if now is not None else time.time()
         meta_by_ticket = meta_by_ticket or {}
         live_tickets = set()
+        changed = False
         for pos in positions:
             ticket = str(getattr(pos, "ticket", "") or "")
             if not ticket:
@@ -158,6 +225,8 @@ class ProfitManager:
             track = self.tracks.get(ticket)
             if track is None:
                 meta = meta_by_ticket.get(ticket, {})
+                broker_sl = float(getattr(pos, "stop_loss", 0) or 0) or None
+                broker_tp = float(getattr(pos, "take_profit", 0) or 0) or None
                 track = TicketTrack(
                     ticket=ticket,
                     thesis_key=str(meta.get("thesis_key") or ""),
@@ -168,19 +237,31 @@ class ProfitManager:
                     family=str(meta.get("family") or ""),
                     opened_ts=now,
                     entry_price=float(getattr(pos, "avg_price", 0) or 0),
-                    target=meta.get("target"),
+                    target=meta.get("target", broker_tp),
                     invalidation=meta.get("invalidation"),
-                    current_sl=meta.get("sl"),
+                    current_sl=meta.get("sl", broker_sl),
                     entry_ev_at_open=meta.get("entry_ev"),
                     regime_at_open=str(meta.get("regime") or ""),
                     session_at_open=str(meta.get("session") or ""),
                 )
                 self.tracks[ticket] = track
+                changed = True
+            else:
+                # Keep stop/target fresh from broker when metadata is silent.
+                broker_sl = float(getattr(pos, "stop_loss", 0) or 0) or None
+                if track.current_sl is None and broker_sl:
+                    track.current_sl = broker_sl
+            before = (track.last_pnl, track.mfe_usd)
             track.update(pnl=float(getattr(pos, "unrealized_pnl", 0) or 0), now=now)
+            if before != (track.last_pnl, track.mfe_usd):
+                changed = True
         for ticket in list(self.tracks.keys()):
             if ticket not in live_tickets:
                 closed = self.tracks.pop(ticket)
                 self._record_closed(closed)
+                changed = True
+        if changed:
+            self._persist()
 
     def _record_closed(self, track: TicketTrack) -> None:
         if (
@@ -201,16 +282,26 @@ class ProfitManager:
         regime_now: str = "",
         margin_pressure: bool = False,
         remaining_ev: float | None = None,
+        remaining_ev_status: str = "UNKNOWN",
     ) -> dict[str, Any]:
         """Return {action, reason, why, policy} for one ticket.
 
         action: HOLD | LOCK | EXIT | REDUCE
+        Spec defect 7: ``remaining_ev`` is the CURRENT remaining-EV estimate
+        (recomputed by the caller from point-in-time info) and carries an
+        explicit status. UNKNOWN never masquerades as evidence.
         """
         track = self.tracks.get(ticket)
         if track is None or not self.cfg.enabled:
             self.decision_counts["HOLD"] += 1
             return {"action": "HOLD", "reason": "pm_disabled_or_untracked",
                     "why": "profit management has no tracked state", "policy": None}
+        track.current_remaining_ev = (
+            float(remaining_ev) if remaining_ev is not None else None
+        )
+        track.remaining_ev_status = (
+            remaining_ev_status if remaining_ev is not None else "UNKNOWN"
+        )
         now = time.time()
         reasons_hold: list[str] = []
 
@@ -272,14 +363,23 @@ class ProfitManager:
                 f"{self.cfg.mfe_arm_usd:.2f}; protective stop owns downside"
             )
 
-        # 6. Portfolio pressure: caller decides which ticket; we expose EV rank.
-        if margin_pressure and (remaining_ev is not None) and remaining_ev <= 0:
+        # 6. Portfolio pressure: exit only when remaining EV is ESTIMATED and
+        # non-positive; UNKNOWN never masquerades as evidence (defect 7).
+        if margin_pressure and (
+            track.remaining_ev_status == "ESTIMATED"
+            and track.current_remaining_ev is not None
+            and track.current_remaining_ev <= 0
+        ):
             self.decision_counts["EXIT"] += 1
             return {"action": "EXIT", "reason": "pm_portfolio_pressure",
                     "why": "margin pressure with non-positive remaining EV",
                     "policy": "portfolio_pressure"}
         if margin_pressure:
-            reasons_hold.append("margin pressure noted; remaining EV still positive")
+            reasons_hold.append(
+                "margin pressure noted; remaining EV "
+                f"{track.remaining_ev_status}"
+                + (f"={track.current_remaining_ev:.2f}" if track.current_remaining_ev is not None else "")
+            )
 
         if track.last_pnl > 0:
             reasons_hold.insert(0, f"floating profit {track.last_pnl:.2f} with "
@@ -307,7 +407,6 @@ class ProfitManager:
         ]
         tickets = []
         for t in self.tracks.values():
-            ev_proxy = (t.entry_ev_at_open if t.entry_ev_at_open is not None else 0)
             tickets.append({
                 "ticket": t.ticket,
                 "thesis": t.thesis_key,
@@ -320,7 +419,11 @@ class ProfitManager:
                 "mfe": round(t.mfe_usd, 4),
                 "mae": round(t.mae_usd, 4),
                 "locked_profit": round(t.locked_profit_usd, 4),
-                "remaining_ev": ev_proxy,
+                # Spec defect 7: entry EV and CURRENT remaining EV are
+                # separate; status UNKNOWN never masquerades as evidence.
+                "entry_ev_at_open": t.entry_ev_at_open,
+                "remaining_ev": t.current_remaining_ev,
+                "remaining_ev_status": t.remaining_ev_status,
                 "exit_state": t.exit_reason or "open",
                 "age_s": round(t.age_s(time.time()), 1),
             })

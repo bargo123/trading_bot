@@ -67,6 +67,103 @@ EXIT_CATEGORIES = {
                                   "fair value", "returns to the mean"),
 }
 
+# Spec defect 5: SOURCE_KNOWLEDGE vs EXECUTABLE_RESEARCH_HYPOTHESIS.
+# A tagged passage is knowledge; an executable hypothesis needs formalized
+# logic fields. Non-executable strategy passages stay SOURCE_KNOWLEDGE only.
+_FAMILY_MAP = (
+    (("failed breakout", "false breakout"), "failed_breakout_fade", "fade"),
+    (("breakout",), "breakout_continuation", "continuation"),
+    (("pullback", "retest"), "pullback_entry", "fade"),
+    (("mean reversion", "reversion"), "mean_reversion", "fade"),
+    (("momentum",), "momentum_continuation", "continuation"),
+    (("trend",), "trend_following", "continuation"),
+    (("range",), "range_fade", "fade"),
+)
+_SIDE_LONG = re.compile(r"\b(buy|long|bullish)\b", re.I)
+_SIDE_SHORT = re.compile(r"\b(sell|short|bearish|fade)\b", re.I)
+_TF_RE = re.compile(r"\b(M1|M5|M15|M30|H1|H4|D1|daily|hourly)\b", re.I)
+
+
+def _formalize(body: str, extras: dict[str, Any]) -> dict[str, Any]:
+    """Derive executable-hypothesis fields from passage text deterministically.
+
+    Returns the extra record fields; ``executable`` is True only when ALL
+    required logic fields are non-empty (label alone is never enough).
+    """
+    lowered = body.lower()
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", body) if s.strip()]
+    family = mechanism = ""
+    polarity = extras.get("polarity") or ""
+    for keys, fam, pol in _FAMILY_MAP:
+        if any(k in lowered for k in keys):
+            family, polarity = fam, polarity or pol
+            break
+    if family:
+        mechanism = (
+            f"{polarity}: {family} edge arises from {extras.get('conflict_topic') or family} "
+            "behavior described by the source; entry follows the stated trigger, "
+            "invalidation at the stated structural level"
+        )
+    side = ""
+    m_long, m_short = _SIDE_LONG.search(lowered), _SIDE_SHORT.search(lowered)
+    if polarity == "fade":
+        side = "sell" if m_short else ("buy" if m_long and not m_short else "")
+    elif polarity == "continuation":
+        side = "buy" if m_long else ("sell" if m_short and not m_long else "")
+    elif m_long and not m_short:
+        side = "buy"
+    elif m_short and not m_long:
+        side = "sell"
+
+    def _sentence_with(pattern: re.Pattern) -> str:
+        for s in sentences:
+            if pattern.search(s):
+                return s[:300]
+        return ""
+
+    entry_h = _sentence_with(re.compile(
+        r"\b(buy|sell|enter|entry|long|short|fade)\b", re.I))
+    invalid_h = _sentence_with(_INVALIDATION_CUE)
+    exit_h = ""
+    for cat_kws in EXIT_CATEGORIES.values():
+        for kw in cat_kws:
+            for s in sentences:
+                if kw in s.lower():
+                    exit_h = s[:300]
+                    break
+            if exit_h:
+                break
+        if exit_h:
+            break
+    if not exit_h:
+        # Explicit executable fallback exit plan (PM policies own it).
+        exit_h = "structural/time-stop per PM policies"
+    tf_match = _TF_RE.search(body)
+    timeframe = tf_match.group(1).upper() if tf_match else ""
+    regime_topic = extras.get("conflict_topic") or ""
+
+    executable = bool(
+        family and mechanism and side and entry_h and invalid_h
+        and exit_h and regime_topic
+    )
+    return {
+        "strategy_family": family,
+        "mechanism": mechanism,
+        "side_rule": side,
+        "entry_hypothesis": entry_h,
+        "invalidation_hypothesis": invalid_h,
+        "exit_hypothesis": exit_h or "structural/time-stop per PM policies",
+        "profit_management_hypothesis": (
+            "; ".join(extras.get("exit_categories", [])) or ""
+        ),
+        "required_regime": regime_topic,
+        "required_timeframe": timeframe or "unspecified",
+        "required_data": "completed_m1+m15_structure",
+        "known_limitation": "",
+        "executable": executable,
+        "polarity": polarity,
+    }
+
 _KEYWORD_SETS: list[tuple[str, str, tuple[str, ...]]] = [
     ("exit", TYPE_EXIT, (
         "trailing stop", "take profit", "profit target", "exit", "let winners run",
@@ -145,6 +242,21 @@ class SectionRecord:
     falsification_condition: str = ""
     polarity: str = ""
     conflict_topic: str = ""
+    exit_categories: list[str] = field(default_factory=list)
+    strategy_family: str = ""
+    mechanism: str = ""
+    side_rule: str = ""
+    required_regime: str = ""
+    required_timeframe: str = ""
+    required_data: str = ""
+    entry_hypothesis: str = ""
+    confirmation_hypothesis: str = ""
+    invalidation_hypothesis: str = ""
+    exit_hypothesis: str = ""
+    profit_management_hypothesis: str = ""
+    falsification_condition: str = ""
+    executable: bool = False
+    concept_note: str = ""
     exit_categories: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
@@ -287,6 +399,15 @@ def process_book(path: Path, *, repo_root: Path) -> dict[str, Any]:
             continue
         primary, extras = _classify(body)
         head = " ".join(body.split())[:400]
+        formal: dict[str, Any] = {}
+        if primary == TYPE_STRATEGY:
+            formal = _formalize(body, extras)
+            if not formal.get("executable"):
+                # Label alone is SOURCE_KNOWLEDGE, not an executable hypothesis.
+                primary = TYPE_DESCR
+                formal["concept_note"] = (
+                    "strategy-tagged passage lacked formalizable logic; kept as source knowledge"
+                )
         rec = SectionRecord(
             book=path.stem,
             author=author,
@@ -299,10 +420,23 @@ def process_book(path: Path, *, repo_root: Path) -> dict[str, Any]:
             passage_hash=_sha256(body),
             passage_excerpt=head,
             concept_type=primary,
-            polarity=extras.get("polarity", ""),
+            polarity=formal.get("polarity", extras.get("polarity", "")),
             conflict_topic=extras.get("conflict_topic", ""),
             exit_categories=extras.get("exit_categories", []),
-            falsification_condition=extras.get("falsification_condition", ""),
+            strategy_family=formal.get("strategy_family", ""),
+            mechanism=formal.get("mechanism", ""),
+            side_rule=formal.get("side_rule", ""),
+            required_regime=formal.get("required_regime", ""),
+            required_timeframe=formal.get("required_timeframe", ""),
+            required_data=formal.get("required_data", ""),
+            entry_hypothesis=formal.get("entry_hypothesis", ""),
+            confirmation_hypothesis="",
+            invalidation_hypothesis=formal.get("invalidation_hypothesis", ""),
+            exit_hypothesis=formal.get("exit_hypothesis", ""),
+            profit_management_hypothesis=formal.get("profit_management_hypothesis", ""),
+            falsification_condition=formal.get("falsification_condition", ""),
+            executable=bool(formal.get("executable")),
+            concept_note=formal.get("concept_note", ""),
         )
         records.append(rec.as_dict())
     return {"file": rel, "status": status, "words": words,

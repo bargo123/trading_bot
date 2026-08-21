@@ -203,7 +203,10 @@ def main() -> None:
     # Intelligent per-thesis profit management (spec B-H, O, P).
     from aegis.intel.profit_management import ProfitManager
 
-    profit_manager = ProfitManager(cfg)
+    profit_manager = ProfitManager(
+        cfg, persist_path=ROOT / "intel" / "pm_tickets.json"
+    )
+    last_inventory_journal: dict[str, float] = {"ts": 0.0}
 
     def write_heartbeat(extra: Optional[dict] = None) -> None:
         payload = {
@@ -1030,7 +1033,9 @@ def main() -> None:
             # (position comments survive runner restarts) plus brain pending
             # reservations for the in-flight window.
             if brain_decision is not None and brain_decision.journal.get("exploration"):
-                from aegis.intel.exploration import ExplorationLimits
+                from aegis.intel.exploration import (
+                    ExplorationLimits, exploration_room_reason,
+                )
 
                 limits_run = ExplorationLimits.from_cfg(cfg)
                 exp_positions = [
@@ -1038,18 +1043,19 @@ def main() -> None:
                     if "EXP" in str(getattr(p, "comment", "") or "")
                 ]
                 total_exp, sym_exp = intelligent_brain.exploration_open_counts(sym)
+                # Prospective: take the WORST of broker truth and brain state
+                # (pending reservations included) without double counting.
                 total_exp = max(total_exp, len(exp_positions))
                 sym_exp = max(
                     sym_exp,
                     len([p for p in exp_positions
                          if str(p.symbol).upper() == str(sym).upper()]),
                 )
-                skip_reason = None
-                if total_exp > limits_run.max_positions:
-                    skip_reason = f"exploration_max_positions:{total_exp}"
-                elif sym_exp > limits_run.max_positions_per_symbol:
-                    skip_reason = "exploration_max_positions_per_symbol"
-                else:
+                skip_reason = exploration_room_reason(
+                    total_open=total_exp, symbol_open=sym_exp,
+                    limits=limits_run,
+                )
+                if skip_reason is None:
                     # Margin pressure (spec K): broker-measured; block NEW
                     # exploration first - never close a high-EV winner to make
                     # room for an unvalidated experiment.
@@ -1406,26 +1412,38 @@ def main() -> None:
                     # winner, WHY it is still being held.
                     try:
                         extra_hb["profit_management"] = profit_manager.snapshot()
-                        _exp_metrics: dict[str, float] = {
-                            "gross_long_exposure": 0.0,
-                            "gross_short_exposure": 0.0,
-                            "net_exposure": 0.0,
-                            "hedged_exposure": 0.0,
-                            "cost_of_internal_hedge": 0.0,
-                        }
+                        # Spec J (audited): self-hedge is PER SYMBOL, then
+                        # aggregated - not portfolio-wide long vs short.
+                        _per_sym: dict[str, dict[str, float]] = {}
                         for _p in eng.positions():
                             _q = float(getattr(_p, "quantity", 0) or 0)
+                            _s = str(getattr(_p, "symbol", "?"))
+                            d = _per_sym.setdefault(_s, {"long": 0.0, "short": 0.0})
                             if str(getattr(_p, "side", "")).lower() == "buy":
-                                _exp_metrics["gross_long_exposure"] += _q
-                                _exp_metrics["net_exposure"] += _q
+                                d["long"] += _q
                             else:
-                                _exp_metrics["gross_short_exposure"] += _q
-                                _exp_metrics["net_exposure"] -= _q
-                        _exp_metrics["hedged_exposure"] = min(
-                            _exp_metrics["gross_long_exposure"],
-                            _exp_metrics["gross_short_exposure"],
-                        )
-                        extra_hb["exposure"] = _exp_metrics
+                                d["short"] += _q
+                        gross_l = gross_s = hedged = hedge_cost = 0.0
+                        for _s, d in _per_sym.items():
+                            gross_l += d["long"]
+                            gross_s += d["short"]
+                            h = min(d["long"], d["short"])
+                            hedged += h
+                            # Estimated double-spread cost of fighting
+                            # ourselves: 1.0 pip typical spread * $10/pip/lot.
+                            hedge_cost += h * 2.0 * 1.0 * 10.0
+                        extra_hb["exposure"] = {
+                            "gross_long_exposure": round(gross_l, 4),
+                            "gross_short_exposure": round(gross_s, 4),
+                            "net_exposure": round(gross_l - gross_s, 4),
+                            "hedged_exposure": round(hedged, 4),
+                            "cost_of_internal_hedge_usd_est": round(hedge_cost, 2),
+                            "per_symbol_hedged": {
+                                s: round(min(d["long"], d["short"]), 4)
+                                for s, d in sorted(_per_sym.items())
+                                if min(d["long"], d["short"]) > 0
+                            },
+                        }
                     except Exception:
                         pass
                     extra_hb["intelligent_firehose"] = True
@@ -1540,6 +1558,52 @@ def main() -> None:
                                         "family": str(_rec.get("strategy_family") or ""),
                                     }
                         profit_manager.sync(all_open, meta_by_ticket=meta_by_ticket)
+                        # Position inventory (audited defect 3): classify EVERY
+                        # open ticket - origin, exploration?, hypothesis,
+                        # thesis, legacy/unattributed, broker comment, risk.
+                        inventory = []
+                        for pos in all_open:
+                            tk = str(getattr(pos, "ticket", "") or "")
+                            meta_t = meta_by_ticket.get(tk) or {}
+                            comment = str(getattr(pos, "comment", "") or "")
+                            is_exp = "EXP" in comment
+                            hyp_id = (
+                                meta_t.get("hypothesis_id")
+                                or (intelligent_brain.find_experiment_by_tag(comment)
+                                    and intelligent_brain.find_experiment_by_tag(
+                                        comment)["hypothesis_id"])
+                                or ""
+                            )
+                            inventory.append({
+                                "ticket": tk,
+                                "symbol": str(getattr(pos, "symbol", "")),
+                                "side": str(getattr(pos, "side", "")),
+                                "quantity": float(getattr(pos, "quantity", 0) or 0),
+                                "origin": ("exploration" if is_exp else
+                                           ("core" if not intelligent_mode else
+                                            "intelligent_unattributed")),
+                                "exploration": bool(is_exp),
+                                "hypothesis_id": hyp_id,
+                                "thesis_id": (meta_t.get("thesis_key") or ""),
+                                "legacy_unattributed": bool(
+                                    is_exp and not meta_t.get("thesis_key")),
+                                "client_comment": comment[:40],
+                                "risk_usd_est": round(
+                                    abs(float(getattr(pos, "unrealized_pnl", 0) or 0)),
+                                    4),
+                            })
+                        now_inv = time.time()
+                        if now_inv - last_inventory_journal.get("ts", 0) >= 300:
+                            last_inventory_journal["ts"] = now_inv
+                            append_journal(
+                                journal,
+                                {"event": "position_inventory",
+                                 "positions": inventory,
+                                 "unattributed_exploration": sum(
+                                     1 for i in inventory
+                                     if i["exploration"] and i["legacy_unattributed"]),
+                                 },
+                            )
                         acct_pm = eng.account()
                         free_margin = float(getattr(acct_pm, "available_funds", 0) or 0)
                         equity_pm = float(getattr(acct_pm, "equity", 0) or 0)
@@ -1549,12 +1613,37 @@ def main() -> None:
                         )
                         for pos in all_open:
                             tk = str(getattr(pos, "ticket", "") or "")
+                            # Current remaining-EV estimate (spec defect 7):
+                            # entry EV scaled by remaining R:R from CURRENT
+                            # price toward target/invalidation. UNKNOWN when
+                            # the thesis lacks executable geometry - never 0.
+                            _rem_ev, _rem_status = None, "UNKNOWN"
+                            _track = profit_manager.tracks.get(tk)
+                            if _track is not None:
+                                _tgt = _track.target
+                                _inv = _track.invalidation
+                                _px = float(_track.entry_price or 0)
+                                _cur = float(getattr(pos, "avg_price", 0) or _px)
+                                if _tgt and _inv and _px and _cur:
+                                    sign = 1.0 if str(_track.side) == "buy" else -1.0
+                                    rem_rr = ((_tgt - _cur) * sign) / max(
+                                        abs(_cur - _inv), 1e-9)
+                                    init_rr = abs(_tgt - _px) / max(
+                                        abs(_px - _inv), 1e-9)
+                                    base_ev = float(_track.entry_ev_at_open or 0.0)
+                                    _rem_ev = round(
+                                        base_ev * max(0.0, min(2.0, rem_rr / max(init_rr, 1e-9))),
+                                        4)
+                                    _rem_status = "ESTIMATED"
                             verdict = profit_manager.evaluate(
                                 ticket=tk,
                                 volume=float(getattr(pos, "quantity", 0) or 0),
                                 volume_min=0.01,
-                                regime_now="",
+                                regime_now=str((intelligent_brain.regime_by_symbol or {})
+                                               .get(str(getattr(pos, "symbol", "")), "")),
                                 margin_pressure=margin_pressure,
+                                remaining_ev=_rem_ev,
+                                remaining_ev_status=_rem_status,
                             )
                             if verdict["action"] == "EXIT" and hasattr(eng, "close_ticket"):
                                 res_close = eng.close_ticket(tk)

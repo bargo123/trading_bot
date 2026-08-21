@@ -37,20 +37,44 @@ def main() -> int:
 
     failures: list[str] = []
     counts: dict[str, int] = {}
-    for req in ledger.get("requirements", []):
+    reqs = ledger.get("requirements", [])
+    for req in reqs:
         status = str(req.get("status") or "NOT_STARTED")
         counts[status] = counts.get(status, 0) + 1
         if status == "VERIFIED":
+            # Machine-checkable verification (audited fix 12): never trust the
+            # ledger label blindly.
+            rid = str(req.get("id"))
+            for f in req.get("implementation_files") or []:
+                if not (BOT.parent / f).exists():
+                    failures.append(f"{rid}: implementation file missing: {f}")
+            for t in req.get("tests") or []:
+                test_path = str(t).split("::")[0]
+                if not (BOT / test_path).exists():
+                    failures.append(f"{rid}: referenced test missing: {t}")
+            sha = str(req.get("commit_sha") or "").strip().lower()
+            if not sha or "pending" in sha:
+                failures.append(f"{rid}: VERIFIED without commit_sha")
+            evidence = str(req.get("evidence") or "").strip()
+            if len(evidence) < 10:
+                failures.append(f"{rid}: VERIFIED without meaningful evidence")
             continue
         if status == "NOT_APPLICABLE":
             continue
         if status == "BLOCKED" and req.get("external"):
             continue
-        failures.append(f"{req.get('id')}: {status} - {req.get('requirement', '')[:90]}")
+        failures.append(f"{req.get('id')}: {status} - {str(req.get('requirement', ''))[:90]}")
+
+    # Ledger counts must reconcile.
+    total_declared = sum(counts.values())
+    if total_declared != len(reqs):
+        failures.append(f"ledger counts do not reconcile: {total_declared} != {len(reqs)}")
+
+    failures.extend(_invariant_checks())
 
     print("Ledger status counts:", json.dumps(counts, sort_keys=True))
     if failures:
-        print(f"NOT COMPLETE: {len(failures)} requirement(s) below VERIFIED:")
+        print(f"NOT COMPLETE: {len(failures)} problem(s):")
         for line in failures:
             print("  -", line)
 
@@ -63,8 +87,54 @@ def main() -> int:
     if failures:
         return 1
     print("MASTER SPEC: all merge-blocking requirements VERIFIED"
-          + (" (+ runtime gates pass)" if args.runtime else ""))
+          " (+ machine checks + runtime gates pass)" if args.runtime else
+          "MASTER SPEC: all merge-blocking requirements VERIFIED (+ machine checks)")
     return 0
+
+
+def _invariant_checks() -> list[str]:
+    """Cross-code invariants the audit explicitly requires the verifier to catch."""
+    failures: list[str] = []
+    # Invariant: MIN_N_TO_JUDGE <= exploration_max_trades_per_hypothesis.
+    try:
+        import re as _re
+
+        src = (BOT / "aegis" / "intel" / "exploration.py").read_text(encoding="utf-8")
+        m = _re.search(r"MIN_N_TO_JUDGE\s*=\s*(\d+)", src)
+        min_n = int(m.group(1)) if m else 10**9
+        cap = None
+        cfg_text = CONFIG.read_text(encoding="utf-8")
+        for line in cfg_text.splitlines():
+            if line.strip().startswith("exploration_max_trades_per_hypothesis:"):
+                cap = int(line.split(":", 1)[1].strip())
+                break
+        if cap is None:
+            cap = 5  # documented default in ExplorationLimits
+        if min_n > cap:
+            failures.append(
+                f"P0 invariant violated: MIN_N_TO_JUDGE({min_n}) > "
+                f"max_trades_per_hypothesis({cap}); lifecycle unreachable"
+            )
+    except Exception as exc:
+        failures.append(f"invariant check failed to run: {exc}")
+    # Deterministic risk-cap check: broker-minimum on a 50-pip stop at $0.15
+    # budget MUST be rejected.
+    try:
+        sys.path.insert(0, str(BOT))
+        from aegis.intel.exploration import risk_lots_for_exploration
+
+        r = risk_lots_for_exploration(
+            max_risk_usd=0.15, entry=1.1000, invalidation=1.0950,
+            pip=0.0001, contract_size=100000.0,
+            volume_min=0.01, volume_step=0.01,
+        )
+        if r.get("allowed") is not False:
+            failures.append(
+                "P0 risk-cap contradiction: 50-pip/$0.15 min-lot trade was allowed"
+            )
+    except Exception as exc:
+        failures.append(f"risk-cap check failed to run: {exc}")
+    return failures
 
 
 def _runtime_checks() -> list[str]:

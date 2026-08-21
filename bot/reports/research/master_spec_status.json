@@ -60,14 +60,14 @@
     },
     {
       "commit_sha": "a23878a",
-      "evidence": "runtime: exploration_max_positions:2 blocked 45 fires in live window",
+      "evidence": "AUDIT DOWNGRADE: min-lot risk can exceed budget (rounds UP to 0.01) - must reject",
       "id": "EF-005",
       "implementation_files": [
         "bot/aegis/intel/exploration.py",
         "bot/config_mt5_demo_firehose_hw.yaml"
       ],
       "requirement": "Independent hard limits: exploration_max_positions/per_symbol/daily_loss_usd/risk_per_trade_usd/trades_per_hypothesis/cooldown_after_failure; no martingale/DCA/recovery sizing",
-      "status": "VERIFIED",
+      "status": "IN_PROGRESS",
       "tests": [
         "tests/test_exploration_firehose.py::test_limits_max_positions_and_per_symbol",
         "tests/test_exploration_firehose.py::test_daily_loss_limit_halts_exploration",
@@ -77,7 +77,7 @@
     },
     {
       "commit_sha": "pending-final-commit",
-      "evidence": "PositionSnapshot.comment added; broker-truth guard + in-flight reservation test; restart-proof",
+      "evidence": "AUDIT DOWNGRADE: restart guard off-by-one (> instead of prospective room)",
       "id": "EF-006",
       "implementation_files": [
         "bot/aegis/intel/firehose_brain.py",
@@ -86,7 +86,7 @@
         "bot/aegis/engines/mt5.py"
       ],
       "requirement": "Cap cannot be raced: in-flight reservations + broker-truth enforcement; survives runner restart",
-      "status": "VERIFIED",
+      "status": "IN_PROGRESS",
       "tests": [
         "tests/test_exploration_firehose.py::test_brain_fires_registered_exploration_on_unvalidated_state"
       ]
@@ -294,14 +294,14 @@
     },
     {
       "commit_sha": "pending-final-commit",
-      "evidence": "_maybe_explore attaches book_logic (source hashes/exit_plan/polarity) from retrieval to every registered experiment",
+      "evidence": "AUDIT DOWNGRADE: strategy_hypotheses records lack executable fields",
       "id": "EF-105",
       "implementation_files": [
         "bot/aegis/intel/knowledge_retrieval.py",
         "bot/aegis/intel/firehose_brain.py"
       ],
       "requirement": "A: Book-backed generation - retrieve relevant source concepts for CURRENT state and construct DISTINCT hypotheses with real derived logic (not relabeled CORE), persisting hypothesis_id/source hashes/logic/mechanism/falsification",
-      "status": "VERIFIED",
+      "status": "IN_PROGRESS",
       "tests": [
         "tests/test_book_knowledge.py"
       ]
@@ -321,27 +321,27 @@
     },
     {
       "commit_sha": "pending-final-commit",
-      "evidence": "ProfitManager policies live: runtime decision_counts HOLD=27 on first cycles; unit tests for giveback/lock/time-decay/regime/portfolio",
+      "evidence": "AUDIT DOWNGRADE: remaining_ev not real; regime_now blank",
       "id": "EF-107",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py",
         "bot/scripts/run_broker_paper.py"
       ],
       "requirement": "B/D: Intelligent profit-management framework with candidate policies (structural target, MFE giveback, breakeven cost-plus lock, trailing structural stop, current-EV exit, time decay, regime change, portfolio pressure); no dumb pnl>X close-all; no global arbitrary hardcoded threshold",
-      "status": "VERIFIED",
+      "status": "IN_PROGRESS",
       "tests": [
         "tests/test_profit_management.py"
       ]
     },
     {
       "commit_sha": "pending-final-commit",
-      "evidence": "TicketTrack stores pnl/mfe/mae/peak/giveback/age/entry_ev/regime/session/spread; snapshot exposes per-ticket remaining_ev",
+      "evidence": "AUDIT DOWNGRADE: entry_ev reported AS remaining_ev; no separate current_remaining_ev",
       "id": "EF-108",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py"
       ],
       "requirement": "C: Track ENTRY_EV_AT_OPEN, CURRENT_REMAINING_EV proxy, MFE/MAE, peak P/L, giveback, age, distances, spread-to-exit, regime-change flag per open thesis",
-      "status": "VERIFIED",
+      "status": "IN_PROGRESS",
       "tests": [
         "tests/test_profit_management.py"
       ]
@@ -361,27 +361,27 @@
     },
     {
       "commit_sha": "pending-final-commit",
-      "evidence": "per-ticket tracks independent (test_per_ticket_mfe_is_independent); thesis/hypothesis/family in meta_by_ticket",
+      "evidence": "AUDIT DOWNGRADE: current_sl from meta only; broker stop_loss ignored; restart resets age/MFE",
       "id": "EF-110",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py"
       ],
       "requirement": "E: Per-ticket/per-thesis tracking (thesis_id/hypothesis_id/ticket; entry,pnl,MFE,MAE,MFE ts,locked profit,SL,target,age,family,status); EURUSD positions never share one common MFE",
-      "status": "VERIFIED",
+      "status": "IN_PROGRESS",
       "tests": [
         "tests/test_profit_management.py"
       ]
     },
     {
       "commit_sha": "pending-final-commit",
-      "evidence": "LOCK uses stop adjustment via modify_stops (refuses loosen); EXIT full-close; no partial-close pretense",
+      "evidence": "AUDIT DOWNGRADE: lock path unreachable when meta sl missing",
       "id": "EF-111",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py",
         "bot/scripts/run_broker_paper.py"
       ],
       "requirement": "F: 0.01-lot reality - choose FULL TICKET CLOSE or PROTECTIVE STOP ADJUSTMENT; never pretend partial close below broker volume_min",
-      "status": "VERIFIED",
+      "status": "IN_PROGRESS",
       "tests": [
         "tests/test_profit_management.py"
       ]
@@ -429,28 +429,28 @@
     },
     {
       "commit_sha": "pending-final-commit",
-      "evidence": "self_hedge_blocked_same_family regression test passes; heartbeat exposure block (gross/net/hedged) live",
+      "evidence": "AUDIT DOWNGRADE: self-hedge only checks family equality; hedge metric is portfolio-wide not per-symbol",
       "id": "EF-115",
       "implementation_files": [
         "bot/aegis/intel/exploration.py",
         "bot/aegis/intel/firehose_brain.py"
       ],
       "requirement": "J: Self-hedge audit - opposing same-symbol exposure requires distinct hypothesis IDs/mechanisms/invalidations/EV and benefit after double spread else blocked; metrics gross_long/short/net/hedged/cost_of_internal_hedge",
-      "status": "VERIFIED",
+      "status": "IN_PROGRESS",
       "tests": [
         "tests/test_profit_management.py"
       ]
     },
     {
       "commit_sha": "pending-final-commit",
-      "evidence": "exploration guard blocks new entries on min_free_margin_usd/max_margin_fraction using broker account; PM pressure policy never closes high-EV winner (test)",
+      "evidence": "AUDIT DOWNGRADE: margin guard present but unproven against restart leak",
       "id": "EF-116",
       "implementation_files": [
         "bot/aegis/intel/exploration.py",
         "bot/scripts/run_broker_paper.py"
       ],
       "requirement": "K: Margin pressure controls (min free-margin reserve, min margin level, max exploration margin fraction) using broker-measured margin; block NEW exploration first; never auto-close high-EV winner to make room",
-      "status": "VERIFIED",
+      "status": "IN_PROGRESS",
       "tests": [
         "tests/test_profit_management.py"
       ]
@@ -497,21 +497,21 @@
     },
     {
       "commit_sha": "pending-final-commit",
-      "evidence": "heartbeat profit_management block live: floating pnl/mfe/giveback, w2l, capture ratio, lock counts, decision_counts, per-ticket table",
+      "evidence": "AUDIT DOWNGRADE: remaining_ev misreported; per-ticket table incomplete",
       "id": "EF-120",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py",
         "bot/aegis/intel/firehose_brain.py"
       ],
       "requirement": "O: Heartbeat additions - open_floating_profit_usd/open_floating_loss_usd/open_mfe_usd/open_profit_given_back_usd/winner_to_loser_count/profit_capture_ratio/positions_with(out)_profit_lock + per-ticket table (ticket,thesis,hypothesis,stage,pnl,mfe,mae,locked,remaining_ev,exit_state)",
-      "status": "VERIFIED",
+      "status": "IN_PROGRESS",
       "tests": [
         "tests/test_profit_management.py"
       ]
     },
     {
       "commit_sha": "pending-final-commit",
-      "evidence": "PM pre-pass runs in intelligent mode; experiments register explicit exit_plan (pm_policies or book-derived); target=None no longer claims quick-win",
+      "evidence": "AUDIT DOWNGRADE: exit plan recorded but PM evaluate lacked real inputs",
       "id": "EF-121",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py",
@@ -519,7 +519,7 @@
         "bot/scripts/run_broker_paper.py"
       ],
       "requirement": "P: Intelligent-mode profit-management layer replaces bypassed quick-win/MFE-giveback CORE branches; max_hold_seconds=0/flatten_if_profit_usd=0 handled; every exploration experiment has explicit executable exit plan (target=None must still define one)",
-      "status": "VERIFIED",
+      "status": "IN_PROGRESS",
       "tests": [
         "tests/test_profit_management.py"
       ]

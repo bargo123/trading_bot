@@ -147,3 +147,47 @@ def test_exit_categories_cover_spec_L_topics():
         "trend_termination", "mean_reversion_completion",
     }
     assert required <= set(EXIT_CATEGORIES.keys())
+
+
+def test_label_alone_is_not_executable_strategy():
+    """Audited defect 5: a strategy-tagged passage WITHOUT formalizable logic
+    stays SOURCE_KNOWLEDGE and never reaches strategy_hypotheses.jsonl."""
+    books = tmp_path_factory()
+    _write(books / "Vague.md",
+           "# Notes\n\n" + ("Sometimes breakouts fail and price reverses. " * 30))
+    out = books.parent / "knowledge"
+    build_knowledge_base(books, out)
+    hyps = [json.loads(l) for l in (out / "strategy_hypotheses.jsonl")
+            .read_text(encoding="utf-8").splitlines() if line_ok(l)]
+    assert not any(h.get("book") == "Vague" for h in hyps)
+
+
+def test_real_book_backed_hypothesis_has_full_logic():
+    books = tmp_path_factory()
+    body = ("Sell the failed breakout trap back into the range on M15: enter "
+            "short after the false breakout above resistance traps buyers. "
+            "Invalidate above the trap high. Exit at the range midpoint; this "
+            "is a time-stop friendly setup. ")
+    _write(books / "Fade Masters.md", "# Traps\n\n" + body * 20)
+    out = books.parent / "knowledge"
+    build_knowledge_base(books, out)
+    hyps = [json.loads(l) for l in (out / "strategy_hypotheses.jsonl")
+            .read_text(encoding="utf-8").splitlines() if line_ok(l)]
+    fade = [h for h in hyps if h.get("polarity") == "fade"]
+    assert fade, "executable fade hypothesis must be extracted"
+    h = fade[0]
+    for field in ("strategy_family", "mechanism", "side_rule", "entry_hypothesis",
+                  "invalidation_hypothesis", "exit_hypothesis", "required_regime",
+                  "required_data", "passage_hash", "location"):
+        assert h.get(field), f"missing {field}"
+    assert h["executable"] is True
+
+
+def tmp_path_factory():
+    import tempfile
+
+    return Path(tempfile.mkdtemp())
+
+
+def line_ok(line: str) -> bool:
+    return bool(line.strip())
