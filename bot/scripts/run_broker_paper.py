@@ -1094,6 +1094,17 @@ def main() -> None:
                         },
                     )
                     return
+                # Reservation happens HERE (post-guard) so the guard doesn't
+                # see its own decision as a conflict.
+                _thesis_key = str(brain_decision.journal.get("thesis_key") or "")
+                if _thesis_key:
+                    intelligent_brain.memory.exploration_pending.setdefault(
+                        _thesis_key, []).append(time.time())
+                    _mem = intelligent_brain.memory.theses.get(_thesis_key)
+                    if _mem is not None:
+                        _mem.symbol = sym.upper()
+                        _mem.side = brain_decision.side
+                        _mem.setup_family = str(brain_decision.journal.get("setup_family") or "")
             # --- Pre-send refresh (P8): the decision was priced on quote q,
             # fetched before the brain ran. If that quote is now stale, fetch
             # ONE fresh tick and re-validate; never send on stale pricing and

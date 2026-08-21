@@ -869,17 +869,13 @@ class IntelligentFirehoseBrain:
         self.experiments.save()
         thesis_key_exp = thesis_key(symbol, side, setup, regime=regime, session=session)
         self._exploration_theses.add(thesis_key_exp)
-        # Reservation must be visible to audits: record side/family on the
-        # thesis memory so self-hedge checks can identify it.
+        # Set identity on the thesis memory so self-hedge checks can find it.
         _mem = self.memory.get(thesis_key_exp, symbol)
         _mem.symbol = str(symbol).upper()
         _mem.side = side
         _mem.setup_family = setup
-        # Reserve in-flight exposure BEFORE returning the decision so parallel
-        # bar evaluations cannot race past max_positions.
-        self.memory.exploration_pending.setdefault(thesis_key_exp, []).append(
-            datetime.now(timezone.utc).timestamp()
-        )
+        # Reservation happens in the RUNNER after the pre-send guard passes,
+        # not here — otherwise the guard sees its own decision as a conflict.
         self.counts["exploration_eligible"] = int(self.counts.get("exploration_eligible", 0)) + 1
         journal = {
             "brain": "intelligent_firehose",
