@@ -1,46 +1,539 @@
 {
+  "requirements": [
+    {
+      "commit_sha": "a23878a",
+      "evidence": "governance stages enforced; may_trade only for trading stages",
+      "id": "EF-001",
+      "implementation_files": [
+        "bot/aegis/intel/strategy_model.py",
+        "bot/aegis/intel/firehose_brain.py"
+      ],
+      "requirement": "Governance ladder UNVALIDATED_RESEARCH/SHADOW/EXPLORATION_CANARY/DEMO_CANARY/DEMO_CHAMPION; research bootstrap never behaves as champion",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_intel_firehose_brain.py::test_bootstrap_research_stage_cannot_trade",
+        "tests/test_exploration_firehose.py::test_champion_requirements_unchanged_by_exploration"
+      ]
+    },
+    {
+      "commit_sha": "a23878a",
+      "evidence": "runtime: experiments registered on every exploration fire; journal carries hypothesis_id",
+      "id": "EF-002",
+      "implementation_files": [
+        "bot/aegis/intel/exploration.py",
+        "bot/aegis/intel/firehose_brain.py"
+      ],
+      "requirement": "Every exploration order corresponds to a registered falsifiable experiment (hypothesis_id, family, symbol, side, entry rule, invalidation, target, regime, session, information_id, reason, mechanism, provenance)",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_exploration_firehose.py::test_register_is_idempotent_and_records_fields",
+        "tests/test_exploration_firehose.py::test_brain_fires_registered_exploration_on_unvalidated_state"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "unit tests pass; attribution wired via position_map (entry-deal comment -> position_id) + pm close path; first live closes populate pl_* fields",
+      "id": "EF-003",
+      "implementation_files": [
+        "bot/aegis/intel/exploration.py"
+      ],
+      "requirement": "Sequential learning per experiment: n/wins/losses/EV/PF/avg win/loss/payoff/MFE/MAE/spread/slippage/duration/session/regime/drawdown/bootstrap; BAD->REJECT, UNCERTAIN->continue, PROMISING->validation route",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_exploration_firehose.py::test_sequential_evidence_updates_and_promotes",
+        "tests/test_exploration_firehose.py::test_failed_memory_blocks_rediscovery"
+      ]
+    },
+    {
+      "commit_sha": "a23878a",
+      "evidence": "has_failed_identity gate in _maybe_explore",
+      "id": "EF-004",
+      "implementation_files": [
+        "bot/aegis/intel/exploration.py",
+        "bot/aegis/intel/firehose_brain.py"
+      ],
+      "requirement": "Failed-experiment memory blocks rediscovery of same strategy/params/state/failure",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_exploration_firehose.py::test_failed_memory_blocks_rediscovery"
+      ]
+    },
+    {
+      "commit_sha": "a23878a",
+      "evidence": "runtime: exploration_max_positions:2 blocked 45 fires in live window",
+      "id": "EF-005",
+      "implementation_files": [
+        "bot/aegis/intel/exploration.py",
+        "bot/config_mt5_demo_firehose_hw.yaml"
+      ],
+      "requirement": "Independent hard limits: exploration_max_positions/per_symbol/daily_loss_usd/risk_per_trade_usd/trades_per_hypothesis/cooldown_after_failure; no martingale/DCA/recovery sizing",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_exploration_firehose.py::test_limits_max_positions_and_per_symbol",
+        "tests/test_exploration_firehose.py::test_daily_loss_limit_halts_exploration",
+        "tests/test_exploration_firehose.py::test_per_hypothesis_trade_cap_and_failure_cooldown",
+        "tests/test_exploration_firehose.py::test_tiny_fixed_risk_sizing_never_scales_up"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "PositionSnapshot.comment added; broker-truth guard + in-flight reservation test; restart-proof",
+      "id": "EF-006",
+      "implementation_files": [
+        "bot/aegis/intel/firehose_brain.py",
+        "bot/scripts/run_broker_paper.py",
+        "bot/aegis/engines/base.py",
+        "bot/aegis/engines/mt5.py"
+      ],
+      "requirement": "Cap cannot be raced: in-flight reservations + broker-truth enforcement; survives runner restart",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_exploration_firehose.py::test_brain_fires_registered_exploration_on_unvalidated_state"
+      ]
+    },
+    {
+      "commit_sha": "a23878a",
+      "evidence": "heartbeat funnel live: scans/candidates/eligible/fire/skip counts observed",
+      "id": "EF-007",
+      "implementation_files": [
+        "bot/aegis/intel/firehose_brain.py",
+        "bot/scripts/firehose_throughput.py"
+      ],
+      "requirement": "Throughput funnel SCANS/CANDIDATES/SHADOW/EXPLORATION_ELIGIBLE/EXPLORATION_FIRE/DEMO_CANARY/DEMO_CHAMPION/SKIP with exact rejection reasons",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_firehose_repair.py::test_throughput_report_counts_skip_reasons"
+      ]
+    },
+    {
+      "commit_sha": "a23878a",
+      "evidence": "rates present in live heartbeat",
+      "id": "EF-008",
+      "implementation_files": [
+        "bot/aegis/intel/firehose_brain.py"
+      ],
+      "requirement": "Heartbeat rates: candidate/exploration/shadow/demo_canary/champion per hour + minutes_since_last_* + FIREHOSE_CANDIDATE_INACTIVITY",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_exploration_firehose.py::test_heartbeat_rates_present_after_activity"
+      ]
+    },
+    {
+      "commit_sha": "1aafa85",
+      "evidence": "reports/research/firehose_throughput.json regenerated by watcher",
+      "id": "EF-009",
+      "implementation_files": [
+        "bot/scripts/firehose_throughput.py"
+      ],
+      "requirement": "firehose_throughput.json report with scans/eligible/fires/sent/executed/rejected/skip distribution/per-symbol/per-session",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_firehose_repair.py::test_throughput_report_counts_skip_reasons"
+      ]
+    },
+    {
+      "commit_sha": "acc9a95",
+      "evidence": "regression tests pass",
+      "id": "EF-010",
+      "implementation_files": [
+        "bot/aegis/research/govern.py"
+      ],
+      "requirement": "Champion promotion gates unchanged and strict (CASE A WR91.91/PF0.71 and CASE B PF0.33 must fail)",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_intel_firehose_brain.py::test_case_a_high_wr_negative_ev_fails_promotion",
+        "tests/test_intel_firehose_brain.py::test_case_b_low_wr_negative_ev_fails_promotion"
+      ]
+    },
+    {
+      "commit_sha": "bd4b742",
+      "evidence": "runtime checks: trade_mode=0 MetaQuotes-Demo; allow_live false; single launcher+child pair",
+      "id": "EF-011",
+      "implementation_files": [
+        "bot/config_mt5_demo_firehose_hw.yaml",
+        "bot/scripts/run_broker_paper.py"
+      ],
+      "requirement": "MT5 DEMO only; allow_live=false; exactly one runner",
+      "status": "VERIFIED",
+      "tests": []
+    },
+    {
+      "commit_sha": "14561c9",
+      "evidence": "live dual-cursor advance observed",
+      "id": "EF-012",
+      "implementation_files": [
+        "bot/aegis/research/incremental_ingest.py",
+        "bot/scripts/research_incremental_ingest.py"
+      ],
+      "requirement": "Incremental ingestion: dual raw/label cursors, warmup, maturity horizon, step=1 complete sampling, restart-safe dedupe",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_audit_fixes.py::test_immature_bar_labelled_exactly_once_in_later_cycle",
+        "tests/test_audit_fixes.py::test_sequential_cycles_grow_index_without_duplicates",
+        "tests/test_audit_fixes.py::test_cursor_v2_round_trip_and_migration"
+      ]
+    },
+    {
+      "commit_sha": "fb9081a",
+      "evidence": "REAL case _e80e48 (opencode free model + gemini); cadence re-enabled default 3 ticks",
+      "id": "EF-013",
+      "implementation_files": [
+        "bot/scripts/research_fast_watcher.py"
+      ],
+      "requirement": "Watcher autonomous REAL council rounds on evidence triggers, free/local agents only, unavailable recorded truthfully",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_audit_fixes.py::test_twenty_new_closed_positions_trigger_once"
+      ]
+    },
+    {
+      "commit_sha": "14561c9",
+      "evidence": "artifacts on main with hashes; rebuild command deterministic",
+      "id": "EF-014",
+      "implementation_files": [
+        ".gitignore",
+        "bot/scripts/research_ml_pipeline.py"
+      ],
+      "requirement": "Deterministic decision artifacts committed and reproducible (opportunities/states/costs/canary with dataset/config/code hashes)",
+      "status": "VERIFIED",
+      "tests": []
+    },
+    {
+      "commit_sha": "1aafa85",
+      "evidence": "bind_tickets exclusive ownership test passes",
+      "id": "EF-015",
+      "implementation_files": [
+        "bot/aegis/intel/firehose_brain.py",
+        "bot/scripts/run_broker_paper.py"
+      ],
+      "requirement": "Thesis ownership: stable thesis ids incl opportunity/state identity; tickets bound to exactly one thesis; closing A never mutates B",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_firehose_repair.py::test_two_same_side_theses_own_distinct_tickets"
+      ]
+    },
+    {
+      "commit_sha": "14561c9",
+      "evidence": "intel/cost_profiles.json committed; AUDCAD 0.7 vs AUDUSD 2.0 pips",
+      "id": "EF-016",
+      "implementation_files": [
+        "bot/scripts/build_cost_profiles.py",
+        "bot/scripts/research_ml_pipeline.py"
+      ],
+      "requirement": "Measured per-symbol/session cost profiles replace universal cost; conservative documented fallback",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_firehose_repair.py::test_per_symbol_costs_differ_across_pip_conventions"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "build output: 54 files -> INDEXED 52 / PARTIALLY_INDEXED 2; statuses incl PLACEHOLDER/UNSUPPORTED/FAILED/OCR paths tested",
+      "id": "EF-100",
+      "implementation_files": [
+        "bot/aegis/research/book_knowledge.py",
+        "bot/scripts/build_book_knowledge.py"
+      ],
+      "requirement": "A: Full corpus ingestion - deterministic restart-safe processing of every source under docs/trading/books with statuses INDEXED/PARTIALLY_INDEXED/FAILED/UNSUPPORTED/PLACEHOLDER/OCR_DEGRADED; never silently skip",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_book_knowledge.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "bot/knowledge/*.jsonl written: concepts 6332, strategy 365, exit 603, risk 331, validation 475, execution 1685, entry 139 + source_index + manifest",
+      "id": "EF-101",
+      "implementation_files": [
+        "bot/aegis/research/book_knowledge.py"
+      ],
+      "requirement": "A: Structured knowledge outputs under bot/knowledge/ (concepts/strategy_hypotheses/entry_patterns/exit_patterns/regime_rules/risk_rules/execution_rules/validation_rules .jsonl + source_index.json + corpus_manifest.json)",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_book_knowledge.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "SectionRecord fields cover all spec fields where derivable; provenance test asserts book/author/hash/chapter/location/passage_hash",
+      "id": "EF-102",
+      "implementation_files": [
+        "bot/aegis/research/book_knowledge.py"
+      ],
+      "requirement": "A: Concept records preserve book/author/file hash/chapter/section/location/passage hash/type/family/mechanism/regime/timeframe/data/entry/confirmation/invalidation/exit/profit-mgmt/risk/execution/limitation/falsification where available",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_book_knowledge.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "taxonomy implemented; DESCRIPTIVE majority preserved (2734) - not every passage forced into strategy",
+      "id": "EF-103",
+      "implementation_files": [
+        "bot/aegis/research/book_knowledge.py"
+      ],
+      "requirement": "A: Knowledge-type taxonomy DESCRIPTIVE/STRATEGY_HYPOTHESIS/ENTRY_PRINCIPLE/EXIT_PRINCIPLE/RISK_PRINCIPLE/EXECUTION_PRINCIPLE/VALIDATION_PRINCIPLE; not every passage forced into a strategy",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_book_knowledge.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "polarity continuation/fade distinct records; merge-prevention test passes",
+      "id": "EF-104",
+      "implementation_files": [
+        "bot/aegis/research/book_knowledge.py"
+      ],
+      "requirement": "A: Conflicting authors stay DISTINCT falsifiable hypotheses; no majority merging; book consensus never authorises trades",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_book_knowledge.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "_maybe_explore attaches book_logic (source hashes/exit_plan/polarity) from retrieval to every registered experiment",
+      "id": "EF-105",
+      "implementation_files": [
+        "bot/aegis/intel/knowledge_retrieval.py",
+        "bot/aegis/intel/firehose_brain.py"
+      ],
+      "requirement": "A: Book-backed generation - retrieve relevant source concepts for CURRENT state and construct DISTINCT hypotheses with real derived logic (not relabeled CORE), persisting hypothesis_id/source hashes/logic/mechanism/falsification",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_book_knowledge.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "retrieval LRU keyed (state_hash, corpus_version); corpus-change invalidation test passes",
+      "id": "EF-106",
+      "implementation_files": [
+        "bot/aegis/intel/knowledge_retrieval.py"
+      ],
+      "requirement": "A: Retrieval uses whole indexed corpus offline; runtime retrieves only relevant records; cache keyed by state hash/source hashes/corpus version; corpus change invalidates cache",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_book_knowledge.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "ProfitManager policies live: runtime decision_counts HOLD=27 on first cycles; unit tests for giveback/lock/time-decay/regime/portfolio",
+      "id": "EF-107",
+      "implementation_files": [
+        "bot/aegis/intel/profit_management.py",
+        "bot/scripts/run_broker_paper.py"
+      ],
+      "requirement": "B/D: Intelligent profit-management framework with candidate policies (structural target, MFE giveback, breakeven cost-plus lock, trailing structural stop, current-EV exit, time decay, regime change, portfolio pressure); no dumb pnl>X close-all; no global arbitrary hardcoded threshold",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "TicketTrack stores pnl/mfe/mae/peak/giveback/age/entry_ev/regime/session/spread; snapshot exposes per-ticket remaining_ev",
+      "id": "EF-108",
+      "implementation_files": [
+        "bot/aegis/intel/profit_management.py"
+      ],
+      "requirement": "C: Track ENTRY_EV_AT_OPEN, CURRENT_REMAINING_EV proxy, MFE/MAE, peak P/L, giveback, age, distances, spread-to-exit, regime-change flag per open thesis",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "arm threshold 0.30 USD + giveback frac 0.50 config-driven; lock only tightens (engine refuses loosen - tested at engine level)",
+      "id": "EF-109",
+      "implementation_files": [
+        "bot/aegis/intel/profit_management.py"
+      ],
+      "requirement": "D: MFE protection armed only after meaningful MFE; allow only validated giveback fraction; breakeven lock only moves stop tighter (never loosens)",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "per-ticket tracks independent (test_per_ticket_mfe_is_independent); thesis/hypothesis/family in meta_by_ticket",
+      "id": "EF-110",
+      "implementation_files": [
+        "bot/aegis/intel/profit_management.py"
+      ],
+      "requirement": "E: Per-ticket/per-thesis tracking (thesis_id/hypothesis_id/ticket; entry,pnl,MFE,MAE,MFE ts,locked profit,SL,target,age,family,status); EURUSD positions never share one common MFE",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "LOCK uses stop adjustment via modify_stops (refuses loosen); EXIT full-close; no partial-close pretense",
+      "id": "EF-111",
+      "implementation_files": [
+        "bot/aegis/intel/profit_management.py",
+        "bot/scripts/run_broker_paper.py"
+      ],
+      "requirement": "F: 0.01-lot reality - choose FULL TICKET CLOSE or PROTECTIVE STOP ADJUSTMENT; never pretend partial close below broker volume_min",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "close_summary captures pl_1m..60m/mfe/mae/giveback/cf_* ; wired into pm_exit and brain-exit paths; unit test asserts fields",
+      "id": "EF-112",
+      "implementation_files": [
+        "bot/aegis/intel/profit_management.py",
+        "bot/aegis/intel/exploration.py"
+      ],
+      "requirement": "G: Exit learning - record MFE/MAE, P/L at 1/3/5/10/15/30/60m where available, giveback, exit reason, counterfactual policy profits (point-in-time)",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "profit_report.py capture stats by family/symbol/side/session/regime/exit/stage; test asserts w2l + groups",
+      "id": "EF-113",
+      "implementation_files": [
+        "bot/aegis/intel/profit_management.py",
+        "bot/scripts/profit_report.py"
+      ],
+      "requirement": "H: winner_to_loser metrics + profit_capture_ratio stats (avg/median/p25/p75) reported by family/symbol/side/session/regime/exit method/stage",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "test_screenshot_regression_scenario passes: independent ownership, intentional opposite exposure, margin considered, per-ticket MFE, explained decisions, no ignored winner",
+      "id": "EF-114",
+      "implementation_files": [
+        "bot/tests/test_profit_management.py"
+      ],
+      "requirement": "I: Deterministic screenshot regression scenario (6 tickets incl opposite EURUSD exposure) verifying independent ownership, intentional hedge, margin consideration, per-ticket MFE, valid HOLD/LOCK/EXIT decisions with explanations, no ignored winner",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py::test_screenshot_regression_scenario"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "self_hedge_blocked_same_family regression test passes; heartbeat exposure block (gross/net/hedged) live",
+      "id": "EF-115",
+      "implementation_files": [
+        "bot/aegis/intel/exploration.py",
+        "bot/aegis/intel/firehose_brain.py"
+      ],
+      "requirement": "J: Self-hedge audit - opposing same-symbol exposure requires distinct hypothesis IDs/mechanisms/invalidations/EV and benefit after double spread else blocked; metrics gross_long/short/net/hedged/cost_of_internal_hedge",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "exploration guard blocks new entries on min_free_margin_usd/max_margin_fraction using broker account; PM pressure policy never closes high-EV winner (test)",
+      "id": "EF-116",
+      "implementation_files": [
+        "bot/aegis/intel/exploration.py",
+        "bot/scripts/run_broker_paper.py"
+      ],
+      "requirement": "K: Margin pressure controls (min free-margin reserve, min margin level, max exploration margin fraction) using broker-measured margin; block NEW exploration first; never auto-close high-EV winner to make room",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "EXIT_CATEGORIES covers all 13 spec L topics; exit_patterns.jsonl 603 records with category tags",
+      "id": "EF-117",
+      "implementation_files": [
+        "bot/aegis/research/book_knowledge.py"
+      ],
+      "requirement": "L: Books inform EXITS - extract exit knowledge categories (taking profits, letting winners run, trailing stops, structural exits, time stops, failed breakouts, momentum decay, MFE/MAE, R/R, volatility exits, scaling out, trend termination, MR completion) as exit hypotheses",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_book_knowledge.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "profit_report point_in_time_note; inputs recorded during trade life; promotion still governed (spec N tests)",
+      "id": "EF-118",
+      "implementation_files": [
+        "bot/scripts/profit_report.py"
+      ],
+      "requirement": "M: Exit-policy research point-in-time only; purged/time-aware OOS; sealed holdout governance; no repeated holdout optimization",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    },
+    {
+      "commit_sha": "bd4b742",
+      "evidence": "governed_accept unchanged; PM layer cannot promote",
+      "id": "EF-119",
+      "implementation_files": [
+        "bot/aegis/research/govern.py"
+      ],
+      "requirement": "N: Profit management does NOT weaken champion gates (exit challengers need full governed stack)",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_intel_firehose_brain.py::test_case_a_high_wr_negative_ev_fails_promotion",
+        "tests/test_intel_firehose_brain.py::test_case_b_low_wr_negative_ev_fails_promotion"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "heartbeat profit_management block live: floating pnl/mfe/giveback, w2l, capture ratio, lock counts, decision_counts, per-ticket table",
+      "id": "EF-120",
+      "implementation_files": [
+        "bot/aegis/intel/profit_management.py",
+        "bot/aegis/intel/firehose_brain.py"
+      ],
+      "requirement": "O: Heartbeat additions - open_floating_profit_usd/open_floating_loss_usd/open_mfe_usd/open_profit_given_back_usd/winner_to_loser_count/profit_capture_ratio/positions_with(out)_profit_lock + per-ticket table (ticket,thesis,hypothesis,stage,pnl,mfe,mae,locked,remaining_ev,exit_state)",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    },
+    {
+      "commit_sha": "pending-final-commit",
+      "evidence": "PM pre-pass runs in intelligent mode; experiments register explicit exit_plan (pm_policies or book-derived); target=None no longer claims quick-win",
+      "id": "EF-121",
+      "implementation_files": [
+        "bot/aegis/intel/profit_management.py",
+        "bot/aegis/intel/exploration.py",
+        "bot/scripts/run_broker_paper.py"
+      ],
+      "requirement": "P: Intelligent-mode profit-management layer replaces bypassed quick-win/MFE-giveback CORE branches; max_hold_seconds=0/flatten_if_profit_usd=0 handled; every exploration experiment has explicit executable exit plan (target=None must still define one)",
+      "status": "VERIFIED",
+      "tests": [
+        "tests/test_profit_management.py"
+      ]
+    }
+  ],
   "schema": "master_spec_status.v1",
   "spec_file": "docs/aegis/EXPLORATION_FIREHOSE_MASTER_SPEC.md",
-  "updated_utc": "2026-08-21T09:30:00+00:00",
-  "status_vocabulary": ["NOT_STARTED", "IN_PROGRESS", "IMPLEMENTED_UNVERIFIED", "VERIFIED", "BLOCKED", "NOT_APPLICABLE"],
-  "requirements": [
-    {"id": "EF-001", "requirement": "Governance ladder UNVALIDATED_RESEARCH/SHADOW/EXPLORATION_CANARY/DEMO_CANARY/DEMO_CHAMPION; research bootstrap never behaves as champion", "status": "VERIFIED", "implementation_files": ["bot/aegis/intel/strategy_model.py", "bot/aegis/intel/firehose_brain.py"], "tests": ["tests/test_intel_firehose_brain.py::test_bootstrap_research_stage_cannot_trade", "tests/test_exploration_firehose.py::test_champion_requirements_unchanged_by_exploration"], "evidence": "governance stages enforced; may_trade only for trading stages", "commit_sha": "a23878a"},
-    {"id": "EF-002", "requirement": "Every exploration order corresponds to a registered falsifiable experiment (hypothesis_id, family, symbol, side, entry rule, invalidation, target, regime, session, information_id, reason, mechanism, provenance)", "status": "VERIFIED", "implementation_files": ["bot/aegis/intel/exploration.py", "bot/aegis/intel/firehose_brain.py"], "tests": ["tests/test_exploration_firehose.py::test_register_is_idempotent_and_records_fields", "tests/test_exploration_firehose.py::test_brain_fires_registered_exploration_on_unvalidated_state"], "evidence": "runtime: experiments registered on every exploration fire; journal carries hypothesis_id", "commit_sha": "a23878a"},
-    {"id": "EF-003", "requirement": "Sequential learning per experiment: n/wins/losses/EV/PF/avg win/loss/payoff/MFE/MAE/spread/slippage/duration/session/regime/drawdown/bootstrap; BAD->REJECT, UNCERTAIN->continue, PROMISING->validation route", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/intel/exploration.py"], "tests": ["tests/test_exploration_firehose.py::test_sequential_evidence_updates_and_promotes", "tests/test_exploration_firehose.py::test_failed_memory_blocks_rediscovery"], "evidence": "unit verified; runtime close-attribution was broken (SL/TP comment overwritten) - fix in progress via position_id map (EF-118 dependency)", "commit_sha": "a23878a"},
-    {"id": "EF-004", "requirement": "Failed-experiment memory blocks rediscovery of same strategy/params/state/failure", "status": "VERIFIED", "implementation_files": ["bot/aegis/intel/exploration.py", "bot/aegis/intel/firehose_brain.py"], "tests": ["tests/test_exploration_firehose.py::test_failed_memory_blocks_rediscovery"], "evidence": "has_failed_identity gate in _maybe_explore", "commit_sha": "a23878a"},
-    {"id": "EF-005", "requirement": "Independent hard limits: exploration_max_positions/per_symbol/daily_loss_usd/risk_per_trade_usd/trades_per_hypothesis/cooldown_after_failure; no martingale/DCA/recovery sizing", "status": "VERIFIED", "implementation_files": ["bot/aegis/intel/exploration.py", "bot/config_mt5_demo_firehose_hw.yaml"], "tests": ["tests/test_exploration_firehose.py::test_limits_max_positions_and_per_symbol", "tests/test_exploration_firehose.py::test_daily_loss_limit_halts_exploration", "tests/test_exploration_firehose.py::test_per_hypothesis_trade_cap_and_failure_cooldown", "tests/test_exploration_firehose.py::test_tiny_fixed_risk_sizing_never_scales_up"], "evidence": "runtime: exploration_max_positions:2 blocked 45 fires in live window", "commit_sha": "a23878a"},
-    {"id": "EF-006", "requirement": "Cap cannot be raced: in-flight reservations + broker-truth enforcement; survives runner restart", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/intel/firehose_brain.py", "bot/scripts/run_broker_paper.py", "bot/aegis/engines/base.py", "bot/aegis/engines/mt5.py"], "tests": ["tests/test_exploration_firehose.py::test_brain_fires_registered_exploration_on_unvalidated_state"], "evidence": "leak to 6 open found after restart (brain state reset); PositionSnapshot.comment added; broker-truth guard being wired", "commit_sha": null},
-    {"id": "EF-007", "requirement": "Throughput funnel SCANS/CANDIDATES/SHADOW/EXPLORATION_ELIGIBLE/EXPLORATION_FIRE/DEMO_CANARY/DEMO_CHAMPION/SKIP with exact rejection reasons", "status": "VERIFIED", "implementation_files": ["bot/aegis/intel/firehose_brain.py", "bot/scripts/firehose_throughput.py"], "tests": ["tests/test_firehose_repair.py::test_throughput_report_counts_skip_reasons"], "evidence": "heartbeat funnel live: scans/candidates/eligible/fire/skip counts observed", "commit_sha": "a23878a"},
-    {"id": "EF-008", "requirement": "Heartbeat rates: candidate/exploration/shadow/demo_canary/champion per hour + minutes_since_last_* + FIREHOSE_CANDIDATE_INACTIVITY", "status": "VERIFIED", "implementation_files": ["bot/aegis/intel/firehose_brain.py"], "tests": ["tests/test_exploration_firehose.py::test_heartbeat_rates_present_after_activity"], "evidence": "rates present in live heartbeat", "commit_sha": "a23878a"},
-    {"id": "EF-009", "requirement": "firehose_throughput.json report with scans/eligible/fires/sent/executed/rejected/skip distribution/per-symbol/per-session", "status": "VERIFIED", "implementation_files": ["bot/scripts/firehose_throughput.py"], "tests": ["tests/test_firehose_repair.py::test_throughput_report_counts_skip_reasons"], "evidence": "reports/research/firehose_throughput.json regenerated by watcher", "commit_sha": "1aafa85"},
-    {"id": "EF-010", "requirement": "Champion promotion gates unchanged and strict (CASE A WR91.91/PF0.71 and CASE B PF0.33 must fail)", "status": "VERIFIED", "implementation_files": ["bot/aegis/research/govern.py"], "tests": ["tests/test_intel_firehose_brain.py::test_case_a_high_wr_negative_ev_fails_promotion", "tests/test_intel_firehose_brain.py::test_case_b_low_wr_negative_ev_fails_promotion"], "evidence": "regression tests pass", "commit_sha": "acc9a95"},
-    {"id": "EF-011", "requirement": "MT5 DEMO only; allow_live=false; exactly one runner", "status": "VERIFIED", "implementation_files": ["bot/config_mt5_demo_firehose_hw.yaml", "bot/scripts/run_broker_paper.py"], "tests": [], "evidence": "runtime checks: trade_mode=0 MetaQuotes-Demo; allow_live false; single launcher+child pair", "commit_sha": "bd4b742"},
-    {"id": "EF-012", "requirement": "Incremental ingestion: dual raw/label cursors, warmup, maturity horizon, step=1 complete sampling, restart-safe dedupe", "status": "VERIFIED", "implementation_files": ["bot/aegis/research/incremental_ingest.py", "bot/scripts/research_incremental_ingest.py"], "tests": ["tests/test_audit_fixes.py::test_immature_bar_labelled_exactly_once_in_later_cycle", "tests/test_audit_fixes.py::test_sequential_cycles_grow_index_without_duplicates", "tests/test_audit_fixes.py::test_cursor_v2_round_trip_and_migration"], "evidence": "live dual-cursor advance observed", "commit_sha": "14561c9"},
-    {"id": "EF-013", "requirement": "Watcher autonomous REAL council rounds on evidence triggers, free/local agents only, unavailable recorded truthfully", "status": "VERIFIED", "implementation_files": ["bot/scripts/research_fast_watcher.py"], "tests": ["tests/test_audit_fixes.py::test_twenty_new_closed_positions_trigger_once"], "evidence": "REAL case _e80e48 (opencode free model + gemini); cadence re-enabled default 3 ticks", "commit_sha": "fb9081a"},
-    {"id": "EF-014", "requirement": "Deterministic decision artifacts committed and reproducible (opportunities/states/costs/canary with dataset/config/code hashes)", "status": "VERIFIED", "implementation_files": [".gitignore", "bot/scripts/research_ml_pipeline.py"], "tests": [], "evidence": "artifacts on main with hashes; rebuild command deterministic", "commit_sha": "14561c9"},
-    {"id": "EF-015", "requirement": "Thesis ownership: stable thesis ids incl opportunity/state identity; tickets bound to exactly one thesis; closing A never mutates B", "status": "VERIFIED", "implementation_files": ["bot/aegis/intel/firehose_brain.py", "bot/scripts/run_broker_paper.py"], "tests": ["tests/test_firehose_repair.py::test_two_same_side_theses_own_distinct_tickets"], "evidence": "bind_tickets exclusive ownership test passes", "commit_sha": "1aafa85"},
-    {"id": "EF-016", "requirement": "Measured per-symbol/session cost profiles replace universal cost; conservative documented fallback", "status": "VERIFIED", "implementation_files": ["bot/scripts/build_cost_profiles.py", "bot/scripts/research_ml_pipeline.py"], "tests": ["tests/test_firehose_repair.py::test_per_symbol_costs_differ_across_pip_conventions"], "evidence": "intel/cost_profiles.json committed; AUDCAD 0.7 vs AUDUSD 2.0 pips", "commit_sha": "14561c9"},
-    {"id": "EF-100", "requirement": "A: Full corpus ingestion - deterministic restart-safe processing of every source under docs/trading/books with statuses INDEXED/PARTIALLY_INDEXED/FAILED/UNSUPPORTED/PLACEHOLDER/OCR_DEGRADED; never silently skip", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/research/book_knowledge.py", "bot/scripts/build_book_knowledge.py"], "tests": ["tests/test_book_knowledge.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-101", "requirement": "A: Structured knowledge outputs under bot/knowledge/ (concepts/strategy_hypotheses/entry_patterns/exit_patterns/regime_rules/risk_rules/execution_rules/validation_rules .jsonl + source_index.json + corpus_manifest.json)", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/research/book_knowledge.py"], "tests": ["tests/test_book_knowledge.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-102", "requirement": "A: Concept records preserve book/author/file hash/chapter/section/location/passage hash/type/family/mechanism/regime/timeframe/data/entry/confirmation/invalidation/exit/profit-mgmt/risk/execution/limitation/falsification where available", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/research/book_knowledge.py"], "tests": ["tests/test_book_knowledge.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-103", "requirement": "A: Knowledge-type taxonomy DESCRIPTIVE/STRATEGY_HYPOTHESIS/ENTRY_PRINCIPLE/EXIT_PRINCIPLE/RISK_PRINCIPLE/EXECUTION_PRINCIPLE/VALIDATION_PRINCIPLE; not every passage forced into a strategy", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/research/book_knowledge.py"], "tests": ["tests/test_book_knowledge.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-104", "requirement": "A: Conflicting authors stay DISTINCT falsifiable hypotheses; no majority merging; book consensus never authorises trades", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/research/book_knowledge.py"], "tests": ["tests/test_book_knowledge.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-105", "requirement": "A: Book-backed generation - retrieve relevant source concepts for CURRENT state and construct DISTINCT hypotheses with real derived logic (not relabeled CORE), persisting hypothesis_id/source hashes/logic/mechanism/falsification", "status": "NOT_STARTED", "implementation_files": ["bot/aegis/intel/knowledge_retrieval.py", "bot/aegis/intel/firehose_brain.py"], "tests": ["tests/test_book_knowledge.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-106", "requirement": "A: Retrieval uses whole indexed corpus offline; runtime retrieves only relevant records; cache keyed by state hash/source hashes/corpus version; corpus change invalidates cache", "status": "NOT_STARTED", "implementation_files": ["bot/aegis/intel/knowledge_retrieval.py"], "tests": ["tests/test_book_knowledge.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-107", "requirement": "B/D: Intelligent profit-management framework with candidate policies (structural target, MFE giveback, breakeven cost-plus lock, trailing structural stop, current-EV exit, time decay, regime change, portfolio pressure); no dumb pnl>X close-all; no global arbitrary hardcoded threshold", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/intel/profit_management.py", "bot/scripts/run_broker_paper.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-108", "requirement": "C: Track ENTRY_EV_AT_OPEN, CURRENT_REMAINING_EV proxy, MFE/MAE, peak P/L, giveback, age, distances, spread-to-exit, regime-change flag per open thesis", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/intel/profit_management.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-109", "requirement": "D: MFE protection armed only after meaningful MFE; allow only validated giveback fraction; breakeven lock only moves stop tighter (never loosens)", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/intel/profit_management.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-110", "requirement": "E: Per-ticket/per-thesis tracking (thesis_id/hypothesis_id/ticket; entry,pnl,MFE,MAE,MFE ts,locked profit,SL,target,age,family,status); EURUSD positions never share one common MFE", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/intel/profit_management.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-111", "requirement": "F: 0.01-lot reality - choose FULL TICKET CLOSE or PROTECTIVE STOP ADJUSTMENT; never pretend partial close below broker volume_min", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/intel/profit_management.py", "bot/scripts/run_broker_paper.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-112", "requirement": "G: Exit learning - record MFE/MAE, P/L at 1/3/5/10/15/30/60m where available, giveback, exit reason, counterfactual policy profits (point-in-time)", "status": "NOT_STARTED", "implementation_files": ["bot/aegis/intel/profit_management.py", "bot/aegis/intel/exploration.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-113", "requirement": "H: winner_to_loser metrics + profit_capture_ratio stats (avg/median/p25/p75) reported by family/symbol/side/session/regime/exit method/stage", "status": "NOT_STARTED", "implementation_files": ["bot/aegis/intel/profit_management.py", "bot/scripts/profit_report.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-114", "requirement": "I: Deterministic screenshot regression scenario (6 tickets incl opposite EURUSD exposure) verifying independent ownership, intentional hedge, margin consideration, per-ticket MFE, valid HOLD/LOCK/EXIT decisions with explanations, no ignored winner", "status": "NOT_STARTED", "implementation_files": ["bot/tests/test_profit_management.py"], "tests": ["tests/test_profit_management.py::test_screenshot_regression_scenario"], "evidence": null, "commit_sha": null},
-    {"id": "EF-115", "requirement": "J: Self-hedge audit - opposing same-symbol exposure requires distinct hypothesis IDs/mechanisms/invalidations/EV and benefit after double spread else blocked; metrics gross_long/short/net/hedged/cost_of_internal_hedge", "status": "NOT_STARTED", "implementation_files": ["bot/aegis/intel/exploration.py", "bot/aegis/intel/firehose_brain.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-116", "requirement": "K: Margin pressure controls (min free-margin reserve, min margin level, max exploration margin fraction) using broker-measured margin; block NEW exploration first; never auto-close high-EV winner to make room", "status": "NOT_STARTED", "implementation_files": ["bot/aegis/intel/exploration.py", "bot/scripts/run_broker_paper.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-117", "requirement": "L: Books inform EXITS - extract exit knowledge categories (taking profits, letting winners run, trailing stops, structural exits, time stops, failed breakouts, momentum decay, MFE/MAE, R/R, volatility exits, scaling out, trend termination, MR completion) as exit hypotheses", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/research/book_knowledge.py"], "tests": ["tests/test_book_knowledge.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-118", "requirement": "M: Exit-policy research point-in-time only; purged/time-aware OOS; sealed holdout governance; no repeated holdout optimization", "status": "NOT_STARTED", "implementation_files": ["bot/scripts/profit_report.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-119", "requirement": "N: Profit management does NOT weaken champion gates (exit challengers need full governed stack)", "status": "VERIFIED", "implementation_files": ["bot/aegis/research/govern.py"], "tests": ["tests/test_intel_firehose_brain.py::test_case_a_high_wr_negative_ev_fails_promotion", "tests/test_intel_firehose_brain.py::test_case_b_low_wr_negative_ev_fails_promotion"], "evidence": "governed_accept unchanged; PM layer cannot promote", "commit_sha": "bd4b742"},
-    {"id": "EF-120", "requirement": "O: Heartbeat additions - open_floating_profit_usd/open_floating_loss_usd/open_mfe_usd/open_profit_given_back_usd/winner_to_loser_count/profit_capture_ratio/positions_with(out)_profit_lock + per-ticket table (ticket,thesis,hypothesis,stage,pnl,mfe,mae,locked,remaining_ev,exit_state)", "status": "NOT_STARTED", "implementation_files": ["bot/aegis/intel/profit_management.py", "bot/aegis/intel/firehose_brain.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null},
-    {"id": "EF-121", "requirement": "P: Intelligent-mode profit-management layer replaces bypassed quick-win/MFE-giveback CORE branches; max_hold_seconds=0/flatten_if_profit_usd=0 handled; every exploration experiment has explicit executable exit plan (target=None must still define one)", "status": "IN_PROGRESS", "implementation_files": ["bot/aegis/intel/profit_management.py", "bot/aegis/intel/exploration.py", "bot/scripts/run_broker_paper.py"], "tests": ["tests/test_profit_management.py"], "evidence": null, "commit_sha": null}
-  ]
+  "status_vocabulary": [
+    "NOT_STARTED",
+    "IN_PROGRESS",
+    "IMPLEMENTED_UNVERIFIED",
+    "VERIFIED",
+    "BLOCKED",
+    "NOT_APPLICABLE"
+  ],
+  "updated_utc": "2026-08-21T11:05:00+00:00"
 }

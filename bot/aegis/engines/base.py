@@ -68,6 +68,14 @@ class OrderRequest:
 
 
 @dataclass(frozen=True)
+class ModifyResult:
+    ok: bool
+    message: str = ""
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+
+
+@dataclass(frozen=True)
 class OrderResult:
     ok: bool
     broker_order_id: str = ""
@@ -108,6 +116,15 @@ class BrokerEngine(ABC):
     @abstractmethod
     def place_order(self, req: OrderRequest) -> OrderResult:
         ...
+
+    def modify_stops(self, ticket: str, *, stop_loss: Optional[float] = None,
+                     take_profit: Optional[float] = None) -> "ModifyResult":
+        """Adjust protective stops on an open position. Default: unsupported.
+
+        Profit-management LOCK uses this; implementations must refuse to
+        LOOSEN an existing stop (only tighten in the protective direction).
+        """
+        return ModifyResult(ok=False, message="modify_stops not supported by engine")
 
     @abstractmethod
     def cancel_order(self, broker_order_id: str) -> OrderResult:

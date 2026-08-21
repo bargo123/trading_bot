@@ -361,3 +361,69 @@ def test_heartbeat_rates_present_after_activity(tmp_path, monkeypatch):
                 "minutes_since_last_validated_fire"):
         assert key in snap, key
     assert snap["candidate_rate_per_hour"] >= 1.0
+
+def test_self_hedge_same_family_blocked(tmp_path, monkeypatch):
+    """Spec J: opposing same-symbol exposure requires a DIFFERENT mechanism;
+    same-family opposite-side exploration is blocked."""
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1",
+                                 "records": []}), encoding="utf-8")
+    cfg = {
+        "analogue_index_path": str(index),
+        "intelligent_gate_validated_states": True,
+        "validated_states_path": str(tmp_path / "empty_states.json"),
+        "intelligent_firehose_bootstrap": True,
+        "intelligent_min_analogues": 20,
+        "intelligent_min_similarity": 0.5,
+        "intelligent_risk_fraction": 0.08,
+        "intelligent_risk_budget_usd": 100.0,
+        "order_quantity": 0.01,
+        "max_positions": 40,
+        "intelligent_exploration_enabled": True,
+    }
+    brain = IntelligentFirehoseBrain(cfg)
+
+    class _Ev:
+        pass
+
+    monkeypatch.setattr(brain.analogues, "query", lambda **k: _FakeEvidence())
+    from aegis.intel import firehose_brain as fb
+
+    fake_state = {
+        "structure": {"M15": {"kind": "retest",
+                              "support": 1.0995, "resistance": 1.1005}},
+        "session": "asia",
+        "regime": {"label": "range"},
+        "multi_timeframe": {"H1": {"direction": "up"}, "M5": {"direction": "down"}},
+        "volatility": {"phase": "stable"},
+    }
+    monkeypatch.setattr(fb, "build_runtime_state", lambda **k: fake_state)
+    monkeypatch.setattr(
+        fb, "runtime_signature",
+        lambda state, side, setup: {"regime": "range", "structure": "retest",
+                                    "session": "asia"},
+    )
+    frame = _exploration_frame()
+
+    def _eval(side):
+        row = frame.iloc[-1].copy()
+        row["time"] = frame["time"].iloc[-1]
+        row["ema_20"] = float(frame["close"].iloc[-1])
+        return brain.evaluate(
+            symbol="EURUSD", row=row, completed_m1=frame.iloc[:-1],
+            positions=[], equity=100.0, pip=0.0001, core_side=side,
+            spread_price=0.0002,
+            symbol_spec={"volume_min": 0.01, "volume_step": 0.01,
+                         "trade_contract_size": 100000.0},
+            entry_price=float(row["close"]),
+        )
+
+    first = _eval("buy")
+    assert first.action == "fire" and first.journal.get("exploration")
+    # Opposite side, SAME family/mechanism -> blocked as self-hedge.
+    second = _eval("sell")
+    skips = brain.counts.get("skip_reasons") or {}
+    assert skips.get("self_hedge_blocked_same_family", 0) >= 1
+    assert second.action != "fire"

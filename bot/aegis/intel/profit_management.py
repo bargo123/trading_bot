@@ -117,6 +117,9 @@ class TicketTrack:
         return out
 
     def giveback(self) -> float:
+        """Profit given back from PEAK POSITIVE MFE (never counts losses)."""
+        if self.mfe_usd <= 0:
+            return 0.0
         return max(0.0, self.mfe_usd - self.last_pnl)
 
     def age_s(self, now: float) -> float:
@@ -131,6 +134,8 @@ class ProfitManager:
         self.tracks: dict[str, TicketTrack] = {}
         self.winner_to_loser_count = 0
         self.winner_to_loser_usd_given_back = 0.0
+        self.decision_counts: dict[str, int] = {"HOLD": 0, "LOCK": 0, "EXIT": 0,
+                                                "REDUCE": 0}
 
     # -- lifecycle -----------------------------------------------------------
 
@@ -203,6 +208,7 @@ class ProfitManager:
         """
         track = self.tracks.get(ticket)
         if track is None or not self.cfg.enabled:
+            self.decision_counts["HOLD"] += 1
             return {"action": "HOLD", "reason": "pm_disabled_or_untracked",
                     "why": "profit management has no tracked state", "policy": None}
         now = time.time()
@@ -213,17 +219,23 @@ class ProfitManager:
         # 2. Regime change kills the mechanism.
         if regime_now and track.regime_at_open and regime_now != track.regime_at_open \
                 and track.last_pnl <= 0:
+            self.decision_counts["EXIT"] += 1
             return {"action": "EXIT", "reason": "pm_regime_change",
                     "why": f"regime changed {track.regime_at_open}->{regime_now} "
                            "and position is not profitable",
                     "policy": "regime_change"}
 
         # 3. Time decay: exploration edges are short-lived; no progress = out.
+        # "Progress" requires meaningful MFE (>= arm threshold) AND retaining
+        # at least the configured fraction of it - a stalled 1-cent MFE is
+        # not progress.
         age = track.age_s(now)
-        progressed = track.mfe_usd <= 0 or track.last_pnl >= (
-            self.cfg.time_decay_progress_frac * track.mfe_usd
+        progressed = (
+            track.mfe_usd >= self.cfg.mfe_arm_usd
+            and track.last_pnl >= self.cfg.time_decay_progress_frac * track.mfe_usd
         )
         if age > self.cfg.time_decay_s and not progressed:
+            self.decision_counts["EXIT"] += 1
             return {"action": "EXIT", "reason": "pm_time_decay",
                     "why": f"held {int(age)}s with no progress "
                            f"(pnl {track.last_pnl:.2f} vs mfe {track.mfe_usd:.2f})",
@@ -235,6 +247,7 @@ class ProfitManager:
             max_giveback = self.cfg.giveback_frac * track.mfe_usd
             # 4. MFE giveback (full-close reality respected by caller).
             if giveback > max_giveback:
+                self.decision_counts["EXIT"] += 1
                 return {"action": "EXIT", "reason": "pm_mfe_giveback",
                         "why": f"gave back {giveback:.2f} of mfe {track.mfe_usd:.2f} "
                                f"(limit {max_giveback:.2f})",
@@ -243,6 +256,7 @@ class ProfitManager:
             if not track.lock_armed and track.current_sl is not None:
                 lock_level_profit = self.cfg.breakeven_buffer_usd
                 if track.last_pnl > lock_level_profit:
+                    self.decision_counts["LOCK"] += 1
                     return {"action": "LOCK", "reason": "pm_breakeven_lock",
                             "why": f"mfe {track.mfe_usd:.2f} armed cost-plus lock at "
                                    f"+{lock_level_profit:.2f}",
@@ -260,6 +274,7 @@ class ProfitManager:
 
         # 6. Portfolio pressure: caller decides which ticket; we expose EV rank.
         if margin_pressure and (remaining_ev is not None) and remaining_ev <= 0:
+            self.decision_counts["EXIT"] += 1
             return {"action": "EXIT", "reason": "pm_portfolio_pressure",
                     "why": "margin pressure with non-positive remaining EV",
                     "policy": "portfolio_pressure"}
@@ -269,6 +284,7 @@ class ProfitManager:
         if track.last_pnl > 0:
             reasons_hold.insert(0, f"floating profit {track.last_pnl:.2f} with "
                                    "protective stop unchanged")
+        self.decision_counts["HOLD"] += 1
         return {
             "action": "HOLD",
             "reason": "pm_hold_justified",
@@ -320,6 +336,7 @@ class ProfitManager:
             ),
             "positions_with_profit_lock": locked,
             "positions_without_profit_lock": len(self.tracks) - locked,
+            "decision_counts": dict(self.decision_counts),
             "tickets": tickets,
         }
 

@@ -12,6 +12,7 @@ from aegis.engines.base import (
     AccountSnapshot,
     Bar,
     BrokerEngine,
+    ModifyResult,
     OrderRequest,
     OrderResult,
     PositionSnapshot,
@@ -789,6 +790,55 @@ class MT5Engine(BrokerEngine):
             if int(getattr(pos, "ticket", 0) or 0) == want:
                 return self._close_position(pos)
         return OrderResult(ok=False, message=f"ticket {ticket} not open")
+
+    def modify_stops(self, ticket: str, *, stop_loss: Optional[float] = None,
+                     take_profit: Optional[float] = None) -> ModifyResult:
+        """Adjust protective stops on an open position (TRADE_ACTION_SLTP).
+
+        Refuses to LOOSEN: a new stop-loss must be tighter (closer to current
+        price on the protective side) than the existing one.
+        """
+        blocked = self._mutation_allowed()
+        if blocked:
+            return ModifyResult(ok=False, message=blocked)
+        mt5 = self._require()
+        want = int(str(ticket).strip() or 0)
+        if want <= 0:
+            return ModifyResult(ok=False, message="invalid ticket")
+        target = None
+        for pos in mt5.positions_get() or []:
+            if int(getattr(pos, "ticket", 0) or 0) == want:
+                target = pos
+                break
+        if target is None:
+            return ModifyResult(ok=False, message=f"ticket {ticket} not open")
+        cur_sl = float(getattr(target, "sl", 0) or 0)
+        cur_tp = float(getattr(target, "tp", 0) or 0)
+        side_buy = int(getattr(target, "type", 0) or 0) == 0
+        new_sl = float(stop_loss) if stop_loss is not None else (cur_sl or None)
+        if new_sl is not None and cur_sl > 0:
+            if side_buy and float(new_sl) < cur_sl - 1e-12:
+                return ModifyResult(ok=False,
+                                    message="refusing to loosen stop-loss (buy)")
+            if not side_buy and float(new_sl) > cur_sl + 1e-12:
+                return ModifyResult(ok=False,
+                                    message="refusing to loosen stop-loss (sell)")
+        req = {
+            "action": mt5.TRADE_ACTION_SLTP,
+            "position": want,
+            "symbol": str(getattr(target, "symbol", "") or ""),
+            "sl": float(new_sl) if new_sl else 0.0,
+            "tp": float(take_profit) if take_profit is not None else cur_tp,
+        }
+        res = mt5.order_send(req)
+        retcode = int(getattr(res, "retcode", 1) or 1)
+        ok = retcode == 10009  # TRADE_RETCODE_DONE
+        return ModifyResult(
+            ok=ok,
+            message=str(getattr(res, "comment", retcode) or retcode),
+            stop_loss=new_sl,
+            take_profit=req["tp"] or None,
+        )
 
     def flatten_positions(
         self,

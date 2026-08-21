@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-21T09:05:35.429312+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-21T09:09:07.447950+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_cd4cf7",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_cd4cf7 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_0cb1a3",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_0cb1a3\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 76.69,
+        "finished_utc": "2026-08-21T09:07:03.288071+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T09:05:46.601794+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T09:07:03.288071+00:00",
+      "text": "Proposal: Run an offline counterfactual exit study as the next experiment \u2014 the measured evidence shows 1,916 of 2,470 exits (77%) carry close_reason=\"manual\" with expectancy \u22120.015 and net \u221229.17, while the 441 TP exits earn +0.099 each (+43.79 net), suggesting premature manual/session closes, not entries, are the dominant drag on the firehose's aggregate expectancy (\u22120.011, PF 0.76). Concretely: replay `bot/intel/outcome_log.jsonl` against `market_evidence.jsonl` and simulate hold-to-original-TP/SL for every manual-closed trade, net of `cost_profiles.json` costs, registered in ExperimentRegistry. Falsifiable prediction: hold-to-target expectancy for the manual cohort flips from \u22120.015 to \u2265 +0.01/trade and lifts portfolio PF above 1.0 out-of-sample on the sealed holdout; if it does not, the exit hypothesis is rejected and recorded as such. No champion change, no gate change, no live exposure \u2014 this is pure research that either produces a promotable exit-policy challenger via `promote.py` gates or kills the idea cheaply."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

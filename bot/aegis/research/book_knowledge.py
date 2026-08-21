@@ -209,7 +209,7 @@ def _classify(body: str) -> tuple[str, dict[str, Any]]:
     scores.sort(reverse=True)
 
     is_strategy = bool(_STRATEGY_CUE.search(body)) and bool(_INVALIDATION_CUE.search(body))
-    if is_strategy and scores and scores[0][1] in {"entry", "exit"}:
+    if is_strategy and scores and scores[0][1] in {TYPE_ENTRY, TYPE_EXIT}:
         primary = TYPE_STRATEGY
     elif scores:
         primary = scores[0][1]
@@ -342,10 +342,14 @@ def build_knowledge_base(
     for path in sources:
         rel = str(path.relative_to(books_dir.parent))
         prev = old_by_file.get(rel)
-        if prev and not force and prev.get("file_hash") \
-                and prev.get("status") not in {STATUS_FAILED}:
+        if prev and not force and prev.get("file_hash"):
+            # Restart-safe reuse ONLY when content is unchanged.
+            try:
+                current_hash = _sha256(path.read_text(encoding="utf-8", errors="replace"))
+            except OSError:
+                current_hash = None
             cached = prev.get("_records") or []
-            if cached:
+            if current_hash == prev.get("file_hash") and cached:
                 files_report.append({k: v for k, v in prev.items() if k != "_records"})
                 all_records.extend(cached)
                 continue

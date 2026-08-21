@@ -608,6 +608,41 @@ class IntelligentFirehoseBrain:
             strategy_family=setup, symbol=symbol, side=side,
             regime=regime, session=session,
         )
+        # Book-derived logic (spec A): retrieve relevant source concepts for
+        # THIS state and attach real derived rules - never just a label.
+        book_logic: dict[str, Any] = {}
+        try:
+            from aegis.intel import knowledge_retrieval
+
+            state_ctx = {
+                "regime": regime,
+                "session": session,
+                "structure": str(signature.get("structure") or setup),
+                "volatility": str(state.get("volatility") or ""),
+                "family": setup,
+                "symbol": symbol,
+                "side": side,
+            }
+            hits = knowledge_retrieval.retrieve_for_state(state_ctx, limit=6)
+            if hits:
+                top = hits[0]
+                book_logic = {
+                    "source_book": top.get("book"),
+                    "source_author": top.get("author"),
+                    "source_passage_hash": top.get("passage_hash"),
+                    "source_location": top.get("location"),
+                    "concept_type": top.get("concept_type"),
+                    "polarity": top.get("polarity"),
+                    "conflict_topic": top.get("conflict_topic"),
+                    "exit_plan": knowledge_retrieval.exit_plan_for_state(state_ctx),
+                    "matched_records": [
+                        {k: h.get(k) for k in ("book", "concept_type",
+                                               "passage_hash", "_score")}
+                        for h in hits[:4]
+                    ],
+                }
+        except Exception:
+            book_logic = {}
         # Candidate counted once per brain lifetime per hypothesis.
         import time as _time
 
@@ -630,6 +665,22 @@ class IntelligentFirehoseBrain:
             tp_dist = abs(float(target) - float(entry))
             if tp_dist / sl_dist < 0.25:
                 return None, "exploration_absurd_payoff"
+        # Self-hedge audit (spec J): opposing exposure on the same symbol is
+        # legitimate ONLY with a genuinely different mechanism (family).
+        opposite_side = "sell" if side == "buy" else "buy"
+        for key in self._exploration_theses:
+            mem = self.memory.theses.get(key)
+            if (
+                mem is not None
+                and mem.symbol == str(symbol).upper()
+                and str(mem.side or "").lower() == opposite_side
+                and (len(mem.tickets) > 0
+                     or len(self.memory.exploration_pending.get(key) or []) > 0)
+            ):
+                if str(mem.setup_family or "").lower() == str(setup).lower():
+                    return None, "self_hedge_blocked_same_family"
+                # Different family = different mechanism/horizon: allowed, but
+                # the double-spread cost must be acknowledged in the record.
         if not portfolio_ok:
             return None, portfolio_reason or "portfolio_risk"
 
@@ -653,19 +704,43 @@ class IntelligentFirehoseBrain:
                 "strategy_family": setup,
                 "symbol": symbol,
                 "side": side,
-                "entry_rule": f"{setup} {side} on {regime}/{session} state at market",
+                "entry_rule": f"{setup} {side} on {regime}/{session} state at market"
+                + (
+                    f" [book: {book_logic.get('source_book')}]" if book_logic else ""
+                ),
                 "invalidation": f"close beyond {invalidation:.5f}",
                 "target": (f"structure target {target:.5f}" if target is not None
-                           else "runner structure/quick-win exit"),
+                           else "profit-management policies (mfe giveback / time decay)"),
                 "regime": regime,
                 "session": session,
                 "information_id": info_id,
             },
             reason=question or "state candidate offered by the firehose scan",
-            mechanism=f"{setup} {side} edge in {regime}/{session}; "
-                      "tiny DEMO risk to buy information, not profit",
-            provenance="market_state+analogue_index",
+            mechanism=(
+                f"{setup} {side} edge in {regime}/{session}; "
+                + (
+                    f"mechanism per source: {(book_logic.get('source_book') or '')} "
+                    f"({book_logic.get('polarity') or 'n/a'}); "
+                    if book_logic
+                    else ""
+                )
+                + "tiny DEMO risk to buy information, not profit",
+            ),
+            provenance=(
+                f"market_state+analogue_index+book:{book_logic.get('source_passage_hash')}"
+                if book_logic else "market_state+analogue_index"
+            ),
         )
+        # Explicit executable exit plan (spec P): target-less exploration still
+        # has one - profit-management policies + optional book-derived plan.
+        exit_plan = (book_logic or {}).get("exit_plan") or {
+            "plan_type": "pm_policies",
+            "policies": ["mfe_giveback", "breakeven_lock", "time_decay",
+                         "regime_change"],
+        }
+        record["exit_plan"] = exit_plan
+        record["book_logic"] = book_logic
+        self.experiments.save()
         lots = risk_lots_for_exploration(
             max_risk_usd=self._exploration_limits.max_risk_per_trade_usd,
             entry=entry,
@@ -676,6 +751,12 @@ class IntelligentFirehoseBrain:
         )
         thesis_key_exp = thesis_key(symbol, side, setup, regime=regime, session=session)
         self._exploration_theses.add(thesis_key_exp)
+        # Reservation must be visible to audits: record side/family on the
+        # thesis memory so self-hedge checks can identify it.
+        _mem = self.memory.get(thesis_key_exp, symbol)
+        _mem.symbol = str(symbol).upper()
+        _mem.side = side
+        _mem.setup_family = setup
         # Reserve in-flight exposure BEFORE returning the decision so parallel
         # bar evaluations cannot race past max_positions.
         self.memory.exploration_pending.setdefault(thesis_key_exp, []).append(
@@ -696,6 +777,8 @@ class IntelligentFirehoseBrain:
             "regime": regime,
             "session": session,
             "max_risk_usd": self._exploration_limits.max_risk_per_trade_usd,
+            "exit_plan": exit_plan,
+            "book_logic": book_logic,
         }
         decision = DemoDecision(
             "fire",

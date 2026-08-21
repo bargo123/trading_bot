@@ -2,27 +2,27 @@
 
 Label: `research_proxy`. Observed demo outcomes; not a profit guarantee.
 
-- rows: 3322
-- exits: 2470
+- rows: 3323
+- exits: 2471
 
 ## Payoff geometry
 
-- win_rate: 0.6781376518218624
-- expectancy: -0.01120242914979757
-- profit_factor: 0.7644504979994892
-- avg_win: 0.053611940298507466
+- win_rate: 0.678267907729664
+- expectancy: -0.010995548360987454
+- profit_factor: 0.768706903890355
+- avg_win: 0.053878281622911695
 - avg_loss: -0.1609178082191781
-- payoff_ratio: 0.3331635006206729
-- wins_erased_by_average_loss: 3.0015292735759833
-- wins_erased_by_tail_loss: 20.51781737193764
+- payoff_ratio: 0.3348186395226486
+- wins_erased_by_average_loss: 2.986691545684856
+- wins_erased_by_tail_loss: 20.41638981173865
 - tail_loss: 1.1
 - cosmetic_win_rate: False
 
 ## By symbol
 
 - AUDNZD: n=6 exp=0.37333333333333335 PF=None erase_avg=None
+- EURCAD: n=28 exp=0.016785714285714286 PF=1.7966101694915255 erase_avg=15.028301886792452
 - USDCAD: n=336 exp=0.0035714285714285726 PF=1.1001669449081803 erase_avg=2.2143641235915155
-- EURCAD: n=27 exp=-0.0011111111111111098 PF=0.9491525423728815 erase_avg=27.392857142857142
 - GBPUSD: n=321 exp=-0.0018691588785046725 PF=0.9585635359116023 erase_avg=3.4774255523535063
 - USDCHF: n=344 exp=-0.0019186046511627905 PF=0.9620907524411257 erase_avg=2.917415196743555
 - AUDUSD: n=310 exp=-0.009387096774193549 PF=0.7641815235008104 erase_avg=3.1376409910344165
@@ -36,11 +36,11 @@ Label: `research_proxy`. Observed demo outcomes; not a profit guarantee.
 ## By side
 
 - sell: n=1249 exp=-0.008398718975180144 PF=0.8338875692794934
-- buy: n=1221 exp=-0.01407043407043407 PF=0.6837260677466863
+- buy: n=1222 exp=-0.01364975450081833 PF=0.6929307805596465
 
 ## By close reason
 
-- tp: n=441 exp=0.09929705215419501 PF=None
+- tp: n=442 exp=0.10020361990950226 PF=None
 - unknown: n=29 exp=0.03896551724137932 PF=1.773972602739726
 - manual: n=1916 exp=-0.015224425887265136 PF=0.5981540157046425
 - sl: n=84 exp=-0.516904761904762 PF=0.0

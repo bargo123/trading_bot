@@ -177,12 +177,17 @@ class ExperimentStore:
 
     # -- sequential learning -------------------------------------------------
 
-    def record_close(self, *, hypothesis_id: str, pnl: float,
+    def record_close(self, hypothesis_id: str, pnl: float,
                      mfe: float | None = None, mae: float | None = None,
                      spread: float | None = None, slippage: float | None = None,
                      duration_min: float | None = None,
-                     session: str = "", regime: str = "") -> dict[str, Any] | None:
-        """Update one experiment's evidence after a closed trade, then judge it."""
+                     session: str = "", regime: str = "",
+                     **extra: Any) -> dict[str, Any] | None:
+        """Update one experiment's evidence after a closed trade, then judge it.
+
+        ``extra`` carries point-in-time exit-learning fields (pl_1m..pl_60m,
+        cf_* counterfactual policy profits) stored on the trade row (EF-112).
+        """
         rec = self.data["experiments"].get(hypothesis_id)
         if rec is None:
             return None
@@ -198,6 +203,7 @@ class ExperimentStore:
             "pnl": round(pnl, 4),
             "ts_utc": _utcnow().isoformat(),
             "session": session, "regime": regime,
+            **{k: v for k, v in extra.items() if v is not None},
         })
         pnls = [t["pnl"] for t in trades]
         wins = [p for p in pnls if p > 0]

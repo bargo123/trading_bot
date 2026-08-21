@@ -200,6 +200,10 @@ def main() -> None:
         "margin_precheck_skip": 0,
         "min_lot_precheck_skip": 0,
     }
+    # Intelligent per-thesis profit management (spec B-H, O, P).
+    from aegis.intel.profit_management import ProfitManager
+
+    profit_manager = ProfitManager(cfg)
 
     def write_heartbeat(extra: Optional[dict] = None) -> None:
         payload = {
@@ -1045,6 +1049,27 @@ def main() -> None:
                     skip_reason = f"exploration_max_positions:{total_exp}"
                 elif sym_exp > limits_run.max_positions_per_symbol:
                     skip_reason = "exploration_max_positions_per_symbol"
+                else:
+                    # Margin pressure (spec K): broker-measured; block NEW
+                    # exploration first - never close a high-EV winner to make
+                    # room for an unvalidated experiment.
+                    try:
+                        _acct_e = eng.account()
+                        _free = float(getattr(_acct_e, "available_funds", 0) or 0)
+                        _eq = float(getattr(_acct_e, "equity", 0) or 0)
+                    except Exception:
+                        _free, _eq = None, 0.0
+                    min_free = float(cfg.get("exploration_min_free_margin_usd", 20) or 20)
+                    max_frac = float(cfg.get("exploration_max_margin_fraction", 0.4) or 0.4)
+                    used_frac = (
+                        (_eq - _free) / _eq if (_eq and _free is not None and _eq > 0)
+                        else 0.0
+                    )
+                    if _free is not None and (_free < min_free or used_frac > max_frac):
+                        skip_reason = (
+                            f"exploration_margin_pressure:free={_free:.2f},"
+                            f"used={used_frac:.0%}"
+                        )
                 if skip_reason:
                     append_journal(
                         journal,
@@ -1376,6 +1401,33 @@ def main() -> None:
                 extra_hb["quote_refresh"] = dict(quote_refresh_counts)
                 if intelligent_brain is not None:
                     extra_hb.update(intelligent_brain.snapshot())
+                    # Profit-management reporting (spec O) + exposure metrics
+                    # (spec J): per-ticket table answers, for every open
+                    # winner, WHY it is still being held.
+                    try:
+                        extra_hb["profit_management"] = profit_manager.snapshot()
+                        _exp_metrics: dict[str, float] = {
+                            "gross_long_exposure": 0.0,
+                            "gross_short_exposure": 0.0,
+                            "net_exposure": 0.0,
+                            "hedged_exposure": 0.0,
+                            "cost_of_internal_hedge": 0.0,
+                        }
+                        for _p in eng.positions():
+                            _q = float(getattr(_p, "quantity", 0) or 0)
+                            if str(getattr(_p, "side", "")).lower() == "buy":
+                                _exp_metrics["gross_long_exposure"] += _q
+                                _exp_metrics["net_exposure"] += _q
+                            else:
+                                _exp_metrics["gross_short_exposure"] += _q
+                                _exp_metrics["net_exposure"] -= _q
+                        _exp_metrics["hedged_exposure"] = min(
+                            _exp_metrics["gross_long_exposure"],
+                            _exp_metrics["gross_short_exposure"],
+                        )
+                        extra_hb["exposure"] = _exp_metrics
+                    except Exception:
+                        pass
                     extra_hb["intelligent_firehose"] = True
                 else:
                     extra_hb["intelligent_firehose"] = bool(cfg.get("intelligent_firehose", False))
@@ -1450,6 +1502,153 @@ def main() -> None:
                     pass
 
                 holding: list[str] = []
+                # Intelligent mode flag is finalized per-symbol below; the
+                # profit-management pre-pass only needs the config truth.
+                intelligent_mode = bool(cfg.get("intelligent_firehose", False))
+                # --- Intelligent per-thesis profit management (spec B-H,P):
+                # runs BEFORE the symbol loop so every open ticket gets a
+                # HOLD/LOCK/EXIT decision with an explicit explanation.
+                if intelligent_mode and intelligent_brain is not None:
+                    try:
+                        all_open = eng.positions()
+                        meta_by_ticket: dict[str, dict] = {}
+                        for _key, _mem in intelligent_brain.memory.theses.items():
+                            for _t in _mem.tickets:
+                                meta_by_ticket[_t] = {
+                                    "thesis_key": _key,
+                                    "hypothesis_id": "",
+                                    "stage": "EXPLORATION_CANARY"
+                                    if _key in intelligent_brain._exploration_theses
+                                    else (intelligent_brain.strategy.promotion_stage
+                                          if intelligent_brain.strategy else ""),
+                                    "family": _mem.setup_family,
+                                }
+                        for _p in all_open:
+                            _tk = str(getattr(_p, "ticket", "") or "")
+                            if _tk in meta_by_ticket:
+                                continue
+                            # Adopt broker-held exploration tickets by tag so
+                            # PM covers positions opened before a restart.
+                            _tag = str(getattr(_p, "comment", "") or "")
+                            if "EXP" in _tag:
+                                _rec = intelligent_brain.find_experiment_by_tag(_tag)
+                                if _rec is not None:
+                                    meta_by_ticket[_tk] = {
+                                        "thesis_key": "",
+                                        "hypothesis_id": str(_rec["hypothesis_id"]),
+                                        "stage": "EXPLORATION_CANARY",
+                                        "family": str(_rec.get("strategy_family") or ""),
+                                    }
+                        profit_manager.sync(all_open, meta_by_ticket=meta_by_ticket)
+                        acct_pm = eng.account()
+                        free_margin = float(getattr(acct_pm, "available_funds", 0) or 0)
+                        equity_pm = float(getattr(acct_pm, "equity", 0) or 0)
+                        margin_pressure = (
+                            equity_pm > 0
+                            and free_margin < float(cfg.get("pm_min_free_margin_usd", 20) or 20)
+                        )
+                        for pos in all_open:
+                            tk = str(getattr(pos, "ticket", "") or "")
+                            verdict = profit_manager.evaluate(
+                                ticket=tk,
+                                volume=float(getattr(pos, "quantity", 0) or 0),
+                                volume_min=0.01,
+                                regime_now="",
+                                margin_pressure=margin_pressure,
+                            )
+                            if verdict["action"] == "EXIT" and hasattr(eng, "close_ticket"):
+                                res_close = eng.close_ticket(tk)
+                                summary = profit_manager.close_summary(
+                                    tk, exit_reason=verdict["reason"]
+                                )
+                                append_journal(
+                                    journal,
+                                    {
+                                        "event": "pm_exit",
+                                        "ticket": tk,
+                                        "symbol": str(getattr(pos, "symbol", "")),
+                                        "ok": bool(res_close.ok),
+                                        "policy": verdict.get("policy"),
+                                        "why": verdict.get("why"),
+                                        **(summary or {}),
+                                    },
+                                )
+                                if (
+                                    res_close.ok
+                                    and summary
+                                    and summary.get("hypothesis_id")
+                                    and intelligent_brain is not None
+                                ):
+                                    try:
+                                        intelligent_brain.record_exploration_close(
+                                            hypothesis_id=str(summary["hypothesis_id"]),
+                                            pnl=float(summary["realized_pnl"]),
+                                            mfe=summary.get("mfe_before_close"),
+                                            mae=summary.get("mae_before_close"),
+                                            duration_min=(
+                                                summary.get("duration_s", 0) / 60.0
+                                            ),
+                                            session=str(summary.get("session") or ""),
+                                            regime=str(summary.get("regime") or ""),
+                                            **{
+                                                k: v for k, v in summary.items()
+                                                if k.startswith(("pl_", "cf_"))
+                                            },
+                                        )
+                                    except Exception:
+                                        pass
+                            elif verdict["action"] == "LOCK":
+                                # 0.01-lot reality: protective STOP ADJUSTMENT
+                                # only - never pretend partial close exists.
+                                lock_sl = None
+                                side_l = str(getattr(pos, "side", "")).lower()
+                                px = float(getattr(pos, "avg_price", 0) or 0)
+                                buffer_usd = float(
+                                    cfg.get("pm_breakeven_buffer_usd", 0.05) or 0.05
+                                )
+                                spec_lock = None
+                                try:
+                                    spec_lock = eng.symbol_spec(str(pos.symbol))
+                                except Exception:
+                                    spec_lock = None
+                                pip_l = float((spec_lock or {}).get("pip_size")
+                                              or pip_size_for(str(pos.symbol), cfg))
+                                usd_per_pip = pip_l * 100000.0 * float(
+                                    getattr(pos, "quantity", 0.01)
+                                )
+                                pips = buffer_usd / max(usd_per_pip, 1e-9)
+                                if side_l == "buy":
+                                    lock_sl = px + pips * pip_l
+                                    cur = float(getattr(pos, "stop_loss", 0) or 0)
+                                    if cur > 0 and cur >= lock_sl:
+                                        lock_sl = None  # never loosen
+                                else:
+                                    lock_sl = px - pips * pip_l
+                                    cur = float(getattr(pos, "stop_loss", 0) or 0)
+                                    if cur > 0 and cur <= lock_sl:
+                                        lock_sl = None
+                                if lock_sl and hasattr(eng, "modify_stops"):
+                                    res_mod = eng.modify_stops(
+                                        tk, stop_loss=float(lock_sl)
+                                    )
+                                    if getattr(res_mod, "ok", False):
+                                        track_l = profit_manager.tracks.get(tk)
+                                        if track_l is not None:
+                                            track_l.lock_armed = True
+                                            track_l.locked_profit_usd = buffer_usd
+                                            track_l.current_sl = float(lock_sl)
+                                append_journal(
+                                    journal,
+                                    {
+                                        "event": "pm_lock",
+                                        "ticket": tk,
+                                        "symbol": str(getattr(pos, "symbol", "")),
+                                        "lock_sl": lock_sl,
+                                        "why": verdict.get("why"),
+                                    },
+                                )
+                    except Exception as exc:
+                        logger.warning("profit-management cycle error: %s", exc)
                 for sym in symbols:
                     try:
                         open_pos = eng.positions(sym)

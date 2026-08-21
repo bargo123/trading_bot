@@ -1,7 +1,7 @@
 {
   "schema": "ml_pipeline.v1",
   "label": "research_proxy",
-  "built_at": "2026-08-21T08:45:28.703673+00:00",
+  "built_at": "2026-08-21T09:49:32.679952+00:00",
   "provenance": "mt5_m1",
   "cost_assumptions": {
     "spread_bps": 0.2,
@@ -243,7 +243,7 @@
   },
   "dataset_hash": "fc2ed8d632100a2e266b4783d4668968ab08c62faeb24866261c3252eacc7e47",
   "config_hash": "a8c3eea5229a44c04d6abeb643e66cd001bfa3c2d93173c5591b32e61e3d6fa1",
-  "code_version": "fb9081ad41440ed035c58fee45ea01155abbb9e4",
+  "code_version": "d67b1304820d6b49c4d68e8552ac547e4cab9255",
   "validated_opportunities_path": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\validated_opportunities.json",
   "validated_states_path": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\validated_states.json",
   "ml": {
