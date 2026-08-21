@@ -1,0 +1,209 @@
+"""FAST_TURNOVER_FIREHOSE_V1 tests (spec phases 3-9, 11-12)."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from aegis.intel.fast_firehose import (  # noqa: E402
+    ExitAction,
+    FastExitConfig,
+    FastExitStateMachine,
+    MicroCandidate,
+    check_entry_economics,
+    classify_firehose_mode,
+    generate_micro_candidates,
+    micro_momentum_burst,
+    failed_breakout_fade,
+    fair_value_snapback,
+    pip_value,
+)
+
+
+def test_pip_value_jpy_vs_standard():
+    assert pip_value("EURUSD") == 0.0001
+    assert pip_value("USDJPY") == 0.01
+    assert pip_value("GBPUSD") == 0.0001
+    assert pip_value("XAUUSD") == 0.1
+
+
+def test_micro_momentum_burst_generates_on_compression_release():
+    c = micro_momentum_burst(
+        symbol="EURUSD", regime="trend", session="london",
+        m15_direction="up", m5_direction="up",
+        m1_return_30s=0.0008, m1_atr=0.0015,
+        compression_ratio=0.4, bid=1.1000, ask=1.10002,
+        m1_low=1.0998, m1_high=1.1001, spread_pips=0.2)
+    assert c is not None
+    assert c.family == "micro_momentum_burst"
+    assert c.side == "buy"
+    assert c.max_hold_s <= 180
+
+
+def test_micro_momentum_rejects_when_no_impulse():
+    c = micro_momentum_burst(
+        symbol="EURUSD", regime="trend", session="london",
+        m15_direction="up", m5_direction="up",
+        m1_return_30s=0.00001, m1_atr=0.0015,
+        compression_ratio=0.9, bid=1.1000, ask=1.10002,
+        m1_low=1.0998, m1_high=1.1001, spread_pips=0.2)
+    assert c is None
+
+
+def test_failed_breakout_fade_generates_on_trap():
+    c = failed_breakout_fade(
+        symbol="GBPUSD", regime="range", session="london",
+        m15_resistance=1.2750, m15_support=1.2700,
+        m1_close=1.2748, prev_m1_close=1.2752,
+        bid=1.2747, ask=1.2749, m1_atr=0.0020,
+        m1_low=1.2740, m1_high=1.2755, spread_pips=0.3)
+    assert c is not None
+    assert c.side == "sell"  # fade the trapped breakout buyers
+
+
+def test_fair_value_snapback_generates_at_range_edge():
+    c = fair_value_snapback(
+        symbol="AUDUSD", regime="range", session="asia",
+        range_mid=0.6500, range_half_width=0.0030,
+        m1_close=0.6535, m1_atr=0.0015,
+        bid=0.6534, ask=0.6536, spread_pips=0.2)
+    assert c is not None
+    assert c.side == "sell"
+    assert c.required_regime == "range"
+
+
+def test_generate_multiple_independent_candidates():
+    """Multiple families can produce candidates simultaneously."""
+    results = generate_micro_candidates(
+        symbol="EURUSD", regime="range", session="asia",
+        m15_direction="up", m5_direction="up",
+        m15_resistance=1.1050, m15_support=1.0950,
+        range_mid=1.1000, range_half_width=0.0040,
+        m1_close=1.1042, prev_m1_close=1.1052,
+        m1_open=1.1030, m1_low=1.1028, m1_high=1.1053,
+        m1_atr=0.0020, m1_return_30s=0.0008,
+        compression_ratio=0.4, bid=1.1041, ask=1.1043,
+        spread_pips=0.2)
+    families = {c.family for c in results}
+    assert len(families) >= 2, f"expected multiple independent families, got: {families}"
+
+
+def test_entry_economics_blocks_min_lot_risk_exceeding_budget():
+    """Spec P6/audit defect 1: broker min lot risk > budget = BLOCKED."""
+    cand = MicroCandidate(
+        hypothesis_id="h1", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0950, target=1.1050,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=1.0, stop_pips=50, target_pips=50,
+        risk_usd_min_lot=5.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(cand, max_risk_usd=0.15)
+    assert not result["allowed"]
+    assert "RISK_GRANULARITY_BLOCKED" in result["rejections"]
+
+
+def test_entry_economics_blocks_negative_net_target():
+    cand = MicroCandidate(
+        hypothesis_id="h2", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0999, target=1.1001,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=2.0, stop_pips=1, target_pips=1,
+        risk_usd_min_lot=0.05, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(cand, max_risk_usd=0.15)
+    assert "NEGATIVE_EXPECTED_NET_AFTER_COST" in result["rejections"]
+
+
+# ---------------------------------------------------------------------------
+# Fast exit state machine
+# ---------------------------------------------------------------------------
+
+
+def _sm(**cfg):
+    return FastExitStateMachine(FastExitConfig(**cfg))
+
+
+BASE = dict(side="buy", entry_price=1.1000, stop_loss=1.0990,
+            stop_pips=10, pip=0.0001)
+
+
+def test_fast_exit_take_at_target():
+    sm = _sm()
+    v = sm.evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.10199,
+        stop_loss=1.0990, target=1.1020,
+        opened_ts=1000, now=1030, pnl_pips=19.9,
+        mfe_pips=20, mae_pips=-1,
+        stop_pips=10, pip=0.0001)
+    assert v["action"] == "TAKE"
+
+
+def test_fast_exit_lock_after_mfe_arm():
+    sm = _sm()
+    v = sm.evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.1006,
+        stop_loss=1.0990, target=1.1020, opened_ts=1000, now=1030,
+        pnl_pips=6.0, mfe_pips=7.0, mae_pips=-1.0,
+        stop_pips=10, pip=0.0001)
+    assert v["action"] == "LOCK"
+    assert "cost-plus lock" in v["why"] or "armed" in v["why"]
+
+
+def test_fast_exit_scratch_on_time_decay_without_progress():
+    sm = _sm(time_exit_s=120)
+    v = sm.evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.10001,
+        stop_loss=1.0990, target=1.1020, opened_ts=1000, now=1300,
+        pnl_pips=0.1, mfe_pips=0.3, mae_pips=-0.5,
+        stop_pips=10, pip=0.0001)
+    assert v["action"] == "SCRATCH"
+
+
+def test_fast_exit_abort_on_regime_change_losing():
+    sm = _sm()
+    v = sm.evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.0998,
+        stop_loss=1.0990, target=1.1020, opened_ts=1000, now=1020,
+        pnl_pips=-2.0, mfe_pips=0.5, mae_pips=-3.0,
+        stop_pips=10, pip=0.0001,
+        regime_now="range", regime_at_entry="trend")
+    assert v["action"] == "ABORT"
+    assert "regime" in v["why"]
+
+
+def test_fast_exit_hold_with_positive_ev():
+    sm = _sm()
+    v = sm.evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.1003,
+        stop_loss=1.0990, target=1.1020, opened_ts=1000, now=1020,
+        pnl_pips=3.0, mfe_pips=3.5, mae_pips=-0.5,
+        stop_pips=10, pip=0.0001,
+        remaining_ev=0.03, remaining_ev_status="ESTIMATED")
+    assert v["action"] == "HOLD"
+    assert "positive" in v["why"].lower() or "mfe" in v["why"].lower()
+
+
+def test_one_large_loser_cannot_occur_from_old_geometry():
+    """The old 30-pip fallback must never produce a valid exploration order."""
+    from aegis.intel.exploration import risk_lots_for_exploration
+
+    r = risk_lots_for_exploration(
+        max_risk_usd=0.15, entry=1.10, invalidation=1.07,
+        pip=0.0001, contract_size=100000.0,
+        volume_min=0.01, volume_step=0.01)
+    assert r["allowed"] is False
+
+
+# ---------------------------------------------------------------------------
+# Firehose mode classification (Phase 12)
+# ---------------------------------------------------------------------------
+
+
+def test_firehose_mode_classification():
+    assert classify_firehose_mode(broker_round_trips=5, shadow_trades=100) == \
+        "DEMO_FAST_TURNOVER_FIREHOSE"
+    assert classify_firehose_mode(broker_round_trips=0, shadow_trades=500) == \
+        "SHADOW_RESEARCH_FIREHOSE"
+    assert classify_firehose_mode(broker_round_trips=0, shadow_trades=0) == \
+        "RESEARCH_CANDIDATES_ONLY"

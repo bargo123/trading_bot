@@ -1,8 +1,8 @@
 {
   "schema": "firehose_throughput.v2",
-  "generated_utc": "2026-08-21T19:09:02.589044+00:00",
-  "scanned_opportunities": 18806,
-  "eligible_opportunities": 18806,
+  "generated_utc": "2026-08-21T19:49:26.986410+00:00",
+  "scanned_opportunities": 19490,
+  "eligible_opportunities": 19490,
   "fire_candidates": 3981,
   "scale_candidates": 0,
   "funnel": {
@@ -11,38 +11,38 @@
   "orders_sent": 0,
   "executed": 0,
   "rejected": 0,
-  "skip_rate": 0.7883,
+  "skip_rate": 0.7957,
   "decisions": {
-    "skip": 14825,
+    "skip": 15509,
     "fire": 3981
   },
   "skip_reason_distribution": {
-    "state_not_in_validated_set": 14825
+    "state_not_in_validated_set": 15509
   },
   "per_symbol_skips": {
-    "NZDUSD": 918,
-    "AUDNZD": 916,
-    "AUDUSD": 915,
-    "USDCAD": 915,
-    "EURGBP": 904,
-    "EURUSD": 900,
-    "USDCHF": 899,
-    "AUDCHF": 899,
-    "GBPUSD": 894,
-    "USDJPY": 892,
-    "EURCHF": 887,
-    "AUDJPY": 804,
-    "EURJPY": 726,
-    "EURCAD": 723,
-    "EURAUD": 715,
-    "GBPCHF": 664,
-    "NZDJPY": 395,
-    "AUDCAD": 321,
-    "GBPCAD": 154,
+    "NZDUSD": 959,
+    "AUDNZD": 957,
+    "AUDUSD": 956,
+    "USDCAD": 956,
+    "EURGBP": 944,
+    "EURUSD": 941,
+    "USDCHF": 940,
+    "AUDCHF": 940,
+    "GBPUSD": 935,
+    "USDJPY": 933,
+    "EURCHF": 928,
+    "AUDJPY": 841,
+    "EURJPY": 767,
+    "EURCAD": 764,
+    "EURAUD": 756,
+    "GBPCHF": 705,
+    "NZDJPY": 413,
+    "AUDCAD": 329,
+    "GBPCAD": 159,
     "GBPAUD": 111,
-    "GBPNZD": 106,
+    "GBPNZD": 107,
     "GBPJPY": 97,
-    "EURNZD": 48,
+    "EURNZD": 49,
     "CADJPY": 21,
     "CADCHF": 1
   },
@@ -81,7 +81,7 @@
   "per_session_skips": {
     "asia": 5699,
     "london": 8319,
-    "newyork": 807
+    "newyork": 1491
   },
   "order_reject_messages": {},
   "pretrade_guards": {

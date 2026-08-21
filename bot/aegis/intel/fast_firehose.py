@@ -1,0 +1,453 @@
+"""FAST_TURNOVER_FIREHOSE_V1 — micro-edge family definitions + fast exit.
+
+Two-timescale architecture:
+  CONTEXT: M15/M5 regime, structure, S/R, compression
+  EXECUTION: M1/tick trigger, spread condition, micro momentum
+
+Multiple independent families, each with its own:
+  hypothesis_id, mechanism, side logic, entry, confirmation,
+  invalidation, target, max hold, required state, falsification
+
+Two lanes:
+  SHADOW_MICRO: research throughput when broker lot granularity blocks
+  BROKER_MICRO: real MT5 DEMO orders when geometry fits
+
+The fast exit state machine manages each ticket through:
+  HOLD / LOCK / TAKE / SCRATCH / ABORT / TRAIL / STOP / TIME_EXIT
+"""
+from __future__ import annotations
+
+import hashlib
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Mapping
+
+
+class ExitAction(str, Enum):
+    HOLD = "HOLD"
+    LOCK = "LOCK"
+    TAKE = "TAKE"
+    SCRATCH = "SCRATCH"
+    ABORT = "ABORT"
+    TRAIL = "TRAIL"
+    STOP = "STOP"
+    TIME_EXIT = "TIME_EXIT"
+
+
+class FirehoseLane(str, Enum):
+    SHADOW_MICRO = "SHADOW_RESEARCH_FIREHOSE"
+    BROKER_MICRO = "DEMO_FAST_TURNOVER_FIREHOSE"
+
+
+def firehose_hypothesis_id(*, family: str, symbol: str, side: str,
+                           regime: str, session: str) -> str:
+    blob = f"ftf|{family}|{symbol}|{side}|{regime}|{session}"
+    return "ftf_" + hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
+@dataclass
+class MicroCandidate:
+    """One fast-turnover trade candidate from a specific family."""
+    hypothesis_id: str
+    family: str
+    symbol: str
+    side: str  # buy | sell
+    entry_price: float          # ask for buy, bid for sell
+    invalidation: float         # protective stop level (micro structure)
+    target: float               # profit target
+    max_hold_s: int             # expected horizon
+    required_regime: str        # trend/range/compression/expansion
+    required_session: str       # asia/london/newyork
+    spread_pips: float          # current spread at evaluation
+    stop_pips: float            # structural invalidation distance
+    target_pips: float          # target distance
+    risk_usd_min_lot: float     # actual risk at broker volume_min
+    lane: FirehoseLane          # SHADOW or BROKER
+    mechanism: str = ""         # why this edge exists
+    book_source_hash: str = ""  # passage hash if book-derived
+    book_family: str = ""       # source strategy family label
+    falsification: str = ""     # what proves this wrong
+
+    @property
+    def payoff(self) -> float:
+        return self.target_pips / max(self.stop_pips, 1e-9)
+
+    @property
+    def net_target_pips(self) -> float:
+        return self.target_pips - self.spread_pips
+
+    @property
+    def economics_viable(self) -> bool:
+        """Target must clear round-trip cost with room."""
+        return self.net_target_pips > 0.1 and self.payoff >= 0.5
+
+
+# ---------------------------------------------------------------------------
+# Micro-firehose families (Phase 5)
+# Each returns a MicroCandidate or None if conditions don't match.
+# ---------------------------------------------------------------------------
+
+
+def _micro_invalidation(*, side: str, entry: float, m1_low: float,
+                        m1_high: float, atr_m1: float, buffer_mult: float = 0.3) -> float | None:
+    """Micro-structure stop: recent M1 swing +/- ATR buffer. NOT the old
+    wide M15 structural level. Must produce a TECHNICALLY VALID tight stop."""
+    buffer = atr_m1 * buffer_mult
+    if side == "buy":
+        level = min(m1_low, entry - atr_m1 * 0.5)
+        return level - buffer
+    elif side == "sell":
+        level = max(m1_high, entry + atr_m1 * 0.5)
+        return level + buffer
+    return None
+
+
+def micro_momentum_burst(*, symbol: str, regime: str, session: str,
+                         m15_direction: str, m5_direction: str,
+                         m1_return_30s: float, m1_atr: float,
+                         compression_ratio: float, bid: float, ask: float,
+                         m1_low: float, m1_high: float,
+                         spread_pips: float) -> MicroCandidate | None:
+    """A. MICRO MOMENTUM BURST: compression -> clean impulse -> M5/M15 aligned."""
+    if abs(m1_return_30s) < m1_atr * 0.3:
+        return None  # no impulse
+    if compression_ratio > 0.8:
+        return None  # still compressed, not expanding yet
+    direction = "buy" if m1_return_30s > 0 else "sell"
+    if m15_direction not in ("up", "down"):
+        return None
+    if (direction == "buy" and m15_direction != "up") or \
+       (direction == "sell" and m15_direction != "down"):
+        return None
+    entry = ask if direction == "buy" else bid
+    inv = _micro_invalidation(side=direction, entry=entry,
+                              m1_low=m1_low, m1_high=m1_high, atr_m1=m1_atr)
+    if inv is None or abs(entry - inv) < pip_value(symbol) * 1.5:
+        return None
+    stop_pips = abs(entry - inv) / pip_value(symbol)
+    target_pips = stop_pips * 1.2  # modest R:R; speed is the edge
+    tgt = entry + (target_pips * pip_value(symbol) * (1 if direction == "buy" else -1))
+    hyp = firehose_hypothesis_id(family="micro_momentum_burst", symbol=symbol,
+                                 side=direction, regime=regime, session=session)
+    return MicroCandidate(
+        hypothesis_id=hyp, family="micro_momentum_burst", symbol=symbol,
+        side=direction, entry_price=entry, invalidation=inv, target=tgt,
+        max_hold_s=120, required_regime=regime, required_session=session,
+        spread_pips=spread_pips, stop_pips=round(stop_pips, 1),
+        target_pips=round(target_pips, 1), risk_usd_min_lot=0.0,
+        lane=FirehoseLane.SHADOW_MICRO,
+        mechanism=f"compression->impulse continuation on {symbol} {m15_direction}",
+        falsification="OOS trades show negative expectancy after costs",
+    )
+
+
+def failed_breakout_fade(*, symbol: str, regime: str, session: str,
+                         m15_resistance: float | None, m15_support: float | None,
+                         m1_close: float, prev_m1_close: float,
+                         bid: float, ask: float, m1_atr: float,
+                         m1_low: float, m1_high: float,
+                         spread_pips: float) -> MicroCandidate | None:
+    """B. FAILED BREAKOUT FADE: pierce level -> fail to continue -> fade back."""
+    if m15_resistance is None or m15_support is None:
+        return None
+    # Bullish trap: broke above resistance then closed back below.
+    if prev_m1_close > m15_resistance and m1_close < m15_resistance:
+        direction = "sell"
+        entry = bid
+        inv = max(m1_high, m15_resistance) + m1_atr * 0.2
+        tgt = m15_support if m15_support < entry else entry - m1_atr * 2
+    # Bearish trap: broke below support then closed back above.
+    elif prev_m1_close < m15_support and m1_close > m15_support:
+        direction = "buy"
+        entry = ask
+        inv = min(m1_low, m15_support) - m1_atr * 0.2
+        tgt = m15_resistance if m15_resistance > entry else entry + m1_atr * 2
+    else:
+        return None
+    stop_pips = abs(entry - inv) / pip_value(symbol)
+    target_pips = abs(entry - tgt) / pip_value(symbol)
+    if stop_pips < 1.0 or target_pips < 1.0:
+        return None
+    hyp = firehose_hypothesis_id(family="failed_breakout_fade", symbol=symbol,
+                                 side=direction, regime=regime, session=session)
+    return MicroCandidate(
+        hypothesis_id=hyp, family="failed_breakout_fade", symbol=symbol,
+        side=direction, entry_price=entry, invalidation=inv, target=tgt,
+        max_hold_s=180, required_regime=regime, required_session=session,
+        spread_pips=spread_pips, stop_pips=round(stop_pips, 1),
+        target_pips=round(target_pips, 1), risk_usd_min_lot=0.0,
+        lane=FirehoseLane.SHADOW_MICRO,
+        mechanism=f"failed breakout trap fade on {symbol} {session}",
+        book_family="failed_breakout_fade",
+        falsification="fade trades show negative expectancy after costs",
+    )
+
+
+def fair_value_snapback(*, symbol: str, regime: str, session: str,
+                        range_mid: float | None, range_half_width: float | None,
+                        m1_close: float, m1_atr: float,
+                        bid: float, ask: float,
+                        spread_pips: float) -> MicroCandidate | None:
+    """C. FAIR-VALUE SNAPBACK: price reaches value edge -> rejection -> snapback."""
+    if range_mid is None or range_half_width is None or range_half_width <= 0:
+        return None
+    edge_upper = range_mid + range_half_width
+    edge_lower = range_mid - range_half_width
+    threshold = range_half_width * 0.85
+    if m1_close > edge_upper:
+        direction = "sell"
+        entry = bid
+        inv = m1_close + m1_atr * 0.4
+        tgt = range_mid
+    elif m1_close < edge_lower:
+        direction = "buy"
+        entry = ask
+        inv = m1_close - m1_atr * 0.4
+        tgt = range_mid
+    else:
+        return None
+    stop_pips = abs(entry - inv) / pip_value(symbol)
+    target_pips = abs(entry - tgt) / pip_value(symbol)
+    if stop_pips < 1.0 or target_pips < 0.8:
+        return None
+    hyp = firehose_hypothesis_id(family="fair_value_snapback", symbol=symbol,
+                                 side=direction, regime="range", session=session)
+    return MicroCandidate(
+        hypothesis_id=hyp, family="fair_value_snapback", symbol=symbol,
+        side=direction, entry_price=entry, invalidation=inv, target=tgt,
+        max_hold_s=300, required_regime="range", required_session=session,
+        spread_pips=spread_pips, stop_pips=round(stop_pips, 1),
+        target_pips=round(target_pips, 1), risk_usd_min_lot=0.0,
+        lane=FirehoseLane.SHADOW_MICRO,
+        mechanism=f"fair-value snapback from {session} range edge",
+        book_family="mean_reversion_completion",
+        falsification="snapback trades show negative expectancy after costs",
+    )
+
+
+def pip_value(symbol: str) -> float:
+    """Pip size per symbol. JPY pairs have different pip conventions."""
+    upper = symbol.upper()
+    if "JPY" in upper:
+        return 0.01
+    if "XAU" in upper or "GOLD" in upper:
+        return 0.1
+    return 0.0001
+
+
+def generate_micro_candidates(
+    *,
+    symbol: str,
+    regime: str,
+    session: str,
+    m15_direction: str,
+    m5_direction: str,
+    m15_resistance: float | None,
+    m15_support: float | None,
+    range_mid: float | None,
+    range_half_width: float | None,
+    m1_close: float,
+    prev_m1_close: float,
+    m1_open: float,
+    m1_low: float,
+    m1_high: float,
+    m1_atr: float,
+    m1_return_30s: float,
+    compression_ratio: float,
+    bid: float,
+    ask: float,
+    spread_pips: float,
+    tick_rate_per_min: float = 0.0,
+    signed_tick_imbalance: float = 0.0,
+) -> list[MicroCandidate]:
+    """Generate candidates from ALL independent micro-firehose families."""
+    candidates = []
+    for fn in (
+        lambda: micro_momentum_burst(
+            symbol=symbol, regime=regime, session=session,
+            m15_direction=m15_direction, m5_direction=m5_direction,
+            m1_return_30s=m1_return_30s, m1_atr=m1_atr,
+            compression_ratio=compression_ratio, bid=bid, ask=ask,
+            m1_low=m1_low, m1_high=m1_high, spread_pips=spread_pips),
+        lambda: failed_breakout_fade(
+            symbol=symbol, regime=regime, session=session,
+            m15_resistance=m15_resistance, m15_support=m15_support,
+            m1_close=m1_close, prev_m1_close=prev_m1_close,
+            bid=bid, ask=ask, m1_atr=m1_atr,
+            m1_low=m1_low, m1_high=m1_high, spread_pips=spread_pips),
+        lambda: fair_value_snapback(
+            symbol=symbol, regime=regime, session=session,
+            range_mid=range_mid, range_half_width=range_half_width,
+            m1_close=m1_close, m1_atr=m1_atr, bid=bid, ask=ask,
+            spread_pips=spread_pips),
+    ):
+        try:
+            c = fn()
+            if c is not None:
+                candidates.append(c)
+        except Exception:
+            pass
+    return candidates
+
+
+# ---------------------------------------------------------------------------
+# Entry economics pre-check (Phase 8)
+# ---------------------------------------------------------------------------
+
+
+def check_entry_economics(candidate: MicroCandidate, *,
+                          max_risk_usd: float,
+                          volume_min: float = 0.01,
+                          contract_size: float = 100000.0,
+                          commission_rt_usd: float = 0.0,
+                          slippage_pips: float = 0.3,
+                          measured_spread_percentile: float | None = None,
+                          spread_p90: float | None = None) -> dict[str, Any]:
+    """Full pre-entry economics check. Hard reject any violation."""
+    rejections = []
+    pv = pip_value(candidate.symbol)
+    usd_per_pip_per_lot = contract_size * pv
+    stop_dist = candidate.stop_pips
+    min_lot_risk = stop_dist * usd_per_pip_per_lot * volume_min
+    budget = max_risk_usd
+    if min_lot_risk > budget:
+        rejections.append("RISK_GRANULARITY_BLOCKED")
+    total_cost_pips = candidate.spread_pips + slippage_pips + \
+        (commission_rt_usd / (usd_per_pip_per_lot * volume_min) if volume_min > 0 else 0)
+    net_target = candidate.target_pips - total_cost_pips
+    if net_target <= 0:
+        rejections.append("NEGATIVE_EXPECTED_NET_AFTER_COST")
+    if candidate.spread_pips > candidate.target_pips * 0.5:
+        rejections.append("SPREAD_FAILURE")
+    if candidate.stop_pips < 0.5:
+        rejections.append("INVALID_GEOMETRY")
+    if candidate.stop_pips > 20:
+        rejections.append("TAIL_RISK_FAILURE")
+    if measured_spread_percentile is not None and spread_p90 is not None \
+            and candidate.spread_pips > spread_p90:
+        rejections.append("SPREAD_ABNORMAL_PERCENTILE")
+
+    return {
+        "allowed": len(rejections) == 0,
+        "rejections": rejections,
+        "min_lot_risk_usd": round(min_lot_risk, 4),
+        "risk_budget_usd": budget,
+        "total_cost_pips": round(total_cost_pips, 2),
+        "net_target_pips": round(net_target, 2),
+        "payoff_net": round(net_target / max(stop_dist, 0.1), 3),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Fast exit state machine (Phase 9)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FastExitConfig:
+    """Research grid parameters. These are CANDIDATES, not final values.
+    The sealed walk-forward must validate which combination works."""
+
+    mfe_arm_r: float = 0.5           # arm protection at 0.5R MFE
+    giveback_frac: float = 0.40      # max 40% of peak MFE given back
+    breakeven_buffer_r: float = 0.05  # lock at entry+costs+5% of R
+    time_exit_s: int = 180           # scratch after 3 min without progress
+    progress_frac: float = 0.25      # pnl must be >= 25% of MFE to count as progress
+    min_scratch_loss_frac: float = 0.30  # scratch if losing > 30% of stop distance
+
+
+class FastExitStateMachine:
+    """Per-ticket state machine producing fast, explained decisions."""
+
+    def __init__(self, cfg: FastExitConfig | None = None):
+        self.cfg = cfg or FastExitConfig()
+
+    def evaluate(
+        self,
+        *,
+        side: str,
+        entry_price: float,
+        current_mark: float,
+        stop_loss: float,
+        target: float,
+        opened_ts: float,
+        now: float,
+        pnl_pips: float,
+        mfe_pips: float,
+        mae_pips: float,
+        stop_pips: float,
+        pip: float,
+        regime_now: str = "",
+        regime_at_entry: str = "",
+        remaining_ev: float | None = None,
+        remaining_ev_status: str = "UNKNOWN",
+    ) -> dict[str, Any]:
+        R = max(stop_pips, 0.1)
+        age = now - opened_ts
+        giveback_pips = max(0.0, mfe_pips - pnl_pips)
+
+        # 1. Structural target reached (within 0.2 pips)
+        dist_to_target = abs(target - current_mark) / max(pip, 1e-9)
+        if dist_to_target <= 0.2:
+            return self._decide(ExitAction.TAKE, "target_reached",
+                                f"price within {dist_to_target:.1f} pips of target")
+
+        # 2. Regime change with loss
+        if regime_now and regime_at_entry and regime_now != regime_at_entry and pnl_pips < 0:
+            return self._decide(ExitAction.ABORT, "regime_change",
+                                f"regime {regime_at_entry}->{regime_now}, losing")
+
+        # 3. Time decay without progress
+        if age > self.cfg.time_exit_s and not (
+            mfe_pips >= self.cfg.mfe_arm_r * R
+            and pnl_pips >= self.cfg.progress_frac * mfe_pips
+        ):
+            return self._decide(ExitAction.SCRATCH, "time_decay_no_progress",
+                                f"{int(age)}s held, pnl {pnl_pips:.1f} vs mfe {mfe_pips:.1f}")
+
+        # 4. MFE giveback (armed only after meaningful MFE)
+        mfe_r = mfe_pips / R
+        if mfe_r >= self.cfg.mfe_arm_r:
+            max_giveback = self.cfg.giveback_frac * mfe_pips
+            if giveback_pips > max_giveback:
+                return self._decide(ExitAction.TAKE, "mfe_giveback_limit",
+                                    f"gave back {giveback_pips:.1f} of mfe {mfe_pips:.1f} "
+                                    f"(max {max_giveback:.1f})")
+            # 5. Breakeven/cost-plus lock via stop adjustment
+            if pnl_pips > self.cfg.breakeven_buffer_r * R:
+                return self._decide(ExitAction.LOCK, "breakeven_lock_armed",
+                                    f"mfe {mfe_r:.1f}R armed cost-plus lock at "
+                                    f"+{self.cfg.breakeven_buffer_r * R:.1f} pips")
+
+        # 6. Current EV exit (if estimable)
+        if remaining_ev_status == "ESTIMATED" and remaining_ev is not None and remaining_ev <= 0:
+            return self._decide(ExitAction.ABORT, "remaining_ev_negative",
+                                f"remaining costed EV={remaining_ev:.4f} <= 0")
+
+        # Default: HOLD with explanation
+        hold_reasons = []
+        if mfe_r >= self.cfg.mfe_arm_r:
+            pct_given = 100.0 * giveback_pips / max(mfe_pips, 1e-9)
+            hold_reasons.append(f"only {pct_given:.0f}% of mfe {mfe_pips:.1f} given back")
+        else:
+            hold_reasons.append(f"mfe {mfe_pips:.1f} below arm threshold; "
+                                "protective stop owns downside")
+        if remaining_ev_status == "ESTIMATED" and remaining_ev is not None and remaining_ev > 0:
+            hold_reasons.append(f"remaining costed EV positive ({remaining_ev:.4f})")
+        return self._decide(ExitAction.HOLD, "fast_hold_justified",
+                            "; ".join(hold_reasons))
+
+    def _decide(self, action: ExitAction, reason: str, why: str) -> dict[str, Any]:
+        return {"action": action.value, "reason": reason, "why": why,
+                "policy": reason}
+
+
+# ---------------------------------------------------------------------------
+
+def classify_firehose_mode(*, broker_round_trips: int, shadow_trades: int) -> str:
+    if broker_round_trips > 0:
+        return FirehoseLane.BROKER_MICRO.value
+    if shadow_trades > 0:
+        return FirehoseLane.SHADOW_MICRO.value
+    return "RESEARCH_CANDIDATES_ONLY"

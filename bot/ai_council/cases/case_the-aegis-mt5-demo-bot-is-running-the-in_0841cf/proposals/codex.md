@@ -1,0 +1,1 @@
+Test a challenger that trades only validated-state signals whose estimated net expected value exceeds zero after current spread and slippage assumptions. On the same sealed holdout as the champion, require higher net expectancy with no worse maximum drawdown and at least 30 eligible signals; otherwise reject it. Record the experiment and retain the champion unchanged.

@@ -528,7 +528,11 @@ def build_knowledge_base(
             fh.close()
 
     corpus_version = _sha256(
-        "\n".join(f"{f['file']}:{f.get('file_hash')}" for f in sorted(files_report, key=lambda x: x['file']))
+        "\n".join(sorted(
+            [f"{f['file']}:{f.get('file_hash')}" for f in files_report]
+            + [f"extraction:{EXTRACTION_VERSION}",
+               f"compiler:{COMPILER_VERSION}"]
+        ))
     )
     source_index = {
         "schema": "book_source_index.v1",

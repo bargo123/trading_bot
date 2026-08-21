@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-21T19:49:27.002458+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_0841cf\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 31.42,
+          "finished_utc": "2026-08-21T19:53:23.550946+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-21T19:52:52.135269+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-21T19:53:23.551668+00:00",
+        "text": "The zero-EV admission bar filters noise, not edge: with no margin above costs, no confidence interval on expectancy, and only ~30 signals, \"higher net expectancy\" is a point estimate indistinguishable from luck\u2014an unmeasurable claim absent a significance test or bootstrap. \"No worse maximum drawdown\" compares a single-path statistic with huge variance; without a defined tolerance or distributional comparison, near-ties are arbitrary. Reusing the same sealed holdout for every successive challenger burns it via repeated peeking, and there is no multiple-comparison control despite an implied stream of challengers. Finally, nothing specifies how \"estimated EV\" and \"validated state\" are computed\u2014if the EV model or validation labels touch the evaluation window, the entire test is lookahead-contaminated before it starts."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_0841cf\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 10.81,
+          "finished_utc": "2026-08-21T19:52:52.114383+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-21T19:52:41.300688+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-21T19:52:52.116381+00:00",
+        "text": "The proposal is not actually testable from \u201creconciled exits\u201d unless full post-entry price paths are available; terminal exit records alone cannot determine whether +1R breakeven, \u22121R stop, or \u22651R target was touched first without lookahead and intrabar-ordering rules. The \u2265500-exit threshold does not address statistical uncertainty, regime dependence, or repeated policy selection, while \u201cmeasured p75 costs\u201d may understate adverse tail costs and differs from the mandated runner assumptions. It also overclaims \u201csymmetric R-geometry\u201d despite an unspecified target and ignores whether the historical entries and position sizing remain valid under longer holding periods."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-21T19:54:15.584200+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_9f23cd",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_9f23cd for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_0841cf",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_0841cf\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 121.51,
+        "finished_utc": "2026-08-21T19:51:44.123857+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T19:49:42.614155+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T19:51:44.125109+00:00",
+      "text": "Proposal: Run one pre-registered, offline exit-research experiment (via `bot/aegis/research/exit_research.py` + ExperimentRegistry, no code/champion changes) testing whether replacing the early-flatten \"quick_win\" path with a symmetric R-geometry exit \u2014 hard stop kept at 1R, breakeven-stop after +1R, minimum target \u22651R \u2014 flips realized expectancy positive on demo replay. Motivating measurement: today's `outcome_learning.md` (n=2517 exits) shows WR 0.675 yet expectancy \u22120.0122 and PF 0.77 because payoff_ratio is 0.34 (avg_win +0.06 vs avg_loss \u22120.18), TP closes earn +0.107 each (n=447) while SL closes cost \u22120.547 each (n=96) and the 1.21 tail loss erases ~20 average wins \u2014 exactly the high-hit-rate/negative-payoff trap Van Tharp dissects in *Trade Your Way to Financial Freedom* via R-multiple expectancy, and echoed by the risk_reward exit passages in *The New Market Wizards*. Falsification test: replay all reconciled demo exits through the challenger exit policy net of the runner's measured p75 spread/slippage costs on a time-sealed holdout; the hypothesis is rejected if sealed-holdout net expectancy stays \u22640 or PF \u22641.0 at n\u2265500 exits, and only a survivor passing every `promote.py` gate may ever be considered for champion status."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_0841cf\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 10.48,
+        "finished_utc": "2026-08-21T19:52:15.094295+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-21T19:52:04.614459+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T19:52:15.094295+00:00",
+      "text": "Test a challenger that trades only validated-state signals whose estimated net expected value exceeds zero after current spread and slippage assumptions. On the same sealed holdout as the champion, require higher net expectancy with no worse maximum drawdown and at least 30 eligible signals; otherwise reject it. Record the experiment and retain the champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_0841cf\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 10.66,
+        "finished_utc": "2026-08-21T19:54:15.551525+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-21T19:54:04.887683+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-21T19:54:15.553526+00:00",
+      "text": "Test a preregistered challenger using only validated-state signals and an EV model fitted exclusively on training data, with all features, labels, thresholds, and cost assumptions frozen before evaluation. Admit signals only when the lower bound of a prespecified bootstrap confidence interval for net EV exceeds a positive margin above estimated spread and slippage. Evaluate once on a fresh sealed holdout with adequate prespecified sample size, requiring multiplicity-adjusted evidence of higher net expectancy and a bootstrap drawdown distribution no worse than the champion beyond a defined tolerance. Retire each holdout after use, record all attempts in the experiment registry, and reject the challenger while leaving the champion unchanged unless every governed promotion gate passes."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_0841cf\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 41.29,
+        "finished_utc": "2026-08-21T19:54:04.864323+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T19:53:23.573767+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-21T19:54:04.864323+00:00",
+      "text": "Proposal: Run one pre-registered, offline exit-research experiment (via `bot/aegis/research/exit_research.py` + ExperimentRegistry, no code/champion changes) testing a fully specified challenger exit \u2014 hard stop at \u22121R, breakeven stop once +1R MFE is reached, and a fixed target at exactly +1R (true 1:1 R-geometry) \u2014 against today's early-flatten \"quick_win\" path, whose `outcome_learning.md` record (n=2517, WR 0.675, payoff_ratio 0.34, expectancy \u22120.0122, PF 0.77) exemplifies the high-hit-rate/negative-payoff trap Van Tharp dissects via R-multiple expectancy in *Trade Your Way to Financial Freedom*. To make the test causal, replay uses full post-entry OHLC price paths with pre-registered conservative intrabar ordering rules (stop-before-target when both levels touch one bar, worst-case fill within bar, no lookahead), and any exit lacking sufficient archived path data is excluded and counted separately rather than imputed. Costs apply the runner's mandated spread/slippage assumptions as the primary basis, supplemented by a p95 adverse-cost stress band instead of p75-only, since understated tail costs are precisely what let one \u22120.18R-average loss class erase ~20 typical wins. The hypothesis survives only if sealed-holdout net expectancy has a bootstrap 95% CI excluding zero with PF > 1.0, evaluated per regime stratum and corrected for repeated policy selection (single pre-registered challenger; family-wise adjustment applies if variants are added), and longer holding periods must be re-checked for overnight-gap exposure and unchanged entry/sizing validity. Only a survivor passing every `promote.py` gate may be considered for champion status; all other outcomes are recorded honestly in the registry."
+    }
+  },
+  "status": "decided"
+}

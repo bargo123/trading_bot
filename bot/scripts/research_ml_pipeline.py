@@ -705,7 +705,13 @@ def main() -> int:
     ml.setdefault("all_holdout_expectancy", all_ev)
     ml.setdefault("model_taken_expectancy", taken_exp)
     ml["all_holdout"] = {"expectancy": all_ev}
-    ml["model_taken"] = {"expectancy": taken_exp}
+    ml["model_taken"] = {
+        "expectancy": taken_exp,
+        "profit_factor": (ml.get("sealed_taken") or {}).get("profit_factor"),
+        "net_pnl": round((taken_exp or 0.0) * ((ml.get("sealed_taken") or {}).get("n") or 0), 4),
+        "n": (ml.get("sealed_taken") or {}).get("n"),
+        "bootstrap_p05": (ml.get("sealed_taken") or {}).get("bootstrap_p05"),
+    }
     ml["improvement_expectancy"] = round(
         (taken_exp or 0.0) - (all_ev or 0.0), 5)
     from aegis.research.predictor_protocol import ml_advances_from_protocol
