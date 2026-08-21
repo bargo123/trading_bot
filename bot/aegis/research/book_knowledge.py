@@ -33,6 +33,13 @@ PLACEHOLDER_MAX_WORDS = 30
 PARTIAL_MAX_WORDS = 400
 OCR_GARBLED_RATIO = 0.35
 
+# Cache identity (audited fix 6): source hash ALONE is insufficient - when the
+# extraction code changes, old records must not be reused. Bump
+# EXTRACTION_VERSION on any classifier/formalizer change.
+EXTRACTION_VERSION = "2"
+SCHEMA_VERSION = "corpus_manifest.v2"
+COMPILER_VERSION = "book_knowledge.py@extraction_" + EXTRACTION_VERSION
+
 STATUS_INDEXED = "INDEXED"
 STATUS_PARTIAL = "PARTIALLY_INDEXED"
 STATUS_FAILED = "FAILED"
@@ -128,7 +135,7 @@ def _formalize(body: str, extras: dict[str, Any]) -> dict[str, Any]:
     for cat_kws in EXIT_CATEGORIES.values():
         for kw in cat_kws:
             for s in sentences:
-                if kw in s.lower():
+                if kw.lower() in s.lower():
                     exit_h = s[:300]
                     break
             if exit_h:
@@ -141,10 +148,14 @@ def _formalize(body: str, extras: dict[str, Any]) -> dict[str, Any]:
     tf_match = _TF_RE.search(body)
     timeframe = tf_match.group(1).upper() if tf_match else ""
     regime_topic = extras.get("conflict_topic") or ""
+    falsification = extras.get(
+        "falsification_condition",
+        "OOS trades of this rule show expectancy <= 0 after costs",
+    )
 
     executable = bool(
         family and mechanism and side and entry_h and invalid_h
-        and exit_h and regime_topic
+        and exit_h and regime_topic and falsification
     )
     return {
         "strategy_family": family,
@@ -160,6 +171,7 @@ def _formalize(body: str, extras: dict[str, Any]) -> dict[str, Any]:
         "required_timeframe": timeframe or "unspecified",
         "required_data": "completed_m1+m15_structure",
         "known_limitation": "",
+        "falsification_condition": falsification,
         "executable": executable,
         "polarity": polarity,
     }
@@ -476,7 +488,11 @@ def build_knowledge_base(
     for path in sources:
         rel = str(path.relative_to(books_dir.parent))
         prev = old_by_file.get(rel)
-        if prev and not force and prev.get("file_hash"):
+        # Cache identity (audited fix 6): source hash AND extraction version.
+        same_extraction = (
+            str(old_manifest.get("extraction_version") or "") == EXTRACTION_VERSION
+        )
+        if prev and not force and prev.get("file_hash") and same_extraction:
             # Restart-safe reuse ONLY when content is unchanged.
             try:
                 current_hash = _sha256(path.read_text(encoding="utf-8", errors="replace"))
@@ -529,9 +545,11 @@ def build_knowledge_base(
 
     # Persist records inside the manifest for restart-safe reuse.
     manifest_path.write_text(json.dumps(
-        {"schema": "corpus_manifest.v2",
+        {"schema": SCHEMA_VERSION,
          "built_utc": datetime.now(timezone.utc).isoformat(),
          "corpus_version": corpus_version,
+         "extraction_version": EXTRACTION_VERSION,
+         "compiler_version": COMPILER_VERSION,
          "files": files_report},
         indent=2, sort_keys=True, default=str), encoding="utf-8")
     counts: dict[str, int] = {}

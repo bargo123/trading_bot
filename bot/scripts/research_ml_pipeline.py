@@ -683,7 +683,34 @@ def main() -> int:
     recommended = recommended_exit(exit_summary)
 
     df = feature_frame(records)
-    ml = train_and_score(df)
+    # Audited remediation 1: proper predictor protocol replaces the old
+    # auto-top-50% scorer. Threshold learned on inner walk-forward only;
+    # sealed holdout evaluated once; ml_advances recomputed from evidence.
+    from aegis.research.predictor_protocol import run_predictor_protocol
+
+    meta_cols = [c for c in ("symbol", "side", "session", "regime",
+                             "strategy_family") if c in df.columns]
+    ml = run_predictor_protocol(
+        df,
+        holdout_frac=0.3,
+        n_folds=4,
+        min_trades_threshold=50,
+        meta=df[meta_cols] if meta_cols else None,
+    )
+    ml["train_n"] = ml.get("train_n", 0)
+    ml["holdout_n"] = ml.get("sealed_n", 0)
+    ml["n_taken"] = (ml.get("sealed_taken") or {}).get("n") or 0
+    all_ev = (ml.get("sealed_all") or {}).get("expectancy")
+    taken_exp = (ml.get("sealed_taken") or {}).get("expectancy")
+    ml.setdefault("all_holdout_expectancy", all_ev)
+    ml.setdefault("model_taken_expectancy", taken_exp)
+    ml["all_holdout"] = {"expectancy": all_ev}
+    ml["model_taken"] = {"expectancy": taken_exp}
+    ml["improvement_expectancy"] = round(
+        (taken_exp or 0.0) - (all_ev or 0.0), 5)
+    from aegis.research.predictor_protocol import ml_advances_from_protocol
+
+    ml["ml_advances"] = ml_advances_from_protocol(ml)
 
     from aegis.research.exit_research import per_trade_cost_pips
 
@@ -829,7 +856,14 @@ def main() -> int:
             "all_holdout_expectancy": ml["all_holdout"]["expectancy"],
             "model_taken_expectancy": ml["model_taken"]["expectancy"],
             "improvement_expectancy": ml["improvement_expectancy"],
-            "ml_advances": ml_advances(ml["model_taken"]["expectancy"], ml["improvement_expectancy"]),
+            "ml_advances": ml["ml_advances"],
+            "locked_threshold": ml.get("locked_threshold"),
+            "threshold_source": ml.get("threshold_source"),
+            "correlation_pearson": ml.get("correlation_pearson"),
+            "correlation_spearman": ml.get("correlation_spearman"),
+            "mae": ml.get("mae"),
+            "rmse": ml.get("rmse"),
+            "monotonicity_fraction": ml.get("monotonicity_fraction"),
             "equity_curve": ml["equity_curve"],
             "drawdown": ml["drawdown"],
             "model_equity_curve": ml["model_equity_curve"],

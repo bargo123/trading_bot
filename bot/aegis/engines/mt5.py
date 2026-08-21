@@ -294,6 +294,8 @@ class MT5Engine(BrokerEngine):
                 "leverage": int(getattr(info, "leverage", 0) or 0),
                 "trade_expert": bool(getattr(info, "trade_expert", True)),
                 "trade_allowed": bool(getattr(info, "trade_allowed", True)),
+                "margin_level": float(getattr(info, "margin_level", 0) or 0),
+                "margin_used": float(getattr(info, "margin", 0) or 0),
             },
         )
 

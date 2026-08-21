@@ -348,6 +348,33 @@ class ExperimentStore:
 
     # -- broker-side close attribution ---------------------------------------
 
+    def migrate_legacy(self, *, max_trades: int) -> dict[str, int]:
+        """Deterministic one-shot migration of pre-lifecycle experiments.
+
+        Applies the NEW judgement to existing evidence WITHOUT inventing
+        trades. ACTIVE records at/over the per-hypothesis cap without proof
+        become EXHAUSTED; those meeting reject/promising rules classify now;
+        genuinely under-evidenced ones stay ACTIVE.
+        """
+        counts: dict[str, int] = {}
+        for rec in self.data.get("experiments", {}).values():
+            before = str(rec.get("status") or "")
+            if before in {LIFECYCLE_REJECTED, LIFECYCLE_PROMISING,
+                          LIFECYCLE_EXHAUSTED}:
+                counts["already_final:" + before] = counts.get(
+                    "already_final:" + before, 0) + 1
+                continue
+            n = int((rec.get("evidence") or {}).get("n") or 0)
+            self._judge(rec, max_trades=max_trades)
+            after = str(rec.get("status") or "")
+            key = f"{before}->{after}"
+            counts[key] = counts.get(key, 0) + 1
+            rec["lifecycle_migrated_from"] = before
+        self.data["migration_version"] = "legacy_migration.v1"
+        self.data["migration_utc"] = _utcnow().isoformat()
+        self.save()
+        return counts
+
     def remember_position(self, position_id: str, hypothesis_id: str) -> None:
         """Map an open position to its experiment so SL/TP closes (whose deal
         comment MT5 overwrites with '[sl ...]'/'[tp ...]') still attribute."""

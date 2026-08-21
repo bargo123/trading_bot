@@ -563,6 +563,24 @@ class IntelligentFirehoseBrain:
             )
         return rec
 
+    def _measured_hedge_cost(self, symbol: str) -> float | None:
+        """Measured double-spread cost for one symbol from cost_profiles.json."""
+        try:
+            profile = json.loads(
+                resolve_bot_path(
+                    self.cfg.get("cost_profiles_path"),
+                    INTEL_DIR / "cost_profiles.json").read_text(encoding="utf-8")
+            )
+            sym_prof = (profile.get("symbols") or {}).get(str(symbol).upper())
+            if not sym_prof:
+                return None
+            spread_p75 = float(sym_prof.get("spread_p75") or 0.0)
+            pip = float(sym_prof.get("pip_size") or 0.0001)
+            # Double-spread cost in USD for one 0.01-lot position.
+            return round(spread_p75 * pip * 100000.0 * 0.01 * 2.0, 4)
+        except (OSError, json.JSONDecodeError, KeyError, ValueError, TypeError):
+            return None
+
     def find_experiment_by_tag(self, tag: str) -> dict[str, Any] | None:
         """Attribute a broker-side close via its compact EXP tag.
 
@@ -713,8 +731,11 @@ class IntelligentFirehoseBrain:
                         "self_hedge_blocked_same_family" if same_family
                         else "self_hedge_blocked_insufficient_independence"
                     )
-                # Independent mechanisms allowed; double-spread cost of the
-                # internal hedge is acknowledged in the experiment record.
+                # Incremental cost assessment using measured spread data.
+                spread_cost = self._measured_hedge_cost(symbol)
+                budget2 = self._exploration_limits.max_risk_per_trade_usd * 2
+                if spread_cost is not None and spread_cost > budget2:
+                    return None, "self_hedge_blocked_spread_cost_exceeds_budget"
         if not portfolio_ok:
             return None, portfolio_reason or "portfolio_risk"
 
@@ -732,6 +753,19 @@ class IntelligentFirehoseBrain:
         )
         if not sizing.get("allowed"):
             # Hard risk rejection: broker-minimum lot would breach the budget.
+            # Structured RISK_GRANULARITY_BLOCKED state (audited fix 8).
+            self.counts["risk_granularity_blocked"] = int(
+                self.counts.get("risk_granularity_blocked", 0)) + 1
+            samples = self.counts.setdefault("risk_granularity_samples", [])
+            if len(samples) < 10:
+                stop_pips = round(abs(entry - invalidation) / pip, 1) if pip else 0
+                samples.append({
+                    "symbol": symbol,
+                    "stop_pips": stop_pips,
+                    "volume_min": float(spec.get("volume_min", 0.01) or 0.01),
+                    "min_lot_risk_usd": sizing.get("actual_min_lot_risk_usd"),
+                    "risk_budget_usd": sizing.get("desired_risk_usd"),
+                })
             return None, str(sizing.get("reason"))
         lots = float(sizing["lots"])
 
@@ -930,7 +964,10 @@ class IntelligentFirehoseBrain:
             )
         return {
             "brain": "intelligent_firehose",
-            "counts": {k: v for k, v in self.counts.items() if k != "skip_reasons"},
+            "counts": {k: v for k, v in self.counts.items()
+                       if k not in ("skip_reasons", "risk_granularity_samples")},
+            "risk_granularity_blocked": int(self.counts.get("risk_granularity_blocked", 0)),
+            "risk_granularity_samples": self.counts.get("risk_granularity_samples", [])[:5],
             "funnel": funnel,
             **rates,
             **recency,

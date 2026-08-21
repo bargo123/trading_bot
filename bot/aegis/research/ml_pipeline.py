@@ -18,6 +18,9 @@ from aegis.intel.expected_value import payoff_metrics
 from aegis.research.evaluate import untouched_holdout
 
 FEATURE_FIELDS = ("regime", "structure", "volatility", "session", "h1_direction", "m5_direction")
+# Numeric passthrough features appended to the design matrix (audited fix 1:
+# the model was categorical-only and could not learn any numeric edge).
+NUMERIC_FEATURES: tuple[str, ...] = ()
 SIDE_VALUES = ("buy", "sell")
 RIDGE_DEFAULT = 1.0
 
@@ -52,6 +55,8 @@ def _design_matrix(df: pd.DataFrame, train: pd.DataFrame) -> np.ndarray:
     symbols = sorted(train["symbol"].astype(str).unique())
     base_cols = [f"{field}={value}" for field in FEATURE_FIELDS for value in cats[field]]
     base_cols += ["hour_utc", "side_sell"]
+    numeric = [f for f in NUMERIC_FEATURES if f in df.columns]
+    base_cols += [f"num={f}" for f in numeric]
     cols = base_cols + [f"sym={symbol}" for symbol in symbols]
 
     matrix = np.zeros((len(df), len(cols)), dtype=float)
@@ -62,9 +67,14 @@ def _design_matrix(df: pd.DataFrame, train: pd.DataFrame) -> np.ndarray:
                 matrix[i, base_cols.index(f"{field}={value}")] = 1.0
         matrix[i, base_cols.index("hour_utc")] = float(row.get("hour_utc") or 0.0)
         matrix[i, base_cols.index("side_sell")] = 1.0 if str(row["side"]) == "sell" else 0.0
+        for j, f in enumerate(numeric):
+            try:
+                matrix[i, len(base_cols) - len(numeric) + j] = float(row.get(f) or 0.0)
+            except (TypeError, ValueError):
+                pass
         symbol = str(row["symbol"])
         if symbol in symbols:
-            matrix[i, base_cols.index(f"sym={symbol}") if f"sym={symbol}" in base_cols else cols.index(f"sym={symbol}")] = 1.0
+            matrix[i, cols.index(f"sym={symbol}")] = 1.0
     return matrix
 
 

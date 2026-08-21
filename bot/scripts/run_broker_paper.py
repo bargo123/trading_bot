@@ -1058,15 +1058,19 @@ def main() -> None:
                 if skip_reason is None:
                     # Margin pressure (spec K): broker-measured; block NEW
                     # exploration first - never close a high-EV winner to make
-                    # room for an unvalidated experiment.
+                    # room for an unvalidated experiment. All three controls:
+                    # min free-margin, max exploration fraction, min margin level.
                     try:
                         _acct_e = eng.account()
                         _free = float(getattr(_acct_e, "available_funds", 0) or 0)
                         _eq = float(getattr(_acct_e, "equity", 0) or 0)
+                        _raw = getattr(_acct_e, "raw", {}) or {}
+                        _mlvl = float(_raw.get("margin_level") or 0)
                     except Exception:
-                        _free, _eq = None, 0.0
+                        _free, _eq, _mlvl = None, 0.0, 0.0
                     min_free = float(cfg.get("exploration_min_free_margin_usd", 20) or 20)
                     max_frac = float(cfg.get("exploration_max_margin_fraction", 0.4) or 0.4)
+                    min_mlvl = float(cfg.get("exploration_min_margin_level", 300) or 300)
                     used_frac = (
                         (_eq - _free) / _eq if (_eq and _free is not None and _eq > 0)
                         else 0.0
@@ -1076,6 +1080,8 @@ def main() -> None:
                             f"exploration_margin_pressure:free={_free:.2f},"
                             f"used={used_frac:.0%}"
                         )
+                    elif _mlvl > 0 and _mlvl < min_mlvl:
+                        skip_reason = f"exploration_min_margin_level:{_mlvl:.0f}"
                 if skip_reason:
                     append_journal(
                         journal,
@@ -1558,6 +1564,19 @@ def main() -> None:
                                         "family": str(_rec.get("strategy_family") or ""),
                                     }
                         profit_manager.sync(all_open, meta_by_ticket=meta_by_ticket)
+                        # Live marks for remaining-EV (audited fix 3): use
+                        # current bid (buy exit) / ask (sell exit), not entry.
+                        live_marks: dict[str, dict[str, float]] = {}
+                        for pos in all_open:
+                            sym_l = str(getattr(pos, "symbol", ""))
+                            if sym_l in live_marks:
+                                continue
+                            try:
+                                _q = eng.quote(sym_l)
+                                live_marks[sym_l] = {
+                                    "bid": float(_q.bid), "ask": float(_q.ask)}
+                            except Exception:
+                                pass
                         # Position inventory (audited defect 3): classify EVERY
                         # open ticket - origin, exploration?, hypothesis,
                         # thesis, legacy/unattributed, broker comment, risk.
@@ -1613,17 +1632,23 @@ def main() -> None:
                         )
                         for pos in all_open:
                             tk = str(getattr(pos, "ticket", "") or "")
-                            # Current remaining-EV estimate (spec defect 7):
-                            # entry EV scaled by remaining R:R from CURRENT
-                            # price toward target/invalidation. UNKNOWN when
-                            # the thesis lacks executable geometry - never 0.
+                            # Current remaining-EV estimate (audited fix 3):
+                            # live exit mark = bid for buy, ask for sell.
                             _rem_ev, _rem_status = None, "UNKNOWN"
                             _track = profit_manager.tracks.get(tk)
                             if _track is not None:
                                 _tgt = _track.target
-                                _inv = _track.invalidation
+                                _inv = _track.invalidation or _track.current_sl
+                                _sym_l = str(getattr(pos, "symbol", ""))
+                                marks = live_marks.get(_sym_l, {})
+                                _cur = (
+                                    marks.get("bid") if str(_track.side) == "buy"
+                                    else marks.get("ask")
+                                )
                                 _px = float(_track.entry_price or 0)
-                                _cur = float(getattr(pos, "avg_price", 0) or _px)
+                                spread_cost = 0.0
+                                if marks.get("bid") and marks.get("ask"):
+                                    spread_cost = marks["ask"] - marks["bid"]
                                 if _tgt and _inv and _px and _cur:
                                     sign = 1.0 if str(_track.side) == "buy" else -1.0
                                     rem_rr = ((_tgt - _cur) * sign) / max(
