@@ -1,0 +1,45 @@
+{
+  "schema": "exploration_fresh_report.v2",
+  "generated_utc": "2026-08-21T14:17:36.875615+00:00",
+  "runner_pid": 6132,
+  "runner_status": "running",
+  "mt5_demo": true,
+  "allow_live": false,
+  "funnel": {
+    "scans": 146,
+    "candidates": 59,
+    "shadow": 0,
+    "exploration_eligible": 0,
+    "exploration_fire": 0,
+    "demo_canary_fire": 0,
+    "champion_fire": 0,
+    "skip": 146
+  },
+  "pm_decisions": {
+    "HOLD": 45,
+    "LOCK": 0,
+    "EXIT": 0,
+    "REDUCE": 0
+  },
+  "pm_tickets": [],
+  "exposure": {
+    "gross_long_exposure": 0.0,
+    "gross_short_exposure": 0.0,
+    "net_exposure": 0.0,
+    "hedged_exposure": 0.0,
+    "cost_of_internal_hedge_usd_est": 0.0,
+    "per_symbol_hedged": {}
+  },
+  "experiment_state_distribution": {
+    "ACTIVE": 198,
+    "NEW": 2
+  },
+  "book_backed_experiment_count": 2,
+  "journal_since_fix": {
+    "fire_trigger:None": 13,
+    "skip:exploration_max_positions:3": 12,
+    "fire_trigger:UNDERCOVERED_STATE": 1
+  },
+  "last_position_inventory": null,
+  "economic_claim": "No validated profitable champion exists. Historical aggregate remains ~n=2471 WR=67.83% PF=0.769 expectancy=-0.0110 net=-27.17."
+}

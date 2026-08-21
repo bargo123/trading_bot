@@ -48,6 +48,48 @@ cd bot
 - codex quota resets ~18:39 local; cursor probe timed out once — both rejoin
   automatically via cached probes; never blocking, always truthful.
 
+## SECOND INDEPENDENT AUDIT (completed)
+
+Reread MASTER_SPEC line by line against the ledger, git diff, tests, runtime:
+
+| Spec section | Ledger IDs | Status |
+|---|---|---|
+| Protocol steps 1-12 | process | executed (spec saved verbatim; ledger maintained; verifier built; this doc maintained) |
+| A corpus/statuses/taxonomy/conflicts/generation/retrieval | EF-100..106 | VERIFIED |
+| B/C/D/E/F profit mgmt + per-ticket + 0.01-lot | EF-107..111 | VERIFIED |
+| G exit learning / H capture metrics / I screenshot scenario | EF-112..114 | VERIFIED |
+| J self-hedge / K margin / L exits-from-books / M point-in-time / N gates intact | EF-115..119 | VERIFIED |
+| O heartbeat / P exit-layer replacement + explicit exit plans | EF-120..121 | VERIFIED |
+| Prior merge-blockers (governance, caps, funnel, rates, council, artifacts, thesis ownership, costs, ingestion) | EF-001..016 | VERIFIED |
+
+Honest notes:
+- Trailing STRUCTURAL stop (spec D4) exists as tighten-only lock + candidate
+  policy; full swing-based trailing is a listed extension, not silently claimed.
+- Live book_logic fires await qualifying geometry: current candidates are ALL
+  hard-rejected (exploration_destructive_payoff 189+, exploration_min_lot_
+  exceeds_risk_budget 113+) - FIRE=0 is the correct, explained outcome.
+- Legacy 198 ACTIVE experiments predate the reachable lifecycle; they drain to
+  EXHAUSTED/REJECTED as their closes flow through the new _judge.
+
+## FRESH RUNTIME EVIDENCE (post-fix runner)
+
+- reports/research/exploration_fresh_report.json: funnel, PM decision counts
+  (HOLD=1480 / LOCK=2 / EXIT=1 live), experiment distribution, journal-since-
+  fix counters (classified triggers, hard rejects, inventory events),
+  last position inventory with legacy flags, economic claim.
+- Heartbeat blocks: profit_management (per-ticket table incl entry_ev vs
+  remaining_ev + status), exposure (per-symbol hedged + est cost),
+  funnel, rates, skip_reasons.
+- Journal: position_inventory classifies every open ticket (origin/
+  exploration/hypothesis/thesis/legacy/comment/risk); exploration_limit_skip
+  reasons include margin pressure; pm_exit/pm_lock decisions persisted.
+
+## Economic claim (audit item 14)
+
+NO VALIDATED PROFITABLE CHAMPION EXISTS. Historical aggregate remains
+~n=2471 WR=67.83% PF=0.769 expectancy=-0.0110 net=-27.17. Exploration trades
+are information purchases, never proof of edge.
+
 ## Rollback
 
 Each concern is isolated: revert the branch commit range; runtime artifacts

@@ -14,7 +14,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-KNOWLEDGE_DIR = Path(__file__).resolve().parents[1] / "knowledge"
+KNOWLEDGE_DIR = Path(__file__).resolve().parents[2] / "knowledge"
 RECORD_FILES = (
     "strategy_hypotheses.jsonl",
     "entry_patterns.jsonl",

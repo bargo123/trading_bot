@@ -1,22 +1,22 @@
 {
   "schema": "outcome_learning.v1",
   "label": "research_proxy",
-  "n_rows": 3336,
-  "n_exits": 2484,
+  "n_rows": 3344,
+  "n_exits": 2492,
   "metrics": {
-    "n": 2484,
-    "n_wins": 1680,
-    "n_losses": 739,
-    "win_rate": 0.6763285024154589,
-    "avg_win": 0.05552976190476191,
-    "avg_loss": -0.1686062246278755,
-    "expectancy": -0.012604669887278583,
-    "profit_factor": 0.7487158908507224,
-    "net_pnl": -31.31,
-    "payoff_ratio": 0.32934585913016895,
-    "breakeven_wr": 0.7522496821514381,
-    "wins_erased_by_average_loss": 3.036321764120815,
-    "wins_erased_by_tail_loss": 21.79011683996141,
+    "n": 2492,
+    "n_wins": 1687,
+    "n_losses": 740,
+    "win_rate": 0.6769662921348315,
+    "avg_win": 0.058245406046235924,
+    "avg_loss": -0.16952702702702702,
+    "expectancy": -0.010910914927768859,
+    "profit_factor": 0.7832602630530092,
+    "net_pnl": -27.189999999999998,
+    "payoff_ratio": 0.3435759304441179,
+    "breakeven_wr": 0.7442824609618087,
+    "wins_erased_by_average_loss": 2.9105647729960773,
+    "wins_erased_by_tail_loss": 20.77417056788113,
     "tail_loss": 1.21,
     "cosmetic_win_rate": false
   },
@@ -47,21 +47,42 @@
       "by": [
         "symbol"
       ],
-      "n": 28,
-      "n_wins": 27,
+      "n": 29,
+      "n_wins": 28,
       "n_losses": 1,
-      "win_rate": 0.9642857142857143,
-      "avg_win": 0.03925925925925926,
+      "win_rate": 0.9655172413793104,
+      "avg_win": 0.045714285714285714,
       "avg_loss": -0.59,
-      "expectancy": 0.016785714285714286,
-      "profit_factor": 1.7966101694915255,
-      "net_pnl": 0.47000000000000003,
-      "payoff_ratio": 0.06654111738857502,
-      "breakeven_wr": 0.9376103590347263,
-      "wins_erased_by_average_loss": 15.028301886792452,
-      "wins_erased_by_tail_loss": 15.028301886792452,
+      "expectancy": 0.023793103448275864,
+      "profit_factor": 2.169491525423729,
+      "net_pnl": 0.6900000000000001,
+      "payoff_ratio": 0.0774818401937046,
+      "breakeven_wr": 0.9280898876404494,
+      "wins_erased_by_average_loss": 12.90625,
+      "wins_erased_by_tail_loss": 12.90625,
       "tail_loss": 0.59,
       "cosmetic_win_rate": true
+    },
+    {
+      "key": "USDCHF",
+      "by": [
+        "symbol"
+      ],
+      "n": 350,
+      "n_wins": 253,
+      "n_losses": 88,
+      "win_rate": 0.7228571428571429,
+      "avg_win": 0.08798418972332016,
+      "avg_loss": -0.1978409090909091,
+      "expectancy": 0.013857142857142858,
+      "profit_factor": 1.2785755313038485,
+      "net_pnl": 4.8500000000000005,
+      "payoff_ratio": 0.44472192393177334,
+      "breakeven_wr": 0.6921747247238597,
+      "wins_erased_by_average_loss": 2.248596136567835,
+      "wins_erased_by_tail_loss": 11.252021563342318,
+      "tail_loss": 0.99,
+      "cosmetic_win_rate": false
     },
     {
       "key": "USDCAD",
@@ -82,27 +103,6 @@
       "wins_erased_by_average_loss": 2.2143641235915155,
       "wins_erased_by_tail_loss": 10.077389984825492,
       "tail_loss": 0.58,
-      "cosmetic_win_rate": false
-    },
-    {
-      "key": "USDCHF",
-      "by": [
-        "symbol"
-      ],
-      "n": 345,
-      "n_wins": 248,
-      "n_losses": 88,
-      "win_rate": 0.7188405797101449,
-      "avg_win": 0.07137096774193548,
-      "avg_loss": -0.1978409090909091,
-      "expectancy": 0.0008405797101449276,
-      "profit_factor": 1.0166570936243537,
-      "net_pnl": 0.29000000000000004,
-      "payoff_ratio": 0.360749291286061,
-      "breakeven_wr": 0.7348892308111272,
-      "wins_erased_by_average_loss": 2.7720082177709298,
-      "wins_erased_by_tail_loss": 13.871186440677967,
-      "tail_loss": 0.99,
       "cosmetic_win_rate": false
     },
     {
@@ -232,27 +232,6 @@
       "cosmetic_win_rate": true
     },
     {
-      "key": "EURGBP",
-      "by": [
-        "symbol"
-      ],
-      "n": 73,
-      "n_wins": 54,
-      "n_losses": 15,
-      "win_rate": 0.7397260273972602,
-      "avg_win": 0.02148148148148148,
-      "avg_loss": -0.21000000000000002,
-      "expectancy": -0.027260273972602743,
-      "profit_factor": 0.36825396825396817,
-      "net_pnl": -1.9900000000000002,
-      "payoff_ratio": 0.1022927689594356,
-      "breakeven_wr": 0.9072,
-      "wins_erased_by_average_loss": 9.77586206896552,
-      "wins_erased_by_tail_loss": 51.20689655172415,
-      "tail_loss": 1.1,
-      "cosmetic_win_rate": true
-    },
-    {
       "key": "AUDJPY",
       "by": [
         "symbol"
@@ -337,6 +316,27 @@
       "cosmetic_win_rate": true
     },
     {
+      "key": "EURGBP",
+      "by": [
+        "symbol"
+      ],
+      "n": 74,
+      "n_wins": 54,
+      "n_losses": 16,
+      "win_rate": 0.7297297297297297,
+      "avg_win": 0.02148148148148148,
+      "avg_loss": -0.25,
+      "expectancy": -0.03837837837837838,
+      "profit_factor": 0.29,
+      "net_pnl": -2.8400000000000003,
+      "payoff_ratio": 0.08592592592592592,
+      "breakeven_wr": 0.9208731241473397,
+      "wins_erased_by_average_loss": 11.63793103448276,
+      "wins_erased_by_tail_loss": 51.20689655172415,
+      "tail_loss": 1.1,
+      "cosmetic_win_rate": true
+    },
+    {
       "key": "EURCHF",
       "by": [
         "symbol"
@@ -362,19 +362,19 @@
       "by": [
         "symbol"
       ],
-      "n": 11,
-      "n_wins": 5,
+      "n": 12,
+      "n_wins": 6,
       "n_losses": 6,
-      "win_rate": 0.45454545454545453,
-      "avg_win": 0.024,
+      "win_rate": 0.5,
+      "avg_win": 0.051666666666666666,
       "avg_loss": -0.22,
-      "expectancy": -0.10909090909090909,
-      "profit_factor": 0.09090909090909091,
-      "net_pnl": -1.2,
-      "payoff_ratio": 0.1090909090909091,
-      "breakeven_wr": 0.9016393442622951,
-      "wins_erased_by_average_loss": 9.166666666666666,
-      "wins_erased_by_tail_loss": 23.333333333333336,
+      "expectancy": -0.08416666666666667,
+      "profit_factor": 0.23484848484848483,
+      "net_pnl": -1.01,
+      "payoff_ratio": 0.23484848484848483,
+      "breakeven_wr": 0.8098159509202454,
+      "wins_erased_by_average_loss": 4.258064516129032,
+      "wins_erased_by_tail_loss": 10.838709677419356,
       "tail_loss": 0.56,
       "cosmetic_win_rate": true
     },
@@ -406,19 +406,19 @@
       "by": [
         "side"
       ],
-      "n": 1254,
-      "n_wins": 788,
-      "n_losses": 433,
-      "win_rate": 0.6283891547049442,
-      "avg_win": 0.07008883248730964,
-      "avg_loss": -0.14935334872979214,
-      "expectancy": -0.0075279106858054225,
-      "profit_factor": 0.8540281428792331,
-      "net_pnl": -9.44,
-      "payoff_ratio": 0.4692819617597816,
-      "breakeven_wr": 0.6806045578904981,
-      "wins_erased_by_average_loss": 2.130915060638715,
-      "wins_erased_by_tail_loss": 16.40774941155169,
+      "n": 1256,
+      "n_wins": 789,
+      "n_losses": 434,
+      "win_rate": 0.6281847133757962,
+      "avg_win": 0.0702788339670469,
+      "avg_loss": -0.15096774193548387,
+      "expectancy": -0.008017515923566879,
+      "profit_factor": 0.8463064713064714,
+      "net_pnl": -10.07,
+      "payoff_ratio": 0.46552219080736196,
+      "breakeven_wr": 0.6823506367031509,
+      "wins_erased_by_average_loss": 2.1481253090549464,
+      "wins_erased_by_tail_loss": 16.363390441839492,
       "tail_loss": 1.15,
       "cosmetic_win_rate": false
     },
@@ -427,24 +427,45 @@
       "by": [
         "side"
       ],
-      "n": 1230,
-      "n_wins": 892,
+      "n": 1236,
+      "n_wins": 898,
       "n_losses": 306,
-      "win_rate": 0.7252032520325203,
-      "avg_win": 0.04266816143497758,
+      "win_rate": 0.7265372168284789,
+      "avg_win": 0.04767260579064588,
       "avg_loss": -0.19584967320261437,
-      "expectancy": -0.01778048780487805,
-      "profit_factor": 0.6350742532955115,
-      "net_pnl": -21.87,
-      "payoff_ratio": 0.2178617954130342,
-      "breakeven_wr": 0.8211112326262381,
-      "wins_erased_by_average_loss": 4.5900659090050455,
-      "wins_erased_by_tail_loss": 28.358381502890172,
+      "expectancy": -0.013851132686084143,
+      "profit_factor": 0.7143333889537794,
+      "net_pnl": -17.12,
+      "payoff_ratio": 0.24341427285061973,
+      "breakeven_wr": 0.8042371893539758,
+      "wins_erased_by_average_loss": 4.108222530622465,
+      "wins_erased_by_tail_loss": 25.381452931558044,
       "tail_loss": 1.21,
       "cosmetic_win_rate": true
     }
   ],
   "by_close_reason": [
+    {
+      "key": "unknown",
+      "by": [
+        "close_reason"
+      ],
+      "n": 35,
+      "n_wins": 24,
+      "n_losses": 11,
+      "win_rate": 0.6857142857142857,
+      "avg_win": 0.3070833333333333,
+      "avg_loss": -0.13272727272727272,
+      "expectancy": 0.16885714285714287,
+      "profit_factor": 5.0479452054794525,
+      "net_pnl": 5.91,
+      "payoff_ratio": 2.3136415525114153,
+      "breakeven_wr": 0.30178279217982945,
+      "wins_erased_by_average_loss": 0.4322190699395584,
+      "wins_erased_by_tail_loss": 0.8466757123473542,
+      "tail_loss": 0.26,
+      "cosmetic_win_rate": false
+    },
     {
       "key": "tp",
       "by": [
@@ -467,44 +488,23 @@
       "cosmetic_win_rate": false
     },
     {
-      "key": "unknown",
-      "by": [
-        "close_reason"
-      ],
-      "n": 29,
-      "n_wins": 18,
-      "n_losses": 11,
-      "win_rate": 0.6206896551724138,
-      "avg_win": 0.1438888888888889,
-      "avg_loss": -0.13272727272727272,
-      "expectancy": 0.03896551724137932,
-      "profit_factor": 1.773972602739726,
-      "net_pnl": 1.1300000000000001,
-      "payoff_ratio": 1.0840943683409439,
-      "breakeven_wr": 0.47982472156289935,
-      "wins_erased_by_average_loss": 0.9224289224289223,
-      "wins_erased_by_tail_loss": 1.806949806949807,
-      "tail_loss": 0.26,
-      "cosmetic_win_rate": false
-    },
-    {
       "key": "manual",
       "by": [
         "close_reason"
       ],
-      "n": 1916,
-      "n_wins": 1222,
+      "n": 1917,
+      "n_wins": 1223,
       "n_losses": 635,
-      "win_rate": 0.6377870563674322,
-      "avg_win": 0.035531914893617025,
+      "win_rate": 0.6379760041731872,
+      "avg_win": 0.03565821749795585,
       "avg_loss": -0.11431496062992126,
-      "expectancy": -0.015224425887265136,
-      "profit_factor": 0.5981540157046425,
-      "net_pnl": -29.17,
-      "payoff_ratio": 0.31082471356174146,
-      "breakeven_wr": 0.7628785066790692,
-      "wins_erased_by_average_loss": 3.2172473949738314,
-      "wins_erased_by_tail_loss": 18.8562874251497,
+      "expectancy": -0.01511737089201878,
+      "profit_factor": 0.600771456123433,
+      "net_pnl": -28.98,
+      "payoff_ratio": 0.31192957860865084,
+      "breakeven_wr": 0.7622360348491696,
+      "wins_erased_by_average_loss": 3.2058517966153106,
+      "wins_erased_by_tail_loss": 18.78949782160055,
       "tail_loss": 0.67,
       "cosmetic_win_rate": false
     },
@@ -513,15 +513,15 @@
       "by": [
         "close_reason"
       ],
-      "n": 93,
+      "n": 94,
       "n_wins": 0,
-      "n_losses": 93,
+      "n_losses": 94,
       "win_rate": 0.0,
       "avg_win": null,
-      "avg_loss": -0.5435483870967742,
-      "expectancy": -0.5435483870967741,
+      "avg_loss": -0.5468085106382978,
+      "expectancy": -0.5468085106382978,
       "profit_factor": 0.0,
-      "net_pnl": -50.55,
+      "net_pnl": -51.4,
       "payoff_ratio": null,
       "breakeven_wr": null,
       "wins_erased_by_average_loss": null,
@@ -551,6 +551,28 @@
       "wins_erased_by_average_loss": null,
       "wins_erased_by_tail_loss": null,
       "tail_loss": null,
+      "cosmetic_win_rate": false
+    },
+    {
+      "key": "USDCHF|buy",
+      "by": [
+        "symbol",
+        "side"
+      ],
+      "n": 155,
+      "n_wins": 115,
+      "n_losses": 36,
+      "win_rate": 0.7419354838709677,
+      "avg_win": 0.084,
+      "avg_loss": -0.19833333333333333,
+      "expectancy": 0.01625806451612903,
+      "profit_factor": 1.3529411764705883,
+      "net_pnl": 2.52,
+      "payoff_ratio": 0.42352941176470593,
+      "breakeven_wr": 0.7024793388429752,
+      "wins_erased_by_average_loss": 2.361111111111111,
+      "wins_erased_by_tail_loss": 11.785714285714285,
+      "tail_loss": 0.99,
       "cosmetic_win_rate": false
     },
     {
@@ -639,28 +661,6 @@
       "wins_erased_by_average_loss": 1.5886075949367087,
       "wins_erased_by_tail_loss": 7.097046413502109,
       "tail_loss": 0.58,
-      "cosmetic_win_rate": false
-    },
-    {
-      "key": "EURGBP|sell",
-      "by": [
-        "symbol",
-        "side"
-      ],
-      "n": 32,
-      "n_wins": 25,
-      "n_losses": 6,
-      "win_rate": 0.78125,
-      "avg_win": 0.0204,
-      "avg_loss": -0.051666666666666666,
-      "expectancy": 0.0062499999999999995,
-      "profit_factor": 1.6451612903225807,
-      "net_pnl": 0.19999999999999998,
-      "payoff_ratio": 0.3948387096774194,
-      "breakeven_wr": 0.7169287696577243,
-      "wins_erased_by_average_loss": 2.5326797385620914,
-      "wins_erased_by_tail_loss": 9.803921568627452,
-      "tail_loss": 0.2,
       "cosmetic_win_rate": false
     },
     {
@@ -774,6 +774,28 @@
       "cosmetic_win_rate": true
     },
     {
+      "key": "EURCAD|sell",
+      "by": [
+        "symbol",
+        "side"
+      ],
+      "n": 13,
+      "n_wins": 12,
+      "n_losses": 1,
+      "win_rate": 0.9230769230769231,
+      "avg_win": 0.03666666666666667,
+      "avg_loss": -0.59,
+      "expectancy": -0.011538461538461536,
+      "profit_factor": 0.7457627118644068,
+      "net_pnl": -0.14999999999999997,
+      "payoff_ratio": 0.062146892655367235,
+      "breakeven_wr": 0.9414893617021277,
+      "wins_erased_by_average_loss": 16.09090909090909,
+      "wins_erased_by_tail_loss": 16.09090909090909,
+      "tail_loss": 0.59,
+      "cosmetic_win_rate": true
+    },
+    {
       "key": "USDJPY|sell",
       "by": [
         "symbol",
@@ -794,28 +816,6 @@
       "wins_erased_by_tail_loss": 5.494780793319415,
       "tail_loss": 0.47,
       "cosmetic_win_rate": false
-    },
-    {
-      "key": "USDCHF|buy",
-      "by": [
-        "symbol",
-        "side"
-      ],
-      "n": 150,
-      "n_wins": 110,
-      "n_losses": 36,
-      "win_rate": 0.7333333333333333,
-      "avg_win": 0.046363636363636364,
-      "avg_loss": -0.19833333333333333,
-      "expectancy": -0.013600000000000001,
-      "profit_factor": 0.7142857142857143,
-      "net_pnl": -2.04,
-      "payoff_ratio": 0.23376623376623376,
-      "breakeven_wr": 0.8105263157894738,
-      "wins_erased_by_average_loss": 4.277777777777778,
-      "wins_erased_by_tail_loss": 21.352941176470587,
-      "tail_loss": 0.99,
-      "cosmetic_win_rate": true
     },
     {
       "key": "GBPUSD|buy",
@@ -860,6 +860,28 @@
       "wins_erased_by_tail_loss": 12.506269592476489,
       "tail_loss": 0.79,
       "cosmetic_win_rate": false
+    },
+    {
+      "key": "EURGBP|sell",
+      "by": [
+        "symbol",
+        "side"
+      ],
+      "n": 33,
+      "n_wins": 25,
+      "n_losses": 7,
+      "win_rate": 0.7575757575757576,
+      "avg_win": 0.0204,
+      "avg_loss": -0.1657142857142857,
+      "expectancy": -0.0196969696969697,
+      "profit_factor": 0.43965517241379315,
+      "net_pnl": -0.65,
+      "payoff_ratio": 0.12310344827586209,
+      "breakeven_wr": 0.8903899293828677,
+      "wins_erased_by_average_loss": 8.123249299719888,
+      "wins_erased_by_tail_loss": 41.666666666666664,
+      "tail_loss": 0.85,
+      "cosmetic_win_rate": true
     },
     {
       "key": "AUDUSD|sell",
@@ -926,28 +948,6 @@
       "wins_erased_by_tail_loss": 9.452449567723344,
       "tail_loss": 0.4,
       "cosmetic_win_rate": false
-    },
-    {
-      "key": "EURCAD|sell",
-      "by": [
-        "symbol",
-        "side"
-      ],
-      "n": 12,
-      "n_wins": 11,
-      "n_losses": 1,
-      "win_rate": 0.9166666666666666,
-      "avg_win": 0.02,
-      "avg_loss": -0.59,
-      "expectancy": -0.030833333333333334,
-      "profit_factor": 0.3728813559322034,
-      "net_pnl": -0.37,
-      "payoff_ratio": 0.03389830508474576,
-      "breakeven_wr": 0.9672131147540983,
-      "wins_erased_by_average_loss": 29.499999999999996,
-      "wins_erased_by_tail_loss": 29.499999999999996,
-      "tail_loss": 0.59,
-      "cosmetic_win_rate": true
     },
     {
       "key": "EURUSD|buy",
@@ -1109,19 +1109,19 @@
         "symbol",
         "side"
       ],
-      "n": 11,
-      "n_wins": 5,
+      "n": 12,
+      "n_wins": 6,
       "n_losses": 6,
-      "win_rate": 0.45454545454545453,
-      "avg_win": 0.024,
+      "win_rate": 0.5,
+      "avg_win": 0.051666666666666666,
       "avg_loss": -0.22,
-      "expectancy": -0.10909090909090909,
-      "profit_factor": 0.09090909090909091,
-      "net_pnl": -1.2,
-      "payoff_ratio": 0.1090909090909091,
-      "breakeven_wr": 0.9016393442622951,
-      "wins_erased_by_average_loss": 9.166666666666666,
-      "wins_erased_by_tail_loss": 23.333333333333336,
+      "expectancy": -0.08416666666666667,
+      "profit_factor": 0.23484848484848483,
+      "net_pnl": -1.01,
+      "payoff_ratio": 0.23484848484848483,
+      "breakeven_wr": 0.8098159509202454,
+      "wins_erased_by_average_loss": 4.258064516129032,
+      "wins_erased_by_tail_loss": 10.838709677419356,
       "tail_loss": 0.56,
       "cosmetic_win_rate": true
     }

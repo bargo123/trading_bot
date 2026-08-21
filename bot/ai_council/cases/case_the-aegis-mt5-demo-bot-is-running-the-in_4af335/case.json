@@ -1,0 +1,12 @@
+{
+  "created_utc": "2026-08-21T14:31:33.337517+00:00",
+  "critiques": {},
+  "decision": null,
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_4af335",
+  "mode": "REAL",
+  "phase": "proposal",
+  "proposals": [],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "open"
+}

@@ -31,7 +31,7 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "unit tests pass; attribution wired via position_map (entry-deal comment -> position_id) + pm close path; first live closes populate pl_* fields",
       "id": "EF-003",
       "implementation_files": [
@@ -59,15 +59,15 @@
       ]
     },
     {
-      "commit_sha": "a23878a",
-      "evidence": "AUDIT DOWNGRADE: min-lot risk can exceed budget (rounds UP to 0.01) - must reject",
+      "commit_sha": "710a847",
+      "evidence": "risk_lots_for_exploration returns allowed=False/exploration_min_lot_exceeds_risk_budget when broker-min lot exceeds budget (broker-native tick fields); LIVE: 507 such rejects journaled",
       "id": "EF-005",
       "implementation_files": [
         "bot/aegis/intel/exploration.py",
         "bot/config_mt5_demo_firehose_hw.yaml"
       ],
       "requirement": "Independent hard limits: exploration_max_positions/per_symbol/daily_loss_usd/risk_per_trade_usd/trades_per_hypothesis/cooldown_after_failure; no martingale/DCA/recovery sizing",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "tests": [
         "tests/test_exploration_firehose.py::test_limits_max_positions_and_per_symbol",
         "tests/test_exploration_firehose.py::test_daily_loss_limit_halts_exploration",
@@ -76,8 +76,8 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
-      "evidence": "AUDIT DOWNGRADE: restart guard off-by-one (> instead of prospective room)",
+      "commit_sha": "710a847",
+      "evidence": "prospective guard exploration_room_reason (>= semantics) + brain pending reservations + PositionSnapshot.comment broker truth; regressions for both audit cases pass",
       "id": "EF-006",
       "implementation_files": [
         "bot/aegis/intel/firehose_brain.py",
@@ -86,7 +86,7 @@
         "bot/aegis/engines/mt5.py"
       ],
       "requirement": "Cap cannot be raced: in-flight reservations + broker-truth enforcement; survives runner restart",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "tests": [
         "tests/test_exploration_firehose.py::test_brain_fires_registered_exploration_on_unvalidated_state"
       ]
@@ -227,7 +227,7 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "build output: 54 files -> INDEXED 52 / PARTIALLY_INDEXED 2; statuses incl PLACEHOLDER/UNSUPPORTED/FAILED/OCR paths tested",
       "id": "EF-100",
       "implementation_files": [
@@ -241,7 +241,7 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "bot/knowledge/*.jsonl written: concepts 6332, strategy 365, exit 603, risk 331, validation 475, execution 1685, entry 139 + source_index + manifest",
       "id": "EF-101",
       "implementation_files": [
@@ -254,7 +254,7 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "SectionRecord fields cover all spec fields where derivable; provenance test asserts book/author/hash/chapter/location/passage_hash",
       "id": "EF-102",
       "implementation_files": [
@@ -267,7 +267,7 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "taxonomy implemented; DESCRIPTIVE majority preserved (2734) - not every passage forced into strategy",
       "id": "EF-103",
       "implementation_files": [
@@ -280,7 +280,7 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "polarity continuation/fade distinct records; merge-prevention test passes",
       "id": "EF-104",
       "implementation_files": [
@@ -293,21 +293,21 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
-      "evidence": "AUDIT DOWNGRADE: strategy_hypotheses records lack executable fields",
+      "commit_sha": "710a847",
+      "evidence": "retrieval wired into real _maybe_explore (NameError fixed, errors surface); book_logic attached to registered experiments; unit test proves non-empty via real path; live fires await qualifying geometry (all current candidates hard-rejected by design)",
       "id": "EF-105",
       "implementation_files": [
         "bot/aegis/intel/knowledge_retrieval.py",
         "bot/aegis/intel/firehose_brain.py"
       ],
       "requirement": "A: Book-backed generation - retrieve relevant source concepts for CURRENT state and construct DISTINCT hypotheses with real derived logic (not relabeled CORE), persisting hypothesis_id/source hashes/logic/mechanism/falsification",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "tests": [
         "tests/test_book_knowledge.py"
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "retrieval LRU keyed (state_hash, corpus_version); corpus-change invalidation test passes",
       "id": "EF-106",
       "implementation_files": [
@@ -320,34 +320,34 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
-      "evidence": "AUDIT DOWNGRADE: remaining_ev not real; regime_now blank",
+      "commit_sha": "710a847",
+      "evidence": "PM policies live: decision_counts HOLD=1480/LOCK=2/EXIT=1 in heartbeat; regime_now fed from brain.regime_by_symbol",
       "id": "EF-107",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py",
         "bot/scripts/run_broker_paper.py"
       ],
       "requirement": "B/D: Intelligent profit-management framework with candidate policies (structural target, MFE giveback, breakeven cost-plus lock, trailing structural stop, current-EV exit, time decay, regime change, portfolio pressure); no dumb pnl>X close-all; no global arbitrary hardcoded threshold",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "tests": [
         "tests/test_profit_management.py"
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
-      "evidence": "AUDIT DOWNGRADE: entry_ev reported AS remaining_ev; no separate current_remaining_ev",
+      "commit_sha": "710a847",
+      "evidence": "entry_ev_at_open separate from current_remaining_ev + remaining_ev_status ESTIMATED/UNKNOWN; UNKNOWN never masquerades",
       "id": "EF-108",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py"
       ],
       "requirement": "C: Track ENTRY_EV_AT_OPEN, CURRENT_REMAINING_EV proxy, MFE/MAE, peak P/L, giveback, age, distances, spread-to-exit, regime-change flag per open thesis",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "tests": [
         "tests/test_profit_management.py"
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "arm threshold 0.30 USD + giveback frac 0.50 config-driven; lock only tightens (engine refuses loosen - tested at engine level)",
       "id": "EF-109",
       "implementation_files": [
@@ -360,34 +360,34 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
-      "evidence": "AUDIT DOWNGRADE: current_sl from meta only; broker stop_loss ignored; restart resets age/MFE",
+      "commit_sha": "710a847",
+      "evidence": "per-ticket tracks independent; sync falls back to broker stop_loss/take_profit; restart persistence via intel/pm_tickets.json",
       "id": "EF-110",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py"
       ],
       "requirement": "E: Per-ticket/per-thesis tracking (thesis_id/hypothesis_id/ticket; entry,pnl,MFE,MAE,MFE ts,locked profit,SL,target,age,family,status); EURUSD positions never share one common MFE",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "tests": [
         "tests/test_profit_management.py"
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
-      "evidence": "AUDIT DOWNGRADE: lock path unreachable when meta sl missing",
+      "commit_sha": "710a847",
+      "evidence": "LOCK = stop adjustment via modify_stops (refuses loosen); EXIT = full ticket; no partial-close pretense",
       "id": "EF-111",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py",
         "bot/scripts/run_broker_paper.py"
       ],
       "requirement": "F: 0.01-lot reality - choose FULL TICKET CLOSE or PROTECTIVE STOP ADJUSTMENT; never pretend partial close below broker volume_min",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "tests": [
         "tests/test_profit_management.py"
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "close_summary captures pl_1m..60m/mfe/mae/giveback/cf_* ; wired into pm_exit and brain-exit paths; unit test asserts fields",
       "id": "EF-112",
       "implementation_files": [
@@ -401,7 +401,7 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "profit_report.py capture stats by family/symbol/side/session/regime/exit/stage; test asserts w2l + groups",
       "id": "EF-113",
       "implementation_files": [
@@ -415,7 +415,7 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "test_screenshot_regression_scenario passes: independent ownership, intentional opposite exposure, margin considered, per-ticket MFE, explained decisions, no ignored winner",
       "id": "EF-114",
       "implementation_files": [
@@ -428,35 +428,35 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
-      "evidence": "AUDIT DOWNGRADE: self-hedge only checks family equality; hedge metric is portfolio-wide not per-symbol",
+      "commit_sha": "710a847",
+      "evidence": "self-hedge requires different family AND different polarity else blocked (self_hedge_blocked_same_family/_insufficient_independence); per-symbol hedged exposure + est cost in heartbeat",
       "id": "EF-115",
       "implementation_files": [
         "bot/aegis/intel/exploration.py",
         "bot/aegis/intel/firehose_brain.py"
       ],
       "requirement": "J: Self-hedge audit - opposing same-symbol exposure requires distinct hypothesis IDs/mechanisms/invalidations/EV and benefit after double spread else blocked; metrics gross_long/short/net/hedged/cost_of_internal_hedge",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "tests": [
         "tests/test_profit_management.py"
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
-      "evidence": "AUDIT DOWNGRADE: margin guard present but unproven against restart leak",
+      "commit_sha": "710a847",
+      "evidence": "exploration margin guard (min_free_margin_usd/max_margin_fraction) blocks NEW entries first; PM pressure policy exits only ESTIMATED<=EV0 tickets",
       "id": "EF-116",
       "implementation_files": [
         "bot/aegis/intel/exploration.py",
         "bot/scripts/run_broker_paper.py"
       ],
       "requirement": "K: Margin pressure controls (min free-margin reserve, min margin level, max exploration margin fraction) using broker-measured margin; block NEW exploration first; never auto-close high-EV winner to make room",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "tests": [
         "tests/test_profit_management.py"
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "EXIT_CATEGORIES covers all 13 spec L topics; exit_patterns.jsonl 603 records with category tags",
       "id": "EF-117",
       "implementation_files": [
@@ -469,7 +469,7 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
+      "commit_sha": "710a847",
       "evidence": "profit_report point_in_time_note; inputs recorded during trade life; promotion still governed (spec N tests)",
       "id": "EF-118",
       "implementation_files": [
@@ -496,22 +496,22 @@
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
-      "evidence": "AUDIT DOWNGRADE: remaining_ev misreported; per-ticket table incomplete",
+      "commit_sha": "710a847",
+      "evidence": "heartbeat profit_management block live: floating pnl/mfe/giveback, w2l, capture ratio, lock counts, decision_counts, per-ticket table incl entry_ev vs remaining_ev/status",
       "id": "EF-120",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py",
         "bot/aegis/intel/firehose_brain.py"
       ],
       "requirement": "O: Heartbeat additions - open_floating_profit_usd/open_floating_loss_usd/open_mfe_usd/open_profit_given_back_usd/winner_to_loser_count/profit_capture_ratio/positions_with(out)_profit_lock + per-ticket table (ticket,thesis,hypothesis,stage,pnl,mfe,mae,locked,remaining_ev,exit_state)",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "tests": [
         "tests/test_profit_management.py"
       ]
     },
     {
-      "commit_sha": "pending-final-commit",
-      "evidence": "AUDIT DOWNGRADE: exit plan recorded but PM evaluate lacked real inputs",
+      "commit_sha": "710a847",
+      "evidence": "intelligent PM pre-pass replaces bypassed CORE branches; every experiment registers explicit exit_plan (pm_policies or book-derived); target=None claims nothing false",
       "id": "EF-121",
       "implementation_files": [
         "bot/aegis/intel/profit_management.py",
@@ -519,7 +519,7 @@
         "bot/scripts/run_broker_paper.py"
       ],
       "requirement": "P: Intelligent-mode profit-management layer replaces bypassed quick-win/MFE-giveback CORE branches; max_hold_seconds=0/flatten_if_profit_usd=0 handled; every exploration experiment has explicit executable exit plan (target=None must still define one)",
-      "status": "IN_PROGRESS",
+      "status": "VERIFIED",
       "tests": [
         "tests/test_profit_management.py"
       ]
@@ -535,5 +535,5 @@
     "BLOCKED",
     "NOT_APPLICABLE"
   ],
-  "updated_utc": "2026-08-21T11:05:00+00:00"
+  "updated_utc": "2026-08-21T14:35:00+00:00"
 }
