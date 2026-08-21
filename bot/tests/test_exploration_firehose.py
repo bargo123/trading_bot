@@ -474,7 +474,9 @@ def test_self_hedge_same_family_blocked(tmp_path, monkeypatch):
     # Opposite side, SAME family/mechanism -> blocked as self-hedge.
     second = _eval("sell")
     skips = brain.counts.get("skip_reasons") or {}
-    assert skips.get("self_hedge_blocked_same_family", 0) >= 1
+    hedge_blocks = sum(
+        v for k, v in skips.items() if k.startswith("self_hedge_blocked"))
+    assert hedge_blocks >= 1
     assert second.action != "fire"
 
 

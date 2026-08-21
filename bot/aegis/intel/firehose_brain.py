@@ -739,6 +739,47 @@ class IntelligentFirehoseBrain:
         if not portfolio_ok:
             return None, portfolio_reason or "portfolio_risk"
 
+        # FAST_TURNOVER_FIREHOSE: generate micro candidates with tight
+        # micro-structure stops that fit the risk budget.
+        from aegis.intel.fast_firehose import (
+            check_entry_economics,
+            generate_micro_candidates,
+        )
+
+        m1_atr = max(abs(entry - float(invalidation)) * 0.3, pip * 2)
+        m1_ret = (entry - float(invalidation)) / max(pip, 1e-10) * pip * 0.1
+        tgt_f = float(target) if target is not None else entry + pip * 10
+        inv_f = float(invalidation)
+        range_mid = (tgt_f + inv_f) / 2.0
+        range_hw = abs(tgt_f - inv_f) / 2.0
+
+        bid_px = entry - spread_price / 2 if side == "buy" else entry
+        ask_px = entry + spread_price / 2 if side == "buy" else entry - (-spread_price / 2)
+
+        micro_cands = generate_micro_candidates(
+            symbol=symbol,
+            regime=regime_label or regime or "range",
+            session=session or "london",
+            m15_direction="up" if side == "buy" else "sell",
+            m5_direction=side,
+            m15_resistance=tgt_f, m15_support=inv_f,
+            range_mid=range_mid, range_half_width=range_hw,
+            m1_close=entry, prev_m1_close=entry - pip * 2,
+            m1_open=entry - pip, m1_low=entry - pip * 3, m1_high=entry + pip * 3,
+            m1_atr=m1_atr, m1_return_30s=m1_ret,
+            compression_ratio=0.4,
+            bid=bid_px, ask=ask_px,
+            spread_pips=max(0.1, round(spread_price / max(pip, 1e-10), 1)),
+        )
+        if micro_cands:
+            mc = micro_cands[0]
+            entry = mc.entry_price
+            invalidation = mc.invalidation
+            target = mc.target
+            setup = mc.family
+            book_logic["firehose_family"] = mc.family
+            book_logic["micro_mechanism"] = mc.mechanism
+
         spec = symbol_spec or {}
         sizing = risk_lots_for_exploration(
             max_risk_usd=self._exploration_limits.max_risk_per_trade_usd,
