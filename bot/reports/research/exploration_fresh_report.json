@@ -1,6 +1,6 @@
 {
   "schema": "exploration_fresh_report.v2",
-  "generated_utc": "2026-08-22T01:07:42.267191+00:00",
+  "generated_utc": "2026-08-22T01:34:33.830328+00:00",
   "runner_pid": 6604,
   "runner_status": "running",
   "mt5_demo": true,
@@ -16,7 +16,7 @@
     "skip": 144
   },
   "pm_decisions": {
-    "HOLD": 3276,
+    "HOLD": 3583,
     "LOCK": 1,
     "EXIT": 4,
     "REDUCE": 0
@@ -38,7 +38,7 @@
       "remaining_ev": 0.0,
       "remaining_ev_status": "ESTIMATED",
       "exit_state": "open",
-      "age_s": 132.6
+      "age_s": 1746.1
     }
   ],
   "exposure": {

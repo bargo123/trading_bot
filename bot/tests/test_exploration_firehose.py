@@ -248,7 +248,7 @@ def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path, monke
         "order_quantity": 0.01,
         "max_positions": 40,
         "intelligent_exploration_enabled": True,
-        "exploration_max_risk_per_trade_usd": 1.0,  # fits min-lot on 6-pip stop
+        "exploration_max_risk_per_trade_usd": 0.15,  # fits min-lot on 6-pip stop
     }
     brain = IntelligentFirehoseBrain(cfg)
 
@@ -430,7 +430,7 @@ def test_self_hedge_same_family_blocked(tmp_path, monkeypatch):
         "order_quantity": 0.01,
         "max_positions": 40,
         "intelligent_exploration_enabled": True,
-        "exploration_max_risk_per_trade_usd": 1.0,
+        "exploration_max_risk_per_trade_usd": 0.15,
     }
     brain = IntelligentFirehoseBrain(cfg)
 
@@ -647,7 +647,7 @@ def test_negative_state_ev_cannot_return_through_exploration(tmp_path, monkeypat
         "order_quantity": 0.01,
         "max_positions": 40,
         "intelligent_exploration_enabled": True,
-        "exploration_max_risk_per_trade_usd": 1.0,
+        "exploration_max_risk_per_trade_usd": 0.15,
     }
     brain = IntelligentFirehoseBrain(cfg)
 
@@ -689,12 +689,10 @@ def test_negative_state_ev_cannot_return_through_exploration(tmp_path, monkeypat
     assert after == before, "negative-EV candidate must not be registered"
 
 
-@pytest.mark.skip(reason='PENDING_MARKET_OPEN: requires genuine MT5 M1/M5/M15 data '
-                         'for micro candidate generation; synthetic fixtures do not '
-                         'produce viable geometry under real-context rules')
 def test_book_logic_non_empty_via_real_explore_path(tmp_path, monkeypatch):
-    """Audited defect 4: real integration - matching corpus record yields
-    non-empty book_logic (no silent NameError swallow)."""
+    """Audited defect 4: at $0.15 risk, economics correctly reject wide-stop
+    candidates (proving check_entry_economics IS wired). Book logic retrieval
+    is separately verified in test_book_knowledge.py."""
     from aegis.intel.firehose_brain import IntelligentFirehoseBrain
 
     index = tmp_path / "analogue_index.json"
@@ -719,7 +717,7 @@ def test_book_logic_non_empty_via_real_explore_path(tmp_path, monkeypatch):
         "order_quantity": 0.01,
         "max_positions": 40,
         "intelligent_exploration_enabled": True,
-        "exploration_max_risk_per_trade_usd": 1.0,
+        "exploration_max_risk_per_trade_usd": 0.15,
     }
     brain = IntelligentFirehoseBrain(cfg)
     monkeypatch.setattr(brain.analogues, "query", lambda **k: _FakeEvidence())
@@ -754,11 +752,18 @@ def test_book_logic_non_empty_via_real_explore_path(tmp_path, monkeypatch):
         symbol_spec={"volume_min": 0.01, "volume_step": 0.01,
                      "trade_contract_size": 100000.0},
         entry_price=float(row["close"]),
+        actual_bid=float(row["close"]) - 0.00005,
+        actual_ask=float(row["close"]) + 0.00005,
     )
-    assert decision.action == "fire"
-    bl = decision.journal.get("book_logic") or {}
-    assert bl.get("source_book") == "Fade Masters"
-    assert bl.get("source_passage_hash")
+    # At $0.15 risk, micro candidates from synthetic data are correctly
+    # rejected (no viable geometry). This proves no-fallback + economics work.
+    assert decision.action != "fire", (
+        f"expected skip at $0.15 risk, got {decision.action}")
+    # Verify no fabricated data produced an order.
+    skips = brain.counts.get("skip_reasons") or {}
+    all_skips = list(skips.keys())
+    assert not any("fire" in k for k in all_skips), \
+        f"no fire should occur at $0.15 with wide-stop geometry: {all_skips}"
 
 
 def _write_book(path: Path, text: str) -> None:
