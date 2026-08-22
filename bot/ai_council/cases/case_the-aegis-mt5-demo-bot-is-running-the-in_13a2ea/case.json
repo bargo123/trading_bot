@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-22T03:33:22.559666+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_13a2ea\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 28.55,
+          "finished_utc": "2026-08-22T03:36:11.882376+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T03:35:43.329063+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T03:36:11.884389+00:00",
+        "text": "Replaying the already-sealed holdout to select acceptance thresholds guarantees this is its last clean use\u2014every future challenger compared against the same burned sample compounds selection bias, so the 10% expectancy gain is indistinguishable from multiple-comparison noise without a fresh out-of-sample segment, bootstrap CIs, and a minimum eligible-signal count. \"Two consecutive qualifying evaluations\" and \"qualifying\" are undefined, and max-drawdown non-worsening on a single replay path is statistically meaningless at these sample sizes. Most seriously, \"accept the candidate\" via bespoke thresholds sidesteps the governed promotion gates\u2014the council cannot self-declare acceptance criteria outside `promote.py`; the correct outcome here is \"eligible for gated evaluation,\" nothing more. Safety hygiene (no live config edits, registry logging, no champion mutation) is otherwise compliant."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_13a2ea\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 10.22,
+          "finished_utc": "2026-08-22T03:35:43.313332+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T03:35:33.090345+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T03:35:43.313332+00:00",
+        "text": "The fixed ~0.12 cap is tuned directly from the same reconciled sample it claims to explain, creating threshold-selection overfitting; it also assumes losses can be capped there despite gaps, slippage, and execution latency. A \u2265500-exit holdout lacks a preregistered power analysis, cost model, regime stratification, and confidence bounds, while \u201cbinding constraint\u201d is unmeasurable without a counterfactual policy and selection-bias controls for skipped states. Logging hypothetical TP-class outcomes for rejected states risks lookahead and post-selection bias unless outcomes, analogue assignment, and timestamps are frozen prospectively."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T03:37:18.179699+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_320478",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_320478 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_13a2ea",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_13a2ea\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 62.71,
+        "finished_utc": "2026-08-22T03:34:34.898595+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T03:33:32.184091+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T03:34:34.898595+00:00",
+      "text": "Proposal: In the next research cycle, run an exit-research challenger (via ExperimentRegistry + sealed holdout, no champion change) that caps per-trade loss at ~2\u00d7 the current average win (~0.12), because the reconciled demo sample (outcome_learning.json, 2,518 exits) shows win_rate 0.68 but payoff_ratio 0.34 with tail_loss 1.21 erasing ~20 average wins \u2014 i.e., the entire negative expectancy (-0.012, PF 0.77) comes from the fat left tail of 96 SL exits averaging -0.55. Falsifiable prediction: on the next \u2265500 fresh demo exits, the capped-loss variant raises net-of-cost expectancy above 0 and cuts wins_erased_by_tail_loss below 5, while win rate stays \u22650.60. Secondary check: since all 16,261 firehose skips are `state_not_in_validated_set` (firehose_throughput.json, skip_rate 0.79), separately log which skipped state-cluster analogues would have hit TP-class outcomes (+0.107 expectancy on n=447) to test whether the validated-state set, not the exits, is the binding constraint. If either prediction fails on the holdout, record the rejection and keep the champion unchanged."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_13a2ea\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.48,
+        "finished_utc": "2026-08-22T03:35:06.294064+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T03:34:53.815892+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T03:35:06.294064+00:00",
+      "text": "Test a stricter validated-state candidate that requires two consecutive qualifying evaluations before a DEMO signal becomes eligible. Replay the current sealed holdout with identical spread/slippage assumptions and compare it against the champion\u2019s existing gate. Accept the candidate only if net expectancy improves by at least 10% without reducing eligible signals by more than 25% or worsening maximum drawdown; otherwise reject and record the result in the ExperimentRegistry. Do not modify or promote the champion during this cycle."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_13a2ea\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 10.89,
+        "finished_utc": "2026-08-22T03:37:18.148090+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T03:37:07.255960+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T03:37:18.148090+00:00",
+      "text": "Define a qualifying evaluation using the existing champion gate\u2019s exact validated-state predicates, and require those predicates to pass on two consecutive scheduled evaluations before a DEMO signal becomes eligible. Treat the current sealed holdout as burned after this preregistered comparison, require a fresh untouched out-of-sample segment, a prespecified minimum eligible-signal count, and bootstrap confidence intervals for net expectancy and drawdown differences under identical spread/slippage assumptions. The candidate may advance only if the confidence interval supports at least a 10% net-expectancy improvement, eligible signals decline by no more than 25%, and drawdown risk is not materially worse. Record all specifications and outcomes in the ExperimentRegistry, and describe success only as eligibility for evaluation through every governed gate in `promote.py`. Do not edit live configuration or modify or promote the champion during this cycle."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_13a2ea\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 55.33,
+        "finished_utc": "2026-08-22T03:37:07.223961+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T03:36:11.896163+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T03:37:07.233394+00:00",
+      "text": "In the next research cycle, run an exit-research challenger (via ExperimentRegistry + sealed holdout, champion unchanged) whose cap is not tuned on the full reconciled sample: split the 2,518 exits chronologically, select the best of three preregistered caps {0.10, 0.12, 0.15} on the earlier ~70% training slice only, freeze it, and model execution pessimistically \u2014 fill at cap plus measured median demo slippage and a gap penalty for high-volatility bars \u2014 so the estimate already absorbs gaps, latency, and spread rather than assuming frictionless stops. Size the sealed holdout via a preregistered power analysis (80% power to detect a +0.02 net-of-cost expectancy shift at \u03b1=0.05, hence \u2265500 exits or more as required), report bootstrap 95% CIs stratified by regime (trend/range/high-volatility), and declare success only if the overall CI excludes zero, wins_erased_by_tail_loss falls below 5, and win_rate holds \u22650.60 in every regime bucket. For the firehose-skip question, drop the causal \"binding constraint\" claim and replace it with a prospective audit: from cycle T0, freeze every skip's state-cluster ID, feature vector, timestamp, and analogue assignments before any outcome exists, then \u2014 only after those hypothetical trades mature \u2014 score skipped clusters against a matched contemporaneous control set of validated-state trades (TP-class baseline +0.107, n=447), controlling selection bias through like-for-like period and cluster matching. If either arm fails its preregistered criterion on the holdout, the rejection is recorded and the champion remains unchanged."
+    }
+  },
+  "status": "decided"
+}

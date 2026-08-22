@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-22T04:37:56.308582+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_873494\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 31.59,
+          "finished_utc": "2026-08-22T04:43:49.092391+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T04:43:17.507066+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T04:43:49.092391+00:00",
+        "text": "Flawed by construction: deriving the suppression threshold from the *current median* of the very holdout you then replay is in-sample threshold fitting \u2014 the filter's parameter is tuned on the test set, guaranteeing optimistic bias, and re-replaying an already-sealed holdout for yet another challenger compounds multiple-testing erosion of what little validity it had left. \"Improve\" carries no minimum effect size or significance test, profit factor and drawdown on ~30 retained trades are statistically meaningless, and \"validated-state confidence\" is undefined (median over which window, computed at what timestamp \u2014 entry-time features or peeking?). Finally, acceptance criteria are self-declared rather than routed through every gate in `promote.py`; per governance, any promotion must go via `research_promote_champion.py`'s full checks, not this ad-hoc criterion list \u2014 as written, this is reject-on-safety-procedure grounds regardless of results."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_873494\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.87,
+          "finished_utc": "2026-08-22T04:43:17.488983+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T04:43:05.620820+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T04:43:17.491643+00:00",
+        "text": "The proposal risks selection and multiple-testing overfit because \u201cstratified sample\u201d and \u201ccluster\u201d definitions are unspecified, and searching many symbol\u00d7session\u00d7direction groups makes a nominal sealed holdout insufficient without multiplicity correction and untouched final validation. The \u2265100-trade, +0.05R, and PF \u22651.3 thresholds lack power analysis, confidence bounds, regime stability tests, and an independent temporal holdout; one cycle may not contain enough representative gated-out outcomes to make the claimed bidirectional falsifiability measurable. It also omits explicit lookahead/audit checks proving counterfactual entries and exits were observable at decision time and does not state that every replay\u2014including failures and rejected clusters\u2014will be recorded in `ExperimentRegistry`, as required."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T04:44:31.353272+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_eeecb1",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_eeecb1 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_873494",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_873494\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 244.41,
+        "finished_utc": "2026-08-22T04:42:11.646005+00:00",
+        "mode": "REAL",
+        "model": "opencode/x-preview-f-free",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T04:38:07.237366+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T04:42:11.661935+00:00",
+      "text": "Proposal: Build an offline **counterfactual shadow ledger for the validated-state gate**: the 2026\u201108\u201122 throughput report shows the gate rejects 79% of the firehose (`state_not_in_validated_set` = 16,261/20,573, all skips), while the states it admits still run negative expectancy (-0.012R overall, SL exits at -0.547R erasing ~20x average win per outcome_learning.md) \u2014 so replay a stratified sample of gated-out symbol\u00d7session\u00d7direction states through the identical exit/cost model on demo data only, and pre-register the admission rule: promote any skipped-state cluster as a challenger only if sealed-holdout net-of-cost expectancy \u2265 +0.05R over \u2265100 trades with PF \u2265 1.3; otherwise reject expansion and confirm the gate is already conservative. This is falsifiable in both directions within one research cycle and follows the pre-registration discipline of *Evidence-Based Technical Analysis* (2011) and *Systematic Trading* (2015). No live trading, no YAML edits, no champion change; the challenger would still pass every `promote.py` gate before ever touching `intelligent_champion.json`."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_873494\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 9.66,
+        "finished_utc": "2026-08-22T04:42:40.286141+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T04:42:30.630399+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T04:42:40.290338+00:00",
+      "text": "Test a DEMO-only challenger that suppresses entries when the validated-state confidence is below its current median, while leaving all other champion logic unchanged. Replay the same sealed holdout with identical spread and slippage assumptions; accept the candidate only if net expectancy and profit factor improve while maximum drawdown does not increase, with at least 30 trades retained. Record the result in the ExperimentRegistry and reject without promotion if any criterion fails."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_873494\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.43,
+        "finished_utc": "2026-08-22T04:44:31.337354+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T04:44:19.905377+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T04:44:31.337354+00:00",
+      "text": "Test a DEMO-only challenger using a pre-registered confidence threshold derived exclusively from a training window, where validated-state confidence is computed from entry-time features only and frozen before evaluation. Evaluate once on a fresh, untouched sealed holdout with identical spread and slippage assumptions, preserving that holdout from further challenger reuse and accounting for multiple testing. Require pre-specified, practically meaningful effect sizes and uncertainty bounds for net expectancy, profit factor, and maximum drawdown, with a substantially larger minimum trade count than 30. Record the complete experiment in `ExperimentRegistry`, including failures, and permit promotion only through `research_promote_champion.py` after every gate in `promote.py` passes; otherwise retain the challenger record and reject it without promotion."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_873494\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 30.76,
+        "finished_utc": "2026-08-22T04:44:19.871259+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T04:43:49.108327+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T04:44:19.881492+00:00",
+      "text": "Revised proposal: Replay a **pre-specified** stratified sample of gated-out states through the identical demo-only exit/cost model, where strata are defined ex ante as the full symbol\u00d7session\u00d7direction grid with a minimum of 50 gated-out states per cell (no outcome-informed sampling), and \"clusters\" are exactly these cells\u2014no post-hoc grouping. Because this is a multiplicity-rich search, admission requires Benjamini\u2013Hochberg-corrected net-of-cost expectancy with a one-sided 95% lower bound \u2265 +0.05R over \u2265150 trades (n set by a power analysis targeting 80% detection of +0.05R at the corrected \u03b1, PF bootstrap CI excluding 1.0), stability across volatility-regime terciles, and confirmation on an untouched final temporal holdout (most recent 20% of bars) evaluated once after challenger selection is frozen. If no cell clears these gates, or if the cycle lacks the sample size the power analysis demands, the result is recorded as \"insufficient evidence\" rather than either confirmation or expansion\u2014falsifiability is therefore bounded by data availability, which the registry will state explicitly. Every replay entry/exit must use only features observable at its decision timestamp, verified by an automated lookahead audit comparing feature timestamps against bar close times before any expectancy is computed. All replays\u2014including failed clusters, rejects, and the insufficient-evidence case\u2014are written to `ExperimentRegistry` (`bot/research/experiments.sqlite`) with sealed holdout hashes, so nothing is silently dropped; no live trading, YAML edits, or champion changes occur, and any surviving challenger still passes every `promote.py` gate."
+    }
+  },
+  "status": "decided"
+}

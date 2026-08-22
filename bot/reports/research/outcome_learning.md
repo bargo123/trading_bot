@@ -2,19 +2,19 @@
 
 Label: `research_proxy`. Observed demo outcomes; not a profit guarantee.
 
-- rows: 3369
-- exits: 2517
+- rows: 3370
+- exits: 2518
 
 ## Payoff geometry
 
-- win_rate: 0.6750099324592769
-- expectancy: -0.0122248708780294
-- profit_factor: 0.7686640102247951
-- avg_win: 0.0601765744555621
+- win_rate: 0.6751389992057188
+- expectancy: -0.012152501985702937
+- profit_factor: 0.7699421096158184
+- avg_win: 0.060241176470588235
 - avg_loss: -0.17664010624169987
-- payoff_ratio: 0.3406733370802064
-- wins_erased_by_average_loss: 2.9353632678467143
-- wins_erased_by_tail_loss: 20.107492175273865
+- payoff_ratio: 0.3410390638474772
+- wins_erased_by_average_loss: 2.932215414616637
+- wins_erased_by_tail_loss: 20.085929108485498
 - tail_loss: 1.21
 - cosmetic_win_rate: False
 
@@ -35,12 +35,12 @@ Label: `research_proxy`. Observed demo outcomes; not a profit guarantee.
 
 ## By side
 
-- sell: n=1270 exp=-0.011614173228346457 PF=0.794511005851212
+- sell: n=1271 exp=-0.011471282454760031 PF=0.7968793535803845
 - buy: n=1247 exp=-0.012846832397754611 PF=0.7383635472807447
 
 ## By close reason
 
 - tp: n=447 exp=0.1069351230425056 PF=None
 - unknown: n=47 exp=3.2479928911906176e-18 PF=1.0
-- manual: n=1927 exp=-0.013528801245459264 PF=0.6408596225375396
+- manual: n=1928 exp=-0.013433609958506223 PF=0.6432015429122468
 - sl: n=96 exp=-0.546875 PF=0.0

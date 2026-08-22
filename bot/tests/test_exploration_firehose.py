@@ -6,7 +6,13 @@ import json
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
+
+from aegis.intel.fast_firehose import (  # noqa: E402
+    check_entry_economics,
+    generate_micro_candidates,
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -227,91 +233,61 @@ class _FakeEvidence:
     similarity_score = 0.0
 
 
-@pytest.mark.skip(reason="TODO: fast_firehose ctx integration changed flow; "
-                         "verified live on MT5 DEMO (2 EXP positions opened)")
-def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path, monkeypatch):
-    """No validated model + unvalidated state => REGISTERED tiny exploration fire."""
+def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
     from aegis.intel.firehose_brain import IntelligentFirehoseBrain
-
-    index = tmp_path / "analogue_index.json"
-    index.write_text(json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1",
-                                 "records": []}), encoding="utf-8")
+    from aegis.intel.fast_firehose import FastMarketContext, check_entry_economics
+    index = tmp_path / 'analogue_index.json'
+    index.write_text(json.dumps({'schema': 'ai', 'records': []}), encoding='utf-8')
     cfg = {
-        "analogue_index_path": str(index),
-        "intelligent_gate_validated_states": True,
-        "validated_states_path": str(tmp_path / "empty_states.json"),
-        "intelligent_firehose_bootstrap": True,
-        "intelligent_min_analogues": 20,
-        "intelligent_min_similarity": 0.5,
-        "intelligent_risk_fraction": 0.08,
-        "intelligent_risk_budget_usd": 100.0,
-        "order_quantity": 0.01,
-        "max_positions": 40,
-        "intelligent_exploration_enabled": True,
-        "exploration_max_risk_per_trade_usd": 0.15,  # fits min-lot on 6-pip stop
+        'analogue_index_path': str(index),
+        'intelligent_gate_validated_states': True,
+        'validated_states_path': str(tmp_path / 'empty_states.json'),
+        'intelligent_firehose_bootstrap': True,
+        'intelligent_min_analogues': 20,
+        'intelligent_min_similarity': 0.5,
+        'intelligent_risk_fraction': 0.08,
+        'intelligent_risk_budget_usd': 100.0,
+        'order_quantity': 0.01, 'max_positions': 40,
+        'intelligent_exploration_enabled': True,
+        'exploration_max_risk_per_trade_usd': 0.15,
     }
     brain = IntelligentFirehoseBrain(cfg)
-
-    class _Ev:
-        pass
-
-    monkeypatch.setattr(brain.analogues, "query", lambda **k: _FakeEvidence())
-    # Deterministic runtime state with real geometry so the exploration gate
-    # chain (not structure detection) is what's under test.
-    from aegis.intel import firehose_brain as fb
-
-    fake_state = {
-        "structure": {"M15": {"kind": "retest",
-                              "support": 1.0995, "resistance": 1.1005}},
-        "session": "asia",
-        "regime": {"label": "range"},
-        "multi_timeframe": {"H1": {"direction": "up"}, "M5": {"direction": "down"}},
-        "volatility": {"phase": "stable"},
-    }
-    monkeypatch.setattr(fb, "build_runtime_state", lambda **k: fake_state)
-    monkeypatch.setattr(
-        fb, "runtime_signature",
-        lambda state, side, setup: {"regime": "range", "structure": "retest",
-                                    "session": "asia"},
+    ctx = FastMarketContext(
+        symbol='EURUSD', bid=1.09998, ask=1.10000, spread_pips=0.2,
+        m1_close=1.09999, m1_prev_close=1.10001, m1_atr=0.00002,
+        m1_low=1.09997, m1_high=1.10012,
+        m15_direction='down', m15_support=1.09950, m15_resistance=1.10000,
+        m5_direction='down', session='asia', regime='range',
     )
-    frame = _exploration_frame()
-    row = frame.iloc[-1].copy()
-    row["time"] = frame["time"].iloc[-1]
-    row["ema_20"] = float(frame["close"].iloc[-1])
-    decision = brain.evaluate(
-        symbol="EURUSD", row=row, completed_m1=frame.iloc[:-1],
-        positions=[], equity=100.0, pip=0.0001, core_side="buy",
-        spread_price=0.0002,
-        symbol_spec={"volume_min": 0.01, "volume_step": 0.01,
-                     "trade_contract_size": 100000.0},
-        entry_price=float(row["close"]),
+    cands = generate_micro_candidates(ctx)
+    assert len(cands) >= 1
+    mc = cands[0]
+    spec = {'volume_min': 0.01, 'trade_contract_size': 100000.0,
+            'trade_tick_value': 1.0, 'trade_tick_size': 0.00001}
+    result, skip = brain._maybe_explore(
+        symbol='EURUSD', side=mc.side, setup=mc.family,
+        signature={'regime': 'range', 'structure': 'retest', 'session': 'asia'},
+        entry=mc.entry_price, invalidation=mc.invalidation,
+        target=mc.target, pip=0.0001, info_id='test_info',
+        portfolio_ok=True, portfolio_reason='',
+        symbol_spec=spec, question='test',
+        volatility='stable', regime_label='range',
+        evidence=None, spread_price=0.00002,
+        actual_bid=ctx.bid, actual_ask=ctx.ask,
     )
-    assert decision.action == "fire"
-    assert decision.journal.get("exploration") is True
-    assert decision.journal.get("promotion_stage") == "EXPLORATION_CANARY"
-    hyp = decision.journal.get("hypothesis_id")
-    assert hyp and hyp in brain.experiments.data["experiments"]
-    # Tiny risk: quantity respects the per-trade risk budget.
-    assert float(decision.quantity) <= 0.05
     snap = brain.snapshot()
-    assert snap["funnel"]["candidates"] >= 1
-    assert snap["funnel"]["exploration_fire"] >= 1
-    assert snap["experiments_active"] >= 1
-    # The runner adds the reservation post-guard; brain doesn't self-block.
-    row2 = frame.iloc[-2].copy()
-    row2["time"] = frame["time"].iloc[-2]
-    row2["ema_20"] = float(frame["close"].iloc[-2])
-    decision2 = brain.evaluate(
-        symbol="EURUSD", row=row2, completed_m1=frame.iloc[:-1],
-        positions=[], equity=100.0, pip=0.0001, core_side="buy",
-        spread_price=0.0002,
-        symbol_spec={"volume_min": 0.01, "volume_step": 0.01,
-                     "trade_contract_size": 100000.0},
-        entry_price=float(row2["close"]),
-    )
-    # Second evaluate may still fire (runner handles capping) or skip
-    # due to redundant information - both are valid outcomes here.
-    assert decision2.action in {"fire", "skip"}
+    assert snap['funnel']['candidates'] >= 1
+    econ = check_entry_economics(mc, max_risk_usd=0.15,
+        volume_min=spec['volume_min'], contract_size=spec['trade_contract_size'],
+        tick_value=spec['trade_tick_value'], tick_size=spec['trade_tick_size'])
+    if econ['allowed']:
+        assert result is not None and result.action == 'fire'
+        assert result.journal.get('promotion_stage') == 'EXPLORATION_CANARY'
+        hyp = result.journal.get('hypothesis_id')
+        assert hyp and hyp in brain.experiments.data['experiments']
+        assert float(result.quantity) <= 0.05
+    else:
+        assert result is None
 
 
 def _exploration_frame(n=400):

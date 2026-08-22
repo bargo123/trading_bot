@@ -692,13 +692,6 @@ class IntelligentFirehoseBrain:
         sl_dist = abs(float(entry) - float(invalidation))
         if sl_dist <= 0:
             return None, "exploration_no_invalidation"
-        if target is not None:
-            tp_dist = abs(float(target) - float(entry))
-            if tp_dist / sl_dist < 0.25:
-                return None, "exploration_destructive_payoff"
-            # SPREAD_FAILURE: target must clear the live spread with room.
-            if spread_price is not None and tp_dist <= 2.0 * float(spread_price):
-                return None, "exploration_spread_failure"
         # NEGATIVE_STATE_EV: measured analogue evidence against this state is
         # a HARD rejection - economics never returns through exploration.
         ev_obj = evidence
@@ -790,14 +783,18 @@ class IntelligentFirehoseBrain:
         mtf = st.get("multi_timeframe") or {}
         m15_struct = structure.get("M15") or {}
         m5_struct = structure.get("M5") or {}
+        m15_kind = str(m15_struct.get("kind") or "")
         m5_mtf = mtf.get("M5") or {}
         m5_dir = str(m5_mtf.get("direction") or "")  # genuine M5 direction
-        # M15 direction not directly available; infer from structure kind.
-        m15_kind = str(m15_struct.get("kind") or "")
         m15_sup = float(m15_struct["support"]) if m15_struct.get("support") else None
         m15_res = float(m15_struct["resistance"]) if m15_struct.get("resistance") else None
         m15_mid = (m15_sup + m15_res) / 2.0 if m15_sup and m15_res else None
         m15_hw = abs(m15_res - m15_sup) / 2.0 if m15_sup and m15_res else None
+        # Infer M15 direction from completed bar's position within S/R range.
+        m15_dir = None
+        if m15_sup is not None and m15_res is not None and m1_c:
+            mid = (m15_sup + m15_res) / 2.0
+            m15_dir = "up" if m1_c > mid else "down"
         regime_raw = st.get("regime")
         regime_label_str = str(regime_raw.get("label", "") if isinstance(regime_raw, dict) else regime_raw or "")
 
@@ -811,14 +808,15 @@ class IntelligentFirehoseBrain:
             m1_atr=m1_atr, m1_volume=m1_vol,
             m1_range=(m1_h - m1_l) if m1_h and m1_l else None,
             m1_body=abs(m1_c - m1_o) if m1_c and m1_o else None,
-            m15_direction=m15_kind if m15_kind in ("up", "down") else None,
+            m15_direction=m15_dir,
             m15_structure=m15_kind,
             m15_support=m15_sup,
             m15_resistance=m15_res,
             m15_range_mid=m15_mid, m15_range_half_width=m15_hw,
             m5_direction=m5_dir or None,
             m5_structure=str(m5_struct.get("kind") or "") if m5_struct.get("kind") else None,
-            return_30s=None,  # requires tick history; skip if unavailable
+            return_30s=(m1_c - prev_close) if prev_close is not None and m1_c else None,
+            return_60s=round((m1_c - (float(completed_m1["close"].iloc[-3]) if completed_m1 is not None and len(completed_m1) >= 3 else m1_c)) / max(pip, 1e-10), 2) if completed_m1 is not None and len(completed_m1) >= 3 else None,
             session=session or None,
             regime=regime_label_str or regime_label or regime or None,
         )
@@ -850,6 +848,13 @@ class IntelligentFirehoseBrain:
         # Select strongest: highest payoff among economically viable.
         viable.sort(key=lambda c: -c.payoff)
         mc = viable[0]
+
+        # Structural payoff/spread checks apply to the FINAL candidate's
+        # own geometry, not the legacy structural geometry.
+        if mc.target_pips / max(mc.stop_pips, 0.1) < 0.25:
+            return None, "exploration_destructive_payoff"
+        if spread_price is not None and mc.target_pips <= 2.0 * float(spread_price) / max(pip, 1e-10):
+            return None, "exploration_spread_failure"
 
         # FINAL CANDIDATE OWNS ALL EXECUTION IDENTITY.
         side = mc.side          # may differ from legacy hint!

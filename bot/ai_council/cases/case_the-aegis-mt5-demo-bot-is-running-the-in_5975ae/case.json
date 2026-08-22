@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-22T12:34:50.497606+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5975ae\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 27.75,
+          "finished_utc": "2026-08-22T12:39:34.082757+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T12:39:06.329124+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T12:39:34.098551+00:00",
+        "text": "Replaying the already-sealed holdout is textbook holdout contamination\u2014those labels were consumed validating the champion, so any \"improvement\" measured there is selection noise, not evidence, and repeated replays across challengers demand a multiple-testing correction this proposal lacks. The 10%-expectancy bar carries no confidence interval or significance test, so you'd be promoting on point estimates from a single parameter perturbation; worse, raising the sample threshold changes *which* trades qualify, meaning the challenger is compared against champion results computed on a different trade population\u2014an apples-to-oranges comparison that also makes the 70% trade-count floor ill-defined. Finally, \"accept\" as defined here substitutes ad-hoc criteria for the governed gates in `bot/aegis/research/promote.py`, which is a governance violation regardless of whether the numbers look good."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5975ae\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 15.12,
+          "finished_utc": "2026-08-22T12:39:06.313247+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T12:38:51.189448+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T12:39:06.313247+00:00",
+        "text": "The cap is calibrated from the same observed outcomes (\u201c~2\u00d7 average win\u201d and worst-decile losses), creating material selection and overfitting risk unless its value is frozen using training folds only. \u201cWithout materially cutting\u201d win rate is undefined, and aggregate expectancy/PF alone omit confidence intervals, regime stability, sample size per fold, and sensitivity testing across cap values. Most importantly, exit truncation cannot be validated from reconciled final exits unless intratrade paths and executable stop fills are available; otherwise the claimed capped outcomes are counterfactual, potentially look-ahead-biased, and not genuinely net of slippage."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T12:40:22.657883+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_4ba29d",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_4ba29d for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_5975ae",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5975ae\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 177.53,
+        "finished_utc": "2026-08-22T12:37:59.295624+00:00",
+        "mode": "REAL",
+        "model": "opencode/x-preview-f-free",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T12:35:01.763100+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T12:37:59.295624+00:00",
+      "text": "Proposal: Run the currently dormant `exit_research` module (it shows `n_rows: 0` in ml_pipeline.json) over the 2,518 reconciled demo exits to test one challenger: a volatility-scaled hard loss cap set at ~2\u00d7 the observed average win (~0.12 R, vs today's avg_loss of \u22120.177 and tail_loss of 1.21 that erases ~20 winners). Falsifiable prediction: capping the worst-decile losers flips aggregate net expectancy from \u22120.012/PF 0.77 to \u2265 0 on the sealed holdout, net of measured p75 costs, without materially cutting the 67.5% win rate from TP-style exits (+0.107 expectancy) that already work. Evaluate strictly via the existing cost-aware walk-forward and all gates in `promote.py`, registered in `ExperimentRegistry`; a rejected challenger stays on record and the champion remains untouched. This targets the single dominant measured failure \u2014 payoff geometry (payoff_ratio 0.34), not entry selection \u2014 where only 2 of 43 shortlisted strategies survive validation anyway."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5975ae\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.0,
+        "finished_utc": "2026-08-22T12:38:25.199059+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T12:38:13.194327+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T12:38:25.199059+00:00",
+      "text": "Test a challenger that raises the validated-state minimum sample threshold by 25%, leaving all other logic and the champion unchanged. Replay the same sealed holdout with identical spread and slippage assumptions, recording the experiment in `ExperimentRegistry`. Accept the candidate only if net expectancy improves by at least 10% without increasing maximum drawdown or reducing trade count below 70% of the champion\u2019s; otherwise reject it."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5975ae\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.09,
+        "finished_utc": "2026-08-22T12:40:22.625855+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T12:40:10.539013+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T12:40:22.641863+00:00",
+      "text": "Test the 25%-higher validated-state sample threshold on a fresh, untouched, time-forward holdout, with the champion and challenger evaluated over the same eligible decision opportunities under identical spread and slippage assumptions. Pre-register the single comparison in `ExperimentRegistry`, define trade-count retention against the champion\u2019s trades on that shared evaluation frame, and report paired net-expectancy and maximum-drawdown differences with confidence intervals and a significance test; if multiple challengers are tested, apply an appropriate multiplicity correction. Treat the 10% net-expectancy improvement and 70% trade-count retention as screening criteria, not promotion authority. Preserve the champion unless every governed gate in `bot/aegis/research/promote.py` passes, and retain any rejected challenger and its results in the required research records."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5975ae\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 36.41,
+        "finished_utc": "2026-08-22T12:40:10.529220+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T12:39:34.114613+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T12:40:10.529220+00:00",
+      "text": "Revised proposal: Run the dormant `exit_research` module over the 2,518 reconciled demo exits to test one challenger \u2014 a hard loss cap whose value is frozen from training folds only (selected via a pre-registered rule on in-fold outcomes, e.g., ~2\u00d7 in-fold average win), applied out-of-sample through the existing cost-aware nested walk-forward, with the sealed holdout evaluated exactly once after thresholds are locked. Acceptance is pre-registered and multi-dimensional: net expectancy \u2265 0 with a bootstrap 95% CI excluding material losses, win-rate decline \u2264 2 pp, minimum per-fold sample sizes, stable sign across regime splits, and flat/sensible behavior across a cap-value sensitivity grid (1.5\u00d7\u20133\u00d7 average win) so no single value drives the result. Because reconciled final exits cannot prove an intratrade stop would have filled, the study is staged: first confirm the dataset contains intratrade paths (MFE/MAE or bar-level series); if absent, results are labeled counterfactual, registered as exploratory-only, and ineligible for promotion. Where paths exist, stop fills are modeled worst-case within the touching bar and charged full measured spread/slippage, so claimed capped outcomes are conservative and genuinely net of costs. Only a challenger passing every gate in `promote.py` on these verified fills advances; anything else stays on record with the champion untouched \u2014 still targeting the dominant measured failure (payoff_ratio 0.34), but with interval-, robustness-, and executability-gated claims rather than point estimates."
+    }
+  },
+  "status": "decided"
+}

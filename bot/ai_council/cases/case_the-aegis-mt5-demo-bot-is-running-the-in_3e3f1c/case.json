@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-22T05:48:32.877139+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_3e3f1c\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 42.69,
+          "finished_utc": "2026-08-22T05:52:10.389065+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T05:51:27.697433+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T05:52:10.389065+00:00",
+        "text": "The headline claim\u2014\"reduces false state transitions\"\u2014is unmeasurable as stated because nothing defines ground truth for a \"false\" transition; you can only measure downstream outcomes, so the proposed mechanism is unfalsifiable. Going straight to a sealed holdout with a binary accept/reject burns your only clean data on a point estimate: \"net expectancy improves\" carries no minimum effect size or significance test, and since a two-bar confirmation delays entries, the trade population shifts\u2014so expectancy differences conflate gating quality with timing luck. The 70% retention floor is arbitrary and unjustified, and nothing mentions ExperimentRegistry logging or how many gate variants precede this; if this is challenge N against one holdout, it's textbook multiple-testing leakage. Finally, \"accept\" must mean routing through every gate in `promote.py`\u2014the proposal's private acceptance criteria don't constitute governed promotion."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_3e3f1c\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.84,
+          "finished_utc": "2026-08-22T05:51:27.685375+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T05:51:14.840555+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T05:51:27.685375+00:00",
+        "text": "The \u226560% threshold and predicted sign flip are unsupported and appear tuned post hoc; relabeling exit causes cannot change realized aggregate expectancy, only its attribution. The proposal also lacks a predeclared join key, coverage target, ambiguity handling, and validation against an independently audited ticket sample, so incomplete MT5 or intent logs could manufacture the conclusion. Its fallback claim that \u201cexternal closes\u201d imply missing hard stops is a false dichotomy and does not establish that a stop candidate would improve net, tail-aware out-of-sample performance."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T05:53:12.931801+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_820874",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_820874 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_3e3f1c",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_3e3f1c\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 91.41,
+        "finished_utc": "2026-08-22T05:50:19.248688+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T05:48:47.842499+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T05:50:19.248688+00:00",
+      "text": "**Proposal \u2014 reconcile the \"manual\"-exit bucket before any new signal work.** The reconciled-exit evidence (`outcome_learning.json`, n=2,518) shows 76% of all exits are labeled `manual` (n=1,928, expectancy \u22120.013) while true `tp` exits are strongly positive (n=447, exp +0.107) and `sl` exits are rare but ruinous (n=96, exp \u22120.547; one 1.21 tail loss erases ~20 wins), so the aggregate \u22120.012 expectancy / 0.77 profit factor is dominated by an unexplained close category rather than entry quality. Next cycle should run one registered experiment that joins every `manual`-closed demo ticket back to the MT5 deal history and the runner's own exit-intent log, testing the hypothesis that most `manual` labels are actually strategy-driven (time/max-age) exits mis-attributed at journaling. Falsifiable prediction: if reclassification shows \u226560% of `manual` closes were bot-initiated, corrected expectancy turns measurably positive (>0) and the champion's true edge estimate changes sign; if instead they are genuinely external closes, the same join will show missing hard stops on the tail-loss tickets (avg loss 3\u00d7 avg win), justifying a stop-placement candidate instead. No corpus passage matched directly (checked the firehose book synthesis), so this stands purely on measured data. No code or champion changes proposed here; output goes to `bot/reports/research/` and the experiment registry only."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_3e3f1c\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 10.94,
+        "finished_utc": "2026-08-22T05:50:48.297497+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T05:50:37.355504+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T05:50:48.297497+00:00",
+      "text": "Test whether requiring two consecutive validated-state observations before DEMO signal eligibility reduces false state transitions versus the current single-observation gate. Replay the latest registered firehose dataset with identical spread/slippage assumptions and compare net expectancy, maximum drawdown, and eligible-signal count on a sealed holdout. Accept the candidate only if net expectancy improves, maximum drawdown does not worsen, and at least 70% of current eligible signals remain; otherwise reject it."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_3e3f1c\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 16.03,
+        "finished_utc": "2026-08-22T05:53:12.893234+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T05:52:56.866062+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T05:53:12.893234+00:00",
+      "text": "Evaluate whether two-observation confirmation improves risk-adjusted DEMO signal performance, without claiming to identify \u201cfalse\u201d transitions absent labeled ground truth. Register one prespecified experiment in `ExperimentRegistry`, compare one- versus two-observation gates on development data using matched entry-time analyses to separate gating effects from delay effects, and require a predefined minimum expectancy uplift with bootstrap confidence intervals, non-worsening drawdown, and a retention threshold justified from historical power and coverage. Use the sealed holdout once, only after freezing the mechanism, thresholds, cost assumptions, and variant count; report all results net of identical spread/slippage assumptions and reject rather than retune after exposure. A successful holdout result creates a challenger only, and any promotion must proceed exclusively through every gate in `bot/aegis/research/promote.py` and its governed promotion script."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_3e3f1c\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 46.43,
+        "finished_utc": "2026-08-22T05:52:56.832465+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T05:52:10.404866+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T05:52:56.846260+00:00",
+      "text": "**Proposal (rev. 2) \u2014 reconcile the `manual`-exit bucket before any new signal work.** The reconciled-exit evidence (`outcome_learning.json`, n=2,518) shows 76% of exits labeled `manual` (n=1,928, expectancy \u22120.013) versus positive `tp` (n=447, +0.107) and rare but ruinous `sl` (n=96, \u22120.547) exits, so we test whether the aggregate \u22120.012 expectancy reflects exit mis-attribution rather than entry quality. One registered experiment joins each `manual`-closed demo ticket to MT5 deal history and the runner's intent log via the predeclared key (ticket ID \u2192 deal position ID, exact match only), with a predeclared coverage gate: if fewer than 90% of manual tickets resolve to a definitive cause, the outcome is recorded as inconclusive and no inference is drawn. Ambiguity handling is fixed in advance \u2014 conflicting evidence defaults conservatively back to `manual`, and a blind-audited sample of 100 tickets provides ground-truth validation requiring agreement \u03ba \u2265 0.7 before any classification results are reported. We accept that relabeling cannot change realized expectancy: the primary outcome is corrected per-cause attribution with binomial confidence intervals on the reclassified share, the hypothesis (\"most manual labels are bot-initiated time/max-age exits\") is registered before data access, and no sign-flip or percentage threshold is asserted. A finding of genuinely external closes generates only a stop-placement hypothesis; any resulting challenger must separately clear every gate in `promote.py`, net of costs, on the sealed holdout before champion consideration."
+    }
+  },
+  "status": "decided"
+}
