@@ -200,6 +200,7 @@ def main() -> None:
         "margin_precheck_skip": 0,
         "min_lot_precheck_skip": 0,
     }
+    fast_exit_error_count: int = 0
     # Intelligent per-thesis profit management (spec B-H, O, P).
     from aegis.intel.profit_management import ProfitManager
 
@@ -1428,6 +1429,7 @@ def main() -> None:
                 if execution_status_counts:
                     extra_hb["execution_status"] = dict(execution_status_counts)
                 extra_hb["quote_refresh"] = dict(quote_refresh_counts)
+                extra_hb["fast_exit_errors"] = fast_exit_error_count
                 if intelligent_brain is not None:
                     extra_hb.update(intelligent_brain.snapshot())
                     # Profit-management reporting (spec O) + exposure metrics
@@ -1554,15 +1556,29 @@ def main() -> None:
                         all_open = eng.positions()
                         meta_by_ticket: dict[str, dict] = {}
                         for _key, _mem in intelligent_brain.memory.theses.items():
+                            # Look up hypothesis_id from the experiment store
+                            # using thesis key's family/symbol/side/regime/session.
+                            _hyp = ""
+                            _max_hold = 120
+                            _tgt_px = None
+                            for _exp in intelligent_brain.experiments.data.get("experiments", {}).values():
+                                if str(_exp.get("council_case") or "") == _key or \
+                                   (str(_exp.get("symbol") or "") == str(_mem.symbol) and
+                                    str(_exp.get("strategy_family") or "") == str(_mem.setup_family)):
+                                    _hyp = str(_exp.get("hypothesis_id") or "")
+                                    _max_hold = int(_exp.get("max_hold_s") or 120)
+                                    _tgt_px = _exp.get("target_price")
+                                    break
                             for _t in _mem.tickets:
                                 meta_by_ticket[_t] = {
                                     "thesis_key": _key,
-                                    "hypothesis_id": "",
+                                    "hypothesis_id": _hyp,
                                     "stage": "EXPLORATION_CANARY"
                                     if _key in intelligent_brain._exploration_theses
                                     else (intelligent_brain.strategy.promotion_stage
                                           if intelligent_brain.strategy else ""),
                                     "family": _mem.setup_family,
+                                    "target": _tgt_px,
                                 }
                         for _p in all_open:
                             _tk = str(getattr(_p, "ticket", "") or "")
@@ -1702,20 +1718,30 @@ def main() -> None:
                                                  else marks.get("ask")) or _cur
                                         _pnl_pips = ((_cur - _entry_px) / max(_pip_sz, 1e-10)
                                                      * (1 if _side_l == "buy" else -1))
+                                        # Broker-native pip-to-USD using tick fields.
+                                        _spec_pm = brain_spec or {}
+                                        _tv = float(_spec_pm.get("trade_tick_value") or 1.0)
+                                        _ts = float(_spec_pm.get("trade_tick_size") or _pip_sz)
+                                        _usd_per_pip_per_lot = (_tv / _ts) * _pip_sz
+                                        _lot_sz = float(getattr(pos, "quantity", .01))
                                         _mfe_pips = abs(float(_track.mfe_usd or 0)) / max(
-                                            _pip_sz * 100000 * float(getattr(pos, "quantity", .01)), 1e-9)
+                                            _usd_per_pip_per_lot * _lot_sz, 1e-9)
                                         _mae_pips = abs(float(_track.mae_usd or 0)) / max(
-                                            _pip_sz * 100000 * float(getattr(pos, "quantity", .01)), 1e-9)
+                                            _usd_per_pip_per_lot * _lot_sz, 1e-9)
                                         _stop_dist_pips = abs(
                                             float(getattr(pos, "avg_price", 0) or 0) -
                                             float(getattr(pos, "stop_loss", 0) or 0)
                                         ) / max(_pip_sz, 1e-10) if getattr(pos, 'stop_loss', 0) else 10.0
                                         _tgt_px = None
-                                        # Structured numeric target from experiment record.
+                                        _max_hold_s = 120
                                         for _exp in intelligent_brain.experiments.data.get("experiments", {}).values():
                                             if str(_exp.get("hypothesis_id")) == str(meta_by_ticket.get(tk, {}).get("hypothesis_id") or ""):
                                                 _tgt_px = _exp.get("target_price")
+                                                _max_hold_s = int(_exp.get("max_hold_s") or 120)
                                                 break
+                                        fast_exit_sm = FastExitStateMachine(
+                                            FastExitConfig(time_exit_s=_max_hold_s)
+                                        )
                                         fast_verdict = fast_exit_sm.evaluate(
                                             side=_side_l,
                                             entry_price=_entry_px,
@@ -1742,6 +1768,7 @@ def main() -> None:
                                                 "policy": f"fast_{fast_verdict['policy']}",
                                             }
                                 except Exception as fast_exc:
+                                    fast_exit_error_count += 1
                                     append_journal(journal, {
                                         "event": "fast_exit_error",
                                         "ticket": tk,

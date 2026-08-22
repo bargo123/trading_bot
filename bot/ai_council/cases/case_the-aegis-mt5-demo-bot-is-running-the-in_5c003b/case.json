@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-22T00:12:01.422051+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5c003b\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 46.44,
+          "finished_utc": "2026-08-22T00:15:30.281589+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T00:14:43.839681+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T00:15:30.281589+00:00",
+        "text": "Replaying on the *same* sealed DEMO dataset after each iteration is the fatal flaw: every accept/reject decision spent against a reused holdout turns it into a selection surface, so reported gains become a multiple-testing artifact rather than evidence of generalization \u2014 the seal exists precisely so it can be spent once. The acceptance rule is under-specified and statistically weak: no minimum effect size or significance test (e.g., bootstrap on net expectancy/DD), an unjustified magic cutoff of ATR>75, no confirmation that model confidence is calibrated across volatility regimes, and no guarantee the ATR percentile itself uses only closed bars (lookahead risk) \u2014 all compounded by a small high-volatility subsample that 80% trade-count retention will shrink further toward noise. Defining bespoke accept criteria also sidesteps governance: the candidate must still clear every gate in `bot/aegis/research/promote.py`, not merely this proposal's two-metric comparison, and a rejected challenger must be recorded in `bot/research/strategies/` and the sealed-holdout ledger, which the proposal omits."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5c003b\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 10.38,
+          "finished_utc": "2026-08-22T00:14:43.833042+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T00:14:33.457089+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T00:14:43.833042+00:00",
+        "text": "The 0.30 cap is tuned from the same observed loss distribution it aims to improve, so a single sealed holdout is insufficient without walk-forward testing, untouched multi-regime data, and sensitivity analysis across stop levels. A replay based only on recorded exits cannot reliably model intratrade stop triggering, gaps, slippage, or whether stopped trades would later recover, making the PF and win-rate predictions potentially unmeasurable from `outcome_log` alone. The proposal also omits uncertainty bounds, sample-size requirements, Monte Carlo results, and explicit proof that every experiment\u2014including tuning runs\u2014is registered."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T00:16:14.646232+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_858d6f",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_858d6f for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_5c003b",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5c003b\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 96.63,
+        "finished_utc": "2026-08-22T00:13:48.525854+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T00:12:11.900063+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T00:13:48.530015+00:00",
+      "text": "Proposal: Add a hard tail-loss exit rule as the next exit_research challenger. Current reconciled demo evidence shows WR=67.5% but PF=0.77 and expectancy=-0.012 because payoff geometry is broken \u2014 avg_win 0.060 vs avg_loss -0.177, with tail losses (worst -1.21) each erasing ~20 average wins, and 1,927 of 2,517 exits closing under \"manual\" rather than a managed tp/sl rule (tp closes alone run +0.107 expectancy). Candidate: cap per-trade loss at 0.30 (~1.7\u00d7 current avg loss, half the observed tail) via a synthetic-stop replay over the existing outcome_log exits, evaluated net of runner spread/slippage on a sealed holdout. Falsifiable prediction: this flips aggregate PF above 1.0 and reduces wins_erased_by_tail_loss from ~20 to <3 while keeping win rate \u226555%; if the holdout does not show both, the challenger is rejected and recorded in the ExperimentRegistry as failed. This follows \"Building Winning Algorithmic Trading Systems\" (Davey), which stresses fixing trade-management geometry and Monte-Carlo/sealed validation before any strategy change; no champion or live config is touched."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5c003b\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 9.89,
+        "finished_utc": "2026-08-22T00:14:10.508940+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T00:14:00.617230+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T00:14:10.510951+00:00",
+      "text": "Test a volatility-normalized confidence threshold for the validated-state gate, requiring higher model confidence when the current ATR percentile exceeds 75. Replay the next research cycle on the same sealed DEMO dataset with identical spread, slippage, and lookahead controls, recording the experiment in `ExperimentRegistry`. Accept the candidate only if it improves net expectancy and maximum drawdown versus the current champion while retaining at least 80% of its trade count; otherwise reject it and leave the champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5c003b\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.43,
+        "finished_utc": "2026-08-22T00:16:14.614419+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T00:16:03.185901+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T00:16:14.614419+00:00",
+      "text": "First validate confidence calibration across volatility regimes and tune the ATR breakpoint and threshold exclusively through preregistered walk-forward training/validation splits, computing ATR percentiles from closed bars only and recording every trial in `ExperimentRegistry`. Before evaluation, preregister minimum effect sizes, bootstrap confidence bounds for net expectancy and maximum drawdown, and minimum total and high-volatility sample sizes, while preserving at least 80% of the champion\u2019s trade count. Spend a fresh sealed DEMO holdout exactly once for the final candidate under identical spread, slippage, and lookahead controls; do not reuse it after acceptance or rejection. Promote only through the governed scripts and only if every gate in `bot/aegis/research/promote.py` passes; otherwise leave the champion unchanged and record the rejected challenger in `bot/research/strategies/` and `bot/research/sealed_holdouts.jsonl`."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5c003b\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 32.87,
+        "finished_utc": "2026-08-22T00:16:03.170095+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T00:15:30.297292+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T00:16:03.170095+00:00",
+      "text": "Revised proposal: Add a hard tail-loss exit challenger, but replace single-point tuning with a pre-registered sensitivity sweep over stop caps (0.15\u20130.45 in 0.05 steps) selected by walk-forward across distinct regime windows, choosing the cap on training folds only so no level is fit to evaluation data; every sweep and tuning run is logged in the ExperimentRegistry before execution. Because recorded `outcome_log` exits cannot establish intratrade stop behavior, the replay reconstructs each trade from stored M1 price paths, filling synthetic stops conservatively (worst of stop level vs. next-bar open, plus a fixed slippage/gap buffer), and separately reports the counterfactual recovery rate of would-be-stopped trades instead of assuming it. Acceptance gates, declared in advance: on a sealed holdout untouched by tuning, spanning \u22652 regimes and meeting a minimum sample of ~300 qualifying exits, the challenger must show PF > 1.0 with a 95% bootstrap CI excluding 1.0, wins_erased_by_tail_loss < 3, win rate \u2265 55% (CI non-inferior to baseline), all net of runner spread/slippage under both base and stressed cost assumptions. Additionally, Monte Carlo resampling of holdout trades must demonstrate lower tail-drawdown and risk-of-ruin than the unmanaged baseline, with all uncertainty bounds reported alongside point estimates. If any gate fails\u2014or if intrabar data proves insufficient to verify fill assumptions\u2014the challenger is rejected and recorded as failed in the registry; no champion or live config is modified, consistent with Davey's sealed-validation and Monte Carlo discipline."
+    }
+  },
+  "status": "decided"
+}

@@ -171,7 +171,9 @@ def micro_momentum_burst(ctx: FastMarketContext) -> MicroCandidate | None:
         return None
     m1_ret = ctx.return_30s or 0.0
     atr = ctx.m1_atr
-    compression = ctx.m5_compression if ctx.m5_compression is not None else 0.5
+    compression = ctx.m5_compression
+    if compression is None:
+        return None  # required feature unavailable → SKIP
     if abs(m1_ret) < atr * 0.3:
         return None
     if compression > 0.8:

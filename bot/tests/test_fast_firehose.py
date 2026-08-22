@@ -32,6 +32,7 @@ def _ctx(**overrides) -> FastMarketContext:
         m1_open=1.09998, m1_high=1.10008, m1_low=1.09990,
         m1_close=1.10000, m1_prev_close=1.09995, m1_atr=0.0015,
         m1_range=0.00018, m1_body=0.00005, m1_volume=100,
+        m5_compression=0.4,
         m5_direction="up", m5_structure="none",
         m5_support=1.0950, m5_resistance=1.1050, m5_atr=0.002,
         m15_direction="up", m15_structure="none",
