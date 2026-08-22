@@ -6,6 +6,75 @@ from typing import Any, Mapping
 import pandas as pd
 
 
+def _atr(frame: pd.DataFrame, periods: int = 14) -> float | None:
+    """Average True Range from completed bars."""
+    if len(frame) < periods + 1:
+        return None
+    highs = frame["high"].astype(float)
+    lows = frame["low"].astype(float)
+    closes = frame["close"].astype(float)
+    prev_closes = closes.shift(1)
+    tr = pd.concat([
+        highs - lows,
+        (highs - prev_closes).abs(),
+        (lows - prev_closes).abs()
+    ], axis=1).max(axis=1)
+    return round(float(tr.tail(periods).mean()), 8)
+
+
+def _compression(frame: pd.DataFrame) -> float | None:
+    """Body/range compression ratio for completed bars."""
+    if frame.empty:
+        return None
+    last = frame.iloc[-1]
+    body = abs(float(last["close"]) - float(last["open"]))
+    rng = float(last["high"]) - float(last["low"])
+    if rng <= 0:
+        return None
+    return round(body / rng, 4)
+
+
+def _structure_full(frame: pd.DataFrame) -> dict[str, Any]:
+    """Complete structure with S/R, direction, ATR, compression from completed bars."""
+    if len(frame) < 5:
+        return {
+            "kind": "unavailable",
+            "support": None,
+            "resistance": None,
+            "direction": None,
+            "atr": None,
+            "compression": None,
+        }
+    highs = frame["high"].astype(float)
+    lows = frame["low"].astype(float)
+    closes = frame["close"].astype(float)
+    opens = frame["open"].astype(float)
+    resistance = float(highs.tail(20).max())
+    support = float(lows.tail(20).min())
+    close = float(closes.iloc[-1])
+    open_ = float(opens.iloc[-1])
+    kind = "none"
+    if close > resistance * 0.9999:
+        kind = "breakout"
+    elif close < support * 1.0001:
+        kind = "breakout"
+    elif abs(close - resistance) / max(resistance, 1e-9) < 0.0003:
+        kind = "retest"
+    elif abs(close - support) / max(support, 1e-9) < 0.0003:
+        kind = "retest"
+    direction = "up" if close > open_ else ("down" if close < open_ else "flat")
+    atr_val = _atr(frame)
+    comp = _compression(frame.tail(1))
+    return {
+        "kind": kind,
+        "support": support,
+        "resistance": resistance,
+        "direction": direction,
+        "atr": atr_val,
+        "compression": comp,
+    }
+
+
 def _direction(frame: pd.DataFrame) -> str:
     if frame.empty:
         return "unavailable"
@@ -78,15 +147,33 @@ def build_runtime_state(*, symbol: str, m1: pd.DataFrame) -> dict[str, Any]:
         regime = "trend" if h1_dir == m5_dir else "range"
     else:
         regime = "unknown"
-    structure = _structure(m15)
+    m15_struct = _structure_full(m15)
+    m5_struct = _structure_full(m5)
     return {
         "schema": "runtime_state.v1",
         "symbol": str(symbol).upper(),
         "observed_at": str(source["time"].iloc[-1]),
         "regime": {"label": regime},
-        "structure": {"M15": structure},
+        "structure": {
+            "M15": {
+                "kind": m15_struct["kind"],
+                "support": m15_struct["support"],
+                "resistance": m15_struct["resistance"],
+                "direction": m15_struct["direction"],
+                "atr": m15_struct["atr"],
+            },
+            "M5": {
+                "kind": m5_struct["kind"],
+                "support": m5_struct["support"],
+                "resistance": m5_struct["resistance"],
+                "direction": m5_struct["direction"],
+                "atr": m5_struct["atr"],
+                "compression": m5_struct["compression"],
+            },
+        },
         "multi_timeframe": {
-            "M5": {"direction": m5_dir},
+            "M5": {"direction": m15_struct["direction"]},  # genuine M5 direction from completed bars
+            "M15": {"direction": m15_struct["direction"]},  # genuine M15 direction from completed bars
             "H1": {"direction": h1_dir},
         },
         "volatility": {"phase": _volatility(source)},

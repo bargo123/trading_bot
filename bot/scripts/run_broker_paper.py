@@ -201,6 +201,12 @@ def main() -> None:
         "min_lot_precheck_skip": 0,
     }
     fast_exit_error_count: int = 0
+    # Quote buffer for genuine sub-minute features
+    from aegis.intel.quote_buffer import QuoteBuffer
+    quote_buffer = QuoteBuffer(max_points_per_symbol=3600)
+    # Exact ticket->hypothesis metadata persistence
+    from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
+    ticket_metadata_store = TicketMetadataStore(ROOT / "intel" / "ticket_metadata.json")
     # Intelligent per-thesis profit management (spec B-H, O, P).
     from aegis.intel.profit_management import ProfitManager
 
@@ -503,6 +509,9 @@ def main() -> None:
                 return
 
             q = eng.quote(sym)
+            # Record quote for sub-minute features (genuine, point-in-time)
+            now_ts = time.time()
+            quote_buffer.record_from_quote(sym, {"bid": q.bid, "ask": q.ask, "time": now_ts})
             t0 = time.perf_counter()
             live_spread = max(0.0, float(q.ask) - float(q.bid))
             mid = (float(q.bid) + float(q.ask)) / 2.0 if q.bid and q.ask else 0.0
@@ -655,6 +664,8 @@ def main() -> None:
                     entry_price=brain_entry,
                     actual_bid=float(q.bid),
                     actual_ask=float(q.ask),
+                    quote_buffer=quote_buffer,
+                    now_ts=now_ts,
                 )
                 brain_decision = decision
                 if decision.action in {"exit", "reduce"}:
@@ -1309,6 +1320,37 @@ def main() -> None:
                     thesis_key_now = str(brain_decision.journal.get("thesis_key") or "") or None
                     if new_tickets and thesis_key_now:
                         intelligent_brain.memory.bind_tickets(thesis_key_now, sym, new_tickets)
+                        # Persist exact ticket->hypothesis metadata for PM/FastExit/restart.
+                        hypothesis_id = str(brain_decision.journal.get("hypothesis_id") or "")
+                        strategy_family = str(brain_decision.journal.get("setup_family") or "")
+                        expected_mechanism = str(brain_decision.journal.get("micro_mechanism") or strategy_family)
+                        side = brain_decision.side or sig.side
+                        entry_price = float(brain_decision.journal.get("entry_price")
+                                            or (q.ask if side == "buy" else q.bid))
+                        stop_loss = float(brain_decision.sl) if brain_decision.sl is not None else 0.0
+                        target_price = brain_decision.tp
+                        max_hold_s = int(brain_decision.journal.get("max_hold_s") or 120)
+                        regime = str(brain_decision.journal.get("regime") or "")
+                        session = str(brain_decision.journal.get("session") or "")
+                        information_id = brain_decision.information_id
+                        for tk in new_tickets:
+                            meta = create_ticket_metadata(
+                                ticket=tk,
+                                hypothesis_id=hypothesis_id,
+                                thesis_key=thesis_key_now,
+                                strategy_family=strategy_family,
+                                expected_mechanism=expected_mechanism,
+                                side=side,
+                                entry_price=entry_price,
+                                stop_loss=stop_loss,
+                                target_price=target_price,
+                                max_hold_s=max_hold_s,
+                                regime=regime,
+                                session=session,
+                                information_id=information_id,
+                                symbol=sym,
+                            )
+                            ticket_metadata_store.add(meta)
                     intelligent_brain.memory.apply(
                         sym,
                         brain_decision.action,
@@ -1715,34 +1757,33 @@ def main() -> None:
                                         _side_l = str(getattr(pos, "side", "")).lower()
                                         _entry_px = float(getattr(pos, "avg_price", 0) or 0)
                                         _mark = (_marks.get("bid") if _side_l == "buy"
-                                                 else marks.get("ask")) or _cur
+                                                  else marks.get("ask")) or _cur
                                         _pnl_pips = ((_cur - _entry_px) / max(_pip_sz, 1e-10)
-                                                     * (1 if _side_l == "buy" else -1))
+                                                      * (1 if _side_l == "buy" else -1))
                                         # Broker-native pip-to-USD using CURRENT symbol's tick fields.
-                                        _spec_fast = None
-                                        try:
-                                            _spec_fast = eng.symbol_spec(_sym)
-                                        except Exception:
-                                            pass
-                                        _tv = float((_spec_fast or {}).get("trade_tick_value") or 1.0)
-                                        _ts = float((_spec_fast or {}).get("trade_tick_size") or _pip_sz)
-                                        _usd_per_pip_per_lot = (_tv / _ts) * _pip_sz
+                                        from aegis.intel.broker_math import BrokerSymbolSpec, mfe_mae_from_usd
+                                        _spec_fast = BrokerSymbolSpec.from_mapping(
+                                            eng.symbol_spec(_sym) if hasattr(eng, 'symbol_spec') else None)
                                         _lot_sz = float(getattr(pos, "quantity", .01))
-                                        _mfe_pips = abs(float(_track.mfe_usd or 0)) / max(
-                                            _usd_per_pip_per_lot * _lot_sz, 1e-9)
-                                        _mae_pips = abs(float(_track.mae_usd or 0)) / max(
-                                            _usd_per_pip_per_lot * _lot_sz, 1e-9)
+                                        _mfe_pips, _mae_pips = mfe_mae_from_usd(
+                                            float(_track.mfe_usd or 0),
+                                            float(_track.mae_usd or 0),
+                                            _spec_fast, _lot_sz, _pip_sz)
                                         _stop_dist_pips = abs(
                                             float(getattr(pos, "avg_price", 0) or 0) -
                                             float(getattr(pos, "stop_loss", 0) or 0)
                                         ) / max(_pip_sz, 1e-10) if getattr(pos, 'stop_loss', 0) else 10.0
-                                        _tgt_px = None
-                                        _max_hold_s = 120
-                                        for _exp in intelligent_brain.experiments.data.get("experiments", {}).values():
-                                            if str(_exp.get("hypothesis_id")) == str(meta_by_ticket.get(tk, {}).get("hypothesis_id") or ""):
-                                                _tgt_px = _exp.get("target_price")
-                                                _max_hold_s = int(_exp.get("max_hold_s") or 120)
-                                                break
+                                        # Use exact ticket metadata for max_hold_s (not experiment scan).
+                                        _ticket_meta = ticket_metadata_store.get(tk)
+                                        _tgt_px = _ticket_meta.target_price if _ticket_meta else None
+                                        _max_hold_s = int(_ticket_meta.max_hold_s) if _ticket_meta else 120
+                                        # Fallback to experiment scan only for legacy tickets without metadata.
+                                        if _tgt_px is None:
+                                            for _exp in intelligent_brain.experiments.data.get("experiments", {}).values():
+                                                if str(_exp.get("hypothesis_id")) == str(meta_by_ticket.get(tk, {}).get("hypothesis_id") or ""):
+                                                    _tgt_px = _exp.get("target_price")
+                                                    _max_hold_s = int(_exp.get("max_hold_s") or 120)
+                                                    break
                                         fast_exit_sm = FastExitStateMachine(
                                             FastExitConfig(time_exit_s=_max_hold_s)
                                         )
@@ -1798,6 +1839,9 @@ def main() -> None:
                                         **(summary or {}),
                                     },
                                 )
+                                # Remove ticket metadata on successful close.
+                                if res_close.ok:
+                                    ticket_metadata_store.remove(tk)
                                 if (
                                     res_close.ok
                                     and summary
@@ -1831,24 +1875,20 @@ def main() -> None:
                                 buffer_usd = float(
                                     cfg.get("pm_breakeven_buffer_usd", 0.05) or 0.05
                                 )
-                                spec_lock = None
-                                try:
-                                    spec_lock = eng.symbol_spec(str(pos.symbol))
-                                except Exception:
-                                    spec_lock = None
-                                pip_l = float((spec_lock or {}).get("pip_size")
-                                              or pip_size_for(str(pos.symbol), cfg))
-                                usd_per_pip = pip_l * 100000.0 * float(
-                                    getattr(pos, "quantity", 0.01)
-                                )
-                                pips = buffer_usd / max(usd_per_pip, 1e-9)
+                                spec_lock = BrokerSymbolSpec.from_mapping(
+                                    eng.symbol_spec(str(pos.symbol)) if hasattr(eng, 'symbol_spec') else None)
+                                from aegis.intel.broker_math import lock_buffer_price
+                                pip_l = float((spec_lock.trade_tick_size
+                                               or pip_size_for(str(pos.symbol), cfg)))
+                                _lot_sz = float(getattr(pos, "quantity", 0.01))
+                                price_buffer = lock_buffer_price(buffer_usd, spec_lock, _lot_sz)
                                 if side_l == "buy":
-                                    lock_sl = px + pips * pip_l
+                                    lock_sl = px + price_buffer
                                     cur = float(getattr(pos, "stop_loss", 0) or 0)
                                     if cur > 0 and cur >= lock_sl:
                                         lock_sl = None  # never loosen
                                 else:
-                                    lock_sl = px - pips * pip_l
+                                    lock_sl = px - price_buffer
                                     cur = float(getattr(pos, "stop_loss", 0) or 0)
                                     if cur > 0 and cur <= lock_sl:
                                         lock_sl = None

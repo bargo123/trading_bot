@@ -56,7 +56,11 @@ class Direction(str, Enum):
 @dataclass
 class FastMarketContext:
     """Point-in-time market data for fast-turnover decisions.
-    All fields are None if unavailable. NO fabricated defaults."""
+    All fields are None if unavailable. NO fabricated defaults.
+
+    Sub-minute returns are side-specific (liquidation-side semantics):
+    BUY -> BID (closing a long), SELL -> ASK (closing a short).
+    """
     symbol: str
     timestamp: str = ""
     bid: float | None = None
@@ -86,11 +90,15 @@ class FastMarketContext:
     m15_resistance: float | None = None
     m15_range_mid: float | None = None
     m15_range_half_width: float | None = None
-    # Recent tick/quote buffer
-    return_5s: float | None = None
-    return_15s: float | None = None
-    return_30s: float | None = None
-    return_60s: float | None = None
+    # Recent tick/quote buffer - side-specific returns
+    return_5s_buy: float | None = None
+    return_5s_sell: float | None = None
+    return_15s_buy: float | None = None
+    return_15s_sell: float | None = None
+    return_30s_buy: float | None = None
+    return_30s_sell: float | None = None
+    return_60s_buy: float | None = None
+    return_60s_sell: float | None = None
     tick_rate_per_min: float | None = None
     quote_change_rate: float | None = None
     short_volatility: float | None = None
@@ -98,6 +106,18 @@ class FastMarketContext:
     # Session/regime
     session: str | None = None
     regime: str | None = None
+
+    def get_return(self, window_s: int, side: str) -> float | None:
+        """Get return for window and side (buy/sell)."""
+        if window_s == 5:
+            return self.return_5s_buy if side == "buy" else self.return_5s_sell
+        if window_s == 15:
+            return self.return_15s_buy if side == "buy" else self.return_15s_sell
+        if window_s == 30:
+            return self.return_30s_buy if side == "buy" else self.return_30s_sell
+        if window_s == 60:
+            return self.return_60s_buy if side == "buy" else self.return_60s_sell
+        return None
 
     @property
     def has_micro_geometry(self) -> bool:
@@ -165,11 +185,23 @@ def _micro_invalidation(*, side: str, entry: float, m1_low: float,
 
 def micro_momentum_burst(ctx: FastMarketContext) -> MicroCandidate | None:
     """A. MICRO MOMENTUM BURST: compression → clean impulse → M15/M5 aligned."""
-    if None in (ctx.m1_atr, ctx.return_30s, ctx.bid, ctx.ask,
+    if None in (ctx.m1_atr, ctx.bid, ctx.ask,
                 ctx.m1_low, ctx.m1_high,
                 ctx.m15_direction, ctx.m5_direction):
         return None
-    m1_ret = ctx.return_30s or 0.0
+    # Use side-specific 30s return once direction is known.
+    # First check both sides to determine direction.
+    ret_30s_buy = ctx.get_return(30, "buy")
+    ret_30s_sell = ctx.get_return(30, "sell")
+    if ret_30s_buy is None and ret_30s_sell is None:
+        return None  # required feature unavailable → SKIP
+    # Determine direction from returns
+    if ret_30s_buy is not None and abs(ret_30s_buy) >= abs(ret_30s_sell or 0):
+        direction = "buy" if ret_30s_buy > 0 else "sell"
+        m1_ret = ret_30s_buy if direction == "buy" else -abs(ret_30s_buy)
+    else:
+        direction = "sell" if ret_30s_sell < 0 else "buy"
+        m1_ret = ret_30s_sell if direction == "sell" else abs(ret_30s_sell or 0)
     atr = ctx.m1_atr
     compression = ctx.m5_compression
     if compression is None:

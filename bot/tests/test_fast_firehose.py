@@ -38,7 +38,9 @@ def _ctx(**overrides) -> FastMarketContext:
         m15_direction="up", m15_structure="none",
         m15_support=1.0950, m15_resistance=1.1050,
         m15_range_mid=1.1000, m15_range_half_width=0.0040,
-        return_30s=0.0008, return_15s=0.0004, return_60s=0.001,
+        return_30s_buy=0.0008, return_30s_sell=-0.0008,
+        return_15s_buy=0.0004, return_15s_sell=-0.0004,
+        return_60s_buy=0.001, return_60s_sell=-0.001,
         session="london", regime="trend",
     )
     base.update(overrides)
@@ -55,7 +57,8 @@ def test_pip_value_jpy_vs_standard():
 def test_micro_momentum_burst_generates_on_compression_release():
     c = micro_momentum_burst(_ctx(
         m15_direction="up", m5_direction="up",
-        return_30s=0.0008, m1_atr=0.0015,
+        return_30s_buy=0.0008, return_30s_sell=-0.0008,
+        m1_atr=0.0015,
         m1_low=1.0998, m1_high=1.1001, spread_pips=0.2))
     assert c is not None
     assert c.family == "micro_momentum_burst"
@@ -66,7 +69,8 @@ def test_micro_momentum_burst_generates_on_compression_release():
 def test_micro_momentum_rejects_when_no_impulse():
     c = micro_momentum_burst(_ctx(
         m15_direction="up", m5_direction="up",
-        return_30s=0.00001, m1_atr=0.0015,
+        return_30s_buy=0.00001, return_30s_sell=-0.00001,
+        m1_atr=0.0015,
         m1_low=1.0998, m1_high=1.1001, spread_pips=0.2))
     assert c is None
 
@@ -102,7 +106,7 @@ def test_generate_multiple_independent_candidates():
         m15_range_mid=1.1000, m15_range_half_width=0.0040,
         m1_close=1.1042, m1_prev_close=1.1052,
         m1_low=1.1028, m1_high=1.1053,
-        m1_atr=0.0020, return_30s=-0.0012,
+        m1_atr=0.0020, return_30s_sell=-0.0012, return_30s_buy=0.0012,
         bid=1.1041, ask=1.1043, spread_pips=0.2))
     families = {c.family for c in results}
     assert len(families) >= 2, f"expected multiple families, got: {families}"
