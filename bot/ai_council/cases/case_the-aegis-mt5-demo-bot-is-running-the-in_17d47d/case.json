@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-22T13:41:03.132669+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-22T13:43:37.054462+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_3094fb",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_3094fb for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_17d47d",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_17d47d\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.91,
+        "finished_utc": "2026-08-22T13:43:14.033803+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T13:43:02.124403+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T13:43:14.035816+00:00",
+      "text": "Test a challenger that adds a 30-minute post-validation entry-expiry rule: if no entry occurs within 30 minutes after the validated-state gate opens, invalidate the signal for that cycle. Backtest it on the same sealed holdout, symbols, and spread/slippage assumptions as the current champion, recording the experiment in `ExperimentRegistry`. Accept it for further consideration only if net expectancy improves by at least 5% without reducing trade count by more than 15% or worsening maximum drawdown; otherwise reject and retain the current champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

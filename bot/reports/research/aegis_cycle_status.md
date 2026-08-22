@@ -1,6 +1,6 @@
 # AEGIS cycle status (fast watcher)
 
-Tick: 177  |  UTC: 2026-08-22T12:40:28.271121+00:00
+Tick: 190  |  UTC: 2026-08-22T17:36:19.685606+00:00
 
 > Research-only watcher. No orders placed, no live YAML promoted. Champion
 > promotion is reserved for the full `/aegis-cycle` run.
@@ -34,4 +34,4 @@ Tick: 177  |  UTC: 2026-08-22T12:40:28.271121+00:00
 
 - outcome script: 1.0s
 - book memory script: 0s
-- ML script: 4.6s
+- ML script: 4.9s

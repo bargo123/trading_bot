@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-22T15:57:59.062812+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_66b29c\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 40.98,
+          "finished_utc": "2026-08-22T16:03:41.207593+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T16:03:00.226877+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T16:03:41.207593+00:00",
+        "text": "The proposal burns the sealed holdout as a selection set\u2014accepting or rejecting on it means repeated challengers will eventually overfit it, so it's no longer a valid final gate; challenger variants (e.g., persistence length of two vs. three bars) must be screened on in-sample/walk-forward data first. The thresholds are unjustified and unpreregistered: a 10% relative expectancy gain is meaningless without a significance test or confidence interval (and is fragile if baseline expectancy is near zero), while \"worsening maximum drawdown\" has no defined tolerance. Requiring only a single replay ignores estimator variance\u2014a >20% trade-count cut inflates the variance of the expectancy estimate, which the criteria never account for via bootstrap or block resampling. Finally, \"permitting a DEMO entry\" skirts the repo's no-order-placement rule: evaluation must be pure replay/backtest, and any eventual promotion must clear every `promote.py` gate rather than this ad hoc criterion alone."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_66b29c\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 14.16,
+          "finished_utc": "2026-08-22T16:03:00.210941+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T16:02:46.051388+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T16:03:00.210941+00:00",
+        "text": "The proposal commits a causal leap: profitable TP exits do not prove unattributed exits caused the losses, since close reason is confounded with trade quality and adverse price paths. Replaying and tuning the time-stop on the same 2,518-exit window invites overfitting, while \u201cMFE \u2265 average win\u201d is ambiguous and potentially look-ahead-contaminated; the sealed holdout must remain untouched until the rule and threshold are frozen, then be evaluated on independent temporal folds with uncertainty and minimum-sample gates. The claim that relaxing one parameter will flip expectancy is also unsupported without modeling the post-stop path, added exposure, tail risk, and realistic costs. Finally, an \u201c\u226580% explained\u201d attribution threshold measures labeling coverage, not attribution accuracy, and needs validation against an independently audited sample."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T16:04:36.873096+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_81a941",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_81a941 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_66b29c",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_66b29c\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 125.16,
+        "finished_utc": "2026-08-22T16:01:46.082910+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T15:59:40.920386+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T16:01:46.082910+00:00",
+      "text": "Proposal: In the next cycle, upgrade `outcome_learning`'s close-reason attribution so the 1,928 \"manual\" exits (76% of 2,518 reconciled exits, exp \u22120.013) are reclassified from journal/lifecycle events into concrete rules (time-stop, signal-flip, session-end), because the current evidence shows the only clean bucket \u2014 TP closes (n=447, exp +0.107) \u2014 is profitable while aggregate expectancy is \u22120.012 at PF 0.77, meaning the damage is concentrated in an unattributed exit path. Falsifiable hypothesis: if \u226550% of \"manual\" closes turn out to be time-stops taken while the trade's MFE was still \u2265 the average win (+0.060), then relaxing that single time-stop parameter should flip aggregate expectancy from \u22120.012 to \u2265 +0.01 net of spread/slippage on the same 2,518-exit window. Test it offline as an A/B replay against sealed holdouts (`bot/research/sealed_holdouts.jsonl`) with the ExperimentRegistry recording both arms; reject the change if re-attribution fails to explain \u226580% of \"manual\" exits or the counterfactual edge does not survive costs. This is measurement-infrastructure research only \u2014 no code change to the runner, no champion edit, no live YAML touch \u2014 consistent with the firehose-book synthesis principle that exit policy, not entry selection, is where the current geometry (payoff ratio 0.34, wins erased by tail loss \u224820x) is being destroyed."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_66b29c\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.31,
+        "finished_utc": "2026-08-22T16:02:19.712740+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T16:02:06.400829+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T16:02:19.712740+00:00",
+      "text": "Test a challenger that requires the validated-state signal to persist for two consecutive closed bars before permitting a DEMO entry. Replay it against the current champion on the identical sealed holdout with unchanged spread and slippage assumptions. Accept it for further study only if net expectancy improves by at least 10% without reducing trade count by more than 20% or worsening maximum drawdown; otherwise reject and record the result in the ExperimentRegistry."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_66b29c\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.3,
+        "finished_utc": "2026-08-22T16:04:36.833814+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T16:04:24.536068+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T16:04:36.843565+00:00",
+      "text": "Preregister the two-closed-bar persistence challenger, evaluation metrics, and decision rules, then screen it against alternatives such as three-bar persistence using in-sample and walk-forward replay only, with unchanged spread and slippage assumptions and no order placement. Quantify uncertainty using block-bootstrap confidence intervals, require an absolute as well as relative improvement in net expectancy, and define an explicit maximum-drawdown tolerance while accounting for trade-count reductions and their effect on estimator variance. Evaluate only the single preregistered finalist once on the untouched sealed holdout, treating that result as a final validation gate rather than a selection set. Record every experiment and failure in the ExperimentRegistry, and allow promotion only through the authorized script after every gate in `promote.py` passes."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_66b29c\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 43.28,
+        "finished_utc": "2026-08-22T16:04:24.520350+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T16:03:41.239507+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T16:04:24.520350+00:00",
+      "text": "Proposal: In the next cycle, upgrade `outcome_learning`'s close-reason attribution so the 1,928 \"manual\" exits (76% of 2,518 reconciled exits, exp \u22120.013) are reclassified into concrete rules (time-stop, signal-flip, session-end), while explicitly treating close reason as descriptive evidence confounded with trade quality and adverse price paths \u2014 not as a causal lever \u2014 and validating attribution accuracy against an independently hand-audited sample (double-coded, agreement-gated) instead of a coverage percentage. Phase 1 is purely diagnostic: per-reason expectancy conditioned on trade quality, entry regime, and drawdown state at exit, with the MFE threshold operationalized as peak favorable excursion realized strictly before the close timestamp (no look-ahead), and any candidate time-stop relaxation frozen \u2014 parameter value included \u2014 before evaluation begins. Phase 2 evaluates the frozen rule by counterfactual A/B replay on temporally disjoint folds outside the characterization window, sealed holdouts untouched until the rule is locked, with ExperimentRegistry recording both arms and acceptance gated on bootstrap uncertainty bands and minimum-sample floors per fold. Acceptance additionally requires modeling post-stop path continuation (distribution of adverse excursion after historical stops), added holding exposure, and tail risk, so the claimed expectancy flip from \u22120.012 must survive realistic spread/slippage and extended-hold cost assumptions out-of-fold, or the change is rejected on record. This stays measurement-infrastructure research only \u2014 no runner code change, no champion edit, no live YAML touch \u2014 testing whether exit policy explains the geometry damage (payoff ratio 0.34) before any intervention is even proposed."
+    }
+  },
+  "status": "decided"
+}

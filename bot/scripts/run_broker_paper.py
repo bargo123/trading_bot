@@ -208,7 +208,7 @@ def main() -> None:
         cfg, persist_path=ROOT / "intel" / "pm_tickets.json"
     )
     # Fast exit state machine for FAST_TURNOVER_FIREHOSE tickets.
-    from aegis.intel.fast_firehose import FastExitStateMachine
+    from aegis.intel.fast_firehose import FastExitStateMachine, FastExitConfig
 
     fast_exit_sm = FastExitStateMachine()
     last_inventory_journal: dict[str, float] = {"ts": 0.0}
@@ -1718,10 +1718,14 @@ def main() -> None:
                                                  else marks.get("ask")) or _cur
                                         _pnl_pips = ((_cur - _entry_px) / max(_pip_sz, 1e-10)
                                                      * (1 if _side_l == "buy" else -1))
-                                        # Broker-native pip-to-USD using tick fields.
-                                        _spec_pm = brain_spec or {}
-                                        _tv = float(_spec_pm.get("trade_tick_value") or 1.0)
-                                        _ts = float(_spec_pm.get("trade_tick_size") or _pip_sz)
+                                        # Broker-native pip-to-USD using CURRENT symbol's tick fields.
+                                        _spec_fast = None
+                                        try:
+                                            _spec_fast = eng.symbol_spec(_sym)
+                                        except Exception:
+                                            pass
+                                        _tv = float((_spec_fast or {}).get("trade_tick_value") or 1.0)
+                                        _ts = float((_spec_fast or {}).get("trade_tick_size") or _pip_sz)
                                         _usd_per_pip_per_lot = (_tv / _ts) * _pip_sz
                                         _lot_sz = float(getattr(pos, "quantity", .01))
                                         _mfe_pips = abs(float(_track.mfe_usd or 0)) / max(

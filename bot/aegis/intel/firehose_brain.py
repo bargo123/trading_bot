@@ -624,6 +624,7 @@ class IntelligentFirehoseBrain:
         state: Mapping[str, Any] | None = None,
         actual_bid: float | None = None,
         actual_ask: float | None = None,
+        market_ctx: Any = None,
     ) -> tuple[DemoDecision | None, str | None]:
         """Exploration Firehose gate chain. Returns (fire_decision, skip_reason).
 
@@ -795,6 +796,47 @@ class IntelligentFirehoseBrain:
         if m15_sup is not None and m15_res is not None and m1_c:
             mid = (m15_sup + m15_res) / 2.0
             m15_dir = "up" if m1_c > mid else "down"
+        # Genuine M5/M15 context computed from completed M1 bars.
+        # M5 = last 5 completed bars, M15 = last 15 completed bars.
+        m5_ctx_dir: str | None = None
+        m5_ctx_atr: float | None = None
+        m5_ctx_sup: float | None = None
+        m5_ctx_res: float | None = None
+        m5_ctx_comp: float | None = None
+        m15_ctx_dir: str | None = None
+        m15_ctx_sup: float | None = None
+        m15_ctx_res: float | None = None
+
+        if completed_m1 is not None and len(completed_m1) >= 5:
+            last5 = completed_m1.iloc[-5:]
+            m5_o = float(last5["open"].iloc[0])
+            m5_c5 = float(last5["close"].iloc[-1])
+            m5_ctx_dir = "up" if m5_c5 > m5_o else ("down" if m5_c5 < m5_o else None)
+            m5_highs = last5["high"].astype(float)
+            m5_lows = last5["low"].astype(float)
+            m5_ctx_sup = round(float(m5_lows.min()), 8)
+            m5_ctx_res = round(float(m5_highs.max()), 8)
+            trs5 = []
+            for i in range(len(last5)):
+                h = float(last5["high"].iloc[i])
+                l = float(last5["low"].iloc[i])
+                pc = float(last5["close"].iloc[i - 1]) if i > 0 else float(last5["open"].iloc[0])
+                trs5.append(max(h - l, abs(h - pc), abs(l - pc)))
+            m5_ctx_atr = round(sum(trs5) / len(trs5), 8) if trs5 else None
+            rng5 = m5_ctx_res - m5_ctx_sup
+            body5 = abs(m5_c5 - m5_o)
+            m5_ctx_comp = round(body5 / max(rng5, 1e-10), 4) if rng5 > 0 else None
+
+        if completed_m1 is not None and len(completed_m1) >= 15:
+            last15 = completed_m1.iloc[-15:]
+            m15_o = float(last15["open"].iloc[0])
+            m15_c15 = float(last15["close"].iloc[-1])
+            m15_ctx_dir = "up" if m15_c15 > m15_o else ("down" if m15_c15 < m15_o else None)
+            m15_lows = last15["low"].astype(float)
+            m15_highs = last15["high"].astype(float)
+            m15_ctx_sup = round(float(m15_lows.min()), 8)
+            m15_ctx_res = round(float(m15_highs.max()), 8)
+
         regime_raw = st.get("regime")
         regime_label_str = str(regime_raw.get("label", "") if isinstance(regime_raw, dict) else regime_raw or "")
 
@@ -808,18 +850,26 @@ class IntelligentFirehoseBrain:
             m1_atr=m1_atr, m1_volume=m1_vol,
             m1_range=(m1_h - m1_l) if m1_h and m1_l else None,
             m1_body=abs(m1_c - m1_o) if m1_c and m1_o else None,
-            m15_direction=m15_dir,
+            m15_direction=m15_ctx_dir,
             m15_structure=m15_kind,
-            m15_support=m15_sup,
-            m15_resistance=m15_res,
+            m15_support=m15_ctx_sup if m15_ctx_sup is not None else m15_sup,
+            m15_resistance=m15_ctx_res if m15_ctx_res is not None else m15_res,
             m15_range_mid=m15_mid, m15_range_half_width=m15_hw,
-            m5_direction=m5_dir or None,
+            m5_direction=m5_ctx_dir or m5_dir or None,
             m5_structure=str(m5_struct.get("kind") or "") if m5_struct.get("kind") else None,
-            return_30s=(m1_c - prev_close) if prev_close is not None and m1_c else None,
-            return_60s=round((m1_c - (float(completed_m1["close"].iloc[-3]) if completed_m1 is not None and len(completed_m1) >= 3 else m1_c)) / max(pip, 1e-10), 2) if completed_m1 is not None and len(completed_m1) >= 3 else None,
+            m5_compression=m5_ctx_comp,
+            # Short-horizon returns derived from genuine completed-bar data.
+            # NOTE: These are M1-derived approximations; tick-level returns
+            # require implementing a bounded per-symbol quote buffer.
+            return_30s=(m1_c - m1_o) if m1_c is not None and m1_o is not None else None,
+            return_60s=(m1_c - prev_close) if prev_close is not None and m1_c else None,
             session=session or None,
             regime=regime_label_str or regime_label or regime or None,
         )
+        # Use externally-provided context if given (for deterministic tests),
+        # otherwise build from genuine row/completed_m1/state data.
+        if market_ctx is not None:
+            ctx = market_ctx
         micro_cands = generate_micro_candidates(ctx)
         if not micro_cands:
             return None, "no_micro_candidate_matched"
