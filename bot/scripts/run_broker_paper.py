@@ -215,6 +215,7 @@ def main() -> None:
     )
     # Fast exit state machine for FAST_TURNOVER_FIREHOSE tickets.
     from aegis.intel.fast_firehose import FastExitStateMachine, FastExitConfig
+    from aegis.intel.fast_exit_runner import FastExitContext, evaluate_fast_exit, MissingLiquidationMarkError
 
     fast_exit_sm = FastExitStateMachine()
     last_inventory_journal: dict[str, float] = {"ts": 0.0}
@@ -1772,67 +1773,65 @@ def main() -> None:
                             if _is_fast and intelligent_brain is not None:
                                 try:
                                     _sym = str(getattr(pos, "symbol", ""))
-                                    _marks = live_marks.get(_sym, {})
-                                    if _track is not None and _track.opened_ts > 0:
-                                        _pip_sz = pip_size_for(_sym, cfg) if _sym else 0.0001
-                                        _side_l = str(getattr(pos, "side", "")).lower()
-                                        _entry_px = float(getattr(pos, "avg_price", 0) or 0)
-                                        # Fresh liquidation mark for current position's side using CURRENT symbol's marks
-                                        _mark = _marks.get("bid" if _side_l == "buy" else "ask") or _cur
-                                        _pnl_pips = ((_mark - _entry_px) / max(_pip_sz, 1e-10)
-                                                      * (1 if _side_l == "buy" else -1))
-                                        # Broker-native pip-to-USD using CURRENT symbol's tick fields.
-                                        from aegis.intel.broker_math import BrokerSymbolSpec, mfe_mae_from_usd
-                                        _spec_fast = BrokerSymbolSpec.from_mapping(
-                                            eng.symbol_spec(_sym) if hasattr(eng, 'symbol_spec') else None)
-                                        _lot_sz = float(getattr(pos, "quantity", .01))
-                                        _mfe_pips, _mae_pips = mfe_mae_from_usd(
-                                            float(_track.mfe_usd or 0),
-                                            float(_track.mae_usd or 0),
-                                            _spec_fast, _lot_sz, _pip_sz)
-                                        _stop_dist_pips = abs(
-                                            float(getattr(pos, "avg_price", 0) or 0) -
-                                            float(getattr(pos, "stop_loss", 0) or 0)
-                                        ) / max(_pip_sz, 1e-10) if getattr(pos, 'stop_loss', 0) else 10.0
-                                        # Use exact ticket metadata for max_hold_s (not experiment scan).
-                                        _ticket_meta = ticket_metadata_store.get(tk)
-                                        _tgt_px = _ticket_meta.target_price if _ticket_meta else None
-                                        _max_hold_s = int(_ticket_meta.max_hold_s) if _ticket_meta else 120
-                                        # Fallback to experiment scan only for legacy tickets without metadata.
-                                        if _tgt_px is None:
-                                            for _exp in intelligent_brain.experiments.data.get("experiments", {}).values():
-                                                if str(_exp.get("hypothesis_id")) == str(meta_by_ticket.get(tk, {}).get("hypothesis_id") or ""):
-                                                    _tgt_px = _exp.get("target_price")
-                                                    _max_hold_s = int(_exp.get("max_hold_s") or 120)
-                                                    break
-                                        fast_exit_sm = FastExitStateMachine(
-                                            FastExitConfig(time_exit_s=_max_hold_s)
-                                        )
-                                        fast_verdict = fast_exit_sm.evaluate(
-                                            side=_side_l,
-                                            entry_price=_entry_px,
-                                            current_mark=_mark,
-                                            stop_loss=float(getattr(pos, "stop_loss", 0) or 0),
-                                            target=_tgt_px or _entry_px + _pip_sz * 10 * (1 if _side_l == "buy" else -1),
-                                            opened_ts=_track.opened_ts,
-                                            now=time.time(),
-                                            pnl_pips=_pnl_pips,
-                                            mfe_pips=_mfe_pips,
-                                            mae_pips=_mae_pips,
-                                            stop_pips=max(_stop_dist_pips, 1.0),
-                                            pip=_pip_sz,
-                                            regime_now=intelligent_brain.regime_by_symbol.get(_sym, ""),
-                                            regime_at_entry=_track.regime_at_entry,
-                                            remaining_ev=_rem_ev,
-                                            remaining_ev_status=_rem_status,
-                                        )
-                                        if fast_verdict["action"] in {"TAKE", "SCRATCH", "ABORT", "TIME_EXIT"}:
-                                            verdict = {
-                                                "action": "EXIT",
-                                                "reason": f"fast_{fast_verdict['action'].lower()}:{fast_verdict['reason']}",
-                                                "why": fast_verdict["why"],
-                                                "policy": f"fast_{fast_verdict['policy']}",
-                                            }
+                                    _side_l = str(getattr(pos, "side", "")).lower()
+                                    # Build context for production FastExit helper
+                                    from aegis.intel.fast_exit_runner import FastExitContext, evaluate_fast_exit, MissingLiquidationMarkError
+                                    from aegis.intel.broker_math import BrokerSymbolSpec
+                                    _pip_sz = pip_size_for(_sym, cfg) if _sym else 0.0001
+                                    _entry_px = float(getattr(pos, "avg_price", 0) or 0)
+                                    _cur_bid = live_marks.get(_sym, {}).get("bid")
+                                    _cur_ask = live_marks.get(_sym, {}).get("ask")
+                                    # Determine legacy hypothesis ID for legacy ticket fallback
+                                    _legacy_hyp_id = None
+                                    if _ticket_meta is None:
+                                        _legacy_hyp_id = meta_by_ticket.get(tk, {}).get("hypothesis_id")
+                                    fast_exit_ctx = FastExitContext(
+                                        symbol=_sym,
+                                        ticket=tk,
+                                        side=_side_l,
+                                        entry_price=_entry_px,
+                                        current_bid=_cur_bid or 0.0,
+                                        current_ask=_cur_ask or 0.0,
+                                        avg_price=_entry_px,
+                                        stop_loss=float(getattr(pos, "stop_loss", 0) or 0),
+                                        quantity=float(getattr(pos, "quantity", 0.01)),
+                                        mfe_usd=float(_track.mfe_usd or 0),
+                                        mae_usd=float(_track.mae_usd or 0),
+                                        opened_ts=_track.opened_ts,
+                                        regime_at_entry=_track.regime_at_entry,
+                                        track_target=_track.target if _track else 0.0,
+                                        track_invalidation=_track.invalidation if _track else 0.0,
+                                        track_entry_ev=float(_track.entry_ev_at_open or 0.0),
+                                        track_side=_side_l,
+                                        ticket_meta=_ticket_meta,
+                                        engine_spec=eng.symbol_spec(_sym) if hasattr(eng, 'symbol_spec') else None,
+                                        config=cfg,
+                                        live_marks=live_marks,
+                                        intelligent_brain=intelligent_brain,
+                                        profit_manager=profit_manager,
+                                        now_ts=time.time(),
+                                        legacy_hypothesis_id=_legacy_hyp_id,
+                                    )
+                                    try:
+                                        fast_verdict = evaluate_fast_exit(fast_exit_ctx)
+                                    except MissingLiquidationMarkError:
+                                        fast_exit_error_count += 1
+                                        append_journal(journal, {
+                                            "event": "fast_exit_error",
+                                            "ticket": tk,
+                                            "symbol": _sym,
+                                            "error_type": "MissingLiquidationMarkError",
+                                            "message": f"Missing liquidation mark for {_side_l.upper()}",
+                                            "bar": str(bar_time),
+                                        })
+                                        continue
+                                    if fast_verdict["action"] in {"TAKE", "SCRATCH", "ABORT", "TIME_EXIT"}:
+                                        verdict = {
+                                            "action": "EXIT",
+                                            "reason": f"fast_{fast_verdict['action'].lower()}:{fast_verdict['reason']}",
+                                            "why": fast_verdict["why"],
+                                            "policy": f"fast_{fast_verdict['policy']}",
+                                        }
                                 except Exception as fast_exc:
                                     fast_exit_error_count += 1
                                     append_journal(journal, {

@@ -40,6 +40,16 @@ class FastExitContext:
     intelligent_brain: Any
     profit_manager: Any
     now_ts: float
+    # Legacy hypothesis ID for experiment fallback (only when exact ticket metadata absent)
+    legacy_hypothesis_id: Optional[str] = None
+
+
+class MissingLiquidationMarkError(Exception):
+    """Raised when required liquidation mark (BID for BUY, ASK for SELL) is unavailable."""
+    def __init__(self, side: str, symbol: str):
+        self.side = side
+        self.symbol = symbol
+        super().__init__(f"Missing liquidation mark for {side.upper()} on {symbol}: required {'BID' if side == 'buy' else 'ASK'} unavailable")
 
 
 def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
@@ -48,6 +58,9 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     This is the exact logic from run_broker_paper.py, extracted for testability.
 
     Returns the fast_verdict dict with action, reason, why, policy.
+    
+    Raises:
+        MissingLiquidationMarkError: If required liquidation mark (BID for BUY, ASK for SELL) is unavailable.
     """
     tk = ctx.ticket
     pos_symbol = ctx.symbol
@@ -59,8 +72,15 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     # Get pip size for current symbol
     _pip_sz = pip_size_for(pos_symbol, ctx.config)
 
-    # Fresh liquidation mark for current position's side
-    _mark = (_marks.get("bid") if pos_side == "buy" else _marks.get("ask")) or ctx.current_bid
+    # Fresh liquidation mark for current position's side - NO FALLBACKS
+    if pos_side == "buy":
+        _mark = _marks.get("bid")
+        if _mark is None:
+            raise MissingLiquidationMarkError("buy", pos_symbol)
+    else:
+        _mark = _marks.get("ask")
+        if _mark is None:
+            raise MissingLiquidationMarkError("sell", pos_symbol)
 
     # Entry price from position
     _entry_px = float(ctx.avg_price or 0)
@@ -84,18 +104,21 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
         float(ctx.avg_price or 0) - float(ctx.stop_loss or 0)
     ) / max(_pip_sz, 1e-10) if ctx.stop_loss else 10.0
 
-    # Use exact ticket metadata for target and max_hold_s
+    # Use exact ticket metadata for target and max_hold_s (first priority)
     _ticket_meta = ctx.ticket_meta
     _tgt_px = _ticket_meta.target_price if _ticket_meta else None
     _max_hold_s = int(_ticket_meta.max_hold_s) if _ticket_meta else 120
 
-    # Fallback to experiment scan for legacy tickets
+    # Fallback to experiment scan for legacy tickets ONLY when exact metadata absent
     if _tgt_px is None and ctx.intelligent_brain is not None:
-        for _exp in ctx.intelligent_brain.experiments.data.get("experiments", {}).values():
-            if str(_exp.get("hypothesis_id")) == str(ctx.track_target):
-                _tgt_px = _exp.get("target_price")
-                _max_hold_s = int(_exp.get("max_hold_s") or 120)
-                break
+        # Use explicit legacy_hypothesis_id for lookup, NOT track_target (which is a price)
+        _legacy_hyp_id = ctx.legacy_hypothesis_id
+        if _legacy_hyp_id:
+            for _exp in ctx.intelligent_brain.experiments.data.get("experiments", {}).values():
+                if str(_exp.get("hypothesis_id")) == str(_legacy_hyp_id):
+                    _tgt_px = _exp.get("target_price")
+                    _max_hold_s = int(_exp.get("max_hold_s") or 120)
+                    break
 
     # Create FastExit state machine with ticket's max_hold_s
     fast_exit_sm = FastExitStateMachine(FastExitConfig(time_exit_s=_max_hold_s))
