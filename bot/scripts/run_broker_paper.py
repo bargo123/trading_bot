@@ -1774,12 +1774,12 @@ def main() -> None:
                                     _sym = str(getattr(pos, "symbol", ""))
                                     _marks = live_marks.get(_sym, {})
                                     if _track is not None and _track.opened_ts > 0:
-                                        _pip_sz = pip_size_for(_sym, cfg) if sym_l else 0.0001
+                                        _pip_sz = pip_size_for(_sym, cfg) if _sym else 0.0001
                                         _side_l = str(getattr(pos, "side", "")).lower()
                                         _entry_px = float(getattr(pos, "avg_price", 0) or 0)
-                                        _mark = (_marks.get("bid") if _side_l == "buy"
-                                                  else marks.get("ask")) or _cur
-                                        _pnl_pips = ((_cur - _entry_px) / max(_pip_sz, 1e-10)
+                                        # Fresh liquidation mark for current position's side using CURRENT symbol's marks
+                                        _mark = _marks.get("bid" if _side_l == "buy" else "ask") or _cur
+                                        _pnl_pips = ((_mark - _entry_px) / max(_pip_sz, 1e-10)
                                                       * (1 if _side_l == "buy" else -1))
                                         # Broker-native pip-to-USD using CURRENT symbol's tick fields.
                                         from aegis.intel.broker_math import BrokerSymbolSpec, mfe_mae_from_usd
@@ -1811,7 +1811,7 @@ def main() -> None:
                                         fast_verdict = fast_exit_sm.evaluate(
                                             side=_side_l,
                                             entry_price=_entry_px,
-                                            current_mark=_cur,
+                                            current_mark=_mark,
                                             stop_loss=float(getattr(pos, "stop_loss", 0) or 0),
                                             target=_tgt_px or _entry_px + _pip_sz * 10 * (1 if _side_l == "buy" else -1),
                                             opened_ts=_track.opened_ts,
