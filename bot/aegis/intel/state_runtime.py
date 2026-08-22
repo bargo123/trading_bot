@@ -93,7 +93,12 @@ def _resample(m1: pd.DataFrame, minutes: int) -> pd.DataFrame:
     out = frame.resample(f"{minutes}min", label="right", closed="right").agg(
         {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
     )
-    return out.dropna(subset=["close"]).reset_index()
+    out = out.dropna(subset=["close"]).reset_index()
+    # Drop the last bar: resample with label="right" always produces a bar for
+    # the current incomplete period (right edge = bin end time).
+    if len(out) > 0:
+        out = out.iloc[:-1]
+    return out
 
 
 def _volatility(m1: pd.DataFrame) -> str:
@@ -172,7 +177,7 @@ def build_runtime_state(*, symbol: str, m1: pd.DataFrame) -> dict[str, Any]:
             },
         },
         "multi_timeframe": {
-            "M5": {"direction": m15_struct["direction"]},  # genuine M5 direction from completed bars
+            "M5": {"direction": m5_struct["direction"]},  # genuine M5 direction from completed bars
             "M15": {"direction": m15_struct["direction"]},  # genuine M15 direction from completed bars
             "H1": {"direction": h1_dir},
         },

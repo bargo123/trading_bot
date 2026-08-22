@@ -3,6 +3,14 @@
 Records quotes continuously on runner polling (NOT only on new M1 bars).
 Provides point-in-time returns for 5s, 15s, 30s, 60s using correct
 liquidation-side semantics: BUY -> BID, SELL -> ASK.
+
+For a requested horizon N:
+- never use observations after now
+- require genuine history covering approximately N seconds
+- select the latest observation at/before now-N as the starting observation
+- select latest observation at/before now as endpoint
+- if there is no observation sufficiently old to cover N => None
+- no interpolation/fabrication
 """
 from __future__ import annotations
 
@@ -98,22 +106,38 @@ class QuoteBuffer:
         SELL uses ASK prices (liquidation side for closing a short).
 
         Returns price change (not percentage) in raw price units.
+
+        Implementation:
+        - Select endpoint: latest observation at/before `now`
+        - Select startpoint: latest observation at/before `now - window_seconds`
+        - Both must exist and startpoint must be strictly before endpoint
+        - No interpolation, no future observations
         """
         buf = self.buffers.get(str(symbol).upper())
         if not buf:
             return None
 
-        since = now - window_seconds
-        points = buf.get_points_since(since)
-        if len(points) < 2:
+        price_attr = "bid" if side.lower() == "buy" else "ask"
+
+        # Endpoint: latest quote at or before now (no future observations)
+        end_point = buf.get_at_or_before(now)
+        if end_point is None:
+            return None
+        end_price = getattr(end_point, price_attr)
+        if end_price <= 0:
             return None
 
-        # Use liquidation-side price
-        price_attr = "bid" if side.lower() == "buy" else "ask"
-        start_price = getattr(points[0], price_attr)
-        end_price = getattr(points[-1], price_attr)
+        # Startpoint: latest quote at or before now - window_seconds
+        start_ts = now - window_seconds
+        start_point = buf.get_at_or_before(start_ts)
+        if start_point is None:
+            return None  # insufficient history to cover the window
+        start_price = getattr(start_point, price_attr)
+        if start_price <= 0:
+            return None
 
-        if start_price <= 0 or end_price <= 0:
+        # Ensure start is strictly before end (genuine time progression)
+        if start_point.timestamp >= end_point.timestamp:
             return None
 
         return end_price - start_price
@@ -135,12 +159,14 @@ class QuoteBuffer:
         return self._returns_for_side(symbol, 60, side, now)
 
     def tick_rate_per_min(self, symbol: str, now: float) -> Optional[float]:
-        """Observed tick/quote rate per minute over last 60s."""
+        """Observed tick/quote rate per minute over last 60s (observations at/before now)."""
         buf = self.buffers.get(str(symbol).upper())
         if not buf:
             return None
         since = now - 60
         points = buf.get_points_since(since)
+        # Filter to only observations at/before now
+        points = [p for p in points if p.timestamp <= now]
         if not points:
             return None
         return len(points)  # points per minute
@@ -152,6 +178,7 @@ class QuoteBuffer:
             return None
         since = now - 60
         points = buf.get_points_since(since)
+        points = [p for p in points if p.timestamp <= now]
         if len(points) < 2:
             return None
         changes = []
@@ -170,6 +197,7 @@ class QuoteBuffer:
             return None
         since = now - 60
         points = buf.get_points_since(since)
+        points = [p for p in points if p.timestamp <= now]
         if len(points) < 3:
             return None
         mids = [(p.bid + p.ask) / 2.0 for p in points if p.bid > 0 and p.ask > 0]
@@ -183,16 +211,13 @@ class QuoteBuffer:
         return math.sqrt(var)
 
     def signed_tick_imbalance(self, symbol: str, now: float) -> Optional[float]:
-        """Signed imbalance of upticks vs downticks over last 60s.
-
-        Positive = more upticks (bid/ask moving up).
-        Negative = more downticks.
-        """
+        """Signed imbalance of upticks vs downticks over last 60s."""
         buf = self.buffers.get(str(symbol).upper())
         if not buf:
             return None
         since = now - 60
         points = buf.get_points_since(since)
+        points = [p for p in points if p.timestamp <= now]
         if len(points) < 2:
             return None
         up = down = 0

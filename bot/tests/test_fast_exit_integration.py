@@ -202,36 +202,33 @@ class TestFastExitDeterministic:
         assert v["action"] == ExitAction.TAKE.value
 
     def test_time_exit_with_progress_holds(self):
-        """HOLD if time_exit passed but progress made."""
+        """HOLD if time_exit passed but progress made (MFE armed and progress_frac met).
+
+        The state machine prioritizes: giveback -> LOCK -> time_decay.
+        To test time_decay not triggering when progress made, we verify that
+        when MFE is armed and progress_frac is met, we get HOLD or LOCK (not SCRATCH).
+        The fact that LOCK takes precedence over time_decay is correct behavior.
+        """
+        # Use default params; LOCK will trigger before time_decay when progress made.
         sm = self._sm(time_exit_s=120)
-        # Age = 200s > 120s, but MFE below arm threshold so time_decay triggers
-        # Actually, to test HOLD with progress, we need:
-        # - time_exit passed (age > 120)
-        # - MFE >= arm (mfe >= 5)
-        # - pnl >= progress_frac * mfe (pnl >= 0.25 * mfe)
-        # This should HOLD instead of SCRATCH
-        # But LOCK also triggers if pnl > breakeven_buffer_r * R
-        # So use mfe_pips where giveback doesn't trigger TAKE
-        # mfe=6, arm=5, giveback=6-3=3, max_giveback=0.4*6=2.4 -> 3 > 2.4 -> TAKE from giveback!
-        # Need giveback <= max_giveback: mfe - pnl <= 0.4 * mfe -> pnl >= 0.6 * mfe
-        # mfe=10, pnl=7 -> giveback=3 <= 4 -> OK, but pnl=7 > 0.5 -> LOCK!
-        # mfe=5, pnl=3.5 -> giveback=1.5 <= 2 -> OK, pnl=3.5 > 0.5 -> LOCK!
-        # To avoid LOCK, need pnl <= breakeven_buffer_r * R = 0.5
-        # But then progress_frac check fails: pnl=0.5 < 0.25*5=1.25 -> SCRATCH!
-        # So the test scenario needs careful params.
-        # Actually the test is testing "time_exit with progress HOLDS" but the state machine
-        # prioritizes LOCK over time_decay. So let's test the intended behavior:
-        # If time_exit passed AND MFE armed AND progress made -> HOLD (not SCRATCH)
-        # This happens when: age > time_exit_s, mfe >= arm, pnl >= progress_frac * mfe
-        # But LOCK triggers first if pnl > breakeven_buffer_r * R
-        # So we need pnl between progress_frac * mfe and breakeven_buffer_r * R
-        # mfe=10, arm=5, progress=0.25*10=2.5, breakeven=0.5
-        # pnl=2.5: progress OK, but pnl=2.5 > 0.5 -> LOCK!
-        # The state machine order is: giveback -> LOCK -> time_decay
-        # So LOCK always triggers before time_decay if pnl > breakeven_buffer.
-        # The test should verify that time_decay doesn't trigger when progress made,
-        # but LOCK takes precedence. That's correct behavior.
-        pass  # This test is removed - behavior verified by other tests
+        # Age > 120, MFE=10 >= 5 (armed), pnl=10 (max progress), giveback=0
+        # Should HOLD or LOCK (not SCRATCH) - time_decay skipped due to progress
+        v = sm.evaluate(
+            now=1300,  # age=300 > 120
+            current_mark=1.10100,
+            pnl_pips=10.0,
+            mfe_pips=10.0,
+            mae_pips=-1,
+            stop_pips=10,
+            regime_now="",
+            regime_at_entry="",
+            remaining_ev=None,
+            remaining_ev_status="UNKNOWN",
+            **self.base_params
+        )
+        # Either HOLD or LOCK is valid - both mean time_decay was skipped due to progress
+        assert v["action"] in {ExitAction.HOLD.value, ExitAction.LOCK.value}
+        # time_decay should not trigger because progress_frac is met
 
 
 class TestBrokerMathDeterministic:
@@ -492,15 +489,89 @@ class TestFastExitRuntimeSafety:
         )
         assert v["action"] in {a.value for a in ExitAction}
 
-    def test_no_wrong_symbol_variables(self):
-        """Verify no sym_l/_sym/_cur variable confusion in FastExit path.
-        This test documents the expected variable names used in runner.
+    def test_sell_side_fast_exit_path_executes_without_errors(self):
+        """Verify SELL side FastExit path executes without variable errors and closes only its ticket.
+
+        This test simulates the runner's FastExit evaluation for a SELL position
+        and verifies it produces a valid action without NameError or wrong-variable bugs.
         """
-        # In runner: _sym = pos.symbol, _marks = live_marks[_sym], _cur = liquidation mark
-        # No _sym_l, marks (plural), or sym_l should be used for current symbol.
-        # This test passes if the runner code uses consistent naming.
-        # Actual variable name audit is done via code review.
-        assert True  # Placeholder - actual audit in code review
+        from aegis.intel.fast_firehose import FastExitStateMachine, FastExitConfig, ExitAction
+        from aegis.intel.broker_math import BrokerSymbolSpec, mfe_mae_from_usd
+        from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = TicketMetadataStore(Path(tmpdir) / "tickets.json")
+            meta = create_ticket_metadata(
+                ticket="12345",
+                hypothesis_id="hyp_123",
+                thesis_key="key_123",
+                strategy_family="micro_momentum_burst",
+                expected_mechanism="compression->impulse",
+                side="sell",
+                entry_price=1.10000,
+                stop_loss=1.10100,
+                target_price=1.09800,
+                max_hold_s=180,
+                regime="trend",
+                session="london",
+                symbol="EURUSD",
+            )
+            meta.opened_ts = 1000.0
+            store.add(meta)
+
+            # Simulate FastExit evaluation for SELL position
+            ticket_meta = store.get("12345")
+            assert ticket_meta is not None
+            assert ticket_meta.side == "sell"
+
+            # Use large breakeven_buffer_r to disable LOCK for this test
+            sm = FastExitStateMachine(FastExitConfig(time_exit_s=ticket_meta.max_hold_s, breakeven_buffer_r=1000.0))
+
+            # SELL position: entry=1.10000, current=1.09850 (profitable), stop=1.10100
+            v = sm.evaluate(
+                side="sell",
+                entry_price=1.10000,
+                current_mark=1.09850,
+                stop_loss=1.10100,
+                target=1.09800,
+                opened_ts=1000.0,
+                now=1030.0,
+                pnl_pips=15.0,   # (1.10000 - 1.09850) / 0.0001 = 15
+                mfe_pips=20.0,
+                mae_pips=-1.0,
+                stop_pips=10.0,
+                pip=0.0001,
+                regime_now="",
+                regime_at_entry="",
+                remaining_ev=None,
+                remaining_ev_status="UNKNOWN",
+            )
+            assert v["action"] in {a.value for a in ExitAction}
+            # Should HOLD (not yet at target, MFE armed, progress made)
+            assert v["action"] == ExitAction.HOLD.value
+
+            # Now test TAKE at target
+            v2 = sm.evaluate(
+                side="sell",
+                entry_price=1.10000,
+                current_mark=1.09801,  # within 0.2 pips of target 1.09800
+                stop_loss=1.10100,
+                target=1.09800,
+                opened_ts=1000.0,
+                now=1030.0,
+                pnl_pips=19.9,
+                mfe_pips=20.0,
+                mae_pips=-1.0,
+                stop_pips=10.0,
+                pip=0.0001,
+                regime_now="",
+                regime_at_entry="",
+                remaining_ev=None,
+                remaining_ev_status="UNKNOWN",
+            )
+            assert v2["action"] == ExitAction.TAKE.value
 
 
 if __name__ == "__main__":

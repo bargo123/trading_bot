@@ -404,21 +404,23 @@ def test_heartbeat_rates_present_after_activity(tmp_path, monkeypatch):
         assert key in snap, key
     assert snap["candidate_rate_per_hour"] >= 1.0
 
-@pytest.mark.skip(reason="TODO: micro_candidates path changed exploration flow; "
-                         "self-hedge verified live on MT5 DEMO (2 open positions)")
-def test_self_hedge_same_family_blocked(tmp_path, monkeypatch):
+def test_self_hedge_same_family_blocked(tmp_path):
     """Spec J: opposing same-symbol exposure requires a DIFFERENT mechanism;
-    same-family opposite-side exploration is blocked."""
-    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+    same-family opposite-side exploration is blocked.
 
+    This test directly exercises the self-hedge check in _maybe_explore by
+    pre-seeding a BUY exploration thesis in memory, then attempting a SELL
+    exploration with the same family. The self-hedge check should block it.
+    """
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+    from aegis.intel.fast_firehose import FastMarketContext, generate_micro_candidates
     index = tmp_path / "analogue_index.json"
-    index.write_text(json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1",
-                                 "records": []}), encoding="utf-8")
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1", "records": []}), encoding="utf-8")
     cfg = {
         "analogue_index_path": str(index),
-        "intelligent_gate_validated_states": True,
-        "validated_states_path": str(tmp_path / "empty_states.json"),
+        "intelligent_gate_validated_states": False,
         "intelligent_firehose_bootstrap": True,
+        "intelligent_bootstrap_canary": True,
         "intelligent_min_analogues": 20,
         "intelligent_min_similarity": 0.5,
         "intelligent_risk_fraction": 0.08,
@@ -427,84 +429,58 @@ def test_self_hedge_same_family_blocked(tmp_path, monkeypatch):
         "max_positions": 40,
         "intelligent_exploration_enabled": True,
         "exploration_max_risk_per_trade_usd": 0.15,
+        "intelligent_min_payoff_ratio": 0.1,
+        "intelligent_min_expected_net_usd": -10.0,
+        "intelligent_allow_synthetic_evidence": True,
+        # Increase per-symbol limit so we can test self-hedge specifically
+        "exploration_max_per_symbol": 2,
     }
     brain = IntelligentFirehoseBrain(cfg)
 
-    class _Ev:
-        pass
+    # Manually seed a BUY exploration thesis for the family we'll test
+    # This simulates a previously filled BUY exploration position
+    test_family = "failed_breakout_fade"
+    buy_thesis_key = "EURUSD|buy|failed_breakout_fade|range|asia"
+    brain._exploration_theses.add(buy_thesis_key)
+    buy_mem = brain.memory.get(buy_thesis_key, "EURUSD")
+    buy_mem.symbol = "EURUSD"
+    buy_mem.side = "buy"
+    buy_mem.setup_family = test_family
+    buy_mem.tickets.add("99990")  # simulate a filled ticket
 
-    monkeypatch.setattr(brain.analogues, "query", lambda **k: _FakeEvidence())
-    from aegis.intel import firehose_brain as fb
-
-    fake_state = {
-        "structure": {"M15": {"kind": "retest",
-                              "support": 1.0995, "resistance": 1.1005}},
-        "session": "asia",
-        "regime": {"label": "range"},
-        "multi_timeframe": {"H1": {"direction": "up"}, "M5": {"direction": "down"}},
-        "volatility": {"phase": "stable"},
-    }
-    monkeypatch.setattr(fb, "build_runtime_state", lambda **k: fake_state)
-    monkeypatch.setattr(
-        fb, "runtime_signature",
-        lambda state, side, setup: {"regime": "range", "structure": "retest",
-                                    "session": "asia"},
+    # Build a context for SELL exploration with same family
+    ctx = FastMarketContext(
+        symbol="EURUSD", bid=1.09998, ask=1.10000, spread_pips=0.2,
+        m1_close=1.09999, m1_prev_close=1.10001, m1_atr=0.00002,
+        m1_low=1.09997, m1_high=1.10012,
+        m15_direction="down", m15_support=1.09950, m15_resistance=1.10000,
+        m5_direction="down", session="asia", regime="range",
     )
-    frame = _exploration_frame()
+    cands = generate_micro_candidates(ctx)
+    assert len(cands) >= 1
+    mc = cands[0]
+    spec = {"volume_min": 0.01, "trade_contract_size": 100000.0, "trade_tick_value": 1.0, "trade_tick_size": 0.00001}
 
-    def _eval(side):
-        row = frame.iloc[-1].copy()
-        row["time"] = frame["time"].iloc[-1]
-        row["ema_20"] = float(frame["close"].iloc[-1])
-        return brain.evaluate(
-            symbol="EURUSD", row=row, completed_m1=frame.iloc[:-1],
-            positions=[], equity=100.0, pip=0.0001, core_side=side,
-            spread_price=0.0002,
-            symbol_spec={"volume_min": 0.01, "volume_step": 0.01,
-                         "trade_contract_size": 100000.0},
-            entry_price=float(row["close"]),
-        )
-
-    first = _eval("buy")
-    assert first.action == "fire" and first.journal.get("exploration")
-    # Simulate that the first fire's order was filled and ticket bound
-    # (the runner does this post-fill; here we do it manually).
-    first_key = None
-    for key in brain.memory.exploration_pending:
-        first_key = key
-        break
-    if first_key:
-        brain.memory.bind_tickets(first_key, "EURUSD", ["99990"])
-    # Keep ticket alive by passing matching position to evaluate.
-    class _FakePos:
-        symbol = "EURUSD"
-        side = "buy"
-        quantity = 0.01
-        avg_price = 1.1000
-        unrealized_pnl = 0.0
-        ticket = "99990"
-        stop_loss = 0.0
-        take_profit = 0.0
-        comment = ""
-
-    row2 = frame.iloc[-1].copy()
-    row2["time"] = frame["time"].iloc[-1]
-    row2["ema_20"] = float(frame["close"].iloc[-1])
-
-    # Opposite side, SAME family/mechanism -> blocked as self-hedge.
-    second = brain.evaluate(
-        symbol="EURUSD", row=row2, completed_m1=frame.iloc[:-1],
-        positions=[_FakePos()], equity=100.0, pip=0.0001, core_side="sell",
-        spread_price=0.0002,
-        symbol_spec={"volume_min": 0.01, "volume_step": 0.01,
-                     "trade_contract_size": 100000.0},
-        entry_price=float(row2["close"]),
+    # Attempt SELL exploration with SAME family - should be blocked by self-hedge
+    result, skip = brain._maybe_explore(
+        symbol="EURUSD", side="sell", setup=test_family,  # opposite side, same family
+        signature={"regime": "range", "structure": "retest", "session": "asia", "m15_direction": "down"},
+        entry=ctx.bid, invalidation=mc.invalidation,
+        target=ctx.bid - (mc.target - mc.entry_price),  # symmetric target
+        pip=0.0001, info_id="test_info2",
+        portfolio_ok=True, portfolio_reason="",
+        symbol_spec=spec, question="test",
+        volatility="stable", regime_label="range",
+        evidence=None, spread_price=0.00002,
+        actual_bid=ctx.bid, actual_ask=ctx.ask,
+        row=pd.Series({"open": 1.100005, "high": ctx.m1_high, "low": ctx.m1_low, "close": ctx.m1_close, "volume": 100}),
+        completed_m1=pd.DataFrame({"open": [1.10]*4+[1.10001], "high": [1.10002]*5, "low": [1.09999]*5, "close": [1.10]*4+[1.10001], "volume": [100]*5}),
+        state={"structure": {"M15": {"kind": "retest", "support": 1.09950, "resistance": 1.10000}}, "multi_timeframe": {"M5": {"direction": "down"}, "M15": {"direction": "down"}}, "session": "asia", "regime": {"label": "range"}, "volatility": {"phase": "stable"}},
+        market_ctx=ctx,
     )
-    skips = brain.counts.get("skip_reasons") or {}
-    hedge_blocks = sum(
-        v for k, v in skips.items() if k.startswith("self_hedge_blocked"))
-    assert hedge_blocks >= 1
-    assert second.action != "fire"
+    # Should be blocked by self-hedge
+    assert result is None, f"expected None but got {result}"
+    assert skip is not None and skip.startswith("self_hedge_blocked_same_family"), f"got skip: {skip}"
 
 
 def test_change_vote_workflow(tmp_path, monkeypatch):

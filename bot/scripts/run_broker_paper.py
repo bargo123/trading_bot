@@ -509,10 +509,9 @@ def main() -> None:
                 return
 
             q = eng.quote(sym)
-            # Record quote for sub-minute features (genuine, point-in-time)
-            now_ts = time.time()
-            quote_buffer.record_from_quote(sym, {"bid": q.bid, "ask": q.ask, "time": now_ts})
+            # Quote already recorded in polling loop; use current quote for this evaluation
             t0 = time.perf_counter()
+            now_ts = time.time()
             live_spread = max(0.0, float(q.ask) - float(q.bid))
             mid = (float(q.bid) + float(q.ask)) / 2.0 if q.bid and q.ask else 0.0
             live_bps = (live_spread / mid * 10000.0) if mid > 0 else 0.0
@@ -1448,6 +1447,15 @@ def main() -> None:
                 acct = eng.account()
                 equity = acct.equity
                 all_pos = eng.positions()
+                # Continuously sample quotes for ALL watched symbols (not just on new M1 bar)
+                now_ts = time.time()
+                for sym in symbols:
+                    try:
+                        q = eng.quote(sym)
+                        if q.bid and q.ask:
+                            quote_buffer.record_from_quote(sym, {"bid": q.bid, "ask": q.ask, "time": now_ts})
+                    except Exception:
+                        pass
                 extra_hb = {
                     "status": "running",
                     "equity": equity,
@@ -1597,31 +1605,31 @@ def main() -> None:
                     try:
                         all_open = eng.positions()
                         meta_by_ticket: dict[str, dict] = {}
-                        for _key, _mem in intelligent_brain.memory.theses.items():
-                            # Look up hypothesis_id from the experiment store
-                            # using thesis key's family/symbol/side/regime/session.
-                            _hyp = ""
-                            _max_hold = 120
-                            _tgt_px = None
-                            for _exp in intelligent_brain.experiments.data.get("experiments", {}).values():
-                                if str(_exp.get("council_case") or "") == _key or \
-                                   (str(_exp.get("symbol") or "") == str(_mem.symbol) and
-                                    str(_exp.get("strategy_family") or "") == str(_mem.setup_family)):
-                                    _hyp = str(_exp.get("hypothesis_id") or "")
-                                    _max_hold = int(_exp.get("max_hold_s") or 120)
-                                    _tgt_px = _exp.get("target_price")
-                                    break
-                            for _t in _mem.tickets:
-                                meta_by_ticket[_t] = {
-                                    "thesis_key": _key,
-                                    "hypothesis_id": _hyp,
-                                    "stage": "EXPLORATION_CANARY"
-                                    if _key in intelligent_brain._exploration_theses
-                                    else (intelligent_brain.strategy.promotion_stage
-                                          if intelligent_brain.strategy else ""),
-                                    "family": _mem.setup_family,
-                                    "target": _tgt_px,
+                        # FIRST: use exact ticket metadata as source of truth
+                        for _p in all_open:
+                            _tk = str(getattr(_p, "ticket", "") or "")
+                            if not _tk:
+                                continue
+                            _ticket_meta = ticket_metadata_store.get(_tk)
+                            if _ticket_meta is not None:
+                                # Fresh ticket: exact metadata exists - use it exclusively
+                                meta_by_ticket[_tk] = {
+                                    "thesis_key": _ticket_meta.thesis_key,
+                                    "hypothesis_id": _ticket_meta.hypothesis_id,
+                                    "stage": "EXPLORATION_CANARY",
+                                    "family": _ticket_meta.strategy_family,
+                                    "target": _ticket_meta.target_price,
+                                    "max_hold_s": _ticket_meta.max_hold_s,
+                                    "regime": _ticket_meta.regime,
+                                    "session": _ticket_meta.session,
+                                    "side": _ticket_meta.side,
+                                    "entry": _ticket_meta.entry_price,
+                                    "stop": _ticket_meta.stop_loss,
+                                    "mechanism": _ticket_meta.expected_mechanism,
+                                    "information_id": _ticket_meta.information_id,
                                 }
+                            # else: legacy ticket - will be handled below
+                        # SECOND: legacy tickets without exact metadata - fallback to experiment scan
                         for _p in all_open:
                             _tk = str(getattr(_p, "ticket", "") or "")
                             if _tk in meta_by_ticket:
@@ -1659,15 +1667,23 @@ def main() -> None:
                         for pos in all_open:
                             tk = str(getattr(pos, "ticket", "") or "")
                             meta_t = meta_by_ticket.get(tk) or {}
+                            _ticket_meta = ticket_metadata_store.get(tk)
                             comment = str(getattr(pos, "comment", "") or "")
                             is_exp = "EXP" in comment
-                            hyp_id = (
-                                meta_t.get("hypothesis_id")
-                                or (intelligent_brain.find_experiment_by_tag(comment)
-                                    and intelligent_brain.find_experiment_by_tag(
-                                        comment)["hypothesis_id"])
-                                or ""
-                            )
+                            if _ticket_meta is not None:
+                                hyp_id = _ticket_meta.hypothesis_id
+                                thesis_id = _ticket_meta.thesis_key
+                                legacy_unattributed = False
+                            else:
+                                hyp_id = (
+                                    meta_t.get("hypothesis_id")
+                                    or (intelligent_brain.find_experiment_by_tag(comment)
+                                        and intelligent_brain.find_experiment_by_tag(
+                                            comment)["hypothesis_id"])
+                                    or ""
+                                )
+                                thesis_id = meta_t.get("thesis_key") or ""
+                                legacy_unattributed = is_exp and not meta_t.get("thesis_key")
                             inventory.append({
                                 "ticket": tk,
                                 "symbol": str(getattr(pos, "symbol", "")),
@@ -1678,9 +1694,8 @@ def main() -> None:
                                             "intelligent_unattributed")),
                                 "exploration": bool(is_exp),
                                 "hypothesis_id": hyp_id,
-                                "thesis_id": (meta_t.get("thesis_key") or ""),
-                                "legacy_unattributed": bool(
-                                    is_exp and not meta_t.get("thesis_key")),
+                                "thesis_id": thesis_id,
+                                "legacy_unattributed": legacy_unattributed,
                                 "client_comment": comment[:40],
                                 "risk_usd_est": round(
                                     abs(float(getattr(pos, "unrealized_pnl", 0) or 0)),
@@ -1746,8 +1761,14 @@ def main() -> None:
                                 remaining_ev_status=_rem_status,
                             )
                             # Fast exit state machine governs FAST tickets.
-                            _is_fast = bool(meta_by_ticket.get(tk, {}).get("hypothesis_id")
-                                            and "EXP" in str(getattr(pos, "comment", "")))
+                            _is_fast = False
+                            _ticket_meta = ticket_metadata_store.get(tk)
+                            if _ticket_meta is not None:
+                                # Fresh ticket with exact metadata - use it for fast exit
+                                _is_fast = True
+                            elif meta_by_ticket.get(tk, {}).get("hypothesis_id") and "EXP" in str(getattr(pos, "comment", "")):
+                                # Legacy ticket - fallback to experiment scan
+                                _is_fast = True
                             if _is_fast and intelligent_brain is not None:
                                 try:
                                     _sym = str(getattr(pos, "symbol", ""))
