@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -366,6 +367,42 @@ def test_preexisting_unlocked_mutex_file_is_harmless_and_persistent(tmp_path: Pa
     assert record["status"] == "succeeded"
     assert lock_path.exists()
     assert lock_path.read_bytes() == b"\0"
+
+
+def test_sealed_reservation_reads_ledger_only_while_locked(tmp_path: Path):
+    class LockOrderedStore(SealedHoldoutStore):
+        def __init__(self, path: Path) -> None:
+            super().__init__(path)
+            self.locked = False
+
+        @contextmanager
+        def _locked(self):
+            self.locked = True
+            try:
+                yield
+            finally:
+                self.locked = False
+
+        def _rows(self):
+            assert self.locked, "ledger read occurred outside the mutex"
+            return super()._rows()
+
+    frozen = freeze_candidate(
+        strategy_id="breakout-v1",
+        code_hash="code-a",
+        config={"window": 2},
+        artifact_hash="model-a",
+        training_dataset_fingerprint="training-a",
+    )
+    store = LockOrderedStore(tmp_path / "sealed.jsonl")
+
+    record = store.evaluate_once(
+        frozen,
+        holdout_fingerprint="holdout-a",
+        evaluate=lambda: {"expectancy": 0.2, "n_trades": 25},
+    )
+
+    assert record["status"] == "succeeded"
 
 
 def test_preexisting_sealed_reservation_blocks_callback(tmp_path: Path):

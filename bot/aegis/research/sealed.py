@@ -155,10 +155,6 @@ class SealedHoldoutStore:
         holdout_fingerprint: str,
     ) -> dict[str, Any]:
         key = (frozen.frozen_hash, holdout_fingerprint)
-        if any(self._matches(row, key) for row in self._rows()):
-            raise SealedHoldoutError(
-                "frozen candidate already reserved or evaluated on this holdout fingerprint"
-            )
         with self._locked():
             if any(self._matches(row, key) for row in self._rows()):
                 raise SealedHoldoutError(
