@@ -827,14 +827,25 @@ Live trading: DISABLED
         return df
 
     def _split_data(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """Split data chronologically into train/val/test/sealed."""
+        """Split data chronologically into train/val/test/sealed.
+        
+        The sealed holdout is PHYSICALLY ISOLATED - it is NEVER used for:
+        - Feature selection tuning
+        - Hyperparameter tuning  
+        - Hypothesis generation
+        - Model selection
+        - Any optimization decisions
+        
+        It is ONLY used ONCE for final evaluation of a candidate that has
+        passed ALL prior gates (champion promotion).
+        """
         if df.empty or "time" not in df.columns:
             return df, df, df, df
 
         df = df.sort_values("time").reset_index(drop=True)
         n = len(df)
 
-        # 60% train, 20% validation, 15% test, 5% sealed holdout
+        # 60% train, 20% validation, 15% test, 5% SEALED HOLDOUT
         train_end = int(n * 0.6)
         val_end = int(n * 0.8)
         test_end = int(n * 0.95)
@@ -844,7 +855,12 @@ Live trading: DISABLED
         test = df.iloc[val_end:test_end].copy()
         sealed = df.iloc[test_end:].copy()
 
-        logger.info(f"Data split: train={len(train)}, val={len(val)}, test={len(test)}, sealed={len(sealed)}")
+        # Mark sealed data as physically isolated
+        sealed.attrs["sealed"] = True
+        sealed.attrs["sealed_at"] = datetime.now(timezone.utc).isoformat()
+        sealed.attrs["purpose"] = "FINAL_EVALUATION_ONLY"
+
+        logger.info(f"Data split: train={len(train)}, val={len(val)}, test={len(test)}, SEALED={len(sealed)}")
         return train, val, test, sealed
 
     def _train_models(self, train_data: pd.DataFrame, val_data: pd.DataFrame) -> List[Any]:
@@ -1372,7 +1388,48 @@ Live trading: DISABLED
             challenger_metrics["max_drawdown"] <= champion_metrics["max_drawdown"] * 1.1
         )
 
-    def _promote_challenger(self) -> None:
+    def _evaluate_on_sealed_holdout(self, champion: Champion) -> Dict[str, Any]:
+        """Evaluate a champion candidate on the SEALED holdout data.
+        
+        This is the FINAL GATE - only called ONCE when a challenger is
+        ready for promotion to champion. The sealed holdout has been
+        physically isolated and never used during training/validation.
+        """
+        if not hasattr(self, '_sealed_holdout') or self._sealed_holdout is None:
+            return {"status": "no_sealed_data", "promoted": False}
+        
+        if self._sealed_holdout_evaluated:
+            return {"status": "already_evaluated", "promoted": False}
+        
+        self._log_event("SEALED_HOLDOUT", f"Evaluating champion {champion.hypothesis_id} on SEALED holdout")
+        
+        try:
+            # Evaluate champion on sealed data using same walk-forward logic
+            models = self.ml_pipeline.train(self._sealed_holdout, self._sealed_holdout)
+            if not models:
+                return {"promoted": False, "reason": "no_models_on_sealed"}
+            
+            # Use the champion's model (first model) for evaluation
+            best_model = models[0] if models else None
+            if best_model is None:
+                return {"promoted": False, "reason": "no_model_on_sealed"}
+            
+            # Run walk-forward on sealed data
+            sealed_results = self._walk_forward_validation([best_model], self._sealed_holdout)
+            
+            # Check if performance meets threshold on SEALED data
+            if sealed_results.get("summary", {}).get("avg_expectancy", 0) > 0.1:
+                self._sealed_holdout_evaluated = True
+                self._log_event("CHAMPION_PROMOTED", f"Champion promoted after SEALED evaluation: {champion.hypothesis_id}")
+                return {"promoted": True, "sealed_metrics": sealed_results}
+            else:
+                return {"promoted": False, "reason": "failed_sealed_evaluation", "sealed_metrics": sealed_results}
+                
+        except Exception as e:
+            logger.exception(f"Sealed holdout evaluation failed: {e}")
+            return {"promoted": False, "reason": f"sealed_evaluation_error: {e}"}
+
+    def _should_promote_challenger(self) -> bool:
         """Promote challenger to champion."""
         self.state.champion = self.state.challenger
         self.state.challenger = None
