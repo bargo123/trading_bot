@@ -147,13 +147,12 @@ def load_losses() -> List[Dict[str, Any]]:
     """Load losses from the loss database."""
     from aegis.intel.paths import INTEL_DIR
     import json
-    import random
-    from datetime import datetime, timezone
     
     losses_path = INTEL_DIR / "losses.jsonl"
     if not losses_path.exists():
-        # Generate synthetic losses for testing
-        return generate_synthetic_losses()
+        # NO synthetic data - real research requires real losses
+        logger.warning(f"Losses file not found at {losses_path}. Returning empty list.")
+        return []
     
     losses = []
     with losses_path.open() as f:
@@ -162,64 +161,6 @@ def load_losses() -> List[Dict[str, Any]]:
                 losses.append(json.loads(line))
             except Exception:
                 pass
-    return losses
-
-
-def generate_synthetic_losses(n: int = 100) -> List[Dict[str, Any]]:
-    """Generate synthetic losses for testing."""
-    loss_classes = [
-        "BAD_ENTRY", "WRONG_SIDE", "WRONG_REGIME", "SPREAD_COST",
-        "ADVERSE_SELECTION", "LATE_ENTRY", "FALSE_BREAKOUT", "NO_PROGRESS",
-        "MOMENTUM_FAILURE", "WINNER_GIVEBACK", "STOP_TOO_WIDE",
-        "TIME_EXIT_TOO_LATE", "SELF_HEDGE", "TAIL_EVENT",
-        "INSUFFICIENT_INFORMATION", "UNAVOIDABLE"
-    ]
-    
-    symbols = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCAD"]
-    sides = ["buy", "sell"]
-    regimes = ["trend", "range", "unknown"]
-    sessions = ["asia", "london", "newyork"]
-    
-    losses = []
-    for i in range(n):
-        loss_class = random.choice(["BAD_ENTRY", "WRONG_SIDE", "WRONG_REGIME", 
-                                   "ADVERSE_SELECTION", "FALSE_BREAKOUT", 
-                                   "NO_PROGRESS", "MOMENTUM_FAILURE"])
-        symbol = random.choice(["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCAD"])
-        side = random.choice(sides)
-        entry_price = round(random.uniform(1.05, 1.15), 5)
-        pnl = round(random.uniform(-20, -0.5), 2)
-        mfe = round(random.uniform(0, 10), 2)
-        mae = round(random.uniform(0, 20), 2)
-        
-        losses.append({
-            "trade_id": f"trade_{i}",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "symbol": symbol,
-            "side": side,
-            "entry_price": entry_price,
-            "exit_price": round(random.uniform(1.05, 1.15), 5),
-            "stop_loss": round(random.uniform(1.04, 1.16), 5),
-            "target_price": round(random.uniform(1.05, 1.15), 5),
-            "pnl": pnl,
-            "mfe": round(random.uniform(0, 10), 2),
-            "mae": round(random.uniform(0, 20), 2),
-            "hold_time": random.randint(10, 3600),
-            "regime_at_entry": random.choice(["trend", "range", "unknown"]),
-            "regime_at_exit": random.choice(["trend", "range", "unknown"]),
-            "session": random.choice(sessions),
-            "spread_at_entry": round(random.uniform(0.0001, 0.0005), 5),
-            "volatility_at_entry": round(random.uniform(0.0005, 0.002), 5),
-            "loss_class": loss_class,
-            "entry_distance_from_extreme": round(random.uniform(0, 1), 2),
-            "breakout_failed": random.choice([True, False]),
-            "momentum_at_entry": round(random.uniform(-1, 1), 2),
-            "regime_change": random.choice([True, False]),
-            "breakout_failed": random.choice([True, False]),
-            "entry_distance_from_extreme": round(random.uniform(0, 1), 2),
-            "opposite_position_open": random.choice([True, False]),
-            "feature_completeness": round(random.uniform(0.3, 1.0), 2),
-        })
     return losses
 
 
@@ -1528,38 +1469,216 @@ Live trading: DISABLED
         val_data: pd.DataFrame,
         test_data: pd.DataFrame,
     ) -> Dict[str, Any]:
-        """Test a hypothesis with walk-forward validation."""
-        # Simplified hypothesis testing
-        # In reality, would implement the hypothesis rules and backtest
-
-        # Simulate results based on hypothesis
-        metrics = {
-            "win_rate": 0.65,
-            "loss_rate": 0.35,
-            "expectancy": 0.15,
-            "profit_factor": 1.8,
-            "avg_win": 1.2,
-            "avg_loss": -0.8,
-            "p95_loss": -2.5,
-            "p99_loss": -4.0,
-            "max_loss": -5.0,
-            "max_drawdown": 0.15,
-            "profit_factor": 1.8,
-            "wins_erased_by_avg_loss": 0.3,
-            "wins_erased_by_tail_loss": 0.1,
-            "total_trades": 100,
-            "net_pnl": 15.0,
-        }
-
-        # Decision logic
-        decision = "REJECTED"
-        if metrics["expectancy"] > 0.1 and metrics["profit_factor"] > 1.5:
-            if metrics["p95_loss"] > -3.0:
-                decision = "CHALLENGER"
-            else:
+        """Test a hypothesis with REAL walk-forward historical replay.
+        
+        Compiles hypothesis rules into entry/exit signals and runs 
+        chronological walk-forward validation on test_data.
+        """
+        self._log_event("HYPOTHESIS", f"Testing {hypothesis.hypothesis_id} via historical replay")
+        
+        # Combine train + val for training, test_data for validation
+        # Use the entry_rule and exit_rule from hypothesis to generate signals
+        # Run chronological walk-forward on test_data
+        
+        try:
+            # Parse hypothesis entry/exit rules into executable signals
+            # This is a simplified version - real implementation would parse the rules
+            entry_signals = self._generate_entry_signals(test_data, hypothesis.entry_rule)
+            exit_signals = self._generate_exit_signals(test_data, hypothesis.exit_rule)
+            
+            if entry_signals.empty or exit_signals.empty:
+                return {
+                    "metrics": {},
+                    "decision": "REJECTED",
+                    "reason": "No signals generated from hypothesis rules"
+                }
+            
+            # Run chronological walk-forward replay
+            trades = self._run_walkforward_replay(
+                test_data, entry_signals, exit_signals, hypothesis
+            )
+            
+            if not trades:
+                return {
+                    "metrics": {},
+                    "decision": "REJECTED",
+                    "reason": "No trades executed from hypothesis"
+                }
+            
+            # Calculate real metrics from actual trades
+            metrics = self._calculate_trade_metrics(trades)
+            
+            # Decision logic based on REAL metrics
+            decision = "REJECTED"
+            if metrics["expectancy"] > 0.1 and metrics["profit_factor"] > 1.5:
+                if metrics["p95_loss"] > -3.0:
+                    decision = "CHALLENGER"
+                else:
+                    decision = "REJECTED"
+            elif metrics["expectancy"] <= 0:
                 decision = "REJECTED"
+            elif metrics["profit_factor"] <= 1.0:
+                decision = "REJECTED"
+            
+            return {
+                "metrics": metrics,
+                "decision": decision,
+                "trade_count": len(trades),
+                "trades": trades
+            }
+            
+        except Exception as e:
+            logger.exception(f"Hypothesis testing failed for {hypothesis.hypothesis_id}: {e}")
+            return {
+                "metrics": {},
+                "decision": "REJECTED",
+                "reason": f"Testing error: {str(e)}"
+            }
 
-        return {"metrics": metrics, "decision": decision}
+    def _generate_entry_signals(self, data: pd.DataFrame, entry_rule: str) -> pd.Series:
+        """Generate entry signals from hypothesis entry rule."""
+        # Simplified rule parsing - real implementation would parse the rule string
+        signals = pd.Series(False, index=data.index)
+        
+        if "regime" in entry_rule.lower() and "structure" in entry_rule.lower():
+            # Example: regime and structure alignment
+            if "regime" in data.columns and "structure" in data.columns:
+                regime_ok = data["regime"].isin(["trend", "range"])
+                structure_ok = data["structure"].notna()
+                signals = regime_ok & structure_ok
+        
+        return signals
+
+    def _generate_exit_signals(self, data: pd.DataFrame, exit_rule: str) -> pd.Series:
+        """Generate exit signals from hypothesis exit rule."""
+        signals = pd.Series(False, index=data.index)
+        
+        if "regime change" in exit_rule.lower() or "adverse" in exit_rule.lower():
+            # Exit on regime change or adverse selection
+            if "regime" in data.columns:
+                regime_change = data["regime"] != data["regime"].shift(1)
+                signals = regime_change
+        
+        return signals
+
+    def _run_walkforward_replay(
+        self,
+        data: pd.DataFrame,
+        entry_signals: pd.Series,
+        exit_signals: pd.Series,
+        hypothesis: Hypothesis
+    ) -> List[Dict[str, Any]]:
+        """Run chronological walk-forward replay of hypothesis signals."""
+        trades = []
+        in_position = False
+        entry_idx = None
+        entry_price = 0.0
+        entry_side = None
+        
+        # Get stop loss and target from hypothesis if available
+        stop_loss = hypothesis.falsification_criterion if hypothesis.falsification_criterion else None
+        
+        for i in range(1, len(data)):
+            if not in_position and entry_signals.iloc[i]:
+                # Enter position
+                in_position = True
+                entry_idx = i
+                entry_price = data.iloc[i]["close"]
+                entry_side = "buy" if hypothesis.side == "buy" else "sell"
+                
+            elif in_position:
+                # Check exit conditions
+                should_exit = False
+                exit_price = data.iloc[i]["close"]
+                
+                if exit_signals.iloc[i]:
+                    should_exit = True
+                
+                # Check stop loss
+                if entry_side == "buy":
+                    if data.iloc[i]["low"] <= entry_price * 0.995:  # 0.5% stop
+                        should_exit = True
+                        exit_price = min(exit_price, entry_price * 0.995)
+                else:
+                    if data.iloc[i]["high"] >= entry_price * 1.005:
+                        should_exit = True
+                        exit_price = max(exit_price, entry_price * 1.005)
+                
+                # Time-based exit (max 20 bars)
+                if i - entry_idx >= 20:
+                    should_exit = True
+                
+                if should_exit:
+                    pnl = (exit_price - entry_price) / entry_price
+                    if entry_side == "sell":
+                        pnl = -pnl
+                    
+                    trades.append({
+                        "entry_idx": entry_idx,
+                        "exit_idx": i,
+                        "entry_price": entry_price,
+                        "exit_price": exit_price,
+                        "side": entry_side,
+                        "pnl_pct": pnl,
+                        "bars_held": i - entry_idx,
+                        "exit_reason": "signal" if exit_signals.iloc[i] else "stop/time"
+                    })
+                    in_position = False
+        
+        return trades
+
+
+    def _calculate_trade_metrics(self, trades: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Calculate real trade metrics from actual trades."""
+        if not trades:
+            return {}
+        
+        pnls = [t["pnl_pct"] for t in trades]
+        wins = [p for p in pnls if p > 0]
+        losses = [p for p in pnls if p <= 0]
+        
+        win_rate = len(wins) / len(pnls) if pnls else 0
+        loss_rate = 1 - win_rate
+        avg_win = np.mean(wins) if wins else 0
+        avg_loss = np.mean(losses) if losses else 0
+        expectancy = (win_rate * avg_win) + (loss_rate * avg_loss)
+        
+        gross_profit = sum(wins) if wins else 0
+        gross_loss = abs(sum(losses)) if losses else 0
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+        
+        pnls_sorted = sorted(pnls)
+        p95_idx = int(len(pnls_sorted) * 0.05)
+        p99_idx = int(len(pnls_sorted) * 0.01)
+        p95_loss = pnls_sorted[p95_idx] if pnls_sorted else 0
+        p99_loss = pnls_sorted[p99_idx] if pnls_sorted else 0
+        max_loss = min(pnls) if pnls else 0
+        
+        # Calculate drawdown
+        equity_curve = np.cumsum(pnls)
+        running_max = np.maximum.accumulate(equity_curve)
+        drawdown = (running_max - equity_curve) / np.where(running_max != 0, running_max, 1)
+        max_drawdown = drawdown.max() if len(drawdown) > 0 else 0
+        
+        wins_erased_by_avg_loss = abs(avg_loss) / avg_win if avg_win != 0 else 0
+        wins_erased_by_tail_loss = abs(p95_loss) / avg_win if avg_win != 0 else 0
+        
+        return {
+            "win_rate": win_rate,
+            "loss_rate": 1 - win_rate,
+            "expectancy": expectancy,
+            "profit_factor": profit_factor if profit_factor != float('inf') else 999,
+            "avg_win": avg_win,
+            "avg_loss": avg_loss,
+            "p95_loss": p95_loss,
+            "p99_loss": p99_loss,
+            "max_loss": max_loss,
+            "max_drawdown": max_drawdown,
+            "wins_erased_by_avg_loss": abs(avg_loss) / avg_win if avg_win != 0 else 0,
+            "wins_erased_by_tail_loss": abs(p95_loss) / avg_win if avg_win != 0 else 0,
+            "total_trades": len(trades),
+            "net_pnl": sum(pnls),
+        }
 
 def main():
     """Main entry point."""
