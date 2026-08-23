@@ -7,12 +7,79 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class DataSource:
+    """An immutable reference to a persisted market-data source."""
+
+    path: Path
+    symbol: str
+    timeframe: str
+    source_kind: str
+    quality: str
+    metadata_path: Optional[Path]
+
+
+_KNOWN_TIMEFRAMES = frozenset({"1m", "5m", "15m", "30m", "1h", "4h", "1d"})
+
+
+def _identity_from_filename(path: Path) -> Tuple[Optional[str], Optional[str]]:
+    parts = path.stem.split("_")
+    timeframe = next((part for part in parts if part in _KNOWN_TIMEFRAMES), None)
+    symbol = parts[0] if parts and parts[0] else None
+    return symbol, timeframe
+
+
+def discover_csv_sources(roots: Sequence[Path]) -> List[DataSource]:
+    """Discover persisted CSV sources without inventing fallback data."""
+    paths = sorted(
+        {csv_path for root in roots for csv_path in Path(root).rglob("*.csv")},
+        key=lambda path: str(path),
+    )
+    sources = []
+    for csv_path in paths:
+        metadata_path = csv_path.with_suffix(".json")
+        metadata: Dict[str, Any] = {}
+        if metadata_path.is_file():
+            try:
+                loaded = json.loads(metadata_path.read_text(encoding="utf-8"))
+                if not isinstance(loaded, dict):
+                    raise ValueError("metadata must be a JSON object")
+                metadata = loaded
+            except (OSError, UnicodeError, ValueError) as exc:
+                logger.warning("Failed to read metadata %s: %s", metadata_path, exc)
+                continue
+
+        filename_symbol, filename_timeframe = _identity_from_filename(csv_path)
+        symbol = metadata.get("symbol") or filename_symbol
+        timeframe = (
+            metadata.get("timeframe")
+            or metadata.get("actual_interval")
+            or metadata.get("requested_interval")
+            or filename_timeframe
+        )
+        if not symbol or timeframe not in _KNOWN_TIMEFRAMES:
+            logger.warning("Could not identify source %s", csv_path)
+            continue
+
+        sources.append(
+            DataSource(
+                path=csv_path,
+                symbol=str(symbol),
+                timeframe=str(timeframe),
+                source_kind=str(metadata.get("source") or "csv"),
+                quality=str(metadata.get("quality") or "unknown"),
+                metadata_path=metadata_path if metadata_path.is_file() else None,
+            )
+        )
+    return sources
 
 
 @dataclass
@@ -64,49 +131,45 @@ class DataPipeline:
         timeframes: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """Load and combine all available historical data."""
+        sources = discover_csv_sources([data_dir])
+        if symbols:
+            sources = [source for source in sources if source.symbol in symbols]
+        if timeframes:
+            sources = [source for source in sources if source.timeframe in timeframes]
+        return self.load_sources(sources)
+
+    def load_sources(self, sources: Sequence[DataSource]) -> pd.DataFrame:
+        """Load real source rows with point-in-time provenance."""
         frames = []
 
-        for csv_file in Path(data_dir).rglob("*.csv"):
+        for source in sources:
             try:
-                # Parse symbol and timeframe from filename
-                # Format: SYMBOL_TIMEFRAME_DURATION.csv
-                parts = csv_file.stem.split("_")
-                if len(parts) >= 2:
-                    symbol = parts[0]
-                    timeframe = parts[1] if len(parts) > 1 else "unknown"
-                else:
-                    symbol = "UNKNOWN"
-                    timeframe = "unknown"
-
-                if symbols and symbol not in symbols:
+                df = pd.read_csv(source.path)
+                if "time" not in df.columns:
+                    raise ValueError("missing time column")
+                df["time"] = pd.to_datetime(df["time"], utc=True, errors="coerce")
+                df = df.dropna(subset=["time"])
+                if df.empty:
                     continue
-                if timeframes and timeframe not in timeframes:
-                    continue
-
-                df = pd.read_csv(csv_file)
-                df["symbol"] = symbol
-                df["timeframe"] = timeframe
-                df["source_file"] = csv_file.name
+                df["source_file"] = str(source.path)
+                df["source_kind"] = source.source_kind
+                df["source_quality"] = source.quality
+                df["symbol"] = source.symbol
+                df["timeframe"] = source.timeframe
                 frames.append(df)
-                logger.info(f"Loaded {csv_file.name}: {len(df)} rows")
+                logger.info("Loaded %s: %s rows", source.path.name, len(df))
 
-            except Exception as e:
-                logger.warning(f"Failed to load {csv_file}: {e}")
+            except (OSError, UnicodeError, ValueError, pd.errors.ParserError) as exc:
+                logger.warning("Failed to load %s: %s", source.path, exc)
 
         if not frames:
             logger.warning("No data files loaded")
             return pd.DataFrame()
 
         combined = pd.concat(frames, ignore_index=True)
-
-        # Ensure time column is datetime
-        if "time" in combined.columns:
-            combined["time"] = pd.to_datetime(combined["time"], utc=True, errors="coerce")
-            # Drop rows with invalid timestamps
-            combined = combined.dropna(subset=["time"])
-
-        # Sort by time
-        combined = combined.sort_values("time").reset_index(drop=True)
+        combined = combined.sort_values(
+            ["symbol", "timeframe", "time"], kind="stable"
+        ).reset_index(drop=True)
 
         logger.info(f"Loaded {len(combined)} total rows from {len(frames)} files")
         return combined
@@ -183,19 +246,26 @@ class DataPipeline:
         if df.empty:
             return "empty"
 
-        # Hash based on shape, columns, date range, and sample
-        info = {
-            "shape": df.shape,
-            "columns": sorted(df.columns.tolist()),
-            "dtypes": {c: str(df[c].dtype) for c in df.columns},
-            "date_range": f"{df['time'].min()}|{df['time'].max()}" if "time" in df.columns else "none",
-            "sample_hash": hashlib.sha256(
-                pd.util.hash_pandas_object(df.head(100), index=True).values
-            ).hexdigest()[:16] if len(df) > 0 else "empty",
-        }
+        columns = sorted(df.columns, key=str)
+        canonical = df.loc[:, columns].copy()
+        for column in columns:
+            if pd.api.types.is_datetime64_any_dtype(canonical[column].dtype):
+                canonical[column] = pd.to_datetime(
+                    canonical[column], utc=True, errors="coerce"
+                ).astype("datetime64[ns, UTC]")
 
-        info_str = json.dumps(info, sort_keys=True)
-        return hashlib.sha256(info_str.encode()).hexdigest()[:16]
+        schema = json.dumps(
+            [(str(column), str(canonical[column].dtype)) for column in columns],
+            separators=(",", ":"),
+        ).encode("utf-8")
+        row_hashes = np.sort(
+            pd.util.hash_pandas_object(canonical, index=False).to_numpy()
+        )
+
+        digest = hashlib.sha256()
+        digest.update(schema)
+        digest.update(row_hashes.tobytes())
+        return digest.hexdigest()[:16]
 
 
 class FeatureEngineer:
