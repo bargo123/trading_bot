@@ -203,10 +203,6 @@ class DataPipeline:
         df = df.sort_values(
             ["time", *group_columns], kind="stable"
         ).reset_index(drop=True)
-        n = len(df)
-
-        if n < self.min_train_size:
-            raise ValueError(f"Dataset too small: {n} rows, minimum {self.min_train_size}")
 
         timestamps = pd.Index(df["time"].drop_duplicates().sort_values())
         train_end = int(len(timestamps) * self.train_ratio)
@@ -214,6 +210,10 @@ class DataPipeline:
             len(timestamps) * self.validation_ratio
         )
         test_end = validation_end + int(len(timestamps) * self.test_ratio)
+        if not 0 < train_end < validation_end < test_end < len(timestamps):
+            raise ValueError(
+                "Ratios produce empty timestamp partitions for this dataset"
+            )
 
         timestamp_partitions = (
             timestamps[:train_end],
@@ -247,6 +247,22 @@ class DataPipeline:
                 partitions[partition_index] = partition.loc[known_target].copy()
 
         train, validation, test, sealed_holdout = partitions
+        partition_names = ("train", "validation", "test", "sealed_holdout")
+        empty_partitions = [
+            name
+            for name, partition in zip(partition_names, partitions)
+            if partition.empty
+        ]
+        if empty_partitions:
+            raise ValueError(
+                "Unusable split after purge and target filtering; "
+                f"empty partitions: {empty_partitions}"
+            )
+        if len(train) < self.min_train_size:
+            raise ValueError(
+                "Training partition too small after purge and target filtering: "
+                f"{len(train)} rows, minimum {self.min_train_size}"
+            )
 
         def timestamp_bound(partition: pd.DataFrame) -> Dict[str, Optional[str]]:
             if partition.empty:
@@ -354,8 +370,8 @@ class FeatureEngineer:
         self,
         df: pd.DataFrame,
         *,
-        profit_barrier_pct: Optional[float] = None,
-        loss_barrier_pct: Optional[float] = None,
+        profit_barrier_pct: float,
+        loss_barrier_pct: float,
         label_horizon: int = 20,
         fit_scalers: bool = True,
         scaler_dict: Optional[Dict[str, Any]] = None,
@@ -724,8 +740,8 @@ def create_research_splits(
 def engineer_features(
     df: pd.DataFrame,
     *,
-    profit_barrier_pct: Optional[float] = None,
-    loss_barrier_pct: Optional[float] = None,
+    profit_barrier_pct: float,
+    loss_barrier_pct: float,
     label_horizon: int = 20,
 ) -> FeatureSet:
     """Engineer features with point-in-time correctness."""

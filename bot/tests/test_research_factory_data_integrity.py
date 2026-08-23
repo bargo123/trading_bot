@@ -10,6 +10,7 @@ from aegis.research_factory.data import (
     DataPipeline,
     FeatureEngineer,
     discover_csv_sources,
+    engineer_features,
 )
 
 
@@ -168,8 +169,10 @@ def test_label_barriers_are_required_and_must_be_positive():
     frame = _label_frame()
     engineer = FeatureEngineer()
 
-    with pytest.raises(ValueError, match="profit_barrier_pct"):
+    with pytest.raises(TypeError, match="profit_barrier_pct"):
         engineer.engineer(frame, label_horizon=2)
+    with pytest.raises(TypeError, match="profit_barrier_pct"):
+        engineer_features(frame, label_horizon=2)
     for profit_barrier_pct, loss_barrier_pct in (
         (0.0, 0.02),
         (-0.01, 0.02),
@@ -245,3 +248,51 @@ def test_splits_keep_timestamps_together_and_purge_each_series_horizon():
         "start": timestamps[0].isoformat(),
         "end": timestamps[56].isoformat(),
     }
+
+
+def _split_frame(timestamp_count: int, symbols: list[str]) -> pd.DataFrame:
+    timestamps = pd.date_range(
+        "2026-02-01", periods=timestamp_count, freq="min", tz="UTC"
+    )
+    return pd.DataFrame(
+        {
+            "time": timestamps.repeat(len(symbols)),
+            "symbol": symbols * timestamp_count,
+            "timeframe": "1m",
+            "profit_barrier_first": 1.0,
+        }
+    )
+
+
+def test_split_rejects_empty_unique_timestamp_partitions_despite_many_rows():
+    frame = _split_frame(3, [f"SYMBOL_{index}" for index in range(100)])
+
+    with pytest.raises(ValueError, match="timestamp partitions"):
+        DataPipeline(min_train_size=1).create_splits(frame, label_horizon=1)
+
+
+@pytest.mark.parametrize(
+    ("label_horizon", "target"),
+    [(20, 1.0), (3, np.nan)],
+    ids=["excessive-horizon", "unknown-targets"],
+)
+def test_split_rejects_empty_partitions_after_purge_or_target_filtering(
+    label_horizon, target
+):
+    frame = _split_frame(100, ["EURUSD"])
+    frame["profit_barrier_first"] = target
+
+    with pytest.raises(ValueError, match="empty partitions"):
+        DataPipeline(min_train_size=1).create_splits(
+            frame, label_horizon=label_horizon
+        )
+
+
+def test_split_applies_minimum_train_size_after_purge_and_target_filtering():
+    frame = _split_frame(100, ["EURUSD"])
+
+    with pytest.raises(
+        ValueError,
+        match="Training partition too small.*57 rows.*minimum 58",
+    ):
+        DataPipeline(min_train_size=58).create_splits(frame, label_horizon=3)

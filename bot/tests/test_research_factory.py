@@ -50,7 +50,7 @@ class TestDataPipeline:
             "profit_barrier_first": 1.0,
         })
 
-        pipeline = DataPipeline()
+        pipeline = DataPipeline(min_train_size=500)
         splits = pipeline.create_splits(df, label_horizon=3)
 
         assert len(splits.train) == 597
