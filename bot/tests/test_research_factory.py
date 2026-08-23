@@ -1,0 +1,357 @@
+"""Tests for Research Factory."""
+from __future__ import annotations
+
+import pytest
+import tempfile
+from pathlib import Path
+
+from aegis.research_factory.core import ResearchFactory, ResearchState, Champion, ExperimentResult
+from aegis.research_factory.data import DataPipeline, FeatureEngineer, FeatureSet, DatasetSplit
+from aegis.research_factory.loss_autopsy import LossAutopsyEngine, LossClass, HypothesisGenerator
+from aegis.research_factory.hypothesis import HypothesisRegistry, Hypothesis, HypothesisOrigin, HypothesisStatus
+from aegis.research_factory.champion import ChampionChallenger
+from aegis.research_factory.data import DataPipeline, FeatureEngineer, FeatureSet, DatasetSplit
+import pandas as pd
+import numpy as np
+
+
+class TestDataPipeline:
+    """Tests for data pipeline."""
+
+    def test_load_raw_data(self):
+        """Test loading raw data from CSV files."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            # Create test CSV
+            csv_file = tmpdir / "EURUSD_1m_7d.csv"
+            df = pd.DataFrame({
+                "time": pd.date_range("2024-01-01", periods=100, freq="1min", tz="UTC"),
+                "open": np.random.rand(100) * 1.1 + 1.09,
+                "high": np.random.rand(100) * 1.1 + 1.095,
+                "low": np.random.rand(100) * 1.1 + 1.085,
+                "close": np.random.rand(100) * 1.1 + 1.09,
+                "volume": np.random.randint(100, 1000, 100),
+            })
+            df.to_csv(csv_file, index=False)
+
+            pipeline = DataPipeline()
+            df_loaded = pipeline.load_raw_data(tmpdir)
+            assert len(df_loaded) == 100
+            assert "symbol" in df_loaded.columns
+            assert "timeframe" in df_loaded.columns
+
+    def test_create_splits(self):
+        """Test chronological data splits."""
+        df = pd.DataFrame({
+            "time": pd.date_range("2024-01-01", periods=1000, freq="1min", tz="UTC"),
+            "close": np.random.rand(1000) * 1.1 + 1.09,
+            "symbol": "EURUSD",
+        })
+
+        pipeline = DataPipeline()
+        splits = pipeline.create_splits(df)
+
+        assert len(splits.train) == 600
+        assert len(splits.validation) == 200
+        assert len(splits.test) == 150
+        assert len(splits.sealed_holdout) == 50
+
+        # Check chronological order
+        assert splits.train["time"].max() <= splits.validation["time"].min()
+        assert splits.validation["time"].max() <= splits.test["time"].min()
+        assert splits.test["time"].max() <= splits.sealed_holdout["time"].min()
+
+    def test_dataset_fingerprint(self):
+        """Test dataset fingerprint computation."""
+        df = pd.DataFrame({
+            "time": pd.date_range("2024-01-01", periods=100, freq="1min", tz="UTC"),
+            "close": np.random.rand(100),
+        })
+
+        pipeline = DataPipeline()
+        fp1 = pipeline.compute_dataset_fingerprint(df)
+        fp2 = pipeline.compute_dataset_fingerprint(df)
+        assert fp1 == fp2
+        assert len(fp1) == 16
+
+
+class TestFeatureEngineer:
+    """Tests for feature engineering."""
+
+    def test_engineer_features(self):
+        """Test feature engineering."""
+        df = pd.DataFrame({
+            "time": pd.date_range("2024-01-01", periods=200, freq="1min", tz="UTC"),
+            "open": np.random.rand(200) * 1.1 + 1.09,
+            "high": np.random.rand(200) * 1.1 + 1.095,
+            "low": np.random.rand(200) * 1.1 + 1.085,
+            "close": np.random.rand(200) * 1.1 + 1.09,
+            "volume": np.random.randint(100, 1000, 200),
+            "symbol": "EURUSD",
+        })
+
+        engineer = FeatureEngineer()
+        feature_set = engineer.engineer(df)
+
+        # Check features were created
+        assert len(feature_set.features) == 200
+        assert len(feature_set.feature_names) > 10
+        assert len(feature_set.label_names) > 0
+
+        # Check specific features exist
+        feature_names = set(feature_set.feature_names)
+        assert "returns" in feature_names
+        assert "log_returns" in feature_names
+        assert "atr_14" in feature_names
+        assert "realized_vol_20" in feature_names
+        assert "range_position" in feature_names
+
+    def test_labels_created(self):
+        """Test labels are created correctly."""
+        df = pd.DataFrame({
+            "time": pd.date_range("2024-01-01", periods=200, freq="1min", tz="UTC"),
+            "open": np.random.rand(200) * 1.1 + 1.09,
+            "high": np.random.rand(200) * 1.1 + 1.095,
+            "low": np.random.rand(200) * 1.1 + 1.085,
+            "close": np.random.rand(200) * 1.1 + 1.09,
+            "volume": np.random.randint(100, 1000, 200),
+            "symbol": "EURUSD",
+        })
+
+        engineer = FeatureEngineer()
+        feature_set = engineer.engineer(df)
+
+        # Check labels
+        assert "profit_barrier_first" in feature_set.labels.columns
+        assert "mfe" in feature_set.labels.columns
+        assert "mae" in feature_set.labels.columns
+        assert "no_progress" in feature_set.labels.columns
+        assert "tail_loss" in feature_set.labels.columns
+
+
+class TestLossAutopsy:
+    """Tests for loss autopsy engine."""
+
+    def test_classify_loss(self):
+        """Test loss classification."""
+        engine = LossAutopsyEngine()
+
+        # Test BAD_ENTRY
+        trade = {
+            "mae": 10.0,
+            "mfe": 1.0,
+            "hold_time": 30,
+            "pnl": -5.0,
+        }
+        loss_class, confidence = engine.classify_loss(trade)
+        assert loss_class == LossClass.BAD_ENTRY
+        assert confidence > 0
+
+    def test_perform_autopsy(self):
+        """Test complete autopsy."""
+        engine = LossAutopsyEngine()
+
+        trade = {
+            "trade_id": "test_1",
+            "symbol": "EURUSD",
+            "side": "buy",
+            "entry_price": 1.1000,
+            "exit_price": 1.0990,
+            "stop_loss": 1.0980,
+            "target_price": 1.1020,
+            "pnl": -10.0,
+            "mfe": 1.0,
+            "mae": 15.0,
+            "hold_time": 120,
+            "regime_at_entry": "trend",
+            "regime_at_exit": "range",
+            "session": "london",
+            "spread_at_entry": 0.0002,
+            "volatility_at_entry": 0.001,
+        }
+
+        autopsy = engine.perform_autopsy(trade)
+        assert "loss_class" in autopsy
+        assert "confidence" in autopsy
+        assert "trade_details" in autopsy
+
+
+class TestHypothesisGenerator:
+    """Tests for hypothesis generation."""
+
+    def test_generate_from_losses(self):
+        """Test hypothesis generation from losses."""
+        engine = LossAutopsyEngine()
+        generator = HypothesisGenerator(engine)
+
+        losses = []
+        for i in range(10):
+            losses.append({
+                "trade_id": f"trade_{i}",
+                "symbol": "EURUSD",
+                "side": "buy",
+                "pnl": -5.0,
+                "mfe": 1.0,
+                "mae": 10.0,
+                "hold_time": 60,
+                "regime_at_entry": "trend",
+                "session": "london",
+            })
+
+        hypotheses = generator.generate_from_losses(losses)
+        assert len(hypotheses) > 0
+        for h in hypotheses:
+            assert "hypothesis_id" in h
+            assert "origin" in h
+            assert "problem" in h
+
+
+class TestHypothesisRegistry:
+    """Tests for hypothesis registry."""
+
+    def test_register_and_dedupe(self):
+        """Test registration and deduplication."""
+        registry = HypothesisRegistry()
+
+        hyp1 = Hypothesis(
+            hypothesis_id="hyp_1",
+            origin=HypothesisOrigin.DATA_DERIVED,
+            problem="test",
+            proposed_mechanism="test",
+            features_required=[],
+            entry_rule="test",
+            exit_rule="test",
+            expected_effect="test",
+            falsification_criterion="test",
+            training_period="2024-01-01 to 2024-06-30",
+            validation_period="2024-07-01 to 2024-09-30",
+        )
+
+        assert registry.register(hyp1) is True
+        assert registry.register(hyp1) is False  # Duplicate
+        assert registry.is_tested("hyp_1") is True
+        assert registry.is_tested("hyp_2") is False
+
+    def test_save_load(self):
+        """Test save and load."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            registry = HypothesisRegistry()
+
+            hyp = Hypothesis(
+                hypothesis_id="hyp_1",
+                origin=HypothesisOrigin.DATA_DERIVED,
+                problem="test",
+                proposed_mechanism="test",
+                features_required=[],
+                entry_rule="test",
+                exit_rule="test",
+                expected_effect="test",
+                falsification_criterion="test",
+                training_period="2024-01-01 to 2024-06-30",
+                validation_period="2024-07-01 to 2024-09-30",
+            )
+            registry.register(hyp)
+
+            path = Path(tmpdir) / "registry.json"
+            registry.save(path)
+
+            loaded = HypothesisRegistry.load(path)
+            assert loaded.is_tested("hyp_1")
+
+
+class TestChampionChallenger:
+    """Tests for champion/challenger system."""
+
+    def test_evaluate_challenger(self):
+        """Test challenger evaluation."""
+        cc = ChampionChallenger()
+
+        challenger = {
+            "expectancy": 0.2,
+            "profit_factor": 2.0,
+            "avg_loss": -0.5,
+            "p95_loss": -2.0,
+            "max_drawdown": 0.15,
+            "total_trades": 100,
+            "win_rate": 0.6,
+            "payoff_ratio": 1.5,
+        }
+
+        passes, reason = cc.evaluate_challenger(challenger)
+        assert passes is True
+        assert "All gates passed" in reason
+
+    def test_challenger_fails_gates(self):
+        """Test challenger that fails gates."""
+        cc = ChampionChallenger()
+
+        challenger = {
+            "metrics": {
+                "expectancy": 0.05,  # Too low
+                "profit_factor": 1.0,  # Too low
+            }
+        }
+
+        passes, reason = cc.evaluate_challenger(challenger)
+        assert passes is False
+        assert "Failed gates" in reason
+
+    def test_promote_if_better(self):
+        """Test promotion logic."""
+        cc = ChampionChallenger()
+
+        cc.champion = {
+            "hypothesis_id": "champ_1",
+            "metrics": {
+                "expectancy": 0.15,
+                "profit_factor": 1.5,
+                "max_drawdown": 0.15,
+                "avg_loss": -0.8,
+            }
+        }
+
+        cc.challenger = {
+            "hypothesis_id": "chall_1",
+            "metrics": {
+                "expectancy": 0.20,  # Better
+                "profit_factor": 2.0,  # Better
+                "max_drawdown": 0.12,  # Better
+                "avg_loss": -0.7,  # Better
+            }
+        }
+
+        assert cc.promote_if_better(cc.challenger, cc.champion) is True
+
+
+class TestResearchState:
+    """Tests for research state persistence."""
+
+    def test_save_load(self):
+        """Test state save and load."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state = ResearchState(
+                generation=5,
+                champion=Champion(
+                    hypothesis_id="hyp_1",
+                    metrics={"expectancy": 0.2},
+                    model_hash="abc123",
+                    dataset_fingerprint="abc123",
+                    promoted_at="2024-01-01T00:00:00",
+                    promotion_generation=3,
+                ),
+                codex_calls=0,
+                codex_budget=1,
+            )
+
+            path = Path(tmpdir) / "state.json"
+            state.save(path)
+
+            loaded = ResearchState.load(path)
+            assert loaded.generation == 5
+            assert loaded.champion.hypothesis_id == "hyp_1"
+            assert loaded.codex_calls == 0
+            assert loaded.codex_budget == 1
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
