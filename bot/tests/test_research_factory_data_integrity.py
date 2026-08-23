@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import numpy as np
 import pandas as pd
 
 from aegis.research_factory.data import DataPipeline, discover_csv_sources
@@ -93,3 +94,30 @@ def test_fingerprint_hashes_row_101_and_is_order_independent():
     assert pipeline.compute_dataset_fingerprint(frame) != (
         pipeline.compute_dataset_fingerprint(changed)
     )
+
+
+def test_fingerprint_canonicalizes_equivalent_float_nan_encodings():
+    first_nan = np.array([0x7FF8000000000000], dtype=np.uint64).view(np.float64)
+    second_nan = np.array([0x7FF8000000000001], dtype=np.uint64).view(np.float64)
+    pipeline = DataPipeline(min_train_size=1)
+
+    assert pipeline.compute_dataset_fingerprint(
+        pd.DataFrame({"value": first_nan})
+    ) == pipeline.compute_dataset_fingerprint(pd.DataFrame({"value": second_nan}))
+
+
+def test_empty_fingerprints_include_column_names_and_dtypes():
+    pipeline = DataPipeline(min_train_size=1)
+    fingerprints = {
+        pipeline.compute_dataset_fingerprint(
+            pd.DataFrame({"value": pd.Series(dtype="float64")})
+        ),
+        pipeline.compute_dataset_fingerprint(
+            pd.DataFrame({"value": pd.Series(dtype="int64")})
+        ),
+        pipeline.compute_dataset_fingerprint(
+            pd.DataFrame({"other": pd.Series(dtype="float64")})
+        ),
+    }
+
+    assert len(fingerprints) == 3

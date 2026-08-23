@@ -243,9 +243,6 @@ class DataPipeline:
 
     def compute_dataset_fingerprint(self, df: pd.DataFrame) -> str:
         """Compute deterministic fingerprint of dataset."""
-        if df.empty:
-            return "empty"
-
         columns = sorted(df.columns, key=str)
         canonical = df.loc[:, columns].copy()
         for column in columns:
@@ -253,6 +250,9 @@ class DataPipeline:
                 canonical[column] = pd.to_datetime(
                     canonical[column], utc=True, errors="coerce"
                 ).astype("datetime64[ns, UTC]")
+            canonical[column] = canonical[column].mask(
+                canonical[column].isna(), np.nan
+            )
 
         schema = json.dumps(
             [(str(column), str(canonical[column].dtype)) for column in columns],
