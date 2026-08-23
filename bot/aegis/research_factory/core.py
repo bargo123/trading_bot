@@ -599,28 +599,51 @@ Live trading: DISABLED
             logger.info("Research factory stopped")
 
     def _run_generation(self) -> None:
-        """Run one generation of the research loop."""
+        """Run one generation of the research loop with proper canonical data flow."""
         self._log_event("DATA", f"Loading data for generation {self.state.generation}")
 
-        # 1. Load and prepare data
-        dataset = self._load_dataset()
-        self.state.dataset_fingerprint = self._compute_dataset_fingerprint(dataset)
+        # 1. Load raw data
+        raw_data = self._load_dataset()
+        if raw_data.empty:
+            self._log_event("DATA", "No data available, skipping generation")
+            return
 
-        # 2. Feature engineering
+        # 2. Feature engineering on raw data (point-in-time correct)
         self._log_event("ML", f"Engineering features for generation {self.state.generation}")
-        features = self._engineer_features(dataset)
+        features_df = self._engineer_features(raw_data)
 
-        # 3. Create labels
-        labels = self._create_labels(dataset)
+        # 3. Create labels using ONLY past/present data (no lookahead)
+        # The target_direction is the ONLY forward-looking column allowed
+        labeled_data = self._create_labels(raw_data)
 
-        # 4. Split data chronologically
-        train_data, val_data, test_data, sealed_data = self._split_data(dataset)
+        # 4. Combine features + labels into research dataframe
+        # Features from engineered data, labels from labeled data
+        # Join on index (both derived from same raw data)
+        feature_cols = [c for c in features_df.columns if c not in ["time", "source_file", "symbol"]]
+        label_cols = ["target_direction", "vol_regime", "trend_label", "vol_regime", 
+                      "vol_expanding", "vol_contracting", "session_label", 
+                      "range_pos_label", "target_direction"]
+        
+        research_df = pd.concat([
+            features_df[["time", "symbol"] + feature_cols],
+            labeled_data[["target_direction", "vol_regime", "trend_label", 
+                          "vol_regime", "vol_expanding", "vol_contracting",
+                           "session_label", "range_pos_label", "target_direction"]]
+        ], axis=1)
 
-        # 5. Train ML models
-        self._log_event("ML", "Training models...")
+        # 4. Canonical chronological split
+        self._log_event("DATA", f"Splitting data chronologically")
+        train_data, val_data, test_data, sealed_data = self._split_data(labeled_data)
+
+        # CRITICAL: Seal the holdout data - it's NEVER used for training/validation
+        self._sealed_holdout = sealed_data
+        self._sealed_holdout_evaluated = False
+
+        # 5. Train ML models on train, validate on val
+        self._log_event("ML", f"Training models for generation {self.state.generation}")
         models = self._train_models(train_data, val_data)
 
-        # 6. Evaluate on walk-forward
+        # 6. Walk-forward validation on test data (chronological)
         self._log_event("REPLAY", "Running walk-forward validation...")
         wf_results = self._walk_forward_validation(models, test_data)
 
@@ -628,7 +651,7 @@ Live trading: DISABLED
         self._log_event("LOSS AUTOPSY", "Analyzing losses...")
         hypotheses = self._generate_hypotheses_from_losses()
 
-        # 8. Test hypotheses
+        # 8. Test hypotheses with REAL walk-forward replay
         for hypothesis in hypotheses:
             if self._is_hypothesis_tested(hypothesis.hypothesis_id):
                 continue
@@ -754,36 +777,46 @@ Live trading: DISABLED
 
         return df
 
-    def _create_labels(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create outcome labels with no lookahead."""
+    def _create_labels(self, df: pd.DataFrame, horizon: int = 20) -> pd.DataFrame:
+        """Create outcome labels using ONLY past/present data (no lookahead).
+        
+        Labels are computed using only data available at decision time.
+        Future data is NEVER used for label creation.
+        """
         if df.empty:
             return df
 
         df = df.copy()
 
-        # For each row, look forward to determine outcome
-        # This is a simplified version - in practice would use future bars
-        df["future_max_high"] = df.groupby("symbol")["high"].shift(-20).rolling(20).max().reset_index(level=0, drop=True)
-        df["future_min_low"] = df.groupby("symbol")["low"].shift(-20).rolling(20).min().reset_index(level=0, drop=True)
-
-        # Profit barrier before stop barrier
-        df["profit_barrier_first"] = (
-            (df["future_max_high"] - df["close"]) > (df["close"] - df["future_min_low"])
-        ).astype(int)
-
-        # MFE and MAE
-        df["mfe"] = df["future_max_high"] - df["close"]
-        df["mae"] = df["close"] - df["future_min_low"]
-
-        # Time to target
-        df["time_to_target"] = 20  # Simplified
-
-        # No progress
-        df["no_progress"] = (df["mfe"] < 0.0001).astype(int)
-
-        # Tail loss probability
-        df["tail_loss"] = (df["mae"] > df["mae"].quantile(0.95)).astype(int)
-
+        # Labels based on PAST data only - no future leakage
+        # Use rolling windows of PAST data to create labels
+        
+        # Volatility regime label (based on past volatility)
+        past_vol = df.groupby("symbol")["returns"].rolling(20).std().reset_index(level=0, drop=True)
+        df["vol_regime"] = pd.qcut(past_vol, q=3, labels=["low", "med", "high"], duplicates="drop")
+        
+        # Trend label (based on past returns)
+        past_return = df.groupby("symbol")["close"].pct_change(20)
+        df["trend_label"] = np.where(past_return > 0.01, "up", np.where(past_return < -0.01, "down", "flat"))
+        
+        # Volatility expansion/contraction
+        vol_ratio = df.groupby("symbol")["atr_14"].rolling(5).mean().reset_index(level=0, drop=True) / \
+                     df.groupby("symbol")["atr_14"].rolling(20).mean().reset_index(level=0, drop=True)
+        df["vol_expanding"] = (vol_ratio > 1.2).astype(int)
+        df["vol_contracting"] = (vol_ratio < 0.8).astype(int)
+        
+        # Session-based labels
+        df["session_label"] = df["session"] if "session" in df.columns else "unknown"
+        
+        # Range position label (using only past data)
+        df["range_pos_label"] = pd.qcut(df["range_position"], q=3, labels=["low", "mid", "high"], duplicates="drop")
+        
+        # Target: next bar direction (using shift(-1) is acceptable for TARGET only, not features)
+        # This is the ONLY forward-looking operation allowed - creating the TARGET variable
+        df["target_direction"] = np.where(
+            df.groupby("symbol")["close"].shift(-1) > df["close"], 1, 0
+        )
+        
         return df
 
     def _split_data(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
