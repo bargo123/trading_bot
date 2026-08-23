@@ -301,32 +301,42 @@ class CodexClient:
 # CLAUDE INTEGRATION
 # ============================================================
 
+# ============================================================
+# CLAUDE CLI INTEGRATION
+# ============================================================
+
 class ClaudeClient:
-    """Anthropic Claude API integration for hypothesis generation."""
+    """Claude CLI integration for hypothesis generation."""
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-opus-20240229"):
-        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+    def __init__(self, model: str = "claude-3-opus-20240229"):
         self.model = model
-        self.client = None
+        self.claude_path = self._find_claude()
         self.calls_made = 0
         
-        if self.api_key:
-            try:
-                import anthropic
-                self.client = anthropic.Anthropic(api_key=self.api_key)
-            except ImportError:
-                logger.warning("anthropic package not installed. Install with: pip install anthropic")
-            except Exception as e:
-                logger.warning(f"Failed to initialize Anthropic client: {e}")
+    def _find_claude(self) -> Optional[str]:
+        """Find Claude CLI executable."""
+        paths = [
+            "claude",  # In PATH
+            shutil.which("claude"),
+            shutil.which("claude.cmd"),
+            os.path.expanduser("~/.local/bin/claude"),
+            os.path.expanduser("~/.claude/bin/claude"),
+            "/usr/local/bin/claude",
+            "/opt/homebrew/bin/claude",
+        ]
+        for p in paths:
+            if p and os.path.exists(p):
+                return p
+        return None
     
     def is_available(self) -> bool:
-        """Check if Claude API is available."""
-        return self.client is not None and self.api_key is not None
+        """Check if Claude CLI is available."""
+        return self.claude_path is not None
     
     def generate_hypothesis(self, context: str, timeout: int = 60) -> Dict[str, Any]:
-        """Generate a hypothesis using Claude API."""
+        """Generate a hypothesis using Claude CLI."""
         if not self.is_available():
-            return {"success": False, "error": "Claude API not available (no API key or client)"}
+            return {"success": False, "error": "Claude CLI not available"}
         
         try:
             prompt = f"""You are a quantitative researcher. Based on the following research context, generate ONE falsifiable hypothesis to reduce losses.
@@ -342,15 +352,29 @@ EXIT: <precise exit rule>
 FALSIFICATION: <what would prove this wrong>
 """
             
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=1000,
-                temperature=0.3,
-                messages=[{"role": "user", "content": prompt}],
-                timeout=timeout
+            # Use Claude CLI with --print for non-interactive output
+            cmd = [
+                self.claude_path,
+                "--print",
+                "--model", self.model,
+                "--system-prompt", "You are a quantitative researcher specializing in identifying and eliminating loss mechanisms in algorithmic trading.",
+                prompt
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=ROOT
             )
             
-            content = response.content[0].text if response.content else ""
+            self.calls_made += 1
+            
+            if result.returncode != 0:
+                return {"success": False, "error": f"Claude CLI failed: {result.stderr}"}
+            
+            content = result.stdout.strip()
             
             # Parse the response
             hypothesis = self._parse_response(content)
@@ -358,6 +382,8 @@ FALSIFICATION: <what would prove this wrong>
             
             return {"success": True, "hypothesis": hypothesis, "raw_response": content}
             
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": f"Claude CLI timed out after {timeout}s"}
         except Exception as e:
             return {"success": False, "error": str(e)}
     
@@ -376,6 +402,15 @@ FALSIFICATION: <what would prove this wrong>
             "entry": hyp_data.get("entry", ""),
             "exit": hyp_data.get("exit", ""),
             "falsification": hyp_data.get("falsification", ""),
+        }
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get Claude CLI status."""
+        return {
+            "available": self.is_available(),
+            "model": self.model,
+            "calls_made": self.calls_made,
+            "path": self.claude_path
         }
     
     def get_status(self) -> Dict[str, Any]:
