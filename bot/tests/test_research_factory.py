@@ -6,6 +6,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import aegis.research_factory.core as research_factory_core
 from aegis.research_factory.core import ResearchFactory, ResearchState, Champion, ExperimentResult, main
 from aegis.research_factory.data import DataPipeline, FeatureEngineer, FeatureSet, DatasetSplit
 from aegis.research_factory.loss_autopsy import LossAutopsyEngine, LossClass, HypothesisGenerator
@@ -405,5 +406,97 @@ class TestResearchState:
             main()
         assert non_positive.value.code == 2
         assert "profit_barrier_pct must be positive" in capsys.readouterr().err
+
+
+def test_factory_initializes_legacy_forward_learning_dependency(
+    monkeypatch, tmp_path
+):
+    for name in (
+        "knowledge_table.json",
+        "cost_profiles.json",
+        "validated_states.json",
+        "validated_opportunities.json",
+    ):
+        (tmp_path / name).write_text("{}")
+
+    class FakeOutcomeLearning:
+        def __init__(self):
+            self.outcomes = []
+
+        def add_outcomes(self, outcomes):
+            self.outcomes.extend(outcomes)
+
+    class UnavailableCodex:
+        codex_path = None
+
+        def __init__(self, budget):
+            self.budget = budget
+
+        def is_available(self):
+            return False
+
+    markers = {
+        "research_cycle": object(),
+        "market_state_history": object(),
+        "analogue_index": object(),
+        "cursor": object(),
+    }
+    monkeypatch.setattr(research_factory_core, "INTEL_DIR", tmp_path)
+    monkeypatch.setattr(research_factory_core, "ensure_intel_dirs", lambda: None)
+    monkeypatch.setattr(
+        research_factory_core.AnalogueStore, "load", lambda path: object()
+    )
+    monkeypatch.setattr(research_factory_core, "load_losses", lambda: [])
+    monkeypatch.setattr(research_factory_core, "DataPipeline", object)
+    monkeypatch.setattr(research_factory_core, "FeatureEngineer", object)
+    monkeypatch.setattr(research_factory_core, "MLPipeline", object)
+    monkeypatch.setattr(research_factory_core, "CodexClient", UnavailableCodex)
+    monkeypatch.setattr(
+        research_factory_core,
+        "ResearchCycle",
+        lambda: markers["research_cycle"],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        research_factory_core, "OutcomeLearning", FakeOutcomeLearning, raising=False
+    )
+    monkeypatch.setattr(
+        research_factory_core,
+        "MarketStateHistory",
+        lambda: markers["market_state_history"],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        research_factory_core,
+        "AnaloguesIndex",
+        type(
+            "FakeAnaloguesIndex",
+            (),
+            {"load": staticmethod(lambda path: markers["analogue_index"])},
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        research_factory_core,
+        "CursorCLI",
+        lambda: markers["cursor"],
+        raising=False,
+    )
+
+    factory = object.__new__(ResearchFactory)
+    factory.codex_budget = 0
+    factory.claude_enabled = False
+    factory._init_components()
+
+    assert factory.forward_learning_step([{"result": "observed"}]) == {
+        "status": "accumulating",
+        "outcomes_count": 1,
+    }
+    assert factory.research_cycle is markers["research_cycle"]
+    assert factory.market_state_history is markers["market_state_history"]
+    assert factory.analogue_index is markers["analogue_index"]
+    assert factory.cursor is markers["cursor"]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

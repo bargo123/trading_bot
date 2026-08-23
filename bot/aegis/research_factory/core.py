@@ -534,8 +534,17 @@ class ResearchFactory:
         self.feature_engineer = FeatureEngineer()
         self.ml_pipeline = MLPipeline()
 
+        # Preserve legacy collaborators used by existing public controller methods.
+        self.research_cycle = ResearchCycle()
+        self.outcome_learning = OutcomeLearning()
+        self.market_state_history = MarketStateHistory()
+
         # Initialize loss database
         self.losses = load_losses()
+
+        # Load legacy research interfaces.
+        self.analogue_index = AnaloguesIndex.load(INTEL_DIR / "analogue_index.json")
+        self.cursor = CursorCLI()
 
         # Initialize Codex client
         self.codex_client = CodexClient(budget=self.codex_budget)
