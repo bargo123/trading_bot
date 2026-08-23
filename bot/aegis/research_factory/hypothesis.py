@@ -1,16 +1,12 @@
-"""Hypothesis registry and management."""
+"""Canonical structured hypothesis schema and registry."""
 from __future__ import annotations
 
 import json
-import hashlib
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
-
-
 
 class HypothesisOrigin(Enum):
     DIRECT_BOOK = "DIRECT_BOOK_HYPOTHESIS"
@@ -32,24 +28,30 @@ class HypothesisStatus(Enum):
 
 @dataclass
 class Hypothesis:
-    """A falsifiable research hypothesis."""
+    """A falsifiable hypothesis with explicit evidence and trade geometry."""
+
     hypothesis_id: str
-    origin: HypothesisOrigin  # Defined in this module
+    origin: HypothesisOrigin
     problem: str
     proposed_mechanism: str
     features_required: List[str]
-    entry_rule: str
-    exit_rule: str
+    entry_rule: Dict[str, Any]
+    exit_rule: Dict[str, Any]
+    side: str
+    entry_price: Optional[float]
+    invalidation_price: Optional[float]
+    target_price: Optional[float]
+    max_hold_s: Optional[int]
     expected_effect: str
     falsification_criterion: str
     training_period: str
     validation_period: str
+    book_evidence: List[Dict[str, Any]]
+    ml_evidence: Dict[str, Any]
+    loss_autopsy_evidence: List[Dict[str, Any]]
     walk_forward_result: Optional[Dict[str, Any]] = None
     cost_sensitivity: Optional[float] = None
     decision: Optional[str] = None
-    book_evidence: List[Dict[str, Any]] = field(default_factory=list)
-    ml_evidence: Dict[str, Any] = field(default_factory=dict)
-    loss_autopsy_evidence: List[Dict[str, Any]] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     status: HypothesisStatus = HypothesisStatus.PROPOSED
 
@@ -62,7 +64,7 @@ class Hypothesis:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Hypothesis":
         data = data.copy()
-        data["origin"] = HypothesisOrigin  # Defined in this module(data["origin"])
+        data["origin"] = HypothesisOrigin(data["origin"])
         data["status"] = HypothesisStatus(data["status"])
         return cls(**data)
 
@@ -95,7 +97,7 @@ class HypothesisRegistry:
 
     def update_status(self, hypothesis_id: str, status: str) -> bool:
         if hypothesis_id in self.hypotheses:
-            self.hypotheses[hypothesis_id].status = status
+            self.hypotheses[hypothesis_id].status = HypothesisStatus(status)
             return True
         return False
 

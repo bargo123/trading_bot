@@ -38,6 +38,7 @@ from aegis.research_factory.data import (
     discover_csv_sources,
 )
 from aegis.research_factory.ml_pipeline import MLPipeline
+from aegis.research_factory.hypothesis import Hypothesis, HypothesisOrigin
 
 # Configure logging
 logging.basicConfig(
@@ -297,15 +298,6 @@ FALSIFICATION: <what would prove this wrong>
     OPEN = "OPEN"
 
 
-class HypothesisOrigin(Enum):
-    """Origin classification for hypotheses."""
-    DIRECT_BOOK = "DIRECT_BOOK_HYPOTHESIS"
-    BOOK_DERIVED = "BOOK_DERIVED_HYPOTHESIS"
-    DATA_DERIVED = "DATA_DERIVED_HYPOTHESIS"
-    ML_DISCOVERED = "ML_DISCOVERED_HYPOTHESIS"
-    NOVEL_SYNTHESIZED = "NOVEL_SYNTHESIZED_HYPOTHESIS"
-
-
 class LossClass(Enum):
     """Loss classification for autopsy."""
     BAD_ENTRY = "BAD_ENTRY"
@@ -342,37 +334,6 @@ class MarketState(Enum):
     OPEN = "OPEN"
 
 
-@dataclass
-class Hypothesis:
-    """A falsifiable research hypothesis with structured rules for replay."""
-    hypothesis_id: str
-    origin: HypothesisOrigin
-    problem: str
-    proposed_mechanism: str
-    features_required: List[str]
-    
-# Required fields (no defaults) - must come first
-    expected_effect: str
-    falsification_criterion: str
-    training_period: str
-    validation_period: str
-    
-    # Trade parameters (replacing hardcoded values) - all with defaults
-    side: str = "buy"  # "buy" or "sell"
-    entry_price: Optional[float] = None
-    invalidation_price: Optional[float] = None  # Stop loss / invalidation level
-    target_price: Optional[float] = None  # Take profit target
-    max_hold_s: int = 120  # Maximum hold time in seconds
-    
-    # Optional fields with defaults
-    walk_forward_result: Optional[Dict[str, Any]] = None
-    cost_sensitivity: Optional[float] = None
-    decision: Optional[str] = None
-    book_evidence: List[Dict[str, Any]] = field(default_factory=list)
-    ml_evidence: Dict[str, Any] = field(default_factory=dict)
-    loss_autopsy_evidence: List[Dict[str, Any]] = field(default_factory=list)
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    status: str = "PROPOSED"  # PROPOSED, TESTING, REJECTED, CHALLENGER, CHAMPION
 @dataclass
 class ExperimentResult:
     """Result of an experiment."""
@@ -424,7 +385,9 @@ class ResearchState:
             "challenger": asdict(self.challenger) if self.challenger else None,
             "experiments": [asdict(e) for e in self.experiments],
             "failed_hypotheses": self.failed_hypotheses,
-            "hypothesis_registry": {k: asdict(v) for k, v in self.hypothesis_registry.items()},
+            "hypothesis_registry": {
+                k: v.to_dict() for k, v in self.hypothesis_registry.items()
+            },
             "codex_calls": self.codex_calls,
             "codex_budget": self.codex_budget,
             "claude_available": self.claude_available,
@@ -448,7 +411,10 @@ class ResearchState:
             challenger=Champion(**data["challenger"]) if data.get("challenger") else None,
             experiments=[ExperimentResult(**e) for e in data.get("experiments", [])],
             failed_hypotheses=data.get("failed_hypotheses", []),
-            hypothesis_registry={k: Hypothesis(**v) for k, v in data.get("hypothesis_registry", {}).items()},
+            hypothesis_registry={
+                k: Hypothesis.from_dict(v)
+                for k, v in data.get("hypothesis_registry", {}).items()
+            },
             codex_calls=data.get("codex_calls", 0),
             codex_budget=data.get("codex_budget", 1),
             claude_available=data.get("claude_available", True),
