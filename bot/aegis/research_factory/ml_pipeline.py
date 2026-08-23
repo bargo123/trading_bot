@@ -18,9 +18,6 @@ from sklearn.frozen import FrozenEstimator
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
     roc_auc_score,
     log_loss,
     brier_score_loss,
@@ -63,6 +60,27 @@ PROVENANCE_COLUMNS = frozenset(
 )
 
 MIN_ISOTONIC_SAMPLES = 10
+
+
+def _defined_binary_metrics(
+    y_true: pd.Series, y_pred: np.ndarray
+) -> Dict[str, float]:
+    """Return positive-class metrics only when each ratio is defined."""
+    true_values = np.asarray(y_true)
+    predicted_values = np.asarray(y_pred)
+    true_positives = int(((true_values == 1) & (predicted_values == 1)).sum())
+    predicted_positives = int((predicted_values == 1).sum())
+    actual_positives = int((true_values == 1).sum())
+    f1_denominator = predicted_positives + actual_positives
+
+    metrics: Dict[str, float] = {}
+    if predicted_positives:
+        metrics["precision"] = true_positives / predicted_positives
+    if actual_positives:
+        metrics["recall"] = true_positives / actual_positives
+    if f1_denominator:
+        metrics["f1"] = 2 * true_positives / f1_denominator
+    return metrics
 
 
 @dataclass
@@ -164,6 +182,16 @@ class MLPipeline:
             raise ValueError(f"Missing required target column: {target_name}")
         if df[target_name].isna().any():
             raise ValueError(f"Target column {target_name} contains null values")
+        if not df[target_name].isin([0, 1]).all():
+            invalid_values = sorted(
+                {repr(value) for value in df.loc[
+                    ~df[target_name].isin([0, 1]), target_name
+                ]}
+            )
+            raise ValueError(
+                f"Target column {target_name} must be binary with values 0 and 1; "
+                f"invalid values: {invalid_values}"
+            )
 
         y = df[target_name].astype(int)
         if require_two_classes and y.nunique() < 2:
@@ -290,16 +318,16 @@ class MLPipeline:
             if val_df is not None:
                 y_val_proba = pipeline.predict_proba(X_val)[:, 1]
                 # Find threshold that maximizes F1
-                best_f1 = f1_score(
-                    y_val,
-                    (y_val_proba >= config.threshold).astype(int),
-                    zero_division=0,
-                )
+                best_f1 = None
                 best_thresh = config.threshold
-                for thresh in np.linspace(0.1, 0.9, 17):
+                candidate_thresholds = [
+                    config.threshold,
+                    *np.linspace(0.1, 0.9, 17),
+                ]
+                for thresh in candidate_thresholds:
                     preds = (y_val_proba >= thresh).astype(int)
-                    f1 = f1_score(y_val, preds, zero_division=0)
-                    if f1 > best_f1:
+                    f1 = _defined_binary_metrics(y_val, preds).get("f1")
+                    if f1 is not None and (best_f1 is None or f1 > best_f1):
                         best_f1 = f1
                         best_thresh = thresh
                 threshold = best_thresh
@@ -313,25 +341,26 @@ class MLPipeline:
                     {
                         "validation_classes": validation_classes,
                         "accuracy": accuracy_score(y_val, y_val_pred),
-                        "precision": precision_score(
-                            y_val, y_val_pred, zero_division=0
-                        ),
-                        "recall": recall_score(y_val, y_val_pred, zero_division=0),
-                        "f1": f1_score(y_val, y_val_pred, zero_division=0),
                         "log_loss": log_loss(y_val, y_val_proba, labels=[0, 1]),
                         "brier": brier_score_loss(y_val, y_val_proba),
                     }
                 )
+                metrics.update(_defined_binary_metrics(y_val, y_val_pred))
                 if validation_classes == 2:
                     metrics["roc_auc"] = roc_auc_score(y_val, y_val_proba)
 
             if test_df is not None:
                 y_test_proba = pipeline.predict_proba(X_test)[:, 1]
                 y_test_pred = (y_test_proba >= threshold).astype(int)
-                metrics.update({
-                    "test_accuracy": accuracy_score(y_test, y_test_pred),
-                    "test_f1": f1_score(y_test, y_test_pred, zero_division=0),
-                })
+                metrics["test_accuracy"] = accuracy_score(y_test, y_test_pred)
+                metrics.update(
+                    {
+                        f"test_{name}": value
+                        for name, value in _defined_binary_metrics(
+                            y_test, y_test_pred
+                        ).items()
+                    }
+                )
                 if y_test.nunique() == 2:
                     metrics["test_roc_auc"] = roc_auc_score(y_test, y_test_proba)
 

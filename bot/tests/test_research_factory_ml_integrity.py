@@ -140,6 +140,25 @@ def test_single_class_training_target_fails_explicitly() -> None:
         MLPipeline(configs=[small_logistic_config()]).train(frame)
 
 
+@pytest.mark.parametrize(
+    "invalid_target",
+    [
+        pytest.param([0, 0.5] * 10, id="fractional"),
+        pytest.param([1, 2] * 10, id="non_binary_two_class"),
+    ],
+)
+def test_target_rejects_values_outside_binary_membership(
+    invalid_target: list[float],
+) -> None:
+    frame = labeled_frame(20)
+    frame["profit_barrier_first"] = invalid_target
+
+    with pytest.raises(
+        ValueError, match="profit_barrier_first.*binary.*0.*1"
+    ):
+        MLPipeline(configs=[small_logistic_config()]).train(frame)
+
+
 def test_no_numeric_model_features_fails_explicitly() -> None:
     frame = labeled_frame(20).drop(columns="signal")
 
@@ -186,6 +205,60 @@ def test_one_class_validation_omits_undefined_roc_auc() -> None:
 
     assert "roc_auc" not in trained.metrics
     assert trained.metrics["validation_classes"] == 1
+
+
+def test_all_negative_folds_omit_undefined_metrics_and_skip_threshold_tuning() -> None:
+    train = labeled_frame(60)
+    validation = labeled_frame(10)
+    test = labeled_frame(10)
+    for frame in (validation, test):
+        frame["profit_barrier_first"] = 0
+        frame["signal"] = -100.0
+
+    trained = MLPipeline(configs=[small_logistic_config()]).train(
+        train, validation, test
+    )[0]
+
+    assert trained.calibration_threshold == 0.5
+    for metric in ("precision", "recall", "f1"):
+        assert metric not in trained.metrics
+        assert f"test_{metric}" not in trained.metrics
+
+
+def test_all_positive_folds_report_defined_positive_class_metrics() -> None:
+    train = labeled_frame(60)
+    validation = labeled_frame(10)
+    test = labeled_frame(10)
+    for frame in (validation, test):
+        frame["profit_barrier_first"] = 1
+        frame["signal"] = 100.0
+
+    trained = MLPipeline(configs=[small_logistic_config()]).train(
+        train, validation, test
+    )[0]
+
+    for metric in ("precision", "recall", "f1"):
+        assert trained.metrics[metric] == pytest.approx(1.0)
+        assert trained.metrics[f"test_{metric}"] == pytest.approx(1.0)
+
+
+def test_no_positive_predictions_omit_only_undefined_precision() -> None:
+    train = labeled_frame(60)
+    validation = labeled_frame(10)
+    test = labeled_frame(10)
+    for frame in (validation, test):
+        frame["signal"] = -100.0
+
+    trained = MLPipeline(configs=[small_logistic_config()]).train(
+        train, validation, test
+    )[0]
+
+    assert "precision" not in trained.metrics
+    assert "test_precision" not in trained.metrics
+    assert trained.metrics["recall"] == pytest.approx(0.0)
+    assert trained.metrics["f1"] == pytest.approx(0.0)
+    assert trained.metrics["test_recall"] == pytest.approx(0.0)
+    assert trained.metrics["test_f1"] == pytest.approx(0.0)
 
 
 def test_small_validation_set_skips_isotonic_calibration_with_status() -> None:
