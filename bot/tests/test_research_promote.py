@@ -6,7 +6,11 @@ import numpy as np
 import pytest
 
 from aegis.research.gates import GateReject
-from aegis.research.promote import PromotionReject, challenger_promotion_result
+from aegis.research.promote import (
+    PromotionReject,
+    challenger_promotion_result,
+    challenger_promotion_result_from_callback,
+)
 from aegis.research.sealed import SealedHoldoutStore
 
 
@@ -123,3 +127,62 @@ def test_destructive_payoff_geometry_fails(tmp_path):
     metrics = _healthy_holdout_metrics(pnls)
     with pytest.raises(PromotionReject):
         _run_promotion(tmp_path, holdout_metrics=metrics, holdout_pnls=pnls)
+
+
+def test_callback_promotion_freezes_before_sealed_evaluation(tmp_path):
+    validation = _healthy_pnls(seed=1)
+    holdout = _healthy_pnls(seed=2)
+    callback_candidates = []
+
+    def evaluate_holdout(frozen):
+        callback_candidates.append(frozen)
+        assert frozen.strategy_id == "asia_sell_callback_v1"
+        assert not hasattr(frozen, "sealed_holdout")
+        return {
+            "metrics": _healthy_holdout_metrics(holdout),
+            "pnls": holdout,
+        }
+
+    result = challenger_promotion_result_from_callback(
+        strategy_id="asia_sell_callback_v1",
+        code_hash="code-callback",
+        artifact_hash="artifact-callback",
+        config={"session": "asia", "side": "sell"},
+        validation_pnls=validation,
+        holdout_fingerprint="holdout-full-content-fingerprint",
+        evaluate_holdout=evaluate_holdout,
+        validated_risk_fraction=0.10,
+        sealed_store=SealedHoldoutStore(tmp_path / "callback-sealed.jsonl"),
+        champion_path=tmp_path / "callback-champion.json",
+    )
+
+    assert callback_candidates[0].frozen_hash == result["frozen"]["frozen_hash"]
+    assert result["sealed_holdout"]["holdout_fingerprint"] == (
+        "holdout-full-content-fingerprint"
+    )
+    assert result["holdout_metrics"]["n_trades"] == 80
+    assert result["champion"]["status"] == "accepted"
+
+
+def test_callback_promotion_rejects_thin_validation_before_sealed_callback(tmp_path):
+    called = False
+
+    def evaluate_holdout(frozen):
+        nonlocal called
+        called = True
+        return {"metrics": {}, "pnls": []}
+
+    with pytest.raises(PromotionReject, match=">=20 trades"):
+        challenger_promotion_result_from_callback(
+            strategy_id="asia_sell_callback_v1",
+            code_hash="code-callback",
+            artifact_hash="artifact-callback",
+            config={"session": "asia", "side": "sell"},
+            validation_pnls=[0.1] * 10,
+            holdout_fingerprint="holdout-full-content-fingerprint",
+            evaluate_holdout=evaluate_holdout,
+            validated_risk_fraction=0.10,
+            sealed_store=SealedHoldoutStore(tmp_path / "callback-sealed.jsonl"),
+            champion_path=tmp_path / "callback-champion.json",
+        )
+    assert called is False

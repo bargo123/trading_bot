@@ -31,6 +31,7 @@ from aegis.intel.books import lookup
 from aegis.intel.fast_firehose import FastExitConfig, FastExitStateMachine
 from aegis.intel.knowledge_retrieval import retrieve_for_state
 from aegis.intel.paths import INTEL_DIR, ensure_intel_dirs
+from aegis.research.registry import ExperimentRegistry
 from aegis.research_factory.data import (
     DataPipeline,
     FeatureEngineer,
@@ -38,6 +39,7 @@ from aegis.research_factory.data import (
     discover_csv_sources,
 )
 from aegis.research_factory.ml_pipeline import MLPipeline
+from aegis.research_factory.evaluation import record_outcome
 from aegis.research_factory.hypothesis import Hypothesis, HypothesisOrigin
 
 # Configure logging
@@ -504,6 +506,7 @@ class ResearchFactory:
         self.data_pipeline = DataPipeline()
         self.feature_engineer = FeatureEngineer()
         self.ml_pipeline = MLPipeline()
+        self.experiment_registry = ExperimentRegistry()
 
         # Initialize loss database
         self.losses = load_losses()
@@ -678,11 +681,36 @@ Live trading: DISABLED
             "Cost-aware replay is not configured; Plan 2 replay is required",
         )
 
-    def _record_generation_outcome(self, status: str, reason: str) -> None:
+    def _record_generation_outcome(
+        self,
+        status: str,
+        reason: str,
+        *,
+        hypothesis: Optional[Hypothesis] = None,
+        metrics: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """Persist and emit an honest terminal generation outcome."""
         self.state.last_generation_status = status
         self.state.last_generation_reason = reason
         self._log_event("GENERATION", reason, status=status)
+        registry = getattr(self, "experiment_registry", None)
+        if registry is None:
+            return
+        attempted_research = hypothesis or {
+            "hypothesis_id": f"research_factory_generation_{self.state.generation}",
+            "origin": "RESEARCH_FACTORY",
+            "problem": "research factory generation",
+            "proposed_mechanism": "execute one governed research factory generation",
+            "generation": self.state.generation,
+        }
+        record_outcome(
+            registry,
+            attempted_research,
+            self.state.dataset_fingerprint,
+            status,
+            reason,
+            metrics,
+        )
 
     def _load_dataset(self) -> pd.DataFrame:
         """Load and combine all available historical data."""
@@ -1323,47 +1351,6 @@ Live trading: DISABLED
             challenger_metrics["profit_factor"] > champion_metrics["profit_factor"] and
             challenger_metrics["max_drawdown"] <= champion_metrics["max_drawdown"] * 1.1
         )
-
-    def _evaluate_on_sealed_holdout(self, champion: Champion) -> Dict[str, Any]:
-        """Evaluate a champion candidate on the SEALED holdout data.
-        
-        This is the FINAL GATE - only called ONCE when a challenger is
-        ready for promotion to champion. The sealed holdout has been
-        physically isolated and never used during training/validation.
-        """
-        if not hasattr(self, '_sealed_holdout') or self._sealed_holdout is None:
-            return {"status": "no_sealed_data", "promoted": False}
-        
-        if self._sealed_holdout_evaluated:
-            return {"status": "already_evaluated", "promoted": False}
-        
-        self._log_event("SEALED_HOLDOUT", f"Evaluating champion {champion.hypothesis_id} on SEALED holdout")
-        
-        try:
-            # Evaluate champion on sealed data using same walk-forward logic
-            models = self.ml_pipeline.train(self._sealed_holdout, self._sealed_holdout)
-            if not models:
-                return {"promoted": False, "reason": "no_models_on_sealed"}
-            
-            # Use the champion's model (first model) for evaluation
-            best_model = models[0] if models else None
-            if best_model is None:
-                return {"promoted": False, "reason": "no_model_on_sealed"}
-            
-            # Run walk-forward on sealed data
-            sealed_results = self._walk_forward_validation([best_model], self._sealed_holdout)
-            
-            # Check if performance meets threshold on SEALED data
-            if sealed_results.get("summary", {}).get("avg_expectancy", 0) > 0.1:
-                self._sealed_holdout_evaluated = True
-                self._log_event("CHAMPION_PROMOTED", f"Champion promoted after SEALED evaluation: {champion.hypothesis_id}")
-                return {"promoted": True, "sealed_metrics": sealed_results}
-            else:
-                return {"promoted": False, "reason": "failed_sealed_evaluation", "sealed_metrics": sealed_results}
-                
-        except Exception as e:
-            logger.exception(f"Sealed holdout evaluation failed: {e}")
-            return {"promoted": False, "reason": f"sealed_evaluation_error: {e}"}
 
     def _should_promote_challenger(self) -> bool:
         """Promote challenger to champion."""
