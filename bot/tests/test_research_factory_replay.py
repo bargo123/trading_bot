@@ -104,6 +104,52 @@ def test_malformed_replay_cost_evidence_fails_closed(costs):
 
 
 @pytest.mark.parametrize(
+    "field",
+    [
+        "trade_tick_value",
+        "trade_tick_size",
+        "volume_min",
+        "lots",
+        "spread_price",
+        "commission_usd",
+        "slippage_price",
+    ],
+)
+def test_oversized_integer_cost_evidence_fails_closed(field):
+    oversized = 10**10000
+    symbol_values = {
+        "trade_tick_value": 1.0,
+        "trade_tick_size": 1.0,
+        "volume_min": 0.01,
+    }
+    cost_values = {
+        "lots": 1.0,
+        "spread_price": 0.2,
+        "commission_usd": 0.0,
+        "slippage_price": 0.0,
+    }
+    if field in symbol_values:
+        symbol_values[field] = oversized
+    else:
+        cost_values[field] = oversized
+    costs = ReplayCostEvidence(
+        symbol_spec=BrokerSymbolSpec(**symbol_values),
+        **cost_values,
+    )
+
+    result = replay_hypothesis(
+        _breakout_frame("buy"),
+        _compiled(side="buy", stop=99.0, target=102.0),
+        costs,
+    )
+
+    assert result.status == "NO_EVIDENCE"
+    assert result.trades == ()
+    assert result.metrics is None
+    assert result.reason
+
+
+@pytest.mark.parametrize(
     "side,stop,target",
     [("buy", 99.0, 102.0), ("sell", 101.0, 98.0)],
 )

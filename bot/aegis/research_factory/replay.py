@@ -53,7 +53,12 @@ def _result(status: str, reason: str) -> ReplayResult:
 
 
 def _real_number(value: Any) -> bool:
-    return isinstance(value, Real) and not isinstance(value, bool) and math.isfinite(value)
+    if not isinstance(value, Real) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(value)
+    except (OverflowError, TypeError, ValueError):
+        return False
 
 
 def _cost_evidence_reason(costs: Any) -> Optional[str]:
