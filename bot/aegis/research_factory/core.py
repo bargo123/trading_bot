@@ -961,14 +961,32 @@ Live trading: DISABLED
                 failed_hyp_evidence = self._get_failed_hypothesis_evidence(loss_class)
 
             # Create hypothesis with full provenance
+                        # Create hypothesis with full provenance
             hypothesis = Hypothesis(
                 hypothesis_id=f"hyp_{loss_class.lower()}_{int(time.time())}",
                 origin=origin,
                 problem=f"High frequency of {loss_class} losses ({count} occurrences)",
                 proposed_mechanism=f"Address {loss_class} by implementing detection and avoidance",
                 features_required=["regime", "structure", "volatility", "momentum", "session"],
-                entry_rule="Enter when regime and structure align with low adverse selection",
-                exit_rule="Exit on regime change or adverse selection signal",
+                
+                # Structured entry/exit rules
+                entry_rule={
+                    "type": "regime_structure_alignment",
+                    "required_regimes": ["trend", "range"],
+                    "required_structure": True
+                },
+                exit_rule={
+                    "type": "regime_change",
+                    "adverse_selection": True
+                },
+                
+                # Trade parameters
+                side="buy",  # Default, can be overridden
+                entry_price=None,
+                invalidation_price=None,
+                target_price=None,
+                max_hold_s=120,
+                
                 expected_effect=f"Reduce {loss_class} losses by 50%",
                 falsification_criterion=f"{loss_class} losses do not decrease OOS",
                 training_period="2024-01-01 to 2024-06-30",
@@ -978,7 +996,6 @@ Live trading: DISABLED
                 loss_autopsy_evidence=self.losses,
             )
             hypotheses.append(hypothesis)
-
         return hypotheses
 
     def _get_ml_evidence_for_loss(self, loss_class: str) -> Dict[str, Any]:
