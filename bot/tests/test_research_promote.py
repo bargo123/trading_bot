@@ -257,6 +257,80 @@ def test_callback_promotion_rejects_invalid_risk_before_callback(tmp_path):
     assert called is False
 
 
+@pytest.mark.parametrize("bad_pnl", [float("nan"), float("inf"), float("-inf")])
+def test_callback_promotion_rejects_nonfinite_validation_pnl_before_freeze(
+    tmp_path, bad_pnl
+):
+    called = False
+    validation = _healthy_pnls(seed=1)
+    validation[0] = bad_pnl
+
+    def evaluate_holdout(frozen):
+        nonlocal called
+        called = True
+        return {"metrics": {}, "pnls": []}
+
+    path = tmp_path / "callback-sealed.jsonl"
+    with pytest.raises(PromotionReject, match="validation.*finite"):
+        challenger_promotion_result_from_callback(
+            strategy_id="asia_sell_callback_v1",
+            code_hash="code-callback",
+            artifact_hash="artifact-callback",
+            config={"session": "asia", "side": "sell"},
+            validation_pnls=validation,
+            training_dataset_fingerprint=None,
+            holdout_fingerprint="holdout-full-content-fingerprint",
+            evaluate_holdout=evaluate_holdout,
+            validated_risk_fraction=0.10,
+            sealed_store=SealedHoldoutStore(path),
+            champion_path=tmp_path / "callback-champion.json",
+        )
+
+    assert called is False
+    assert path.read_text(encoding="utf-8") == ""
+
+
+def test_callback_promotion_rejects_nonfinite_bootstrap_evidence_before_freeze(
+    tmp_path, monkeypatch
+):
+    called = False
+    monkeypatch.setattr(
+        "aegis.research.promote.bootstrap_expectancy",
+        lambda pnls: {
+            "n": 80.0,
+            "mean": 0.5,
+            "p05": float("nan"),
+            "p50": 0.5,
+            "p95": 0.75,
+            "frac_positive": 0.9,
+        },
+    )
+
+    def evaluate_holdout(frozen):
+        nonlocal called
+        called = True
+        return {"metrics": {}, "pnls": []}
+
+    path = tmp_path / "callback-sealed.jsonl"
+    with pytest.raises(PromotionReject, match="bootstrap.*finite"):
+        challenger_promotion_result_from_callback(
+            strategy_id="asia_sell_callback_v1",
+            code_hash="code-callback",
+            artifact_hash="artifact-callback",
+            config={"session": "asia", "side": "sell"},
+            validation_pnls=_healthy_pnls(seed=1),
+            training_dataset_fingerprint=None,
+            holdout_fingerprint="holdout-full-content-fingerprint",
+            evaluate_holdout=evaluate_holdout,
+            validated_risk_fraction=0.10,
+            sealed_store=SealedHoldoutStore(path),
+            champion_path=tmp_path / "callback-champion.json",
+        )
+
+    assert called is False
+    assert path.read_text(encoding="utf-8") == ""
+
+
 def test_repeated_public_callback_after_store_reconstruction_is_blocked(tmp_path):
     validation = _healthy_pnls(seed=1)
     holdout = _healthy_pnls(seed=2)

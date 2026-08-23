@@ -312,6 +312,62 @@ def test_sealed_result_normalization_failure_persists_terminal_failure(tmp_path:
     assert rows[1]["error"]["type"] == "TypeError"
 
 
+def test_sealed_mutex_contends_then_is_reusable_after_context_exit(tmp_path: Path):
+    path = tmp_path / "sealed.jsonl"
+    first = SealedHoldoutStore(path)
+    second = SealedHoldoutStore(path)
+    second._LOCK_TIMEOUT_S = 0.02
+    second._LOCK_POLL_S = 0.001
+
+    with first._locked():
+        with pytest.raises(SealedHoldoutError, match="timed out acquiring"):
+            with second._locked():
+                pytest.fail("contended mutex was acquired")
+
+    with second._locked():
+        pass
+
+    assert first.lock_path.exists()
+    assert first.lock_path.stat().st_size == 1
+
+
+def test_sealed_mutex_is_reusable_after_context_exception(tmp_path: Path):
+    store = SealedHoldoutStore(tmp_path / "sealed.jsonl")
+
+    with pytest.raises(RuntimeError, match="inside mutex"):
+        with store._locked():
+            raise RuntimeError("inside mutex")
+
+    with store._locked():
+        pass
+
+    assert store.lock_path.exists()
+    assert store.lock_path.stat().st_size == 1
+
+
+def test_preexisting_unlocked_mutex_file_is_harmless_and_persistent(tmp_path: Path):
+    path = tmp_path / "sealed.jsonl"
+    lock_path = tmp_path / "sealed.jsonl.lock"
+    lock_path.write_bytes(b"\0")
+    frozen = freeze_candidate(
+        strategy_id="breakout-v1",
+        code_hash="code-a",
+        config={"window": 2},
+        artifact_hash="model-a",
+        training_dataset_fingerprint="training-a",
+    )
+
+    record = SealedHoldoutStore(path).evaluate_once(
+        frozen,
+        holdout_fingerprint="holdout-a",
+        evaluate=lambda: {"expectancy": 0.2, "n_trades": 25},
+    )
+
+    assert record["status"] == "succeeded"
+    assert lock_path.exists()
+    assert lock_path.read_bytes() == b"\0"
+
+
 def test_preexisting_sealed_reservation_blocks_callback(tmp_path: Path):
     frozen = freeze_candidate(
         strategy_id="breakout-v1",

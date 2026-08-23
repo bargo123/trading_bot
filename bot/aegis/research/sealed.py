@@ -4,10 +4,19 @@ from __future__ import annotations
 import json
 import os
 import time
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
+
+if os.name == "nt":
+    import msvcrt
+else:
+    try:
+        import fcntl
+    except ImportError:  # pragma: no cover - only unsupported non-Windows hosts
+        fcntl = None
 
 from aegis.research.fingerprint import config_fingerprint
 
@@ -86,28 +95,47 @@ class SealedHoldoutStore:
             rows.append(json.loads(line))
         return rows
 
-    def _acquire_lock(self) -> int:
+    @contextmanager
+    def _locked(self):
+        descriptor = os.open(self.lock_path, os.O_CREAT | os.O_RDWR)
+        handle = os.fdopen(descriptor, "r+b", buffering=0)
         deadline = time.monotonic() + self._LOCK_TIMEOUT_S
-        while True:
-            try:
-                descriptor = os.open(
-                    self.lock_path,
-                    os.O_CREAT | os.O_EXCL | os.O_WRONLY,
-                )
-                os.write(descriptor, str(os.getpid()).encode("ascii"))
-                os.fsync(descriptor)
-                return descriptor
-            except FileExistsError:
-                if time.monotonic() >= deadline:
-                    raise SealedHoldoutError("timed out acquiring sealed holdout lock")
-                time.sleep(self._LOCK_POLL_S)
-
-    def _release_lock(self, descriptor: int) -> None:
-        os.close(descriptor)
         try:
-            self.lock_path.unlink()
-        except FileNotFoundError:
-            pass
+            if os.fstat(descriptor).st_size == 0:
+                handle.write(b"\0")
+                handle.flush()
+                os.fsync(descriptor)
+            while True:
+                try:
+                    handle.seek(0)
+                    if os.name == "nt":
+                        msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+                    else:
+                        if fcntl is None:
+                            raise RuntimeError("fcntl is unavailable on this platform")
+                        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except OSError as exc:
+                    if time.monotonic() >= deadline:
+                        raise SealedHoldoutError(
+                            "timed out acquiring sealed holdout lock"
+                        ) from exc
+                    time.sleep(self._LOCK_POLL_S)
+            try:
+                handle.seek(0)
+                handle.write(b"\0")
+                handle.truncate(1)
+                handle.flush()
+                os.fsync(descriptor)
+                yield
+            finally:
+                handle.seek(0)
+                if os.name == "nt":
+                    msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                elif fcntl is not None:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            handle.close()
 
     def _append(self, record: Mapping[str, Any]) -> None:
         with self.path.open("a", encoding="utf-8") as handle:
@@ -131,8 +159,7 @@ class SealedHoldoutStore:
             raise SealedHoldoutError(
                 "frozen candidate already reserved or evaluated on this holdout fingerprint"
             )
-        descriptor = self._acquire_lock()
-        try:
+        with self._locked():
             if any(self._matches(row, key) for row in self._rows()):
                 raise SealedHoldoutError(
                     "frozen candidate already reserved or evaluated on this holdout fingerprint"
@@ -149,15 +176,10 @@ class SealedHoldoutStore:
             }
             self._append(reservation)
             return reservation
-        finally:
-            self._release_lock(descriptor)
 
     def _append_terminal(self, record: Mapping[str, Any]) -> None:
-        descriptor = self._acquire_lock()
-        try:
+        with self._locked():
             self._append(record)
-        finally:
-            self._release_lock(descriptor)
 
     def evaluate_once(
         self,

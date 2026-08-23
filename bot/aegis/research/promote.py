@@ -7,6 +7,7 @@ readiness. It never writes live YAML and never places orders.
 """
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -31,7 +32,15 @@ class PromotionReject(GateReject):
 def _validation_bootstrap(
     validation_pnls: Sequence[float], validated_risk_fraction: float
 ) -> dict[str, Any]:
-    validation = bootstrap_expectancy(list(validation_pnls))
+    try:
+        pnls = [float(pnl) for pnl in validation_pnls]
+    except (TypeError, ValueError) as exc:
+        raise PromotionReject("validation PnLs must be finite") from exc
+    if any(not math.isfinite(pnl) for pnl in pnls):
+        raise PromotionReject("validation PnLs must be finite")
+    validation = bootstrap_expectancy(pnls)
+    if any(not math.isfinite(float(value)) for value in validation.values()):
+        raise PromotionReject("validation bootstrap evidence must be finite")
     if int(validation["n"]) < 20:
         raise PromotionReject(f"validation bootstrap needs >=20 trades, got {int(validation['n'])}")
     if float(validation["p05"]) <= 0:
