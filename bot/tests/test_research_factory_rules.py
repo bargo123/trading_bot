@@ -178,6 +178,108 @@ def test_missing_source_evidence_is_not_executable():
     assert result.reason == "missing source evidence"
 
 
+@pytest.mark.parametrize(
+    "overrides,reason",
+    [
+        (
+            {"book_evidence": "book"},
+            "book_evidence must be a list of dictionaries",
+        ),
+        (
+            {"book_evidence": [{"source": "book"}, "passage"]},
+            "book_evidence must be a list of dictionaries",
+        ),
+        (
+            {"ml_evidence": [{"model": "chronological"}]},
+            "ml_evidence must be a dictionary",
+        ),
+        (
+            {"loss_autopsy_evidence": {"loss_class": "FALSE_BREAKOUT"}},
+            "loss_autopsy_evidence must be a list of dictionaries",
+        ),
+        (
+            {"loss_autopsy_evidence": ["FALSE_BREAKOUT"]},
+            "loss_autopsy_evidence must be a list of dictionaries",
+        ),
+    ],
+)
+def test_malformed_provenance_is_not_executable(overrides, reason):
+    result = compile_hypothesis(
+        complete_hypothesis(**overrides),
+        {"time", "high", "low", "close", "regime"},
+    )
+
+    assert result.status == "NOT_EXECUTABLE"
+    assert result.reason == reason
+
+
+@pytest.mark.parametrize(
+    "entry_rule,reason",
+    [
+        (
+            {
+                "type": "breakout",
+                "direction": "long",
+                "window": 20,
+                "confirmation": "close",
+            },
+            "unexpected entry rule keys: confirmation",
+        ),
+        (
+            {"type": "breakout", "direction": "long", "windwo": 20},
+            "unexpected entry rule keys: windwo",
+        ),
+        (
+            {
+                "type": "mean_reversion",
+                "direction": "long",
+                "z_thresold": 2.0,
+            },
+            "unexpected entry rule keys: z_thresold",
+        ),
+    ],
+)
+def test_unexpected_or_misspelled_entry_modifiers_are_not_executable(
+    entry_rule, reason
+):
+    result = compile_hypothesis(
+        complete_hypothesis(entry_rule=entry_rule),
+        {"time", "high", "low", "close", "regime", "sma_20"},
+    )
+
+    assert result.status == "NOT_EXECUTABLE"
+    assert result.reason == reason
+
+
+@pytest.mark.parametrize(
+    "exit_rule,reason",
+    [
+        (
+            {"type": "regime_change", "adverse_selection": True},
+            "unexpected exit rule keys: adverse_selection",
+        ),
+        (
+            {"type": "elapsed_time", "max_bars": 5},
+            "unexpected exit rule keys: max_bars",
+        ),
+        (
+            {"type": "target_hit", "taret_price": 102.0},
+            "unexpected exit rule keys: taret_price",
+        ),
+    ],
+)
+def test_unexpected_or_misspelled_exit_modifiers_are_not_executable(
+    exit_rule, reason
+):
+    result = compile_hypothesis(
+        complete_hypothesis(exit_rule=exit_rule),
+        {"time", "high", "low", "close", "regime"},
+    )
+
+    assert result.status == "NOT_EXECUTABLE"
+    assert result.reason == reason
+
+
 @pytest.mark.parametrize("exit_type", ["trailing_stop", "adverse_selection"])
 def test_unimplemented_exit_types_are_not_executable(exit_type):
     result = compile_hypothesis(
@@ -231,6 +333,24 @@ def test_supported_entry_rules_are_executable(
     assert result.reason == ""
     assert result.entry_rule["direction"] == normalized_direction
     assert result.required_columns <= columns
+
+
+def test_normalized_rules_contain_only_permitted_fields():
+    result = compile_hypothesis(
+        complete_hypothesis(
+            entry_rule={"type": "breakout", "direction": "short", "window": 10},
+            exit_rule={"type": "time_exit"},
+        ),
+        {"time", "high", "low", "close", "regime"},
+    )
+
+    assert result.status == "EXECUTABLE"
+    assert result.entry_rule == {
+        "type": "breakout",
+        "direction": "long",
+        "window": 10,
+    }
+    assert result.exit_rule == {"type": "elapsed_time"}
 
 
 @pytest.mark.parametrize(
