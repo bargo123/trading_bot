@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, HistGradientBoostingClassifier
+from sklearn.frozen import FrozenEstimator
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
@@ -30,6 +31,38 @@ from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.feature_selection import SelectFromModel
 
 logger = logging.getLogger(__name__)
+
+
+LABEL_COLUMNS = frozenset(
+    {
+        "target",
+        "label",
+        "target_direction",
+        "future_max_high",
+        "future_min_low",
+        "profit_barrier_first",
+        "mfe",
+        "mae",
+        "time_to_target",
+        "no_progress",
+        "tail_loss",
+        "direction",
+        "return_horizon",
+    }
+)
+
+PROVENANCE_COLUMNS = frozenset(
+    {
+        "time",
+        "source_file",
+        "source_kind",
+        "source_quality",
+        "symbol",
+        "timeframe",
+    }
+)
+
+MIN_ISOTONIC_SAMPLES = 10
 
 
 @dataclass
@@ -76,29 +109,27 @@ class TrainedModel:
     """A trained model with metadata."""
     name: str
     model: Any
-    scaler: Any
-    feature_selector: Any
     feature_names: List[str]
     calibration_threshold: float
-    metrics: Dict[str, float]
+    metrics: Dict[str, Any]
     trained_at: str
     feature_hash: str
     config_hash: str
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         """Predict probabilities."""
-        # Ensure features match
-        X = X[self.feature_names]
-        X_scaled = self.scaler.transform(X)
-        if self.feature_selector:
-            X_selected = self.feature_selector.transform(X_scaled)
-        else:
-            X_selected = X_scaled
-        return self.model.predict_proba(X_selected)[:, 1]
+        missing = [name for name in self.feature_names if name not in X.columns]
+        if missing:
+            raise ValueError(f"Feature mismatch: missing={missing}")
+        features = X.loc[:, self.feature_names].replace(
+            [np.inf, -np.inf], np.nan
+        ).fillna(0)
+        return self.model.predict_proba(features)[:, 1]
 
     def predict(self, X: pd.DataFrame, threshold: Optional[float] = None) -> np.ndarray:
         """Predict class labels."""
-        threshold = threshold or self.calibration_threshold
+        if threshold is None:
+            threshold = self.calibration_threshold
         probs = self.predict_proba(X)
         return (probs >= threshold).astype(int)
 
@@ -120,22 +151,51 @@ class MLPipeline:
         self.models: List[TrainedModel] = []
         self.feature_names: List[str] = []
 
-    def _prepare_features(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
-        """Extract features and labels from dataframe."""
-        # Identify feature columns (exclude metadata columns)
-        exclude_cols = {
-            "time", "source_file", "symbol", "target", "label",
-            "future_max_high", "future_min_low", "profit_barrier_first",
-            "mfe", "mae", "time_to_target", "no_progress", "tail_loss",
-            "profit_barrier_first",
-        }
+    def _prepare_features(
+        self,
+        df: pd.DataFrame,
+        expected_features: Optional[List[str]] = None,
+        *,
+        require_two_classes: bool = True,
+    ) -> Tuple[pd.DataFrame, pd.Series, List[str]]:
+        """Extract validated model features and the explicit binary target."""
+        target_name = "profit_barrier_first"
+        if target_name not in df.columns:
+            raise ValueError(f"Missing required target column: {target_name}")
+        if df[target_name].isna().any():
+            raise ValueError(f"Target column {target_name} contains null values")
 
-        feature_cols = [c for c in df.columns if c not in exclude_cols and df[c].dtype in [np.float64, np.float32, np.int64, np.int32]]
+        y = df[target_name].astype(int)
+        if require_two_classes and y.nunique() < 2:
+            raise ValueError(
+                f"Target column {target_name} must contain at least two classes"
+            )
 
-        X = df[feature_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
-        y = df.get("profit_barrier_first", pd.Series(0, index=df.index)).astype(int)
+        excluded = LABEL_COLUMNS | PROVENANCE_COLUMNS
+        feature_names = [
+            column
+            for column in df.columns
+            if column not in excluded
+            and (
+                pd.api.types.is_numeric_dtype(df[column])
+                or pd.api.types.is_bool_dtype(df[column])
+            )
+        ]
+        if not feature_names:
+            raise ValueError("No numeric model features remain after exclusions")
 
-        return X.values, y.values, feature_cols
+        if expected_features is not None and set(feature_names) != set(expected_features):
+            missing = [name for name in expected_features if name not in feature_names]
+            unexpected = [name for name in feature_names if name not in expected_features]
+            raise ValueError(
+                "Feature mismatch: "
+                f"missing={missing or 'none'}, unexpected={unexpected or 'none'}"
+            )
+        if expected_features is not None:
+            feature_names = list(expected_features)
+
+        X = df.loc[:, feature_names].replace([np.inf, -np.inf], np.nan).fillna(0)
+        return X, y, feature_names
 
     def _create_model(self, config: ModelConfig) -> Any:
         """Create model from config."""
@@ -157,17 +217,24 @@ class MLPipeline:
         test_df: Optional[pd.DataFrame] = None,
     ) -> List[TrainedModel]:
         """Train all models."""
+        self.models = []
+        self.feature_names = []
+
         # Prepare features
         X_train, y_train, feature_names = self._prepare_features(train_df)
         self.feature_names = feature_names
 
         if val_df is not None:
-            X_val, y_val, _ = self._prepare_features(val_df)
+            X_val, y_val, _ = self._prepare_features(
+                val_df, expected_features=feature_names, require_two_classes=False
+            )
         else:
             X_val, y_val = None, None
 
         if test_df is not None:
-            X_test, y_test, _ = self._prepare_features(test_df)
+            X_test, y_test, _ = self._prepare_features(
+                test_df, expected_features=feature_names, require_two_classes=False
+            )
         else:
             X_test, y_test = None, None
 
@@ -175,9 +242,6 @@ class MLPipeline:
 
         for config in self.configs:
             logger.info(f"Training {config.name}...")
-
-            # Create base model
-            base_model = self._create_model(config)
 
             # Create pipeline
             steps = []
@@ -203,63 +267,78 @@ class MLPipeline:
             # Train
             pipeline.fit(X_train, y_train)
 
-            # Calibrate if requested
-            if config.calibrate and val_df is not None:
-                X_val, y_val, _ = self._prepare_features(val_df)
-                X_val = val_df[self.feature_names].replace([np.inf, -np.inf], np.nan).fillna(0)
-                pipeline.named_steps["model"] = CalibratedClassifierCV(
-                    pipeline.named_steps["model"],
-                    method="isotonic",
-                    cv="prefit",
+            if not config.calibrate:
+                calibration_status = "disabled"
+            elif val_df is None:
+                calibration_status = "skipped_no_validation"
+            elif y_val.nunique() < 2:
+                calibration_status = "skipped_single_class_validation"
+            elif len(y_val) < MIN_ISOTONIC_SAMPLES:
+                calibration_status = "skipped_insufficient_samples"
+            else:
+                calibrated_model = CalibratedClassifierCV(
+                    FrozenEstimator(pipeline), method="isotonic"
                 )
-                pipeline.named_steps["model"].fit(X_val, y_val)
+                calibrated_model.fit(X_val, y_val)
+                pipeline = Pipeline([("calibrated_model", calibrated_model)])
+                calibration_status = "calibrated_isotonic"
 
             # Determine optimal threshold on validation
-            threshold = 0.5
+            threshold = config.threshold
+            y_val_pred = None
+            y_val_proba = None
             if val_df is not None:
-                y_val_pred = pipeline.predict_proba(X_val)[:, 1]
+                y_val_proba = pipeline.predict_proba(X_val)[:, 1]
                 # Find threshold that maximizes F1
-                best_f1 = 0
-                best_thresh = 0.5
+                best_f1 = f1_score(
+                    y_val,
+                    (y_val_proba >= config.threshold).astype(int),
+                    zero_division=0,
+                )
+                best_thresh = config.threshold
                 for thresh in np.linspace(0.1, 0.9, 17):
-                    preds = (y_val_pred >= thresh).astype(int)
+                    preds = (y_val_proba >= thresh).astype(int)
                     f1 = f1_score(y_val, preds, zero_division=0)
                     if f1 > best_f1:
                         best_f1 = f1
                         best_thresh = thresh
                 threshold = best_thresh
+                y_val_pred = (y_val_proba >= threshold).astype(int)
 
             # Evaluate
-            metrics = {}
+            metrics: Dict[str, Any] = {"calibration_status": calibration_status}
             if val_df is not None:
-                y_pred = pipeline.predict(X_val)
-                y_proba = pipeline.predict_proba(X_val)[:, 1]
-                metrics = {
-                    "accuracy": accuracy_score(y_val, y_pred),
-                    "precision": precision_score(y_val, y_pred, zero_division=0),
-                    "recall": recall_score(y_val, y_pred, zero_division=0),
-                    "f1": f1_score(y_val, y_pred, zero_division=0),
-                    "roc_auc": roc_auc_score(y_val, y_proba),
-                    "log_loss": log_loss(y_val, y_proba),
-                    "brier": brier_score_loss(y_val, y_proba),
-                }
+                validation_classes = int(y_val.nunique())
+                metrics.update(
+                    {
+                        "validation_classes": validation_classes,
+                        "accuracy": accuracy_score(y_val, y_val_pred),
+                        "precision": precision_score(
+                            y_val, y_val_pred, zero_division=0
+                        ),
+                        "recall": recall_score(y_val, y_val_pred, zero_division=0),
+                        "f1": f1_score(y_val, y_val_pred, zero_division=0),
+                        "log_loss": log_loss(y_val, y_val_proba, labels=[0, 1]),
+                        "brier": brier_score_loss(y_val, y_val_proba),
+                    }
+                )
+                if validation_classes == 2:
+                    metrics["roc_auc"] = roc_auc_score(y_val, y_val_proba)
 
             if test_df is not None:
-                X_test, y_test, _ = self._prepare_features(test_df)
-                y_test_pred = pipeline.predict(X_test)
                 y_test_proba = pipeline.predict_proba(X_test)[:, 1]
+                y_test_pred = (y_test_proba >= threshold).astype(int)
                 metrics.update({
                     "test_accuracy": accuracy_score(y_test, y_test_pred),
                     "test_f1": f1_score(y_test, y_test_pred, zero_division=0),
-                    "test_roc_auc": roc_auc_score(y_test, y_test_proba),
                 })
+                if y_test.nunique() == 2:
+                    metrics["test_roc_auc"] = roc_auc_score(y_test, y_test_proba)
 
             # Create trained model
             trained = TrainedModel(
                 name=config.name,
                 model=pipeline,
-                scaler=scaler,
-                feature_selector=feature_selector,
                 feature_names=feature_names,
                 calibration_threshold=threshold,
                 metrics=metrics,
@@ -275,15 +354,16 @@ class MLPipeline:
 
     def predict(self, df: pd.DataFrame, model_name: Optional[str] = None) -> Dict[str, np.ndarray]:
         """Get predictions from all or specific model."""
-        X = df[self.feature_names].replace([np.inf, -np.inf], np.nan).fillna(0)
-
         results = {}
         for model in self.models:
             if model_name and model.name != model_name:
                 continue
+            probabilities = model.predict_proba(df)
             results[model.name] = {
-                "proba": model.predict_proba(df),
-                "pred": model.predict(df),
+                "proba": probabilities,
+                "pred": (
+                    probabilities >= model.calibration_threshold
+                ).astype(int),
             }
         return results
 
