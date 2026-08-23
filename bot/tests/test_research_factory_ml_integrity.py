@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+import inspect
+from dataclasses import replace
+
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.frozen import FrozenEstimator
 from sklearn.pipeline import Pipeline
 
-from aegis.research_factory.ml_pipeline import MLPipeline, ModelConfig
+import aegis.research_factory.ml_pipeline as ml_pipeline_module
+from aegis.research_factory.ml_pipeline import (
+    DEFAULT_MODEL_CONFIGS,
+    MLPipeline,
+    ModelConfig,
+)
 
 
 def small_logistic_config(*, calibrate: bool = False) -> ModelConfig:
@@ -66,6 +76,35 @@ def test_prepare_features_excludes_all_labels_and_provenance() -> None:
     pipeline.train(frame.iloc[:60], frame.iloc[60:])
 
     assert pipeline.feature_names == ["signal"]
+
+
+def test_training_drops_non_finite_supervised_rows_and_records_counts() -> None:
+    train = labeled_frame(60)
+    validation = labeled_frame(20)
+    train.loc[train.index[:2], "signal"] = [np.nan, np.inf]
+    validation.loc[validation.index[:2], "signal"] = [np.nan, -np.inf]
+    expected_center = np.median(train.loc[train["signal"].notna() & np.isfinite(train["signal"]), "signal"])
+
+    trained = MLPipeline(configs=[small_logistic_config()]).train(
+        train, validation
+    )[0]
+
+    assert trained.metrics["dropped_non_finite_train_rows"] == 2
+    assert trained.metrics["dropped_non_finite_validation_rows"] == 2
+    assert trained.model.named_steps["scaler"].center_[0] == pytest.approx(
+        expected_center
+    )
+
+
+def test_training_fails_if_non_finite_row_removal_leaves_one_class() -> None:
+    frame = labeled_frame(20)
+    frame.loc[frame["profit_barrier_first"] == 1, "signal"] = np.nan
+    pipeline = MLPipeline(configs=[small_logistic_config()])
+
+    with pytest.raises(ValueError, match="two classes.*non-finite"):
+        pipeline.train(frame)
+
+    assert pipeline.models == []
 
 
 def test_predict_proba_uses_the_fitted_pipeline_once_without_double_preprocessing(
@@ -207,58 +246,56 @@ def test_one_class_validation_omits_undefined_roc_auc() -> None:
     assert trained.metrics["validation_classes"] == 1
 
 
-def test_all_negative_folds_omit_undefined_metrics_and_skip_threshold_tuning() -> None:
+def test_all_negative_validation_omits_undefined_metrics_and_skips_threshold_tuning() -> None:
     train = labeled_frame(60)
     validation = labeled_frame(10)
-    test = labeled_frame(10)
-    for frame in (validation, test):
-        frame["profit_barrier_first"] = 0
-        frame["signal"] = -100.0
+    validation["profit_barrier_first"] = 0
+    validation["signal"] = -100.0
 
     trained = MLPipeline(configs=[small_logistic_config()]).train(
-        train, validation, test
+        train, validation
     )[0]
 
     assert trained.calibration_threshold == 0.5
     for metric in ("precision", "recall", "f1"):
         assert metric not in trained.metrics
-        assert f"test_{metric}" not in trained.metrics
 
 
-def test_all_positive_folds_report_defined_positive_class_metrics() -> None:
+def test_all_positive_validation_reports_defined_positive_class_metrics() -> None:
     train = labeled_frame(60)
     validation = labeled_frame(10)
-    test = labeled_frame(10)
-    for frame in (validation, test):
-        frame["profit_barrier_first"] = 1
-        frame["signal"] = 100.0
+    validation["profit_barrier_first"] = 1
+    validation["signal"] = 100.0
 
     trained = MLPipeline(configs=[small_logistic_config()]).train(
-        train, validation, test
+        train, validation
     )[0]
 
     for metric in ("precision", "recall", "f1"):
         assert trained.metrics[metric] == pytest.approx(1.0)
-        assert trained.metrics[f"test_{metric}"] == pytest.approx(1.0)
 
 
 def test_no_positive_predictions_omit_only_undefined_precision() -> None:
     train = labeled_frame(60)
     validation = labeled_frame(10)
-    test = labeled_frame(10)
-    for frame in (validation, test):
-        frame["signal"] = -100.0
+    validation["signal"] = -100.0
 
     trained = MLPipeline(configs=[small_logistic_config()]).train(
-        train, validation, test
+        train, validation
     )[0]
 
     assert "precision" not in trained.metrics
-    assert "test_precision" not in trained.metrics
     assert trained.metrics["recall"] == pytest.approx(0.0)
     assert trained.metrics["f1"] == pytest.approx(0.0)
-    assert trained.metrics["test_recall"] == pytest.approx(0.0)
-    assert trained.metrics["test_f1"] == pytest.approx(0.0)
+
+
+def test_training_interface_does_not_accept_or_report_test_data() -> None:
+    assert "test_df" not in inspect.signature(MLPipeline.train).parameters
+    frame = labeled_frame(80)
+    pipeline = MLPipeline(configs=[small_logistic_config()])
+
+    with pytest.raises(TypeError):
+        pipeline.train(frame.iloc[:50], frame.iloc[50:65], frame.iloc[65:])
 
 
 def test_small_validation_set_skips_isotonic_calibration_with_status() -> None:
@@ -282,7 +319,63 @@ def test_isotonic_calibration_wraps_the_fitted_preprocessing_pipeline() -> None:
 
     assert isinstance(trained.model, Pipeline)
     assert trained.metrics["calibration_status"] == "calibrated_isotonic"
+    calibrated = trained.model.named_steps["calibrated_model"]
+    assert isinstance(calibrated, CalibratedClassifierCV)
+    assert isinstance(calibrated.estimator, FrozenEstimator)
+    frozen_pipeline = calibrated.estimator.estimator
+    assert isinstance(frozen_pipeline, Pipeline)
+    assert list(frozen_pipeline.named_steps) == ["scaler", "model"]
     assert np.isfinite(trained.predict_proba(frame.iloc[60:])).all()
+
+
+def test_calibration_fails_explicitly_when_frozen_estimator_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frame = labeled_frame(80)
+    monkeypatch.setattr(ml_pipeline_module, "FrozenEstimator", None)
+
+    with pytest.raises(RuntimeError, match="scikit-learn.*FrozenEstimator"):
+        MLPipeline(configs=[small_logistic_config(calibrate=True)]).train(
+            frame.iloc[:60], frame.iloc[60:]
+        )
+
+
+def test_every_default_model_configuration_fits_with_reduced_cost() -> None:
+    frame = labeled_frame(80)
+
+    for default in DEFAULT_MODEL_CONFIGS:
+        params = dict(default.params)
+        if "n_estimators" in params:
+            params["n_estimators"] = 8
+        if "max_iter" in params:
+            params["max_iter"] = 20
+        if "n_jobs" in params:
+            params["n_jobs"] = 1
+        config = replace(default, params=params)
+
+        trained = MLPipeline(configs=[config]).train(
+            frame.iloc[:60], frame.iloc[60:]
+        )[0]
+
+        assert trained.name == default.name
+        assert np.isfinite(trained.predict_proba(frame.iloc[60:])).all()
+
+
+def test_training_failure_does_not_publish_partially_built_models() -> None:
+    frame = labeled_frame(80)
+    invalid = ModelConfig(
+        name="invalid",
+        model_type="unsupported",
+        params={},
+        feature_selector=False,
+        calibrate=False,
+    )
+    pipeline = MLPipeline(configs=[small_logistic_config(), invalid])
+
+    with pytest.raises(ValueError, match="Unknown model type"):
+        pipeline.train(frame.iloc[:60], frame.iloc[60:])
+
+    assert pipeline.models == []
 
 
 def test_real_models_fit_predict_and_repeated_training_resets_state() -> None:

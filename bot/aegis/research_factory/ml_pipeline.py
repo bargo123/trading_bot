@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, HistGradientBoostingClassifier
-from sklearn.frozen import FrozenEstimator
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
@@ -26,6 +25,11 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.feature_selection import SelectFromModel
+
+try:
+    from sklearn.frozen import FrozenEstimator
+except ImportError:  # pragma: no cover - depends on installed sklearn version
+    FrozenEstimator = None
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +121,7 @@ DEFAULT_MODEL_CONFIGS = [
         name="hist_gbm",
         model_type="hist_gradient_boosting",
         params={"max_iter": 200, "max_depth": 5, "learning_rate": 0.05, "class_weight": "balanced"},
+        feature_selector=False,
         calibrate=True,
     ),
 ]
@@ -175,7 +180,7 @@ class MLPipeline:
         expected_features: Optional[List[str]] = None,
         *,
         require_two_classes: bool = True,
-    ) -> Tuple[pd.DataFrame, pd.Series, List[str]]:
+    ) -> Tuple[pd.DataFrame, pd.Series, List[str], int]:
         """Extract validated model features and the explicit binary target."""
         target_name = "profit_barrier_first"
         if target_name not in df.columns:
@@ -191,12 +196,6 @@ class MLPipeline:
             raise ValueError(
                 f"Target column {target_name} must be binary with values 0 and 1; "
                 f"invalid values: {invalid_values}"
-            )
-
-        y = df[target_name].astype(int)
-        if require_two_classes and y.nunique() < 2:
-            raise ValueError(
-                f"Target column {target_name} must contain at least two classes"
             )
 
         excluded = LABEL_COLUMNS | PROVENANCE_COLUMNS
@@ -222,8 +221,18 @@ class MLPipeline:
         if expected_features is not None:
             feature_names = list(expected_features)
 
-        X = df.loc[:, feature_names].replace([np.inf, -np.inf], np.nan).fillna(0)
-        return X, y, feature_names
+        X = df.loc[:, feature_names].replace([np.inf, -np.inf], np.nan)
+        y = df[target_name].astype(int)
+        finite_rows = X.notna().all(axis=1)
+        dropped_rows = int((~finite_rows).sum())
+        X = X.loc[finite_rows].copy()
+        y = y.loc[finite_rows].copy()
+        if require_two_classes and y.nunique() < 2:
+            raise ValueError(
+                f"Target column {target_name} must contain at least two classes "
+                "after dropping non-finite supervised rows"
+            )
+        return X, y, feature_names, dropped_rows
 
     def _create_model(self, config: ModelConfig) -> Any:
         """Create model from config."""
@@ -242,31 +251,26 @@ class MLPipeline:
         self,
         train_df: pd.DataFrame,
         val_df: Optional[pd.DataFrame] = None,
-        test_df: Optional[pd.DataFrame] = None,
     ) -> List[TrainedModel]:
         """Train all models."""
         self.models = []
         self.feature_names = []
 
         # Prepare features
-        X_train, y_train, feature_names = self._prepare_features(train_df)
+        X_train, y_train, feature_names, dropped_train_rows = self._prepare_features(
+            train_df
+        )
         self.feature_names = feature_names
 
         if val_df is not None:
-            X_val, y_val, _ = self._prepare_features(
+            X_val, y_val, _, dropped_validation_rows = self._prepare_features(
                 val_df, expected_features=feature_names, require_two_classes=False
             )
         else:
             X_val, y_val = None, None
+            dropped_validation_rows = 0
 
-        if test_df is not None:
-            X_test, y_test, _ = self._prepare_features(
-                test_df, expected_features=feature_names, require_two_classes=False
-            )
-        else:
-            X_test, y_test = None, None
-
-        trained_models = []
+        models = []
 
         for config in self.configs:
             logger.info(f"Training {config.name}...")
@@ -279,12 +283,15 @@ class MLPipeline:
             steps.append(("scaler", scaler))
 
             # Feature selection
-            feature_selector = None
             if config.feature_selector:
                 selector_model = self._create_model(config)
                 selector_model.set_params(**{k: v for k, v in config.params.items() if k != "n_estimators"})
-                feature_selector = SelectFromModel(selector_model, threshold="median", max_features=50)
-                steps.append(("selector", feature_selector))
+                steps.append((
+                    "selector",
+                    SelectFromModel(
+                        selector_model, threshold="median", max_features=50
+                    ),
+                ))
 
             # Model
             model = self._create_model(config)
@@ -299,11 +306,18 @@ class MLPipeline:
                 calibration_status = "disabled"
             elif val_df is None:
                 calibration_status = "skipped_no_validation"
+            elif y_val.empty:
+                calibration_status = "skipped_no_usable_validation"
             elif y_val.nunique() < 2:
                 calibration_status = "skipped_single_class_validation"
             elif len(y_val) < MIN_ISOTONIC_SAMPLES:
                 calibration_status = "skipped_insufficient_samples"
             else:
+                if FrozenEstimator is None:
+                    raise RuntimeError(
+                        "Calibration requires a scikit-learn version with "
+                        "sklearn.frozen.FrozenEstimator"
+                    )
                 calibrated_model = CalibratedClassifierCV(
                     FrozenEstimator(pipeline), method="isotonic"
                 )
@@ -315,7 +329,7 @@ class MLPipeline:
             threshold = config.threshold
             y_val_pred = None
             y_val_proba = None
-            if val_df is not None:
+            if val_df is not None and not y_val.empty:
                 y_val_proba = pipeline.predict_proba(X_val)[:, 1]
                 # Find threshold that maximizes F1
                 best_f1 = None
@@ -334,8 +348,12 @@ class MLPipeline:
                 y_val_pred = (y_val_proba >= threshold).astype(int)
 
             # Evaluate
-            metrics: Dict[str, Any] = {"calibration_status": calibration_status}
-            if val_df is not None:
+            metrics: Dict[str, Any] = {
+                "calibration_status": calibration_status,
+                "dropped_non_finite_train_rows": dropped_train_rows,
+                "dropped_non_finite_validation_rows": dropped_validation_rows,
+            }
+            if val_df is not None and not y_val.empty:
                 validation_classes = int(y_val.nunique())
                 metrics.update(
                     {
@@ -349,21 +367,6 @@ class MLPipeline:
                 if validation_classes == 2:
                     metrics["roc_auc"] = roc_auc_score(y_val, y_val_proba)
 
-            if test_df is not None:
-                y_test_proba = pipeline.predict_proba(X_test)[:, 1]
-                y_test_pred = (y_test_proba >= threshold).astype(int)
-                metrics["test_accuracy"] = accuracy_score(y_test, y_test_pred)
-                metrics.update(
-                    {
-                        f"test_{name}": value
-                        for name, value in _defined_binary_metrics(
-                            y_test, y_test_pred
-                        ).items()
-                    }
-                )
-                if y_test.nunique() == 2:
-                    metrics["test_roc_auc"] = roc_auc_score(y_test, y_test_proba)
-
             # Create trained model
             trained = TrainedModel(
                 name=config.name,
@@ -376,9 +379,10 @@ class MLPipeline:
                 config_hash=hashlib.sha256(json.dumps(config.params, sort_keys=True).encode()).hexdigest()[:16],
             )
 
-            self.models.append(trained)
+            models.append(trained)
             logger.info(f"{config.name} trained: {metrics}")
 
+        self.models = models
         return self.models
 
     def predict(self, df: pd.DataFrame, model_name: Optional[str] = None) -> Dict[str, np.ndarray]:

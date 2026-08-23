@@ -15,6 +15,10 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+class InsufficientDataError(ValueError):
+    """Raised when valid inputs cannot produce usable supervised partitions."""
+
+
 @dataclass(frozen=True)
 class DataSource:
     """An immutable reference to a persisted market-data source."""
@@ -172,6 +176,41 @@ class DataPipeline:
             ["symbol", "timeframe", "time"], kind="stable"
         ).reset_index(drop=True)
 
+        key_columns = ["symbol", "timeframe", "time"]
+        provenance_columns = ["source_file", "source_kind", "source_quality"]
+        duplicate_rows = combined.duplicated(key_columns, keep=False)
+        drop_indices = []
+        for key, group in combined.loc[duplicate_rows].groupby(
+            key_columns, sort=False, dropna=False
+        ):
+            market_columns = [
+                column
+                for column in combined.columns
+                if column not in provenance_columns and column not in key_columns
+            ]
+            conflicting = [
+                column
+                for column in market_columns
+                if group[column].nunique(dropna=False) > 1
+            ]
+            if conflicting:
+                symbol, timeframe, timestamp = key
+                raise ValueError(
+                    "Conflicting duplicate observations for "
+                    f"symbol={symbol}, timeframe={timeframe}, time={timestamp}; "
+                    f"columns={conflicting}"
+                )
+
+            keep_index = group.index[0]
+            for column in provenance_columns:
+                combined.at[keep_index, column] = "|".join(
+                    sorted({str(value) for value in group[column].dropna()})
+                )
+            drop_indices.extend(group.index[1:])
+
+        if drop_indices:
+            combined = combined.drop(index=drop_indices).reset_index(drop=True)
+
         logger.info(f"Loaded {len(combined)} total rows from {len(frames)} files")
         return combined
 
@@ -187,7 +226,11 @@ class DataPipeline:
 
         if "time" not in df.columns:
             raise ValueError("Time column 'time' not found")
-        if not isinstance(label_horizon, int) or label_horizon <= 0:
+        if (
+            isinstance(label_horizon, bool)
+            or not isinstance(label_horizon, int)
+            or label_horizon <= 0
+        ):
             raise ValueError("label_horizon must be a positive integer")
         group_columns = ["symbol", "timeframe"]
         missing_group_columns = [
@@ -211,7 +254,7 @@ class DataPipeline:
         )
         test_end = validation_end + int(len(timestamps) * self.test_ratio)
         if not 0 < train_end < validation_end < test_end < len(timestamps):
-            raise ValueError(
+            raise InsufficientDataError(
                 "Ratios produce empty timestamp partitions for this dataset"
             )
 
@@ -254,12 +297,12 @@ class DataPipeline:
             if partition.empty
         ]
         if empty_partitions:
-            raise ValueError(
+            raise InsufficientDataError(
                 "Unusable split after purge and target filtering; "
                 f"empty partitions: {empty_partitions}"
             )
         if len(train) < self.min_train_size:
-            raise ValueError(
+            raise InsufficientDataError(
                 "Training partition too small after purge and target filtering: "
                 f"{len(train)} rows, minimum {self.min_train_size}"
             )
@@ -346,7 +389,7 @@ class DataPipeline:
         digest = hashlib.sha256()
         digest.update(schema)
         digest.update(row_hashes.tobytes())
-        return digest.hexdigest()[:16]
+        return digest.hexdigest()
 
 
 class FeatureEngineer:
@@ -383,7 +426,11 @@ class FeatureEngineer:
         loss_barrier_pct = self._validate_barrier(
             "loss_barrier_pct", loss_barrier_pct
         )
-        if not isinstance(label_horizon, int) or label_horizon <= 0:
+        if (
+            isinstance(label_horizon, bool)
+            or not isinstance(label_horizon, int)
+            or label_horizon <= 0
+        ):
             raise ValueError("label_horizon must be a positive integer")
 
         if df.empty:
@@ -665,8 +712,8 @@ class FeatureEngineer:
                 future_high = float(future["high"].max())
                 future_low = float(future["low"].min())
                 final_close = float(future.iloc[-1]["close"])
-                mfe = future_high - close
-                mae = close - future_low
+                mfe = max(0.0, future_high - close)
+                mae = max(0.0, close - future_low)
                 profit_price = close * (1.0 + profit_barrier_pct)
                 loss_price = close * (1.0 - loss_barrier_pct)
 
@@ -681,6 +728,8 @@ class FeatureEngineer:
                     profit_hit = float(bar["high"]) >= profit_price
                     loss_hit = float(bar["low"]) <= loss_price
                     if profit_hit and loss_hit:
+                        labels.at[index, "profit_barrier_first"] = 0
+                        labels.at[index, "time_to_target"] = offset
                         break
                     if profit_hit or loss_hit:
                         labels.at[index, "profit_barrier_first"] = int(profit_hit)

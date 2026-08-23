@@ -76,7 +76,7 @@ class TestDataPipeline:
         fp1 = pipeline.compute_dataset_fingerprint(df)
         fp2 = pipeline.compute_dataset_fingerprint(df)
         assert fp1 == fp2
-        assert len(fp1) == 16
+        assert len(fp1) == 64
 
 
 class TestFeatureEngineer:
@@ -371,6 +371,12 @@ class TestResearchState:
     def test_generation_barriers_are_required_and_must_be_positive(self):
         with pytest.raises(TypeError, match="profit_barrier_pct"):
             ResearchFactory()
+        with pytest.raises(ValueError, match="label_horizon.*positive integer"):
+            ResearchFactory(
+                profit_barrier_pct=0.01,
+                loss_barrier_pct=0.01,
+                label_horizon=True,
+            )
         for profit_barrier_pct, loss_barrier_pct in (
             (0.0, 0.01),
             (-0.01, 0.01),

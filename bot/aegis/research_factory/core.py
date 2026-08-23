@@ -34,6 +34,7 @@ from aegis.intel.paths import INTEL_DIR, ensure_intel_dirs
 from aegis.research_factory.data import (
     DataPipeline,
     FeatureEngineer,
+    InsufficientDataError,
     discover_csv_sources,
 )
 from aegis.research_factory.ml_pipeline import MLPipeline
@@ -484,7 +485,11 @@ class ResearchFactory:
         self.loss_barrier_pct = _positive_barrier(
             "loss_barrier_pct", loss_barrier_pct
         )
-        if not isinstance(label_horizon, int) or label_horizon <= 0:
+        if (
+            isinstance(label_horizon, bool)
+            or not isinstance(label_horizon, int)
+            or label_horizon <= 0
+        ):
             raise ValueError("label_horizon must be a positive integer")
         self.label_horizon = label_horizon
         self.source_roots = tuple(
@@ -624,6 +629,8 @@ Live trading: DISABLED
 
     def _run_generation(self) -> None:
         """Route one canonical frame through discovery, splitting, and training."""
+        self.state.last_generation_status = ""
+        self.state.last_generation_reason = ""
         self._log_event("DATA", f"Loading data for generation {self.state.generation}")
 
         try:
@@ -666,11 +673,18 @@ Live trading: DISABLED
             self.state.dataset_fingerprint = (
                 self.data_pipeline.compute_dataset_fingerprint(canonical)
             )
+        except Exception as exc:
+            self._record_generation_outcome(
+                "FAILED", f"Canonical dataset fingerprint failed: {exc}"
+            )
+            return
+
+        try:
             self._log_event("DATA", "Splitting canonical data chronologically")
             splits = self.data_pipeline.create_splits(
                 canonical, label_horizon=self.label_horizon
             )
-        except ValueError as exc:
+        except InsufficientDataError as exc:
             self._record_generation_outcome(
                 "NO_DATA", f"Canonical data has no usable matured split: {exc}"
             )
@@ -693,52 +707,10 @@ Live trading: DISABLED
             )
             return
 
-        self._log_event("REPLAY", "Running walk-forward validation...")
-        self._walk_forward_validation(models, splits.test)
-
-        self._log_event("LOSS AUTOPSY", "Analyzing losses...")
-        hypotheses = self._generate_hypotheses_from_losses()
-
-        for hypothesis in hypotheses:
-            if self._is_hypothesis_tested(hypothesis.hypothesis_id):
-                continue
-
-            self._log_event("HYPOTHESIS", f"Testing {hypothesis.hypothesis_id}")
-            result = self._test_hypothesis(
-                hypothesis, splits.train, splits.validation, splits.test
-            )
-
-            # Record experiment
-            exp_result = ExperimentResult(
-                hypothesis_id=hypothesis.hypothesis_id,
-                generation=self.state.generation,
-                metrics=result,
-                decision=result.get("decision", "REJECTED"),
-                dataset_fingerprint=self.state.dataset_fingerprint,
-                model_hash=hashlib.sha256(str(hypothesis).encode()).hexdigest()[:16],
-                cost_model="tick_economics_v1",
-                random_seed=42,
-            )
-            self.state.experiments.append(exp_result)
-            self.state.hypothesis_registry[hypothesis.hypothesis_id] = hypothesis
-
-            # Check if challenger beats champion
-            if result.get("decision") == "CHALLENGER":
-                self.state.challenger = Champion(
-                    hypothesis_id=hypothesis.hypothesis_id,
-                    metrics=result,
-                    model_hash=hashlib.sha256(str(hypothesis).encode()).hexdigest()[:16],
-                    dataset_fingerprint=self.state.dataset_fingerprint,
-                    promoted_at=datetime.now(timezone.utc).isoformat(),
-                    promotion_generation=self.state.generation,
-                )
-                self._log_event("DECISION", f"NEW CHALLENGER: {hypothesis.hypothesis_id}")
-
-            # Check if challenger beats champion for promotion
-            if self.state.challenger and self._should_promote_challenger():
-                self._promote_challenger()
-
-        self._log_learning()
+        self._record_generation_outcome(
+            "FAILED",
+            "Cost-aware replay is not configured; Plan 2 replay is required",
+        )
 
     def _record_generation_outcome(self, status: str, reason: str) -> None:
         """Persist and emit an honest terminal generation outcome."""
@@ -919,49 +891,6 @@ Live trading: DISABLED
         except Exception as e:
             logger.warning(f"ML training failed: {e}")
             return []
-
-    def _walk_forward_validation(self, models: List[Any], test_data: pd.DataFrame) -> Dict[str, Any]:
-        """Run REAL walk-forward validation with chronological windows."""
-        if not models:
-            return {"status": "no_models", "windows": []}
-
-        results = {"windows": [], "summary": {}}
-        
-        # Chronological walk-forward: expanding window
-        # Window 1: train on first 60%, validate on next 20%
-        # Window 2: train on first 80%, validate on next 20%
-        # etc.
-        
-        window_size = len(self._sealed_holdout) if hasattr(self, '_sealed_holdout') else len(models[0].feature_names) * 10
-        min_train_size = len(models[0].feature_names) * 20 if models else 1000
-        
-        if len(models) == 0:
-            return {"windows": [], "summary": "no_models"}
-        
-        window_size = max(1000, len(models[0].feature_names) * 50)
-        step_size = max(500, len(models[0].feature_names) * 20)
-        
-        windows_tested = 0
-        window_results = []
-        
-        # Use the last model for walk-forward (best model)
-        best_model = models[0] if models else None
-        if best_model is None:
-            return {"windows": [], "summary": "no_valid_model"}
-        
-        # Get feature names from best model
-        feature_names = getattr(best_model, 'feature_names', [])
-        if not feature_names:
-            return {"windows": [], "summary": "no_features"}
-        
-        # Chronological walk-forward: expanding window
-        # Start with minimum train size, expand by step_size each iteration
-        min_train = min_train_size
-        total_len = len(test_data) if 'test_data' in locals() else 0
-        
-        # For now, use the actual test data passed in
-        # This should be called with the test data from the generation
-        pass  # Will implement below
 
     def _generate_hypotheses_from_losses(self) -> List[Hypothesis]:
         """Generate hypotheses from loss autopsy."""

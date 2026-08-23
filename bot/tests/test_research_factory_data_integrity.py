@@ -14,6 +14,7 @@ from aegis.research_factory.data import (
     DatasetSplit,
     FeatureEngineer,
     FeatureSet,
+    create_research_splits,
     discover_csv_sources,
     engineer_features,
 )
@@ -84,6 +85,52 @@ def test_load_sources_skips_unreadable_csv_without_generating_rows(tmp_path, cap
     assert "Failed to load" in caplog.text
 
 
+def test_load_sources_deduplicates_identical_overlaps_and_aggregates_provenance(
+    tmp_path,
+):
+    first = tmp_path / "EURUSD_A_1m.csv"
+    second = tmp_path / "EURUSD_B_1m.csv"
+    for path, source, quality in (
+        (first, "broker_archive", "broker_native"),
+        (second, "journal_clip", "observed"),
+    ):
+        _write_bar_csv(path)
+        path.with_suffix(".json").write_text(
+            json.dumps(
+                {
+                    "symbol": "EURUSD",
+                    "timeframe": "1m",
+                    "source": source,
+                    "quality": quality,
+                }
+            )
+        )
+
+    frame = DataPipeline(min_train_size=1).load_sources(
+        discover_csv_sources([tmp_path])
+    )
+
+    assert len(frame) == 1
+    assert frame.loc[0, "source_file"] == "|".join(sorted(map(str, (first, second))))
+    assert frame.loc[0, "source_kind"] == "broker_archive|journal_clip"
+    assert frame.loc[0, "source_quality"] == "broker_native|observed"
+
+
+def test_load_sources_rejects_conflicting_overlaps(tmp_path):
+    first = tmp_path / "EURUSD_A_1m.csv"
+    second = tmp_path / "EURUSD_B_1m.csv"
+    _write_bar_csv(first)
+    _write_bar_csv(second)
+    conflicting = pd.read_csv(second)
+    conflicting.loc[0, "close"] = 1.16
+    conflicting.to_csv(second, index=False)
+
+    with pytest.raises(ValueError, match="Conflicting duplicate.*EURUSD.*1m"):
+        DataPipeline(min_train_size=1).load_sources(
+            discover_csv_sources([tmp_path])
+        )
+
+
 def test_fingerprint_hashes_row_101_and_is_order_independent():
     frame = pd.DataFrame(
         {
@@ -99,7 +146,9 @@ def test_fingerprint_hashes_row_101_and_is_order_independent():
     changed.loc[100, "close"] = 999.0
     pipeline = DataPipeline(min_train_size=1)
 
-    assert pipeline.compute_dataset_fingerprint(frame) == (
+    fingerprint = pipeline.compute_dataset_fingerprint(frame)
+    assert len(fingerprint) == 64
+    assert fingerprint == (
         pipeline.compute_dataset_fingerprint(reordered)
     )
     assert pipeline.compute_dataset_fingerprint(frame) != (
@@ -134,7 +183,11 @@ def test_empty_fingerprints_include_column_names_and_dtypes():
     assert len(fingerprints) == 3
 
 
-def _label_frame(symbol: str = "EURUSD", price_scale: float = 1.0) -> pd.DataFrame:
+def _label_frame(
+    symbol: str = "EURUSD",
+    price_scale: float = 1.0,
+    timeframe: str = "1m",
+) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "time": pd.date_range("2026-01-01", periods=3, freq="min", tz="UTC"),
@@ -144,14 +197,18 @@ def _label_frame(symbol: str = "EURUSD", price_scale: float = 1.0) -> pd.DataFra
             "close": np.array([100.0, 100.0, 100.0]) * price_scale,
             "volume": [10.0, 20.0, 30.0],
             "symbol": symbol,
-            "timeframe": "1m",
+            "timeframe": timeframe,
         }
     )
 
 
 def test_labels_record_first_barrier_and_leave_unmatured_tail_null():
+    frame = _label_frame()
+    frame["source_file"] = "fixture.csv"
+    frame["source_kind"] = "test"
+    frame["source_quality"] = "observed"
     feature_set = FeatureEngineer().engineer(
-        _label_frame(),
+        frame,
         label_horizon=2,
         profit_barrier_pct=0.02,
         loss_barrier_pct=0.02,
@@ -168,6 +225,58 @@ def test_labels_record_first_barrier_and_leave_unmatured_tail_null():
     assert feature_set.canonical["profit_barrier_first"].equals(
         feature_set.labels["profit_barrier_first"]
     )
+    metadata = [
+        "time",
+        "source_file",
+        "source_kind",
+        "source_quality",
+        "symbol",
+        "timeframe",
+    ]
+    assert list(feature_set.canonical.columns) == [
+        *metadata,
+        *feature_set.feature_names,
+        *feature_set.label_names,
+    ]
+
+
+def test_same_bar_barrier_collision_is_classified_as_conservative_loss():
+    frame = _label_frame()
+    frame.loc[1, ["high", "low"]] = [103.0, 97.0]
+
+    labels = FeatureEngineer().engineer(
+        frame,
+        label_horizon=2,
+        profit_barrier_pct=0.02,
+        loss_barrier_pct=0.02,
+    ).labels
+
+    assert labels.loc[0, "profit_barrier_first"] == 0
+    assert labels.loc[0, "time_to_target"] == 1
+
+
+def test_mfe_and_mae_are_non_negative_excursions():
+    no_favorable_excursion = _label_frame("EURUSD")
+    no_favorable_excursion.loc[1:, ["open", "high", "low", "close"]] = [
+        [98.5, 99.0, 98.0, 98.5],
+        [97.5, 98.0, 97.0, 97.5],
+    ]
+    no_adverse_excursion = _label_frame("GBPUSD")
+    no_adverse_excursion.loc[1:, ["open", "high", "low", "close"]] = [
+        [101.5, 102.0, 101.0, 101.5],
+        [102.5, 103.0, 102.0, 102.5],
+    ]
+    frame = pd.concat([no_favorable_excursion, no_adverse_excursion])
+
+    labels = FeatureEngineer().engineer(
+        frame,
+        label_horizon=2,
+        profit_barrier_pct=0.02,
+        loss_barrier_pct=0.02,
+    ).canonical
+
+    assert labels.loc[labels["symbol"] == "EURUSD", "mfe"].iloc[0] == 0.0
+    assert labels.loc[labels["symbol"] == "GBPUSD", "mae"].iloc[0] == 0.0
 
 
 def test_label_barriers_are_required_and_must_be_positive():
@@ -208,6 +317,50 @@ def test_symbol_groups_do_not_change_each_others_features_or_labels():
     actual = together.loc[together["symbol"] == "EURUSD"].reset_index(drop=True)
 
     pd.testing.assert_frame_equal(actual, isolated)
+
+
+def test_timeframe_groups_do_not_change_each_others_features_or_labels():
+    first = _label_frame(timeframe="1m")
+    second = _label_frame(timeframe="5m", price_scale=100.0)
+    kwargs = {
+        "label_horizon": 2,
+        "profit_barrier_pct": 0.02,
+        "loss_barrier_pct": 0.02,
+    }
+
+    isolated = FeatureEngineer().engineer(first, **kwargs).canonical
+    together = FeatureEngineer().engineer(
+        pd.concat([second, first], ignore_index=True), **kwargs
+    ).canonical
+    actual = together.loc[together["timeframe"] == "1m"].reset_index(drop=True)
+
+    pd.testing.assert_frame_equal(actual, isolated)
+
+
+def test_public_data_boundaries_reject_boolean_label_horizon():
+    label_frame = _label_frame()
+    split_frame = _split_frame(100, ["EURUSD"])
+
+    with pytest.raises(ValueError, match="positive integer"):
+        FeatureEngineer().engineer(
+            label_frame,
+            label_horizon=True,
+            profit_barrier_pct=0.02,
+            loss_barrier_pct=0.02,
+        )
+    with pytest.raises(ValueError, match="positive integer"):
+        engineer_features(
+            label_frame,
+            label_horizon=True,
+            profit_barrier_pct=0.02,
+            loss_barrier_pct=0.02,
+        )
+    with pytest.raises(ValueError, match="positive integer"):
+        DataPipeline(min_train_size=1).create_splits(
+            split_frame, label_horizon=True
+        )
+    with pytest.raises(ValueError, match="positive integer"):
+        create_research_splits(split_frame, label_horizon=True)
 
 
 def test_splits_keep_timestamps_together_and_purge_each_series_horizon():
@@ -330,8 +483,18 @@ def test_generation_routes_exact_canonical_frame_and_only_training_partitions(
     train = pd.DataFrame({"partition": ["train"]})
     validation = pd.DataFrame({"partition": ["validation"]})
     test = pd.DataFrame({"partition": ["test"]})
-    sealed = pd.DataFrame({"partition": ["sealed"]})
-    captures = {}
+    captures = {"hypotheses": 0, "walk_forward": 0}
+
+    class RaisingSealedSplit:
+        def __init__(self, train_frame, validation_frame, test_frame):
+            self.train = train_frame
+            self.validation = validation_frame
+            self.test = test_frame
+            self.split_info = {}
+
+        @property
+        def sealed_holdout(self):
+            raise AssertionError("sealed holdout must remain inaccessible in Plan 1")
 
     class FakeDataPipeline:
         def load_sources(self, sources):
@@ -345,7 +508,7 @@ def test_generation_routes_exact_canonical_frame_and_only_training_partitions(
         def create_splits(self, frame, *, label_horizon):
             captures["split_frame"] = frame
             captures["label_horizon"] = label_horizon
-            return DatasetSplit(train, validation, test, sealed, {})
+            return RaisingSealedSplit(train, validation, test)
 
     class FakeFeatureEngineer:
         def engineer(self, frame, **kwargs):
@@ -362,11 +525,17 @@ def test_generation_routes_exact_canonical_frame_and_only_training_partitions(
     factory.data_pipeline = FakeDataPipeline()
     factory.feature_engineer = FakeFeatureEngineer()
     factory.ml_pipeline = FakeMLPipeline()
-    factory._walk_forward_validation = lambda models, frame: captures.update(
-        walk_forward_frame=frame
-    ) or {}
-    factory._generate_hypotheses_from_losses = lambda: []
-    factory._log_learning = lambda: None
+
+    def forbidden_walk_forward(*args):
+        captures["walk_forward"] += 1
+        raise AssertionError("classification-only replay must not run")
+
+    def forbidden_hypotheses():
+        captures["hypotheses"] += 1
+        raise AssertionError("hypotheses must not run without cost-aware replay")
+
+    factory._walk_forward_validation = forbidden_walk_forward
+    factory._generate_hypotheses_from_losses = forbidden_hypotheses
     source_catalog = [object()]
     monkeypatch.setattr(
         "aegis.research_factory.core.discover_csv_sources",
@@ -387,9 +556,13 @@ def test_generation_routes_exact_canonical_frame_and_only_training_partitions(
     assert captures["label_horizon"] == 3
     assert captures["training_frames"][0] is train
     assert captures["training_frames"][1] is validation
-    assert all(frame is not sealed for frame in captures["training_frames"])
-    assert captures["walk_forward_frame"] is test
     assert factory.state.dataset_fingerprint == "canonical-fingerprint"
+    assert factory.state.last_generation_status == "FAILED"
+    assert "cost-aware replay" in factory.state.last_generation_reason.lower()
+    assert captures["walk_forward"] == 0
+    assert captures["hypotheses"] == 0
+    assert not hasattr(factory, "_sealed_holdout")
+    assert not hasattr(ResearchFactory, "_walk_forward_validation")
 
 
 def test_generation_with_empty_source_catalog_records_no_data_and_stops(
@@ -475,3 +648,146 @@ def test_generation_training_failure_records_failed_and_stops(monkeypatch):
     assert calls["hypotheses"] == 0
     assert factory.state.hypothesis_registry == {}
     assert factory.state.experiments == []
+
+
+def test_generation_with_empty_model_list_records_failed_and_stops(monkeypatch):
+    canonical = pd.DataFrame({"canonical": [1.0]})
+    train = pd.DataFrame({"partition": ["train"]})
+    validation = pd.DataFrame({"partition": ["validation"]})
+    test = pd.DataFrame({"partition": ["test"]})
+    calls = {"hypotheses": 0}
+
+    class FakeDataPipeline:
+        def load_sources(self, sources):
+            return pd.DataFrame({"raw": [1.0]})
+
+        def compute_dataset_fingerprint(self, frame):
+            return "canonical-fingerprint"
+
+        def create_splits(self, frame, *, label_horizon):
+            return SimpleNamespace(train=train, validation=validation, test=test)
+
+    factory = _factory_for_generation()
+    factory.data_pipeline = FakeDataPipeline()
+    factory.feature_engineer = SimpleNamespace(
+        engineer=lambda *args, **kwargs: SimpleNamespace(canonical=canonical)
+    )
+    factory.ml_pipeline = SimpleNamespace(train=lambda *args: [])
+
+    def generate_hypotheses():
+        calls["hypotheses"] += 1
+        return []
+
+    factory._generate_hypotheses_from_losses = generate_hypotheses
+    monkeypatch.setattr(
+        "aegis.research_factory.core.discover_csv_sources", lambda roots: [object()]
+    )
+
+    factory._run_generation()
+
+    assert factory.state.last_generation_status == "FAILED"
+    assert "no trained models" in factory.state.last_generation_reason.lower()
+    assert calls["hypotheses"] == 0
+
+
+@pytest.mark.parametrize("failure_stage", ["fingerprint", "split"])
+def test_generation_classifies_malformed_preparation_as_failed(
+    monkeypatch, failure_stage
+):
+    canonical = _split_frame(100, ["EURUSD"])
+    calls = {"models": 0}
+
+    class MalformedDataPipeline:
+        def load_sources(self, sources):
+            return pd.DataFrame({"raw": [1.0]})
+
+        def compute_dataset_fingerprint(self, frame):
+            if failure_stage == "fingerprint":
+                raise ValueError("malformed fingerprint input")
+            return "canonical-fingerprint"
+
+        def create_splits(self, frame, *, label_horizon):
+            raise ValueError("malformed split input")
+
+    class ForbiddenMLPipeline:
+        def train(self, *args):
+            calls["models"] += 1
+            raise AssertionError("training must not run after malformed preparation")
+
+    factory = _factory_for_generation()
+    factory.data_pipeline = MalformedDataPipeline()
+    factory.feature_engineer = SimpleNamespace(
+        engineer=lambda *args, **kwargs: SimpleNamespace(canonical=canonical)
+    )
+    factory.ml_pipeline = ForbiddenMLPipeline()
+    monkeypatch.setattr(
+        "aegis.research_factory.core.discover_csv_sources", lambda roots: [object()]
+    )
+
+    factory._run_generation()
+
+    assert factory.state.last_generation_status == "FAILED"
+    assert "malformed" in factory.state.last_generation_reason
+    assert calls["models"] == 0
+
+
+def test_generation_classifies_genuinely_insufficient_split_as_no_data(monkeypatch):
+    canonical = _split_frame(3, ["EURUSD"])
+
+    class InsufficientDataPipeline(DataPipeline):
+        def __init__(self):
+            super().__init__(min_train_size=1)
+
+        def load_sources(self, sources):
+            return pd.DataFrame({"raw": [1.0]})
+
+        def compute_dataset_fingerprint(self, frame):
+            return "canonical-fingerprint"
+
+    factory = _factory_for_generation()
+    factory.data_pipeline = InsufficientDataPipeline()
+    factory.feature_engineer = SimpleNamespace(
+        engineer=lambda *args, **kwargs: SimpleNamespace(canonical=canonical)
+    )
+    factory.ml_pipeline = SimpleNamespace(
+        train=lambda *args: (_ for _ in ()).throw(
+            AssertionError("training must not run without usable splits")
+        )
+    )
+    monkeypatch.setattr(
+        "aegis.research_factory.core.discover_csv_sources", lambda roots: [object()]
+    )
+
+    factory._run_generation()
+
+    assert factory.state.last_generation_status == "NO_DATA"
+    assert factory.state.last_generation_reason
+
+
+def test_generation_clears_prior_terminal_outcome_before_new_work(monkeypatch):
+    observed_outcomes = []
+    factory = _factory_for_generation()
+    factory.state.last_generation_status = "CHALLENGER"
+    factory.state.last_generation_reason = "prior generation"
+
+    class EmptyDataPipeline:
+        def load_sources(self, sources):
+            observed_outcomes.append(
+                (
+                    factory.state.last_generation_status,
+                    factory.state.last_generation_reason,
+                )
+            )
+            return pd.DataFrame()
+
+    factory.data_pipeline = EmptyDataPipeline()
+    factory.feature_engineer = object()
+    factory.ml_pipeline = object()
+    monkeypatch.setattr(
+        "aegis.research_factory.core.discover_csv_sources", lambda roots: []
+    )
+
+    factory._run_generation()
+
+    assert observed_outcomes == [("", "")]
+    assert factory.state.last_generation_status == "NO_DATA"
