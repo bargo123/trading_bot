@@ -17,6 +17,7 @@ from aegis.research.sealed import (
     freeze_candidate,
 )
 from aegis.research_factory.evaluation import (
+    OutcomePersistenceConflictError,
     evaluate_candidate_once,
     record_outcome,
 )
@@ -62,19 +63,20 @@ _PARAMS = {
 
 
 @pytest.mark.parametrize(
-    ("factory_status", "metrics"),
+    ("factory_status", "registry_status", "metrics"),
     [
-        ("NO_DATA", None),
-        ("NO_EVIDENCE", None),
-        ("NOT_EXECUTABLE", None),
-        ("FAILED", None),
-        ("REJECTED", {"expectancy": -0.25, "n_trades": 4}),
-        ("CHALLENGER", {"expectancy": 0.4, "n_trades": 24}),
+        ("NO_DATA", "failed", None),
+        ("NO_EVIDENCE", "failed", None),
+        ("NOT_EXECUTABLE", "failed", None),
+        ("FAILED", "failed", None),
+        ("REJECTED", "rejected", {"expectancy": -0.25, "n_trades": 4}),
+        ("CHALLENGER", "accepted", {"expectancy": 0.4, "n_trades": 24}),
     ],
 )
 def test_record_outcome_persists_every_terminal_status_without_fabricated_metrics(
     tmp_path: Path,
     factory_status: str,
+    registry_status: str,
     metrics: dict | None,
 ):
     registry = ExperimentRegistry(tmp_path / "experiments.sqlite")
@@ -95,7 +97,7 @@ def test_record_outcome_persists_every_terminal_status_without_fabricated_metric
     assert len(rows) == 1
     row = rows[0]
     assert row["id"] == "hyp_eval"
-    assert row["status"] == factory_status.lower()
+    assert row["status"] == registry_status
     assert row["hypothesis"] == hypothesis.proposed_mechanism
     assert row["dataset_fingerprint"] == "dataset-full-content-fingerprint"
     assert row["config_fingerprint"] == config_fingerprint(_PARAMS)
@@ -116,16 +118,34 @@ def test_record_outcome_persists_every_terminal_status_without_fabricated_metric
         assert row["n_trades"] is None
 
 
-def test_record_outcome_surfaces_duplicate_registry_error(tmp_path: Path):
+def test_record_outcome_persists_duplicate_as_unique_failed_conflict(tmp_path: Path):
     registry = ExperimentRegistry(tmp_path / "experiments.sqlite")
     hypothesis = _hypothesis()
     record_outcome(registry, hypothesis, "dataset-a", "FAILED", "first failure")
 
-    with pytest.raises(DuplicateExperimentError, match="already recorded"):
+    with pytest.raises(OutcomePersistenceConflictError) as caught:
         record_outcome(registry, hypothesis, "dataset-a", "FAILED", "retry")
+    rows = registry.all_rows()
+    assert len(rows) == 2
+    conflict = registry.get(caught.value.conflict_id)
+    assert conflict is not None
+    assert conflict["id"] != "hyp_eval"
+    assert conflict["status"] == "failed"
+    provenance = json.loads(conflict["provenance_json"])
+    assert provenance["persistence_conflict"] == {
+        "attempted_id": "hyp_eval",
+        "attempted_factory_status": "FAILED",
+        "attempted_identity": {
+            "config_fingerprint": config_fingerprint(_PARAMS),
+            "dataset_fingerprint": "dataset-a",
+            "hypothesis": hypothesis.proposed_mechanism,
+        },
+        "error_type": DuplicateExperimentError.__name__,
+        "error": "experiment id 'hyp_eval' already recorded; mint a new id",
+    }
 
 
-def test_record_outcome_surfaces_equivalent_registry_error(tmp_path: Path):
+def test_record_outcome_persists_equivalent_as_unique_failed_conflict(tmp_path: Path):
     registry = ExperimentRegistry(tmp_path / "experiments.sqlite")
     record_outcome(
         registry,
@@ -135,7 +155,7 @@ def test_record_outcome_surfaces_equivalent_registry_error(tmp_path: Path):
         "failed governed gates",
     )
 
-    with pytest.raises(EquivalentExperimentError, match="equivalent rejected"):
+    with pytest.raises(OutcomePersistenceConflictError) as caught:
         record_outcome(
             registry,
             _hypothesis("hyp_equivalent"),
@@ -143,6 +163,15 @@ def test_record_outcome_surfaces_equivalent_registry_error(tmp_path: Path):
             "CHALLENGER",
             "unjustified retry",
         )
+    conflict = registry.get(caught.value.conflict_id)
+    assert conflict is not None
+    assert conflict["status"] == "failed"
+    assert conflict["new_reason"]
+    provenance = json.loads(conflict["provenance_json"])
+    assert provenance["persistence_conflict"]["attempted_id"] == "hyp_equivalent"
+    assert provenance["persistence_conflict"]["error_type"] == (
+        EquivalentExperimentError.__name__
+    )
 
 
 def test_sealed_evaluation_is_callback_owned_and_persistent_after_restart(
@@ -153,6 +182,7 @@ def test_sealed_evaluation_is_callback_owned_and_persistent_after_restart(
         code_hash="code-a",
         config={"window": 2, "side": "buy"},
         artifact_hash="model-a",
+        training_dataset_fingerprint="training-a",
     )
     path = tmp_path / "sealed.jsonl"
     callback_candidates = []
@@ -172,9 +202,10 @@ def test_sealed_evaluation_is_callback_owned_and_persistent_after_restart(
     assert callback_candidates == [frozen]
     assert first["frozen_hash"] == frozen.frozen_hash
     assert first["holdout_fingerprint"] == "holdout-a"
+    assert first["training_dataset_fingerprint"] == "training-a"
     assert first["metrics"] == {"expectancy": 0.2, "n_trades": 25}
 
-    with pytest.raises(SealedHoldoutError, match="already scored"):
+    with pytest.raises(SealedHoldoutError, match="already reserved"):
         evaluate_candidate_once(
             frozen,
             SealedHoldoutStore(path),
@@ -182,6 +213,141 @@ def test_sealed_evaluation_is_callback_owned_and_persistent_after_restart(
             evaluate,
         )
     assert callback_candidates == [frozen]
+
+
+def test_frozen_identity_is_deterministic_and_includes_training_dataset():
+    first = freeze_candidate(
+        strategy_id="breakout-v1",
+        code_hash="code-a",
+        config={"window": 2, "side": "buy"},
+        artifact_hash="model-a",
+        training_dataset_fingerprint="training-a",
+    )
+    same_identity = freeze_candidate(
+        strategy_id="breakout-v1",
+        code_hash="code-a",
+        config={"side": "buy", "window": 2},
+        artifact_hash="model-a",
+        training_dataset_fingerprint="training-a",
+    )
+    different_training_data = freeze_candidate(
+        strategy_id="breakout-v1",
+        code_hash="code-a",
+        config={"window": 2, "side": "buy"},
+        artifact_hash="model-a",
+        training_dataset_fingerprint="training-b",
+    )
+
+    assert first.frozen_hash == same_identity.frozen_hash
+    assert first.frozen_hash != different_training_data.frozen_hash
+    assert first.training_dataset_fingerprint == "training-a"
+    assert first.as_dict()["training_dataset_fingerprint"] == "training-a"
+
+
+@pytest.mark.parametrize("fingerprint", [None, "", "   "])
+def test_freeze_candidate_requires_observed_training_fingerprint(fingerprint):
+    with pytest.raises(ValueError, match="training_dataset_fingerprint"):
+        freeze_candidate(
+            strategy_id="breakout-v1",
+            code_hash="code-a",
+            config={"window": 2},
+            artifact_hash="model-a",
+            training_dataset_fingerprint=fingerprint,
+        )
+
+
+def test_sealed_callback_failure_consumes_key_and_persists_terminal_failure(
+    tmp_path: Path,
+):
+    frozen = freeze_candidate(
+        strategy_id="breakout-v1",
+        code_hash="code-a",
+        config={"window": 2},
+        artifact_hash="model-a",
+        training_dataset_fingerprint="training-a",
+    )
+    path = tmp_path / "sealed.jsonl"
+    calls = 0
+
+    def fail(candidate):
+        nonlocal calls
+        calls += 1
+        raise RuntimeError("evaluator crashed")
+
+    with pytest.raises(RuntimeError, match="evaluator crashed"):
+        evaluate_candidate_once(frozen, SealedHoldoutStore(path), "holdout-a", fail)
+
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    assert [row["status"] for row in rows] == ["reserved", "failed"]
+    assert rows[0]["record_type"] == "reservation"
+    assert rows[1]["error"]["type"] == "RuntimeError"
+    assert rows[1]["error"]["message"] == "evaluator crashed"
+    assert "metrics" not in rows[1]
+
+    with pytest.raises(SealedHoldoutError, match="already reserved"):
+        evaluate_candidate_once(frozen, SealedHoldoutStore(path), "holdout-a", fail)
+    assert calls == 1
+
+
+def test_sealed_result_normalization_failure_persists_terminal_failure(tmp_path: Path):
+    frozen = freeze_candidate(
+        strategy_id="breakout-v1",
+        code_hash="code-a",
+        config={"window": 2},
+        artifact_hash="model-a",
+        training_dataset_fingerprint="training-a",
+    )
+    path = tmp_path / "sealed.jsonl"
+
+    with pytest.raises(TypeError):
+        evaluate_candidate_once(
+            frozen,
+            SealedHoldoutStore(path),
+            "holdout-a",
+            lambda candidate: {"metrics": {}, "pnls": 1},
+        )
+
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    assert [row["status"] for row in rows] == ["reserved", "failed"]
+    assert rows[1]["error"]["type"] == "TypeError"
+
+
+def test_preexisting_sealed_reservation_blocks_callback(tmp_path: Path):
+    frozen = freeze_candidate(
+        strategy_id="breakout-v1",
+        code_hash="code-a",
+        config={"window": 2},
+        artifact_hash="model-a",
+        training_dataset_fingerprint="training-a",
+    )
+    path = tmp_path / "sealed.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "record_type": "reservation",
+                "status": "reserved",
+                "frozen_hash": frozen.frozen_hash,
+                "holdout_fingerprint": "holdout-a",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    called = False
+
+    def evaluate(candidate):
+        nonlocal called
+        called = True
+        return {}
+
+    with pytest.raises(SealedHoldoutError, match="already reserved"):
+        evaluate_candidate_once(
+            frozen,
+            SealedHoldoutStore(path),
+            "holdout-a",
+            evaluate,
+        )
+    assert called is False
 
 
 def test_sealed_evaluation_requires_frozen_candidate_before_callback(tmp_path: Path):
@@ -218,9 +384,62 @@ def test_factory_generation_terminal_outcome_is_persisted_without_zero_metrics(
     assert len(rows) == 1
     row = rows[0]
     assert row["id"] == "research_factory_generation_7"
-    assert row["status"] == "no_data"
+    assert row["status"] == "failed"
     assert row["dataset_fingerprint"] == "canonical-data-a"
     assert row["rejection_reason"] == "no matured samples"
     assert row["metrics"] == {}
     assert row["expectancy"] is None
     assert row["n_trades"] is None
+
+
+def test_factory_terminal_persistence_requires_registry():
+    factory = object.__new__(ResearchFactory)
+    factory.state = ResearchState(generation=7, dataset_fingerprint="canonical-data-a")
+    factory._log_event = lambda *args, **kwargs: None
+
+    with pytest.raises(RuntimeError, match="ExperimentRegistry.*required"):
+        factory._record_generation_outcome("NO_DATA", "no matured samples")
+
+    assert factory.state.last_generation_status == "FAILED"
+    assert "registry" in factory.state.last_generation_reason.lower()
+
+
+def test_factory_conflict_sets_failed_state_and_persists_conflict(tmp_path: Path):
+    factory = object.__new__(ResearchFactory)
+    factory.state = ResearchState(generation=7, dataset_fingerprint="canonical-data-a")
+    factory.experiment_registry = ExperimentRegistry(tmp_path / "experiments.sqlite")
+    factory._log_event = lambda *args, **kwargs: None
+    factory._record_generation_outcome("NO_DATA", "first attempt")
+
+    with pytest.raises(OutcomePersistenceConflictError) as caught:
+        factory._record_generation_outcome("NO_DATA", "duplicate attempt")
+
+    assert factory.state.last_generation_status == "FAILED"
+    assert caught.value.conflict_id in factory.state.last_generation_reason
+    rows = factory.experiment_registry.all_rows()
+    assert [row["status"] for row in rows] == ["failed", "failed"]
+
+
+def test_generation_clears_stale_dataset_fingerprint_before_early_outcome(
+    monkeypatch,
+    tmp_path: Path,
+):
+    class EmptyDataPipeline:
+        def load_sources(self, sources):
+            return type("EmptyFrame", (), {"empty": True})()
+
+    factory = object.__new__(ResearchFactory)
+    factory.state = ResearchState(generation=8, dataset_fingerprint="prior-generation")
+    factory.source_roots = (Path("unused"),)
+    factory.data_pipeline = EmptyDataPipeline()
+    factory.experiment_registry = ExperimentRegistry(tmp_path / "experiments.sqlite")
+    factory._log_event = lambda *args, **kwargs: None
+    monkeypatch.setattr(
+        "aegis.research_factory.core.discover_csv_sources", lambda roots: []
+    )
+
+    factory._run_generation()
+
+    assert factory.state.dataset_fingerprint == "NOT_COMPUTED"
+    row = factory.experiment_registry.all_rows()[0]
+    assert row["dataset_fingerprint"] == "NOT_COMPUTED"

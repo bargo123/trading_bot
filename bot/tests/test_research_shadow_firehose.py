@@ -33,6 +33,7 @@ def test_sealed_holdout_rejects_second_evaluation_of_same_frozen_id(tmp_path: Pa
         code_hash="code1",
         config={"tp": 8, "sl": 8},
         artifact_hash="art1",
+        training_dataset_fingerprint="training1",
     )
     store = SealedHoldoutStore(tmp_path / "sealed.jsonl")
     first = store.evaluate_once(

@@ -10,8 +10,9 @@ from aegis.research.promote import (
     PromotionReject,
     challenger_promotion_result,
     challenger_promotion_result_from_callback,
+    promotion_result_markdown,
 )
-from aegis.research.sealed import SealedHoldoutStore
+from aegis.research.sealed import SealedHoldoutError, SealedHoldoutStore
 
 
 def _healthy_pnls(seed: int = 0) -> list[float]:
@@ -70,6 +71,9 @@ def test_healthy_challenger_promotes(tmp_path):
     assert result["champion"]["profit_factor"] > 1
     assert result["champion"]["wins_erased_by_average_loss"] < 1
     assert result["placed_orders"] is False
+    assert result["frozen"]["training_dataset_fingerprint"] == (
+        "LEGACY_DIRECT_METRICS_NOT_PROVIDED"
+    )
 
 
 def test_rejected_on_negative_holdout_expectancy(tmp_path):
@@ -149,6 +153,7 @@ def test_callback_promotion_freezes_before_sealed_evaluation(tmp_path):
         artifact_hash="artifact-callback",
         config={"session": "asia", "side": "sell"},
         validation_pnls=validation,
+        training_dataset_fingerprint="training-callback",
         holdout_fingerprint="holdout-full-content-fingerprint",
         evaluate_holdout=evaluate_holdout,
         validated_risk_fraction=0.10,
@@ -162,6 +167,19 @@ def test_callback_promotion_freezes_before_sealed_evaluation(tmp_path):
     )
     assert result["holdout_metrics"]["n_trades"] == 80
     assert result["champion"]["status"] == "accepted"
+    assert result["sealed_holdout"]["metrics"]["expectancy"] == pytest.approx(
+        result["holdout_metrics"]["expectancy"]
+    )
+    assert result["sealed_holdout"]["metrics"]["profit_factor"] == pytest.approx(
+        result["holdout_metrics"]["profit_factor"]
+    )
+    assert result["sealed_holdout"]["metrics"]["n_trades"] == 80
+    assert "pnls" not in result["sealed_holdout"]["metrics"]
+    assert result["sealed_holdout"]["pnls"] == holdout
+    markdown = promotion_result_markdown(result)
+    assert f"- expectancy: {result['holdout_metrics']['expectancy']}" in markdown
+    assert f"- profit_factor: {result['holdout_metrics']['profit_factor']}" in markdown
+    assert "- n_trades: 80" in markdown
 
 
 def test_callback_promotion_rejects_thin_validation_before_sealed_callback(tmp_path):
@@ -179,6 +197,7 @@ def test_callback_promotion_rejects_thin_validation_before_sealed_callback(tmp_p
             artifact_hash="artifact-callback",
             config={"session": "asia", "side": "sell"},
             validation_pnls=[0.1] * 10,
+            training_dataset_fingerprint="training-callback",
             holdout_fingerprint="holdout-full-content-fingerprint",
             evaluate_holdout=evaluate_holdout,
             validated_risk_fraction=0.10,
@@ -186,3 +205,92 @@ def test_callback_promotion_rejects_thin_validation_before_sealed_callback(tmp_p
             champion_path=tmp_path / "callback-champion.json",
         )
     assert called is False
+
+
+def test_callback_promotion_rejects_negative_validation_p05_before_callback(tmp_path):
+    called = False
+
+    def evaluate_holdout(frozen):
+        nonlocal called
+        called = True
+        return {"metrics": {}, "pnls": []}
+
+    with pytest.raises(PromotionReject, match="p05.*positive"):
+        challenger_promotion_result_from_callback(
+            strategy_id="asia_sell_callback_v1",
+            code_hash="code-callback",
+            artifact_hash="artifact-callback",
+            config={"session": "asia", "side": "sell"},
+            validation_pnls=[-0.1] * 20,
+            training_dataset_fingerprint="training-callback",
+            holdout_fingerprint="holdout-full-content-fingerprint",
+            evaluate_holdout=evaluate_holdout,
+            validated_risk_fraction=0.10,
+            sealed_store=SealedHoldoutStore(tmp_path / "callback-sealed.jsonl"),
+            champion_path=tmp_path / "callback-champion.json",
+        )
+    assert called is False
+
+
+def test_callback_promotion_rejects_invalid_risk_before_callback(tmp_path):
+    called = False
+
+    def evaluate_holdout(frozen):
+        nonlocal called
+        called = True
+        return {"metrics": {}, "pnls": []}
+
+    with pytest.raises(PromotionReject, match="validated risk fraction"):
+        challenger_promotion_result_from_callback(
+            strategy_id="asia_sell_callback_v1",
+            code_hash="code-callback",
+            artifact_hash="artifact-callback",
+            config={"session": "asia", "side": "sell"},
+            validation_pnls=_healthy_pnls(seed=1),
+            training_dataset_fingerprint="training-callback",
+            holdout_fingerprint="holdout-full-content-fingerprint",
+            evaluate_holdout=evaluate_holdout,
+            validated_risk_fraction=0.0,
+            sealed_store=SealedHoldoutStore(tmp_path / "callback-sealed.jsonl"),
+            champion_path=tmp_path / "callback-champion.json",
+        )
+    assert called is False
+
+
+def test_repeated_public_callback_after_store_reconstruction_is_blocked(tmp_path):
+    validation = _healthy_pnls(seed=1)
+    holdout = _healthy_pnls(seed=2)
+    path = tmp_path / "callback-sealed.jsonl"
+    calls = 0
+
+    def evaluate_holdout(frozen):
+        nonlocal calls
+        calls += 1
+        return {
+            "metrics": _healthy_holdout_metrics(holdout),
+            "pnls": holdout,
+        }
+
+    params = dict(
+        strategy_id="asia_sell_callback_v1",
+        code_hash="code-callback",
+        artifact_hash="artifact-callback",
+        config={"session": "asia", "side": "sell"},
+        validation_pnls=validation,
+        training_dataset_fingerprint="training-callback",
+        holdout_fingerprint="holdout-full-content-fingerprint",
+        evaluate_holdout=evaluate_holdout,
+        validated_risk_fraction=0.10,
+        champion_path=tmp_path / "callback-champion.json",
+    )
+    challenger_promotion_result_from_callback(
+        **params,
+        sealed_store=SealedHoldoutStore(path),
+    )
+
+    with pytest.raises(SealedHoldoutError, match="already reserved"):
+        challenger_promotion_result_from_callback(
+            **params,
+            sealed_store=SealedHoldoutStore(path),
+        )
+    assert calls == 1

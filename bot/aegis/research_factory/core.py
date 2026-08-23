@@ -600,6 +600,7 @@ Live trading: DISABLED
         """Route one canonical frame through discovery, splitting, and training."""
         self.state.last_generation_status = ""
         self.state.last_generation_reason = ""
+        self.state.dataset_fingerprint = "NOT_COMPUTED"
         self._log_event("DATA", f"Loading data for generation {self.state.generation}")
 
         try:
@@ -695,7 +696,13 @@ Live trading: DISABLED
         self._log_event("GENERATION", reason, status=status)
         registry = getattr(self, "experiment_registry", None)
         if registry is None:
-            return
+            persistence_reason = (
+                "ExperimentRegistry is required for terminal outcome persistence"
+            )
+            self.state.last_generation_status = "FAILED"
+            self.state.last_generation_reason = persistence_reason
+            self._log_event("GENERATION", persistence_reason, status="FAILED")
+            raise RuntimeError(persistence_reason)
         attempted_research = hypothesis or {
             "hypothesis_id": f"research_factory_generation_{self.state.generation}",
             "origin": "RESEARCH_FACTORY",
@@ -703,14 +710,21 @@ Live trading: DISABLED
             "proposed_mechanism": "execute one governed research factory generation",
             "generation": self.state.generation,
         }
-        record_outcome(
-            registry,
-            attempted_research,
-            self.state.dataset_fingerprint,
-            status,
-            reason,
-            metrics,
-        )
+        try:
+            record_outcome(
+                registry,
+                attempted_research,
+                self.state.dataset_fingerprint,
+                status,
+                reason,
+                metrics,
+            )
+        except Exception as exc:
+            persistence_reason = f"Terminal outcome persistence failed: {exc}"
+            self.state.last_generation_status = "FAILED"
+            self.state.last_generation_reason = persistence_reason
+            self._log_event("GENERATION", persistence_reason, status="FAILED")
+            raise
 
     def _load_dataset(self) -> pd.DataFrame:
         """Load and combine all available historical data."""

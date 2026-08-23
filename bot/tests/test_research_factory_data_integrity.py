@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from aegis.research.registry import ExperimentRegistry
 from aegis.research_factory.core import ResearchFactory, ResearchState
 from aegis.research_factory.data import (
     DataPipeline,
@@ -456,8 +457,11 @@ def test_split_applies_minimum_train_size_after_purge_and_target_filtering():
         DataPipeline(min_train_size=58).create_splits(frame, label_horizon=3)
 
 
-def _factory_for_generation() -> ResearchFactory:
+def _factory_for_generation(tmp_path: Path) -> ResearchFactory:
     factory = object.__new__(ResearchFactory)
+    factory.experiment_registry = ExperimentRegistry(
+        tmp_path / "experiments.sqlite"
+    )
     factory.state = ResearchState(generation=1)
     factory.source_roots = (Path("unused"),)
     factory.profit_barrier_pct = 0.02
@@ -469,6 +473,7 @@ def _factory_for_generation() -> ResearchFactory:
 
 def test_generation_routes_exact_canonical_frame_and_only_training_partitions(
     monkeypatch,
+    tmp_path,
 ):
     raw = pd.DataFrame({"raw": [1.0]})
     canonical = pd.DataFrame({"canonical": [2.0]})
@@ -521,7 +526,7 @@ def test_generation_routes_exact_canonical_frame_and_only_training_partitions(
             captures["training_frames"] = (train_frame, validation_frame)
             return [SimpleNamespace(feature_names=[])]
 
-    factory = _factory_for_generation()
+    factory = _factory_for_generation(tmp_path)
     factory.data_pipeline = FakeDataPipeline()
     factory.feature_engineer = FakeFeatureEngineer()
     factory.ml_pipeline = FakeMLPipeline()
@@ -567,6 +572,7 @@ def test_generation_routes_exact_canonical_frame_and_only_training_partitions(
 
 def test_generation_with_empty_source_catalog_records_no_data_and_stops(
     monkeypatch,
+    tmp_path,
 ):
     calls = {"models": 0, "hypotheses": 0}
 
@@ -580,7 +586,7 @@ def test_generation_with_empty_source_catalog_records_no_data_and_stops(
             calls["models"] += 1
             raise AssertionError("training must not run without source data")
 
-    factory = _factory_for_generation()
+    factory = _factory_for_generation(tmp_path)
     factory.data_pipeline = EmptyDataPipeline()
     factory.feature_engineer = object()
     factory.ml_pipeline = ForbiddenMLPipeline()
@@ -603,7 +609,7 @@ def test_generation_with_empty_source_catalog_records_no_data_and_stops(
     assert factory.state.experiments == []
 
 
-def test_generation_training_failure_records_failed_and_stops(monkeypatch):
+def test_generation_training_failure_records_failed_and_stops(monkeypatch, tmp_path):
     canonical = pd.DataFrame({"canonical": [1.0]})
     train = pd.DataFrame({"partition": ["train"]})
     validation = pd.DataFrame({"partition": ["validation"]})
@@ -625,7 +631,7 @@ def test_generation_training_failure_records_failed_and_stops(monkeypatch):
         def train(self, train_frame, validation_frame):
             raise ValueError("single-class training target")
 
-    factory = _factory_for_generation()
+    factory = _factory_for_generation(tmp_path)
     factory.data_pipeline = FakeDataPipeline()
     factory.feature_engineer = SimpleNamespace(
         engineer=lambda *args, **kwargs: SimpleNamespace(canonical=canonical)
@@ -650,7 +656,7 @@ def test_generation_training_failure_records_failed_and_stops(monkeypatch):
     assert factory.state.experiments == []
 
 
-def test_generation_with_empty_model_list_records_failed_and_stops(monkeypatch):
+def test_generation_with_empty_model_list_records_failed_and_stops(monkeypatch, tmp_path):
     canonical = pd.DataFrame({"canonical": [1.0]})
     train = pd.DataFrame({"partition": ["train"]})
     validation = pd.DataFrame({"partition": ["validation"]})
@@ -667,7 +673,7 @@ def test_generation_with_empty_model_list_records_failed_and_stops(monkeypatch):
         def create_splits(self, frame, *, label_horizon):
             return SimpleNamespace(train=train, validation=validation, test=test)
 
-    factory = _factory_for_generation()
+    factory = _factory_for_generation(tmp_path)
     factory.data_pipeline = FakeDataPipeline()
     factory.feature_engineer = SimpleNamespace(
         engineer=lambda *args, **kwargs: SimpleNamespace(canonical=canonical)
@@ -692,7 +698,7 @@ def test_generation_with_empty_model_list_records_failed_and_stops(monkeypatch):
 
 @pytest.mark.parametrize("failure_stage", ["fingerprint", "split"])
 def test_generation_classifies_malformed_preparation_as_failed(
-    monkeypatch, failure_stage
+    monkeypatch, failure_stage, tmp_path
 ):
     canonical = _split_frame(100, ["EURUSD"])
     calls = {"models": 0}
@@ -714,7 +720,7 @@ def test_generation_classifies_malformed_preparation_as_failed(
             calls["models"] += 1
             raise AssertionError("training must not run after malformed preparation")
 
-    factory = _factory_for_generation()
+    factory = _factory_for_generation(tmp_path)
     factory.data_pipeline = MalformedDataPipeline()
     factory.feature_engineer = SimpleNamespace(
         engineer=lambda *args, **kwargs: SimpleNamespace(canonical=canonical)
@@ -731,7 +737,9 @@ def test_generation_classifies_malformed_preparation_as_failed(
     assert calls["models"] == 0
 
 
-def test_generation_classifies_genuinely_insufficient_split_as_no_data(monkeypatch):
+def test_generation_classifies_genuinely_insufficient_split_as_no_data(
+    monkeypatch, tmp_path
+):
     canonical = _split_frame(3, ["EURUSD"])
 
     class InsufficientDataPipeline(DataPipeline):
@@ -744,7 +752,7 @@ def test_generation_classifies_genuinely_insufficient_split_as_no_data(monkeypat
         def compute_dataset_fingerprint(self, frame):
             return "canonical-fingerprint"
 
-    factory = _factory_for_generation()
+    factory = _factory_for_generation(tmp_path)
     factory.data_pipeline = InsufficientDataPipeline()
     factory.feature_engineer = SimpleNamespace(
         engineer=lambda *args, **kwargs: SimpleNamespace(canonical=canonical)
@@ -764,9 +772,11 @@ def test_generation_classifies_genuinely_insufficient_split_as_no_data(monkeypat
     assert factory.state.last_generation_reason
 
 
-def test_generation_clears_prior_terminal_outcome_before_new_work(monkeypatch):
+def test_generation_clears_prior_terminal_outcome_before_new_work(
+    monkeypatch, tmp_path
+):
     observed_outcomes = []
-    factory = _factory_for_generation()
+    factory = _factory_for_generation(tmp_path)
     factory.state.last_generation_status = "CHALLENGER"
     factory.state.last_generation_reason = "prior generation"
 

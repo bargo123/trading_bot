@@ -2,9 +2,14 @@
 from __future__ import annotations
 
 from typing import Any, Callable, Mapping
+from uuid import uuid4
 
 from aegis.research.fingerprint import config_fingerprint
-from aegis.research.registry import ExperimentRegistry
+from aegis.research.registry import (
+    DuplicateExperimentError,
+    EquivalentExperimentError,
+    ExperimentRegistry,
+)
 from aegis.research.sealed import FrozenCandidate, SealedHoldoutStore
 from aegis.research_factory.hypothesis import Hypothesis
 
@@ -12,6 +17,14 @@ from aegis.research_factory.hypothesis import Hypothesis
 TERMINAL_STATUSES = frozenset(
     {"NO_DATA", "NO_EVIDENCE", "NOT_EXECUTABLE", "FAILED", "REJECTED", "CHALLENGER"}
 )
+_REGISTRY_STATUS = {
+    "NO_DATA": "failed",
+    "NO_EVIDENCE": "failed",
+    "NOT_EXECUTABLE": "failed",
+    "FAILED": "failed",
+    "REJECTED": "rejected",
+    "CHALLENGER": "accepted",
+}
 
 _PARAMETER_FIELDS = (
     "features_required",
@@ -23,6 +36,14 @@ _PARAMETER_FIELDS = (
     "target_price",
     "max_hold_s",
 )
+
+
+class OutcomePersistenceConflictError(RuntimeError):
+    """The attempted row conflicted; a separate failed conflict row was stored."""
+
+    def __init__(self, conflict_id: str, message: str) -> None:
+        super().__init__(f"{message}; conflict outcome {conflict_id}")
+        self.conflict_id = conflict_id
 
 
 def _canonical_hypothesis(hypothesis: Hypothesis | Mapping[str, Any]) -> dict[str, Any]:
@@ -61,7 +82,7 @@ def record_outcome(
     row: dict[str, Any] = {
         "id": experiment_id,
         "hypothesis": mechanism,
-        "status": factory_status.lower(),
+        "status": _REGISTRY_STATUS[factory_status],
         "config_fingerprint": config_fingerprint(params),
         "dataset_fingerprint": str(dataset_fingerprint),
         "provenance": {
@@ -83,7 +104,49 @@ def record_outcome(
     ):
         if field in observed_metrics:
             row[field] = observed_metrics[field]
-    return registry.record(row)
+    try:
+        return registry.record(row)
+    except (DuplicateExperimentError, EquivalentExperimentError) as exc:
+        conflict_id = f"{experiment_id}__persistence_conflict__{uuid4().hex}"
+        conflict_reason = (
+            f"registry rejected attempted outcome {experiment_id}: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        conflict = {
+            **row,
+            "id": conflict_id,
+            "status": "failed",
+            "provenance": {
+                "factory_status": "FAILED",
+                "reason": conflict_reason,
+                "canonical_hypothesis": canonical,
+                "persistence_conflict": {
+                    "attempted_id": experiment_id,
+                    "attempted_factory_status": factory_status,
+                    "attempted_identity": {
+                        "config_fingerprint": row["config_fingerprint"],
+                        "dataset_fingerprint": row["dataset_fingerprint"],
+                        "hypothesis": mechanism,
+                    },
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                },
+            },
+            "metrics": {},
+            "rejection_reason": conflict_reason,
+            "new_reason": conflict_reason,
+        }
+        for field in (
+            "win_rate",
+            "expectancy",
+            "profit_factor",
+            "max_drawdown_pct",
+            "tail_loss",
+            "n_trades",
+        ):
+            conflict.pop(field, None)
+        registry.record(conflict)
+        raise OutcomePersistenceConflictError(conflict_id, conflict_reason) from exc
 
 
 def evaluate_candidate_once(

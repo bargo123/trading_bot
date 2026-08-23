@@ -21,10 +21,32 @@ from aegis.research.sealed import FrozenCandidate, SealedHoldoutStore, freeze_ca
 from aegis.research.stress import bootstrap_expectancy, tail_stress
 
 SEALED_STORE_PATH = Path(__file__).resolve().parents[2] / "research" / "sealed_holdouts.jsonl"
+LEGACY_TRAINING_DATASET_FINGERPRINT = "LEGACY_DIRECT_METRICS_NOT_PROVIDED"
 
 
 class PromotionReject(GateReject):
     """Challenger failed the governed promotion path. Kept on record; not promoted."""
+
+
+def _validation_bootstrap(
+    validation_pnls: Sequence[float], validated_risk_fraction: float
+) -> dict[str, Any]:
+    validation = bootstrap_expectancy(list(validation_pnls))
+    if int(validation["n"]) < 20:
+        raise PromotionReject(f"validation bootstrap needs >=20 trades, got {int(validation['n'])}")
+    if float(validation["p05"]) <= 0:
+        raise PromotionReject(
+            f"validation bootstrap p05 must be positive, got {validation['p05']}"
+        )
+    if isinstance(validated_risk_fraction, bool):
+        raise PromotionReject("validated risk fraction must be in (0, 1]")
+    try:
+        risk_fraction = float(validated_risk_fraction)
+    except (TypeError, ValueError) as exc:
+        raise PromotionReject("validated risk fraction must be in (0, 1]") from exc
+    if not 0 < risk_fraction <= 1:
+        raise PromotionReject("validated risk fraction must be in (0, 1]")
+    return validation
 
 
 def _promotion_payload(
@@ -107,9 +129,7 @@ def challenger_promotion_result(
     The sealed holdout is scored exactly once per (frozen, holdout) pair, so a
     rejected challenger cannot be re-peeked against the same holdout.
     """
-    validation = bootstrap_expectancy(list(validation_pnls))
-    if int(validation["n"]) < 20:
-        raise PromotionReject(f"validation bootstrap needs >=20 trades, got {int(validation['n'])}")
+    validation = _validation_bootstrap(validation_pnls, validated_risk_fraction)
 
     holdout = dict(holdout_metrics)
     n_holdout = int(holdout.get("n_trades") or 0)
@@ -136,6 +156,7 @@ def challenger_promotion_result(
         code_hash=code_hash,
         config=dict(config),
         artifact_hash=artifact_hash,
+        training_dataset_fingerprint=LEGACY_TRAINING_DATASET_FINGERPRINT,
     )
     store = sealed_store if sealed_store is not None else SealedHoldoutStore(SEALED_STORE_PATH)
     record = store.evaluate_once(
@@ -170,6 +191,7 @@ def challenger_promotion_result_from_callback(
     artifact_hash: str,
     config: Mapping[str, Any],
     validation_pnls: Sequence[float],
+    training_dataset_fingerprint: str,
     holdout_fingerprint: str,
     evaluate_holdout: Callable[[FrozenCandidate], Mapping[str, Any]],
     validated_risk_fraction: float,
@@ -179,15 +201,14 @@ def challenger_promotion_result_from_callback(
     champion_path: Path | None = None,
 ) -> dict[str, Any]:
     """Freeze first, then let the sealed store invoke the factory evaluator once."""
-    validation = bootstrap_expectancy(list(validation_pnls))
-    if int(validation["n"]) < 20:
-        raise PromotionReject(f"validation bootstrap needs >=20 trades, got {int(validation['n'])}")
+    validation = _validation_bootstrap(validation_pnls, validated_risk_fraction)
 
     frozen = freeze_candidate(
         strategy_id=strategy_id,
         code_hash=code_hash,
         config=dict(config),
         artifact_hash=artifact_hash,
+        training_dataset_fingerprint=training_dataset_fingerprint,
     )
     store = sealed_store if sealed_store is not None else SealedHoldoutStore(SEALED_STORE_PATH)
     record = store.evaluate_once(
@@ -198,10 +219,8 @@ def challenger_promotion_result_from_callback(
     evaluation = record.get("metrics")
     if not isinstance(evaluation, Mapping):
         raise PromotionReject("sealed evaluator must return a mapping")
-    holdout_metrics = evaluation.get("metrics")
-    holdout_pnls = evaluation.get("pnls")
-    if not isinstance(holdout_metrics, Mapping):
-        raise PromotionReject("sealed evaluator must return observed metrics")
+    holdout_metrics = evaluation
+    holdout_pnls = record.get("pnls")
     if not isinstance(holdout_pnls, Sequence) or isinstance(holdout_pnls, (str, bytes)):
         raise PromotionReject("sealed evaluator must return observed pnl values")
 
