@@ -1,7 +1,7 @@
 {
   "schema": "fast_turnover_firehose.v1",
-  "generated_utc": "2026-08-22T23:17:23.525116+00:00",
-  "git_sha": "7d1b9ab6ea449fcc69abc6be3ec60462a81fe4bc",
+  "generated_utc": "2026-08-23T00:02:03.926206+00:00",
+  "git_sha": "efe09a834f8d7906ac9c60bc28aeae89b568c52f",
   "firehose_mode": "RESEARCH_CANDIDATES_ONLY",
   "book_coverage": {
     "total": 54,
@@ -37,5 +37,5 @@
     "note": "research-only"
   },
   "economic_truth": "NOT PROFITABLE. No validated champion.",
-  "code_under_test_sha": "7d1b9ab6ea449fcc69abc6be3ec60462a81fe4bc"
+  "code_under_test_sha": "efe09a834f8d7906ac9c60bc28aeae89b568c52f"
 }
