@@ -291,6 +291,8 @@ def replay_hypothesis(
     data: pd.DataFrame,
     compiled: Optional[CompileResult],
     costs: Optional[ReplayCostEvidence],
+    *,
+    entry_signals: Optional[pd.Series] = None,
 ) -> ReplayResult:
     """Replay an executable hypothesis or fail closed without cost evidence."""
     if costs is None:
@@ -321,6 +323,12 @@ def replay_hypothesis(
         signals = _entry_signals(frame, compiled)
     except (KeyError, TypeError, ValueError) as exc:
         return _result("NOT_EXECUTABLE", str(exc))
+    if entry_signals is not None:
+        if len(entry_signals) != len(frame):
+            return _result("NOT_EXECUTABLE", "ML entry signals do not match replay rows")
+        signals = signals & pd.Series(
+            entry_signals.to_numpy(dtype=bool), index=frame.index
+        )
     side = compiled.side
     trades: list[ReplayTrade] = []
     position: Optional[dict[str, Any]] = None

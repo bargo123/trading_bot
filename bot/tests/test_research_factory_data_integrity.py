@@ -562,8 +562,8 @@ def test_generation_routes_exact_canonical_frame_and_only_training_partitions(
     assert captures["training_frames"][0] is train
     assert captures["training_frames"][1] is validation
     assert factory.state.dataset_fingerprint == "canonical-fingerprint"
-    assert factory.state.last_generation_status == "FAILED"
-    assert "cost-aware replay" in factory.state.last_generation_reason.lower()
+    assert factory.state.last_generation_status == "NO_EVIDENCE"
+    assert "broker-native replay cost evidence" in factory.state.last_generation_reason
     assert captures["walk_forward"] == 0
     assert captures["hypotheses"] == 0
     assert not hasattr(factory, "_sealed_holdout")

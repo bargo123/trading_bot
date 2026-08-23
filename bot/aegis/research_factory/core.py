@@ -41,6 +41,8 @@ from aegis.research_factory.data import (
 from aegis.research_factory.ml_pipeline import MLPipeline
 from aegis.research_factory.evaluation import record_outcome
 from aegis.research_factory.hypothesis import Hypothesis, HypothesisOrigin
+from aegis.research_factory.rules import compile_hypothesis
+from aegis.research_factory.walk_forward import walk_forward_evaluate
 
 # Configure logging
 logging.basicConfig(
@@ -678,8 +680,8 @@ Live trading: DISABLED
             return
 
         self._record_generation_outcome(
-            "FAILED",
-            "Cost-aware replay is not configured; Plan 2 replay is required",
+            "NO_EVIDENCE",
+            "broker-native replay cost evidence is required for walk-forward evaluation",
         )
 
     def _record_generation_outcome(
@@ -1432,72 +1434,34 @@ def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
         train_data: pd.DataFrame,
         val_data: pd.DataFrame,
         test_data: pd.DataFrame,
+        *,
+        costs: Any = None,
+        min_train_timestamps: int = 100,
+        validation_timestamps: int = 20,
+        step_timestamps: int = 20,
     ) -> Dict[str, Any]:
-        """Test a hypothesis with REAL walk-forward historical replay.
-        
-        Compiles hypothesis rules into entry/exit signals and runs 
-        chronological walk-forward validation on test_data.
-        """
+        """Compile and evaluate only non-sealed rows with explicit costs."""
         self._log_event("HYPOTHESIS", f"Testing {hypothesis.hypothesis_id} via historical replay")
-        
-        # Combine train + val for training, test_data for validation
-        # Use the entry_rule and exit_rule from hypothesis to generate signals
-        # Run chronological walk-forward on test_data
-        
-        try:
-            # Parse hypothesis entry/exit rules into executable signals
-            # This is a simplified version - real implementation would parse the rules
-            entry_signals = self._generate_entry_signals(test_data, hypothesis.entry_rule)
-            exit_signals = self._generate_exit_signals(test_data, hypothesis.exit_rule)
-            
-            if entry_signals.empty or exit_signals.empty:
-                return {
-                    "metrics": {},
-                    "decision": "REJECTED",
-                    "reason": "No signals generated from hypothesis rules"
-                }
-            
-            # Run chronological walk-forward replay
-            trades = self._run_walkforward_replay(
-                test_data, entry_signals, exit_signals, hypothesis
-            )
-            
-            if not trades:
-                return {
-                    "metrics": {},
-                    "decision": "REJECTED",
-                    "reason": "No trades executed from hypothesis"
-                }
-            
-            # Calculate real metrics from actual trades
-            metrics = self._calculate_trade_metrics(trades)
-            
-            # Decision logic based on REAL metrics
-            decision = "REJECTED"
-            if metrics["expectancy"] > 0.1 and metrics["profit_factor"] > 1.5:
-                if metrics["p95_loss"] > -3.0:
-                    decision = "CHALLENGER"
-                else:
-                    decision = "REJECTED"
-            elif metrics["expectancy"] <= 0:
-                decision = "REJECTED"
-            elif metrics["profit_factor"] <= 1.0:
-                decision = "REJECTED"
-            
-            return {
-                "metrics": metrics,
-                "decision": decision,
-                "trade_count": len(trades),
-                "trades": trades
-            }
-            
-        except Exception as e:
-            logger.exception(f"Hypothesis testing failed for {hypothesis.hypothesis_id}: {e}")
-            return {
-                "metrics": {},
-                "decision": "REJECTED",
-                "reason": f"Testing error: {str(e)}"
-            }
+        frame = pd.concat([train_data, val_data, test_data], ignore_index=True)
+        compiled = compile_hypothesis(hypothesis, frame.columns)
+        result = walk_forward_evaluate(
+            frame,
+            pipeline_factory=MLPipeline,
+            compiled=compiled,
+            costs=costs,
+            min_train_timestamps=min_train_timestamps,
+            validation_timestamps=validation_timestamps,
+            step_timestamps=step_timestamps,
+        )
+        self._record_generation_outcome(
+            result.status, result.reason, hypothesis=hypothesis, metrics=result.metrics
+        )
+        return {
+            "metrics": dict(result.metrics) if result.metrics is not None else {},
+            "decision": result.status,
+            "reason": result.reason,
+            "folds": result.folds,
+        }
 
     def _generate_entry_signals(self, data: pd.DataFrame, entry_rule: Dict[str, Any]) -> pd.Series:
         """Generate entry signals from structured hypothesis entry rule."""
