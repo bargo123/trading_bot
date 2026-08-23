@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import pytest
+import sys
 import tempfile
 from pathlib import Path
 
-from aegis.research_factory.core import ResearchFactory, ResearchState, Champion, ExperimentResult
+from aegis.research_factory.core import ResearchFactory, ResearchState, Champion, ExperimentResult, main
 from aegis.research_factory.data import DataPipeline, FeatureEngineer, FeatureSet, DatasetSplit
 from aegis.research_factory.loss_autopsy import LossAutopsyEngine, LossClass, HypothesisGenerator
 from aegis.research_factory.hypothesis import HypothesisRegistry, Hypothesis, HypothesisOrigin, HypothesisStatus
@@ -351,6 +352,8 @@ class TestResearchState:
                 ),
                 codex_calls=0,
                 codex_budget=1,
+                last_generation_status="FAILED",
+                last_generation_reason="training failed",
             )
 
             path = Path(tmpdir) / "state.json"
@@ -361,5 +364,46 @@ class TestResearchState:
             assert loaded.champion.hypothesis_id == "hyp_1"
             assert loaded.codex_calls == 0
             assert loaded.codex_budget == 1
+            assert loaded.last_generation_status == "FAILED"
+            assert loaded.last_generation_reason == "training failed"
+
+    def test_generation_barriers_are_required_and_must_be_positive(self):
+        with pytest.raises(TypeError, match="profit_barrier_pct"):
+            ResearchFactory()
+        for profit_barrier_pct, loss_barrier_pct in (
+            (0.0, 0.01),
+            (-0.01, 0.01),
+            (0.01, 0.0),
+            (0.01, -0.01),
+        ):
+            with pytest.raises(ValueError, match="barrier_pct"):
+                ResearchFactory(
+                    profit_barrier_pct=profit_barrier_pct,
+                    loss_barrier_pct=loss_barrier_pct,
+                )
+
+    def test_cli_requires_positive_generation_barriers(
+        self, monkeypatch, capsys
+    ):
+        monkeypatch.setattr(sys, "argv", ["research-factory"])
+        with pytest.raises(SystemExit) as omitted:
+            main()
+        assert omitted.value.code == 2
+
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "research-factory",
+                "--profit-barrier-pct",
+                "0",
+                "--loss-barrier-pct",
+                "0.01",
+            ],
+        )
+        with pytest.raises(SystemExit) as non_positive:
+            main()
+        assert non_positive.value.code == 2
+        assert "profit_barrier_pct must be positive" in capsys.readouterr().err
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

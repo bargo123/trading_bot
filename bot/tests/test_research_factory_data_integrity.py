@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from aegis.research_factory.core import ResearchFactory, ResearchState
 from aegis.research_factory.data import (
     DataPipeline,
+    DatasetSplit,
     FeatureEngineer,
+    FeatureSet,
     discover_csv_sources,
     engineer_features,
 )
@@ -296,3 +301,177 @@ def test_split_applies_minimum_train_size_after_purge_and_target_filtering():
         match="Training partition too small.*57 rows.*minimum 58",
     ):
         DataPipeline(min_train_size=58).create_splits(frame, label_horizon=3)
+
+
+def _factory_for_generation() -> ResearchFactory:
+    factory = object.__new__(ResearchFactory)
+    factory.state = ResearchState(generation=1)
+    factory.source_roots = (Path("unused"),)
+    factory.profit_barrier_pct = 0.02
+    factory.loss_barrier_pct = 0.01
+    factory.label_horizon = 3
+    factory._log_event = lambda *args, **kwargs: None
+    return factory
+
+
+def test_generation_routes_exact_canonical_frame_and_only_training_partitions(
+    monkeypatch,
+):
+    raw = pd.DataFrame({"raw": [1.0]})
+    canonical = pd.DataFrame({"canonical": [2.0]})
+    feature_set = FeatureSet(
+        canonical=canonical,
+        features=pd.DataFrame({"feature": [2.0]}),
+        labels=pd.DataFrame({"profit_barrier_first": [1]}),
+        feature_names=["feature"],
+        label_names=["profit_barrier_first"],
+        feature_metadata={},
+    )
+    train = pd.DataFrame({"partition": ["train"]})
+    validation = pd.DataFrame({"partition": ["validation"]})
+    test = pd.DataFrame({"partition": ["test"]})
+    sealed = pd.DataFrame({"partition": ["sealed"]})
+    captures = {}
+
+    class FakeDataPipeline:
+        def load_sources(self, sources):
+            captures["sources"] = sources
+            return raw
+
+        def compute_dataset_fingerprint(self, frame):
+            captures["fingerprinted"] = frame
+            return "canonical-fingerprint"
+
+        def create_splits(self, frame, *, label_horizon):
+            captures["split_frame"] = frame
+            captures["label_horizon"] = label_horizon
+            return DatasetSplit(train, validation, test, sealed, {})
+
+    class FakeFeatureEngineer:
+        def engineer(self, frame, **kwargs):
+            captures["engineer_frame"] = frame
+            captures["engineer_kwargs"] = kwargs
+            return feature_set
+
+    class FakeMLPipeline:
+        def train(self, train_frame, validation_frame):
+            captures["training_frames"] = (train_frame, validation_frame)
+            return [SimpleNamespace(feature_names=[])]
+
+    factory = _factory_for_generation()
+    factory.data_pipeline = FakeDataPipeline()
+    factory.feature_engineer = FakeFeatureEngineer()
+    factory.ml_pipeline = FakeMLPipeline()
+    factory._walk_forward_validation = lambda models, frame: captures.update(
+        walk_forward_frame=frame
+    ) or {}
+    factory._generate_hypotheses_from_losses = lambda: []
+    factory._log_learning = lambda: None
+    source_catalog = [object()]
+    monkeypatch.setattr(
+        "aegis.research_factory.core.discover_csv_sources",
+        lambda roots: source_catalog,
+    )
+
+    factory._run_generation()
+
+    assert captures["sources"] is source_catalog
+    assert captures["engineer_frame"] is raw
+    assert captures["engineer_kwargs"] == {
+        "profit_barrier_pct": 0.02,
+        "loss_barrier_pct": 0.01,
+        "label_horizon": 3,
+    }
+    assert captures["split_frame"] is feature_set.canonical
+    assert captures["fingerprinted"] is feature_set.canonical
+    assert captures["label_horizon"] == 3
+    assert captures["training_frames"][0] is train
+    assert captures["training_frames"][1] is validation
+    assert all(frame is not sealed for frame in captures["training_frames"])
+    assert captures["walk_forward_frame"] is test
+    assert factory.state.dataset_fingerprint == "canonical-fingerprint"
+
+
+def test_generation_with_empty_source_catalog_records_no_data_and_stops(
+    monkeypatch,
+):
+    calls = {"models": 0, "hypotheses": 0}
+
+    class EmptyDataPipeline:
+        def load_sources(self, sources):
+            assert sources == []
+            return pd.DataFrame()
+
+    class ForbiddenMLPipeline:
+        def train(self, *args):
+            calls["models"] += 1
+            raise AssertionError("training must not run without source data")
+
+    factory = _factory_for_generation()
+    factory.data_pipeline = EmptyDataPipeline()
+    factory.feature_engineer = object()
+    factory.ml_pipeline = ForbiddenMLPipeline()
+
+    def generate_hypotheses():
+        calls["hypotheses"] += 1
+        return []
+
+    factory._generate_hypotheses_from_losses = generate_hypotheses
+    monkeypatch.setattr(
+        "aegis.research_factory.core.discover_csv_sources", lambda roots: []
+    )
+
+    factory._run_generation()
+
+    assert factory.state.last_generation_status == "NO_DATA"
+    assert factory.state.last_generation_reason
+    assert calls == {"models": 0, "hypotheses": 0}
+    assert factory.state.hypothesis_registry == {}
+    assert factory.state.experiments == []
+
+
+def test_generation_training_failure_records_failed_and_stops(monkeypatch):
+    canonical = pd.DataFrame({"canonical": [1.0]})
+    train = pd.DataFrame({"partition": ["train"]})
+    validation = pd.DataFrame({"partition": ["validation"]})
+    test = pd.DataFrame({"partition": ["test"]})
+    sealed = pd.DataFrame({"partition": ["sealed"]})
+    calls = {"hypotheses": 0}
+
+    class FakeDataPipeline:
+        def load_sources(self, sources):
+            return pd.DataFrame({"raw": [1.0]})
+
+        def compute_dataset_fingerprint(self, frame):
+            return "canonical-fingerprint"
+
+        def create_splits(self, frame, *, label_horizon):
+            return DatasetSplit(train, validation, test, sealed, {})
+
+    class FailingMLPipeline:
+        def train(self, train_frame, validation_frame):
+            raise ValueError("single-class training target")
+
+    factory = _factory_for_generation()
+    factory.data_pipeline = FakeDataPipeline()
+    factory.feature_engineer = SimpleNamespace(
+        engineer=lambda *args, **kwargs: SimpleNamespace(canonical=canonical)
+    )
+    factory.ml_pipeline = FailingMLPipeline()
+
+    def generate_hypotheses():
+        calls["hypotheses"] += 1
+        return []
+
+    factory._generate_hypotheses_from_losses = generate_hypotheses
+    monkeypatch.setattr(
+        "aegis.research_factory.core.discover_csv_sources", lambda roots: [object()]
+    )
+
+    factory._run_generation()
+
+    assert factory.state.last_generation_status == "FAILED"
+    assert "single-class training target" in factory.state.last_generation_reason
+    assert calls["hypotheses"] == 0
+    assert factory.state.hypothesis_registry == {}
+    assert factory.state.experiments == []

@@ -31,6 +31,11 @@ from aegis.intel.books import lookup
 from aegis.intel.fast_firehose import FastExitConfig, FastExitStateMachine
 from aegis.intel.knowledge_retrieval import retrieve_for_state
 from aegis.intel.paths import INTEL_DIR, ensure_intel_dirs
+from aegis.research_factory.data import (
+    DataPipeline,
+    FeatureEngineer,
+    discover_csv_sources,
+)
 from aegis.research_factory.ml_pipeline import MLPipeline
 
 # Configure logging
@@ -43,6 +48,24 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger(__name__)
+
+
+def _positive_barrier(name: str, value: float) -> float:
+    """Validate an explicitly supplied generation barrier percentage."""
+    try:
+        barrier = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be positive") from exc
+    if not np.isfinite(barrier) or barrier <= 0:
+        raise ValueError(f"{name} must be positive")
+    return barrier
+
+
+def _positive_cli_barrier(name: str, value: str) -> float:
+    try:
+        return _positive_barrier(name, value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 # ============================================================
@@ -388,6 +411,8 @@ class ResearchState:
     claude_available: bool = True
     market_state: MarketState = MarketState.WEEKEND_RESEARCH
     dataset_fingerprint: str = ""
+    last_generation_status: str = ""
+    last_generation_reason: str = ""
     last_update: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def save(self, path: Path) -> None:
@@ -404,6 +429,8 @@ class ResearchState:
             "claude_available": self.claude_available,
             "market_state": self.market_state.value,
             "dataset_fingerprint": self.dataset_fingerprint,
+            "last_generation_status": self.last_generation_status,
+            "last_generation_reason": self.last_generation_reason,
             "last_update": self.last_update,
         }
         path.write_text(json.dumps(data, indent=2, default=str))
@@ -426,6 +453,8 @@ class ResearchState:
             claude_available=data.get("claude_available", True),
             market_state=MarketState(data.get("market_state", "WEEKEND_RESEARCH")),
             dataset_fingerprint=data.get("dataset_fingerprint", ""),
+            last_generation_status=data.get("last_generation_status", ""),
+            last_generation_reason=data.get("last_generation_reason", ""),
             last_update=data.get("last_update", datetime.now(timezone.utc).isoformat()),
         )
         return state
@@ -443,7 +472,29 @@ class ResearchFactory:
         codex_budget: int = 1,
         sealed_holdout: bool = True,
         resume: bool = False,
+        *,
+        profit_barrier_pct: float,
+        loss_barrier_pct: float,
+        label_horizon: int = 20,
+        source_roots: Optional[List[Path]] = None,
     ):
+        self.profit_barrier_pct = _positive_barrier(
+            "profit_barrier_pct", profit_barrier_pct
+        )
+        self.loss_barrier_pct = _positive_barrier(
+            "loss_barrier_pct", loss_barrier_pct
+        )
+        if not isinstance(label_horizon, int) or label_horizon <= 0:
+            raise ValueError("label_horizon must be a positive integer")
+        self.label_horizon = label_horizon
+        self.source_roots = tuple(
+            Path(root)
+            for root in (
+                source_roots
+                if source_roots is not None
+                else [ROOT / "bot" / "data" / "cafb_snapshots"]
+            )
+        )
         self.mode = mode
         self.continuous = continuous
         self.max_generations = max_generations
@@ -478,26 +529,13 @@ class ResearchFactory:
         self.validated_states = json.loads((INTEL_DIR / "validated_states.json").read_text())
         self.validated_opportunities = json.loads((INTEL_DIR / "validated_opportunities.json").read_text())
 
-        # Initialize ML pipeline
+        # Initialize the canonical data and ML collaborators once.
+        self.data_pipeline = DataPipeline()
+        self.feature_engineer = FeatureEngineer()
         self.ml_pipeline = MLPipeline()
-
-        # Initialize research cycle
-        self.research_cycle = ResearchCycle()
-
-        # Initialize outcome learning
-        self.outcome_learning = OutcomeLearning()
-
-        # Initialize market state history
-        self.market_state_history = MarketStateHistory()
 
         # Initialize loss database
         self.losses = load_losses()
-
-        # Load analogue index
-        self.analogue_index = AnaloguesIndex.load(INTEL_DIR / "analogue_index.json")
-
-        # Initialize cursor CLI
-        self.cursor = CursorCLI()
 
         # Initialize Codex client
         self.codex_client = CodexClient(budget=self.codex_budget)
@@ -514,27 +552,6 @@ class ResearchFactory:
                 logger.info(f"Claude API available (model: {self.claude_client.model})")
             else:
                 logger.warning("Claude API not available (no API key or client init failed)")
-
-        # Initialize ML pipeline
-        self.ml_pipeline = MLPipeline()
-
-        # Initialize research cycle
-        self.research_cycle = ResearchCycle()
-
-        # Initialize outcome learning
-        self.outcome_learning = OutcomeLearning()
-
-        # Initialize market state history
-        self.market_state_history = MarketStateHistory()
-
-        # Initialize loss database
-        self.losses = load_losses()
-
-        # Load analogue index
-        self.analogue_index = AnaloguesIndex.load(INTEL_DIR / "analogue_index.json")
-
-        # Initialize cursor CLI
-        self.cursor = CursorCLI()
 
         logger.info("All components initialized")
 
@@ -606,65 +623,90 @@ Live trading: DISABLED
             logger.info("Research factory stopped")
 
     def _run_generation(self) -> None:
-        """Run one generation of the research loop with proper canonical data flow."""
+        """Route one canonical frame through discovery, splitting, and training."""
         self._log_event("DATA", f"Loading data for generation {self.state.generation}")
 
-        # 1. Load raw data
-        raw_data = self._load_dataset()
-        if raw_data.empty:
-            self._log_event("DATA", "No data available, skipping generation")
+        try:
+            sources = discover_csv_sources(self.source_roots)
+            raw_data = self.data_pipeline.load_sources(sources)
+        except Exception as exc:
+            self._record_generation_outcome(
+                "FAILED", f"Data discovery or loading failed: {exc}"
+            )
             return
 
-        # 2. Feature engineering on raw data (point-in-time correct)
+        if raw_data.empty:
+            self._record_generation_outcome(
+                "NO_DATA", "No legitimate source rows were available"
+            )
+            return
+
         self._log_event("ML", f"Engineering features for generation {self.state.generation}")
-        features_df = self._engineer_features(raw_data)
+        try:
+            feature_set = self.feature_engineer.engineer(
+                raw_data,
+                profit_barrier_pct=self.profit_barrier_pct,
+                loss_barrier_pct=self.loss_barrier_pct,
+                label_horizon=self.label_horizon,
+            )
+        except Exception as exc:
+            self._record_generation_outcome(
+                "FAILED", f"Feature engineering failed: {exc}"
+            )
+            return
 
-        # 3. Create labels using ONLY past/present data (no lookahead)
-        # The target_direction is the ONLY forward-looking column allowed
-        labeled_data = self._create_labels(raw_data)
+        canonical = feature_set.canonical
+        if canonical.empty:
+            self._record_generation_outcome(
+                "NO_DATA", "Feature engineering produced no canonical rows"
+            )
+            return
 
-        # 4. Combine features + labels into research dataframe
-        # Features from engineered data, labels from labeled data
-        # Join on index (both derived from same raw data)
-        feature_cols = [c for c in features_df.columns if c not in ["time", "source_file", "symbol"]]
-        label_cols = ["target_direction", "vol_regime", "trend_label", "vol_regime", 
-                      "vol_expanding", "vol_contracting", "session_label", 
-                      "range_pos_label", "target_direction"]
-        
-        research_df = pd.concat([
-            features_df[["time", "symbol"] + feature_cols],
-            labeled_data[["target_direction", "vol_regime", "trend_label", 
-                          "vol_regime", "vol_expanding", "vol_contracting",
-                           "session_label", "range_pos_label", "target_direction"]]
-        ], axis=1)
+        try:
+            self.state.dataset_fingerprint = (
+                self.data_pipeline.compute_dataset_fingerprint(canonical)
+            )
+            self._log_event("DATA", "Splitting canonical data chronologically")
+            splits = self.data_pipeline.create_splits(
+                canonical, label_horizon=self.label_horizon
+            )
+        except ValueError as exc:
+            self._record_generation_outcome(
+                "NO_DATA", f"Canonical data has no usable matured split: {exc}"
+            )
+            return
+        except Exception as exc:
+            self._record_generation_outcome(
+                "FAILED", f"Canonical data preparation failed: {exc}"
+            )
+            return
 
-        # 4. Canonical chronological split
-        self._log_event("DATA", f"Splitting data chronologically")
-        train_data, val_data, test_data, sealed_data = self._split_data(labeled_data)
-
-        # CRITICAL: Seal the holdout data - it's NEVER used for training/validation
-        self._sealed_holdout = sealed_data
-        self._sealed_holdout_evaluated = False
-
-        # 5. Train ML models on train, validate on val
         self._log_event("ML", f"Training models for generation {self.state.generation}")
-        models = self._train_models(train_data, val_data)
+        try:
+            models = self.ml_pipeline.train(splits.train, splits.validation)
+        except Exception as exc:
+            self._record_generation_outcome("FAILED", f"ML training failed: {exc}")
+            return
+        if not models:
+            self._record_generation_outcome(
+                "FAILED", "ML training produced no trained models"
+            )
+            return
 
-        # 6. Walk-forward validation on test data (chronological)
         self._log_event("REPLAY", "Running walk-forward validation...")
-        wf_results = self._walk_forward_validation(models, test_data)
+        self._walk_forward_validation(models, splits.test)
 
-        # 7. Generate hypotheses from loss autopsy
         self._log_event("LOSS AUTOPSY", "Analyzing losses...")
         hypotheses = self._generate_hypotheses_from_losses()
 
-        # 8. Test hypotheses with REAL walk-forward replay
         for hypothesis in hypotheses:
             if self._is_hypothesis_tested(hypothesis.hypothesis_id):
                 continue
 
             self._log_event("HYPOTHESIS", f"Testing {hypothesis.hypothesis_id}")
-            result = self._test_hypothesis(hypothesis, train_data, val_data, test_data)
+            result = self._test_hypothesis(
+                hypothesis, splits.train, splits.validation, splits.test
+            )
 
             # Record experiment
             exp_result = ExperimentResult(
@@ -696,8 +738,13 @@ Live trading: DISABLED
             if self.state.challenger and self._should_promote_challenger():
                 self._promote_challenger()
 
-        # 9. Log learning
         self._log_learning()
+
+    def _record_generation_outcome(self, status: str, reason: str) -> None:
+        """Persist and emit an honest terminal generation outcome."""
+        self.state.last_generation_status = status
+        self.state.last_generation_reason = reason
+        self._log_event("GENERATION", reason, status=status)
 
     def _load_dataset(self) -> pd.DataFrame:
         """Load and combine all available historical data."""
@@ -1855,6 +1902,16 @@ def main():
     parser.add_argument("--codex-budget", type=int, default=1)
     parser.add_argument("--sealed-holdout", action="store_true", default=True)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--profit-barrier-pct",
+        required=True,
+        type=lambda value: _positive_cli_barrier("profit_barrier_pct", value),
+    )
+    parser.add_argument(
+        "--loss-barrier-pct",
+        required=True,
+        type=lambda value: _positive_cli_barrier("loss_barrier_pct", value),
+    )
 
     args = parser.parse_args()
 
@@ -1866,6 +1923,8 @@ def main():
         codex_budget=args.codex_budget,
         sealed_holdout=args.sealed_holdout,
         resume=args.resume,
+        profit_barrier_pct=args.profit_barrier_pct,
+        loss_barrier_pct=args.loss_barrier_pct,
     )
 
     factory.run()
