@@ -534,17 +534,8 @@ class ResearchFactory:
         self.feature_engineer = FeatureEngineer()
         self.ml_pipeline = MLPipeline()
 
-        # Preserve legacy collaborators used by existing public controller methods.
-        self.research_cycle = ResearchCycle()
-        self.outcome_learning = OutcomeLearning()
-        self.market_state_history = MarketStateHistory()
-
         # Initialize loss database
         self.losses = load_losses()
-
-        # Load legacy research interfaces.
-        self.analogue_index = AnaloguesIndex.load(INTEL_DIR / "analogue_index.json")
-        self.cursor = CursorCLI()
 
         # Initialize Codex client
         self.codex_client = CodexClient(budget=self.codex_budget)
@@ -1301,29 +1292,6 @@ Live trading: DISABLED
             analysis["avg_giveback_pct"] = (giveback / winners["mfe"]).mean() * 100
         
         return analysis
-
-    # ============================================================
-    # FORWARD-LEARNING LOOP FOR MARKET-OPEN
-    # ============================================================
-    
-    def forward_learning_step(self, new_outcomes: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Process new market outcomes and update models."""
-        if not new_outcomes:
-            return {"status": "no_new_outcomes"}
-        
-        # Append to outcome learning
-        self.outcome_learning.add_outcomes(new_outcomes)
-        
-        # Check if enough new data for retrain
-        if len(self.outcome_learning.outcomes) % 50 == 0:
-            return self._retrain_and_validate()
-        
-        return {"status": "accumulating", "outcomes_count": len(self.outcome_learning.outcomes)}
-
-    def _retrain_and_validate(self) -> Dict[str, Any]:
-        """Retrain models on new data and validate."""
-        # This would retrain models on accumulated outcomes
-        return {"status": "retrain_scheduled", "note": "Implemented in production"}
 
     # ============================================================
     # CLAUDE INTEGRATION
