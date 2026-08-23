@@ -320,18 +320,27 @@ class MarketState(Enum):
 
 @dataclass
 class Hypothesis:
-    """A falsifiable research hypothesis."""
+    """A falsifiable research hypothesis with structured rules for replay."""
     hypothesis_id: str
     origin: HypothesisOrigin
     problem: str
     proposed_mechanism: str
     features_required: List[str]
-    entry_rule: str
-    exit_rule: str
+    
+# Required fields (no defaults) - must come first
     expected_effect: str
     falsification_criterion: str
     training_period: str
     validation_period: str
+    
+    # Trade parameters (replacing hardcoded values) - all with defaults
+    side: str = "buy"  # "buy" or "sell"
+    entry_price: Optional[float] = None
+    invalidation_price: Optional[float] = None  # Stop loss / invalidation level
+    target_price: Optional[float] = None  # Take profit target
+    max_hold_s: int = 120  # Maximum hold time in seconds
+    
+    # Optional fields with defaults
     walk_forward_result: Optional[Dict[str, Any]] = None
     cost_sensitivity: Optional[float] = None
     decision: Optional[str] = None
@@ -340,8 +349,6 @@ class Hypothesis:
     loss_autopsy_evidence: List[Dict[str, Any]] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     status: str = "PROPOSED"  # PROPOSED, TESTING, REJECTED, CHALLENGER, CHAMPION
-
-
 @dataclass
 class ExperimentResult:
     """Result of an experiment."""
@@ -1498,29 +1505,75 @@ def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
                 "reason": f"Testing error: {str(e)}"
             }
 
-    def _generate_entry_signals(self, data: pd.DataFrame, entry_rule: str) -> pd.Series:
-        """Generate entry signals from hypothesis entry rule."""
-        # Simplified rule parsing - real implementation would parse the rule string
+    def _generate_entry_signals(self, data: pd.DataFrame, entry_rule: Dict[str, Any]) -> pd.Series:
+        """Generate entry signals from structured hypothesis entry rule."""
         signals = pd.Series(False, index=data.index)
         
-        if "regime" in entry_rule.lower() and "structure" in entry_rule.lower():
-            # Example: regime and structure alignment
+        rule_type = entry_rule.get("type", "")
+        
+        if rule_type == "regime_structure_alignment":
+            # Regime and structure alignment entry
             if "regime" in data.columns and "structure" in data.columns:
-                regime_ok = data["regime"].isin(["trend", "range"])
+                required_regimes = entry_rule.get("required_regimes", ["trend", "range"])
+                regime_ok = data["regime"].isin(required_regimes)
                 structure_ok = data["structure"].notna()
                 signals = regime_ok & structure_ok
+                
+        elif rule_type == "breakout":
+            # Breakout entry: price breaks above resistance / below support
+            if "high" in data.columns and "low" in data.columns and "close" in data.columns:
+                resistance = data["high"].rolling(20).max().shift(1)
+                support = data["low"].rolling(20).min().shift(1)
+                if entry_rule.get("direction") == "long":
+                    signals = data["close"] > resistance
+                else:
+                    signals = data["close"] < support
+                    
+        elif rule_type == "mean_reversion":
+            # Mean reversion: price deviates from mean
+            if "close" in data.columns and "sma_20" in data.columns:
+                z_score = (data["close"] - data["sma_20"]) / data["close"].rolling(20).std()
+                threshold = entry_rule.get("z_threshold", 2.0)
+                if entry_rule.get("direction") == "long":
+                    signals = z_score < -threshold
+                else:
+                    signals = z_score > threshold
         
-        return signals
+        return signals.fillna(False)
 
-    def _generate_exit_signals(self, data: pd.DataFrame, exit_rule: str) -> pd.Series:
-        """Generate exit signals from hypothesis exit rule."""
+    def _generate_exit_signals(self, data: pd.DataFrame, exit_rule: Dict[str, Any]) -> pd.Series:
+        """Generate exit signals from structured hypothesis exit rule."""
         signals = pd.Series(False, index=data.index)
         
-        if "regime change" in exit_rule.lower() or "adverse" in exit_rule.lower():
-            # Exit on regime change or adverse selection
+        rule_type = exit_rule.get("type", "")
+        
+        if rule_type == "regime_change":
+            # Exit on regime change
             if "regime" in data.columns:
                 regime_change = data["regime"] != data["regime"].shift(1)
                 signals = regime_change
+                
+        elif rule_type == "adverse_selection":
+            # Exit on adverse selection signals
+            if "regime" in data.columns:
+                regime_change = data["regime"] != data["regime"].shift(1)
+                signals = regime_change
+                
+        elif rule_type == "trailing_stop":
+            # Trailing stop exit
+            # This would be handled in the replay loop with actual price tracking
+            pass
+            
+        elif rule_type == "target_hit":
+            # Exit when target price reached
+            pass
+            
+        elif rule_type == "time_exit":
+            # Time-based exit
+            if "max_bars" in exit_rule:
+                max_bars = exit_rule["max_bars"]
+                # This would need position tracking - handled in replay loop
+                pass
         
         return signals
 
@@ -1529,17 +1582,34 @@ def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
         data: pd.DataFrame,
         entry_signals: pd.Series,
         exit_signals: pd.Series,
-        hypothesis: Hypothesis
+        hypothesis: Hypothesis,
+        symbol_spec: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
-        """Run chronological walk-forward replay of hypothesis signals."""
+        """Run chronological walk-forward replay of hypothesis signals with REAL costs."""
         trades = []
         in_position = False
         entry_idx = None
         entry_price = 0.0
         entry_side = None
         
-        # Get stop loss and target from hypothesis if available
-        stop_loss = hypothesis.falsification_criterion if hypothesis.falsification_criterion else None
+        # Get symbol spec for real costs
+        spec = symbol_spec or {}
+        tick_size = spec.get("trade_tick_size", 0.00001)
+        tick_value = spec.get("trade_tick_value", 1.0)
+        contract_size = spec.get("trade_contract_size", 100000.0)
+        spread = spec.get("spread", 0.00002)  # Default 2 pips
+        commission_per_lot = spec.get("commission_per_lot", 0.0)
+        slippage = 0.00001  # 0.1 pip slippage assumption
+        
+        in_position = False
+        entry_idx = None
+        entry_price = 0.0
+        entry_side = None
+        
+        # Get stop loss and target from hypothesis
+        stop_loss_price = hypothesis.invalidation_price
+        target_price = hypothesis.target_price
+        max_hold_bars = hypothesis.max_hold_s // 60  # Convert seconds to minutes/bars
         
         for i in range(1, len(data)):
             if not in_position and entry_signals.iloc[i]:
@@ -1547,32 +1617,85 @@ def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
                 in_position = True
                 entry_idx = i
                 entry_price = data.iloc[i]["close"]
-                entry_side = "buy" if hypothesis.side == "buy" else "sell"
+                
+                # Apply slippage on entry
+                if hypothesis.side == "buy":
+                    entry_price += slippage
+                    entry_side = "buy"
+                else:
+                    entry_price -= slippage
+                    entry_side = "sell"
+                
+                in_position = True
+                entry_idx = i
+                entry_price = data.iloc[i]["close"]
+                entry_side = hypothesis.side  # "buy" or "sell"
                 
             elif in_position:
                 # Check exit conditions
                 should_exit = False
                 exit_price = data.iloc[i]["close"]
                 
+                # Apply slippage on exit
+                if entry_side == "buy":
+                    exit_price_candidate = data.iloc[i]["close"] - slippage
+                else:
+                    exit_price_candidate = data.iloc[i]["close"] + slippage
+                
+                should_exit = False
+                exit_price = exit_price_candidate
+                
+                # Check exit signals
                 if exit_signals.iloc[i]:
                     should_exit = True
                 
-                # Check stop loss
-                if entry_side == "buy":
-                    if data.iloc[i]["low"] <= entry_price * 0.995:  # 0.5% stop
-                        should_exit = True
-                        exit_price = min(exit_price, entry_price * 0.995)
-                else:
-                    if data.iloc[i]["high"] >= entry_price * 1.005:
-                        should_exit = True
-                        exit_price = max(exit_price, entry_price * 1.005)
+                # Check stop loss (invalidation price)
+                if stop_loss_price is not None:
+                    if entry_side == "buy":
+                        if data.iloc[i]["low"] <= stop_loss_price:
+                            should_exit = True
+                            exit_price = min(exit_price_candidate, stop_loss_price)
+                    else:
+                        if data.iloc[i]["high"] >= stop_loss_price:
+                            should_exit = True
+                            exit_price = max(exit_price_candidate, stop_loss_price)
                 
-                # Time-based exit (max 20 bars)
-                if i - entry_idx >= 20:
+                # Check target
+                if target_price is not None:
+                    if entry_side == "buy":
+                        if data.iloc[i]["high"] >= target_price:
+                            should_exit = True
+                            exit_price = max(exit_price_candidate, target_price)
+                    else:
+                        if data.iloc[i]["low"] <= target_price:
+                            should_exit = True
+                            exit_price = min(exit_price_candidate, target_price)
+                
+                # Time-based exit (max hold bars)
+                if i - entry_idx >= hypothesis.max_hold_s:
                     should_exit = True
                 
                 if should_exit:
-                    pnl = (exit_price - entry_price) / entry_price
+                    # Calculate PnL with REAL costs
+                    # Gross PnL
+                    if entry_side == "buy":
+                        gross_pnl = (exit_price - entry_price) / entry_price
+                    else:
+                        gross_pnl = (entry_price - exit_price) / entry_price
+                    
+                    # COSTS
+                    # Spread cost (round trip)
+                    spread_cost = 2 * spread / entry_price
+                    # Commission (round trip, per lot)
+                    commission_cost = 2 * commission_per_lot / (entry_price * contract_size)
+                    # Slippage cost (round trip)
+                    slippage_cost = 2 * slippage / entry_price
+                    
+                    total_cost = spread_cost + commission_cost + slippage_cost
+                    
+                    # Net PnL
+                    pnl = gross_pnl - total_cost
+                    
                     if entry_side == "sell":
                         pnl = -pnl
                     
@@ -1584,7 +1707,12 @@ def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
                         "side": entry_side,
                         "pnl_pct": pnl,
                         "bars_held": i - entry_idx,
-                        "exit_reason": "signal" if exit_signals.iloc[i] else "stop/time"
+                        "exit_reason": "signal" if exit_signals.iloc[i] else "stop/target/time",
+                        "gross_pnl_pct": gross_pnl,
+                        "costs_pct": total_cost,
+                        "spread_cost_pct": spread_cost,
+                        "commission_cost_pct": commission_cost,
+                        "slippage_cost_pct": slippage_cost,
                     })
                     in_position = False
         
