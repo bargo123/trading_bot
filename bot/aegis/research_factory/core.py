@@ -30,15 +30,8 @@ from aegis.intel.analogue_store import AnalogueStore
 from aegis.intel.books import lookup
 from aegis.intel.fast_firehose import FastExitConfig, FastExitStateMachine
 from aegis.intel.knowledge_retrieval import retrieve_for_state
-# from aegis.intel.lossdb import load_losses  # Not available, using local function
-# from aegis.intel.market_state_history import MarketStateHistory  # Not available
-# from aegis.intel.ml_pipeline import MLPipeline  # Not available
-# from aegis.intel.outcome_learning import OutcomeLearning  # Not available
 from aegis.intel.paths import INTEL_DIR, ensure_intel_dirs
-# from aegis.optimizer.cursor_cli import CursorCLI  # Not available
-# from aegis.research.analogues import AnaloguesIndex  # Not available
-# from aegis.research.cycle import ResearchCycle  # Not available
-# from aegis.research.ml_pipeline import MLPipeline as ResearchMLPipeline  # Not available
+from aegis.research_factory.ml_pipeline import MLPipeline
 
 # Configure logging
 logging.basicConfig(
@@ -56,91 +49,9 @@ logger = logging.getLogger(__name__)
 # HELPER CLASSES (stand-ins for unavailable modules)
 # ============================================================
 
-class OutcomeLearning:
-    """Outcome learning for forward-learning loop."""
-    def __init__(self):
-        self.outcomes: List[Dict[str, Any]] = []
-    
-    def add_outcomes(self, outcomes: List[Dict[str, Any]]) -> None:
-        self.outcomes.extend(outcomes)
-    
-    def get_outcomes(self) -> List[Dict[str, Any]]:
-        return self.outcomes
-
-
-class MarketStateHistory:
-    """Market state history tracker."""
-    def __init__(self):
-        self.history: List[Dict[str, Any]] = []
-    
-    def add_state(self, state: Dict[str, Any]) -> None:
-        self.history.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            **state
-        })
-    
-    def get_recent(self, n: int = 100) -> List[Dict[str, Any]]:
-        return self.history[-n:]
-
-
-class AnaloguesIndex:
-    """Analogues index for pattern matching."""
-    @classmethod
-    def load(cls, path: Path) -> "AnaloguesIndex":
-        return cls()
-    
-    def query(self, **kwargs) -> List[Dict[str, Any]]:
-        return []
-
-
-class ResearchCycle:
-    """Research cycle coordinator."""
-    def __init__(self):
-        pass
-    
-    def run(self) -> Dict[str, Any]:
-        return {"status": "completed"}
-
-
-class ResearchMLPipeline:
-    """ML Pipeline for research."""
-    def __init__(self):
-        self.models = []
-        self.feature_names = []
-    
-    def train(self, train_data: pd.DataFrame, val_data: pd.DataFrame) -> List[Any]:
-        return []
-    
-    def predict(self, data: pd.DataFrame) -> np.ndarray:
-        return np.zeros(len(data))
-
-
-class CursorCLI:
-    """Cursor CLI for research."""
-    def __init__(self):
-        pass
-
-
-def load_losses() -> List[Dict[str, Any]]:
-    """Load losses from the loss database."""
-    from aegis.intel.paths import INTEL_DIR
-    import json
-    import random
-    from datetime import datetime, timezone
-    
-    losses_path = INTEL_DIR / "losses.jsonl"
-    if not losses_path.exists():
-        # Generate synthetic losses for testing
-        return generate_synthetic_losses()
-    
-    losses = []
-    with losses_path.open() as f:
-        for line in f:
-            try:
-                losses.append(json.loads(line))
-            except Exception:
-                pass
-    return losses
+# ============================================================
+# CODEX INTEGRATION
+# ============================================================
 
 
 def load_losses() -> List[Dict[str, Any]]:
@@ -353,21 +264,9 @@ FALSIFICATION: <what would prove this wrong>
             "calls_made": self.calls_made,
             "path": self.claude_path
         }
-    
-    def get_status(self) -> Dict[str, Any]:
-        """Get Claude client status."""
-        return {
-            "available": self.is_available(),
-            "model": self.model,
-            "calls_made": self.calls_made,
-            "api_key_set": self.api_key is not None
-        }
 
 
 # Configure logging
-
-
-class MarketState(Enum):
     """Market state for the research factory."""
     CLOSED = "CLOSED"
     WEEKEND_RESEARCH = "WEEKEND_RESEARCH"
@@ -410,6 +309,13 @@ class InventionClass(Enum):
     DATA_DERIVED = "DATA_DERIVED_HYPOTHESIS"
     ML_DISCOVERED = "ML_DISCOVERED_HYPOTHESIS"
     NOVEL_SYNTHESIZED = "NOVEL_SYNTHESIZED_HYPOTHESIS"
+
+
+class MarketState(Enum):
+    """Market state for the research factory."""
+    CLOSED = "CLOSED"
+    WEEKEND_RESEARCH = "WEEKEND_RESEARCH"
+    OPEN = "OPEN"
 
 
 @dataclass
@@ -566,7 +472,7 @@ class ResearchFactory:
         self.validated_opportunities = json.loads((INTEL_DIR / "validated_opportunities.json").read_text())
 
         # Initialize ML pipeline
-        self.ml_pipeline = ResearchMLPipeline()
+        self.ml_pipeline = MLPipeline()
 
         # Initialize research cycle
         self.research_cycle = ResearchCycle()
@@ -603,7 +509,7 @@ class ResearchFactory:
                 logger.warning("Claude API not available (no API key or client init failed)")
 
         # Initialize ML pipeline
-        self.ml_pipeline = ResearchMLPipeline()
+        self.ml_pipeline = MLPipeline()
 
         # Initialize research cycle
         self.research_cycle = ResearchCycle()
@@ -1452,15 +1358,7 @@ Live trading: DISABLED
 
 
 
-    def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
-        """Check if hypothesis has already been tested."""
-        return hypothesis_id in self.state.hypothesis_registry
-
-
-
-    def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
-        """Check if hypothesis has already been tested."""
-        return hypothesis_id in self.state.hypothesis_registry
+def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
 
     def _test_hypothesis(
         self,
