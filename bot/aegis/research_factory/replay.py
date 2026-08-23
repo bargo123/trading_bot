@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from numbers import Real
 from typing import Any, Mapping, Optional, Tuple
 
 import pandas as pd
@@ -51,20 +52,28 @@ def _result(status: str, reason: str) -> ReplayResult:
     return ReplayResult(status=status, trades=(), metrics=None, reason=reason)
 
 
-def _cost_evidence_reason(costs: ReplayCostEvidence) -> Optional[str]:
+def _real_number(value: Any) -> bool:
+    return isinstance(value, Real) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _cost_evidence_reason(costs: Any) -> Optional[str]:
+    if not isinstance(costs, ReplayCostEvidence):
+        return "replay cost evidence is malformed"
+    if not isinstance(costs.symbol_spec, BrokerSymbolSpec):
+        return "broker symbol specification is required"
     values = (
         costs.symbol_spec.trade_tick_value,
         costs.symbol_spec.trade_tick_size,
         costs.symbol_spec.volume_min,
         costs.lots,
     )
-    if not all(math.isfinite(value) and value > 0 for value in values):
+    if not all(_real_number(value) and value > 0 for value in values):
         return "positive broker tick, volume, and lot evidence is required"
     non_negative = (costs.commission_usd, costs.slippage_price)
-    if not all(math.isfinite(value) and value >= 0 for value in non_negative):
+    if not all(_real_number(value) and value >= 0 for value in non_negative):
         return "commission and slippage evidence must be non-negative"
     if costs.spread_price is not None and (
-        not math.isfinite(costs.spread_price) or costs.spread_price < 0
+        not _real_number(costs.spread_price) or costs.spread_price < 0
     ):
         return "spread evidence must be non-negative"
     return None
@@ -150,36 +159,62 @@ def _execution_prices(
                 else ask
             )
             liquidation = ask + half_slippage
-        return entry, high, low, liquidation, observed_spread
+        prices = (entry, high, low, liquidation, observed_spread)
+        if not all(math.isfinite(value) for value in prices):
+            raise ValueError("executable price observation must be finite")
+        return prices
 
     if spread_price is None:
         raise ValueError("spread evidence is required without bid/ask data")
     half_spread = spread_price / 2.0
     if side == "buy":
-        return (
+        prices = (
             float(row["close"]) + half_spread + half_slippage,
             float(row["high"]) - half_spread,
             float(row["low"]) - half_spread,
             float(row["close"]) - half_spread - half_slippage,
             spread_price,
         )
-    return (
-        float(row["close"]) - half_spread - half_slippage,
-        float(row["high"]) + half_spread,
-        float(row["low"]) + half_spread,
-        float(row["close"]) + half_spread + half_slippage,
-        spread_price,
-    )
+    else:
+        prices = (
+            float(row["close"]) - half_spread - half_slippage,
+            float(row["high"]) + half_spread,
+            float(row["low"]) + half_spread,
+            float(row["close"]) + half_spread + half_slippage,
+            spread_price,
+        )
+    if not all(math.isfinite(value) for value in prices):
+        raise ValueError("executable price observation must be finite")
+    return prices
 
 
 def _reference_close(
     row: pd.Series, quote_columns: Optional[tuple[str, str]]
 ) -> float:
+    if quote_columns is not None:
+        return (float(row[quote_columns[0]]) + float(row[quote_columns[1]])) / 2.0
     if "close" in row.index:
         return float(row["close"])
-    if quote_columns is None:
-        raise ValueError("a close or bid/ask pair is required for replay")
-    return (float(row[quote_columns[0]]) + float(row[quote_columns[1]])) / 2.0
+    raise ValueError("a close or bid/ask pair is required for replay")
+
+
+def _execution_observation(
+    row: pd.Series,
+    side: str,
+    costs: ReplayCostEvidence,
+    quote_columns: Optional[tuple[str, str]],
+) -> tuple[float, float, float, float, float, float]:
+    prices = _execution_prices(
+        row,
+        side,
+        costs.spread_price,
+        costs.slippage_price,
+        quote_columns,
+    )
+    reference = _reference_close(row, quote_columns)
+    if not math.isfinite(reference):
+        raise ValueError("executable price reference must be finite")
+    return *prices, reference
 
 
 def _valid_fill_geometry(compiled: CompileResult, entry_fill: float) -> bool:
@@ -290,14 +325,13 @@ def replay_hypothesis(
             if not bool(signals.iloc[offset]):
                 continue
             try:
-                entry_fill, _, _, _, observed_spread = _execution_prices(
+                entry_fill, _, _, _, observed_spread, reference = _execution_observation(
                     row,
                     side,
-                    costs.spread_price,
-                    costs.slippage_price,
+                    costs,
                     quote_columns,
                 )
-            except (KeyError, TypeError, ValueError) as exc:
+            except (KeyError, OverflowError, TypeError, ValueError) as exc:
                 return _result("NO_EVIDENCE", str(exc))
             if not _valid_fill_geometry(compiled, entry_fill):
                 return _result(
@@ -307,23 +341,29 @@ def replay_hypothesis(
             position = {
                 "time": row.get("time", frame.index[offset]),
                 "fill": entry_fill,
-                "reference": _reference_close(row, quote_columns),
+                "reference": reference,
                 "offset": offset,
                 "spread": observed_spread,
             }
             continue
 
         try:
-            _, executable_high, executable_low, liquidation, observed_spread = (
-                _execution_prices(
+            (
+                _,
+                executable_high,
+                executable_low,
+                liquidation,
+                observed_spread,
+                reference,
+            ) = (
+                _execution_observation(
                     row,
                     side,
-                    costs.spread_price,
-                    costs.slippage_price,
+                    costs,
                     quote_columns,
                 )
             )
-        except (KeyError, TypeError, ValueError) as exc:
+        except (KeyError, OverflowError, TypeError, ValueError) as exc:
             return _result("NO_EVIDENCE", str(exc))
         stop = compiled.invalidation_price
         target = compiled.target_price
@@ -356,11 +396,11 @@ def replay_hypothesis(
             exit_reason = "target"
         elif regime_changed:
             exit_price = liquidation
-            exit_reference = _reference_close(row, quote_columns)
+            exit_reference = reference
             exit_reason = "regime_change"
         else:
             exit_price = liquidation
-            exit_reference = _reference_close(row, quote_columns)
+            exit_reference = reference
             exit_reason = "elapsed_time"
         trades.append(
             _closed_trade(
@@ -380,14 +420,13 @@ def replay_hypothesis(
     if position is not None:
         final_row = frame.iloc[-1]
         try:
-            _, _, _, liquidation, observed_spread = _execution_prices(
+            _, _, _, liquidation, observed_spread, reference = _execution_observation(
                 final_row,
                 side,
-                costs.spread_price,
-                costs.slippage_price,
+                costs,
                 quote_columns,
             )
-        except (KeyError, TypeError, ValueError) as exc:
+        except (KeyError, OverflowError, TypeError, ValueError) as exc:
             return _result("NO_EVIDENCE", str(exc))
         trades.append(
             _closed_trade(
@@ -395,7 +434,7 @@ def replay_hypothesis(
                 position=position,
                 exit_time=final_row.get("time", frame.index[-1]),
                 exit_price=liquidation,
-                exit_reference=_reference_close(final_row, quote_columns),
+                exit_reference=reference,
                 exit_reason="end_of_data",
                 costs=costs,
                 entry_spread=position["spread"],

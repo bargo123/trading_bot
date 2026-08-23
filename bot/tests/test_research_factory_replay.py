@@ -78,6 +78,32 @@ def test_replay_without_cost_evidence_fails_closed():
 
 
 @pytest.mark.parametrize(
+    "costs",
+    [
+        object(),
+        ReplayCostEvidence(None, 1.0, 0.2, 0.0, 0.0),
+        ReplayCostEvidence(object(), 1.0, 0.2, 0.0, 0.0),
+        ReplayCostEvidence(BrokerSymbolSpec("bad", 1.0, 0.01), 1.0, 0.2, 0.0, 0.0),
+        ReplayCostEvidence(BrokerSymbolSpec(1.0, 1.0, 0.01), None, 0.2, 0.0, 0.0),
+        ReplayCostEvidence(BrokerSymbolSpec(1.0, 1.0, 0.01), 1.0, "bad", 0.0, 0.0),
+        ReplayCostEvidence(BrokerSymbolSpec(1.0, 1.0, 0.01), 1.0, 0.2, object(), 0.0),
+        ReplayCostEvidence(BrokerSymbolSpec(1.0, 1.0, 0.01), 1.0, 0.2, 0.0, None),
+    ],
+)
+def test_malformed_replay_cost_evidence_fails_closed(costs):
+    result = replay_hypothesis(
+        _breakout_frame("buy"),
+        _compiled(side="buy", stop=99.0, target=102.0),
+        costs,
+    )
+
+    assert result.status == "NO_EVIDENCE"
+    assert result.trades == ()
+    assert result.metrics is None
+    assert result.reason
+
+
+@pytest.mark.parametrize(
     "side,stop,target",
     [("buy", 99.0, 102.0), ("sell", 101.0, 98.0)],
 )
@@ -367,6 +393,39 @@ def test_bid_ask_data_supplies_spread_without_double_charge():
     assert trade.net_pnl_usd == pytest.approx(0.0)
 
 
+def test_bid_ask_midpoint_is_the_reference_when_close_conflicts():
+    frame = pd.DataFrame(
+        {
+            "time": pd.date_range("2026-01-01", periods=3, freq="min", tz="UTC"),
+            "bid": [99.9, 100.9, 101.9],
+            "ask": [100.1, 101.1, 102.1],
+            "close": [500.0, 1000.0, -500.0],
+            "regime": ["range", "trend", "range"],
+            "structure": [None, "breakout", "breakout"],
+        }
+    )
+    compiled = CompileResult(
+        status="EXECUTABLE",
+        reason="",
+        entry_rule={
+            "type": "regime_structure_alignment",
+            "direction": "long",
+            "required_regimes": ["trend"],
+            "required_structure": True,
+        },
+        exit_rule={"type": "regime_change"},
+        required_columns=frozenset({"time", "regime", "structure"}),
+        side="buy",
+    )
+    costs = ReplayCostEvidence(BrokerSymbolSpec(1.0, 1.0, 0.01), 1.0, None, 0.0, 0.0)
+
+    result = replay_hypothesis(frame, compiled, costs)
+
+    assert result.status == "COMPLETED"
+    assert result.trades[0].gross_pnl_usd == pytest.approx(1.0)
+    assert result.trades[0].net_pnl_usd == pytest.approx(0.8)
+
+
 def test_bid_ask_replay_does_not_require_redundant_mid_prices():
     frame = pd.DataFrame(
         {
@@ -397,3 +456,130 @@ def test_bid_ask_replay_does_not_require_redundant_mid_prices():
     assert result.status == "COMPLETED"
     assert result.trades[0].entry_price == pytest.approx(100.4)
     assert result.trades[0].exit_reason == "end_of_data"
+
+
+@pytest.mark.parametrize("field", ["close", "high", "low"])
+def test_non_finite_mid_entry_observation_returns_no_evidence(field):
+    frame = pd.DataFrame(
+        {
+            "time": pd.date_range("2026-01-01", periods=2, freq="min", tz="UTC"),
+            "close": [100.0, 100.2],
+            "high": [100.1, 100.3],
+            "low": [99.9, 100.1],
+            "regime": ["range", "trend"],
+            "structure": [None, "breakout"],
+        }
+    )
+    frame.loc[1, field] = float("nan")
+    compiled = CompileResult(
+        status="EXECUTABLE",
+        reason="",
+        entry_rule={
+            "type": "regime_structure_alignment",
+            "direction": "long",
+            "required_regimes": ["trend"],
+            "required_structure": True,
+        },
+        exit_rule={"type": "regime_change"},
+        required_columns=frozenset({"time", "regime", "structure"}),
+        side="buy",
+    )
+    costs = ReplayCostEvidence(BrokerSymbolSpec(1.0, 1.0, 0.01), 1.0, 0.2, 0.0, 0.0)
+
+    result = replay_hypothesis(frame, compiled, costs)
+
+    assert result.status == "NO_EVIDENCE"
+    assert result.trades == ()
+    assert result.metrics is None
+
+
+@pytest.mark.parametrize("field", ["close", "high", "low"])
+def test_non_finite_mid_exit_observation_returns_no_evidence(field):
+    frame = _breakout_frame("buy")
+    frame.loc[3, field] = float("nan")
+    costs = ReplayCostEvidence(BrokerSymbolSpec(1.0, 1.0, 0.01), 1.0, 0.2, 0.0, 0.0)
+
+    result = replay_hypothesis(
+        frame,
+        _compiled(side="buy", stop=99.0, target=102.0),
+        costs,
+    )
+
+    assert result.status == "NO_EVIDENCE"
+    assert result.trades == ()
+    assert result.metrics is None
+
+
+@pytest.mark.parametrize("field", ["bid", "ask", "high_bid", "low_bid"])
+def test_non_finite_quote_exit_observation_returns_no_evidence(field):
+    frame = _breakout_frame("buy")
+    frame["bid"] = frame["close"] - 0.1
+    frame["ask"] = frame["close"] + 0.1
+    frame["high_bid"] = frame["high"] - 0.1
+    frame["low_bid"] = frame["low"] - 0.1
+    frame.loc[3, field] = float("nan")
+    costs = ReplayCostEvidence(BrokerSymbolSpec(1.0, 1.0, 0.01), 1.0, None, 0.0, 0.0)
+
+    result = replay_hypothesis(
+        frame,
+        _compiled(side="buy", stop=99.0, target=102.0),
+        costs,
+    )
+
+    assert result.status == "NO_EVIDENCE"
+    assert result.trades == ()
+    assert result.metrics is None
+
+
+def test_non_finite_end_of_data_liquidation_returns_no_evidence():
+    frame = pd.DataFrame(
+        {
+            "time": pd.date_range("2026-01-01", periods=3, freq="min", tz="UTC"),
+            "close": [100.0, 101.0, float("nan")],
+            "high": [100.0, 101.0, 101.5],
+            "low": [99.0, 100.0, 100.5],
+        }
+    )
+    costs = ReplayCostEvidence(BrokerSymbolSpec(1.0, 1.0, 0.01), 1.0, 0.2, 0.0, 0.0)
+
+    result = replay_hypothesis(
+        frame,
+        _compiled(side="buy", stop=None, target=None, window=1),
+        costs,
+    )
+
+    assert result.status == "NO_EVIDENCE"
+    assert result.trades == ()
+    assert result.metrics is None
+
+
+def test_non_finite_quote_midpoint_reference_returns_no_evidence():
+    frame = pd.DataFrame(
+        {
+            "time": pd.date_range("2026-01-01", periods=2, freq="min", tz="UTC"),
+            "bid": [100.0, 1e308],
+            "ask": [100.2, 1e308],
+            "regime": ["range", "trend"],
+            "structure": [None, "breakout"],
+        }
+    )
+    compiled = CompileResult(
+        status="EXECUTABLE",
+        reason="",
+        entry_rule={
+            "type": "regime_structure_alignment",
+            "direction": "long",
+            "required_regimes": ["trend"],
+            "required_structure": True,
+        },
+        exit_rule={"type": "regime_change"},
+        required_columns=frozenset({"time", "regime", "structure"}),
+        side="buy",
+    )
+    costs = ReplayCostEvidence(BrokerSymbolSpec(1.0, 1.0, 0.01), 1.0, None, 0.0, 0.0)
+
+    result = replay_hypothesis(frame, compiled, costs)
+
+    assert result.status == "NO_EVIDENCE"
+    assert result.trades == ()
+    assert result.metrics is None
