@@ -44,22 +44,24 @@ class TestDataPipeline:
         """Test chronological data splits."""
         df = pd.DataFrame({
             "time": pd.date_range("2024-01-01", periods=1000, freq="1min", tz="UTC"),
-            "close": np.random.rand(1000) * 1.1 + 1.09,
+            "close": np.linspace(100.0, 110.0, 1000),
             "symbol": "EURUSD",
+            "timeframe": "1m",
+            "profit_barrier_first": 1.0,
         })
 
         pipeline = DataPipeline()
-        splits = pipeline.create_splits(df)
+        splits = pipeline.create_splits(df, label_horizon=3)
 
-        assert len(splits.train) == 600
-        assert len(splits.validation) == 200
-        assert len(splits.test) == 150
+        assert len(splits.train) == 597
+        assert len(splits.validation) == 197
+        assert len(splits.test) == 147
         assert len(splits.sealed_holdout) == 50
 
         # Check chronological order
-        assert splits.train["time"].max() <= splits.validation["time"].min()
-        assert splits.validation["time"].max() <= splits.test["time"].min()
-        assert splits.test["time"].max() <= splits.sealed_holdout["time"].min()
+        assert splits.train["time"].max() < splits.validation["time"].min()
+        assert splits.validation["time"].max() < splits.test["time"].min()
+        assert splits.test["time"].max() < splits.sealed_holdout["time"].min()
 
     def test_dataset_fingerprint(self):
         """Test dataset fingerprint computation."""
@@ -80,18 +82,22 @@ class TestFeatureEngineer:
 
     def test_engineer_features(self):
         """Test feature engineering."""
+        close = np.linspace(100.0, 102.0, 200)
         df = pd.DataFrame({
             "time": pd.date_range("2024-01-01", periods=200, freq="1min", tz="UTC"),
-            "open": np.random.rand(200) * 1.1 + 1.09,
-            "high": np.random.rand(200) * 1.1 + 1.095,
-            "low": np.random.rand(200) * 1.1 + 1.085,
-            "close": np.random.rand(200) * 1.1 + 1.09,
-            "volume": np.random.randint(100, 1000, 200),
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": np.arange(100, 300),
             "symbol": "EURUSD",
+            "timeframe": "1m",
         })
 
         engineer = FeatureEngineer()
-        feature_set = engineer.engineer(df)
+        feature_set = engineer.engineer(
+            df, profit_barrier_pct=0.01, loss_barrier_pct=0.01
+        )
 
         # Check features were created
         assert len(feature_set.features) == 200
@@ -108,18 +114,22 @@ class TestFeatureEngineer:
 
     def test_labels_created(self):
         """Test labels are created correctly."""
+        close = np.linspace(100.0, 102.0, 200)
         df = pd.DataFrame({
             "time": pd.date_range("2024-01-01", periods=200, freq="1min", tz="UTC"),
-            "open": np.random.rand(200) * 1.1 + 1.09,
-            "high": np.random.rand(200) * 1.1 + 1.095,
-            "low": np.random.rand(200) * 1.1 + 1.085,
-            "close": np.random.rand(200) * 1.1 + 1.09,
-            "volume": np.random.randint(100, 1000, 200),
+            "open": close,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": np.arange(100, 300),
             "symbol": "EURUSD",
+            "timeframe": "1m",
         })
 
         engineer = FeatureEngineer()
-        feature_set = engineer.engineer(df)
+        feature_set = engineer.engineer(
+            df, profit_barrier_pct=0.01, loss_barrier_pct=0.01
+        )
 
         # Check labels
         assert "profit_barrier_first" in feature_set.labels.columns
@@ -351,7 +361,5 @@ class TestResearchState:
             assert loaded.champion.hypothesis_id == "hyp_1"
             assert loaded.codex_calls == 0
             assert loaded.codex_budget == 1
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

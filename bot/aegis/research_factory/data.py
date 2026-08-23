@@ -95,6 +95,7 @@ class DatasetSplit:
 @dataclass
 class FeatureSet:
     """Engineered feature set."""
+    canonical: pd.DataFrame
     features: pd.DataFrame
     labels: pd.DataFrame
     feature_names: List[str]
@@ -177,30 +178,90 @@ class DataPipeline:
     def create_splits(
         self,
         df: pd.DataFrame,
-        time_column: str = "time",
+        *,
+        label_horizon: int,
     ) -> DatasetSplit:
-        """Create chronological train/validation/test/sealed splits."""
+        """Create timestamp-safe chronological splits with boundary purges."""
         if df.empty:
             raise ValueError("Cannot split empty DataFrame")
 
-        if time_column not in df.columns:
-            raise ValueError(f"Time column '{time_column}' not found")
+        if "time" not in df.columns:
+            raise ValueError("Time column 'time' not found")
+        if not isinstance(label_horizon, int) or label_horizon <= 0:
+            raise ValueError("label_horizon must be a positive integer")
+        group_columns = ["symbol", "timeframe"]
+        missing_group_columns = [
+            column for column in group_columns if column not in df.columns
+        ]
+        if missing_group_columns:
+            raise ValueError(
+                f"DataFrame missing grouping columns: {missing_group_columns}"
+            )
 
-        df = df.sort_values(time_column).reset_index(drop=True)
+        df = df.copy()
+        df["time"] = pd.to_datetime(df["time"], utc=True)
+        df = df.sort_values(
+            ["time", *group_columns], kind="stable"
+        ).reset_index(drop=True)
         n = len(df)
 
         if n < self.min_train_size:
             raise ValueError(f"Dataset too small: {n} rows, minimum {self.min_train_size}")
 
-        # Calculate split indices
-        train_end = int(len(df) * self.train_ratio)
-        val_end = train_end + int(len(df) * self.validation_ratio)
-        test_end = val_end + int(len(df) * self.test_ratio)
+        timestamps = pd.Index(df["time"].drop_duplicates().sort_values())
+        train_end = int(len(timestamps) * self.train_ratio)
+        validation_end = train_end + int(
+            len(timestamps) * self.validation_ratio
+        )
+        test_end = validation_end + int(len(timestamps) * self.test_ratio)
 
-        train = df.iloc[:train_end].copy()
-        validation = df.iloc[train_end:train_end + int(len(df) * self.validation_ratio)].copy()
-        test = df.iloc[train_end + int(len(df) * self.validation_ratio):test_end].copy()
-        sealed_holdout = df.iloc[test_end:].copy()
+        timestamp_partitions = (
+            timestamps[:train_end],
+            timestamps[train_end:validation_end],
+            timestamps[validation_end:test_end],
+            timestamps[test_end:],
+        )
+        partitions = [
+            df.loc[df["time"].isin(partition)].copy()
+            for partition in timestamp_partitions
+        ]
+
+        purged_rows = 0
+        for partition_index in range(3):
+            partition = partitions[partition_index]
+            position = partition.groupby(
+                group_columns, sort=False, observed=True
+            ).cumcount()
+            group_size = partition.groupby(
+                group_columns, sort=False, observed=True
+            )["time"].transform("size")
+            keep = position < (group_size - label_horizon)
+            purged_rows += int((~keep).sum())
+            partitions[partition_index] = partition.loc[keep].copy()
+
+        dropped_target_rows = 0
+        if "profit_barrier_first" in df.columns:
+            for partition_index, partition in enumerate(partitions):
+                known_target = partition["profit_barrier_first"].notna()
+                dropped_target_rows += int((~known_target).sum())
+                partitions[partition_index] = partition.loc[known_target].copy()
+
+        train, validation, test, sealed_holdout = partitions
+
+        def timestamp_bound(partition: pd.DataFrame) -> Dict[str, Optional[str]]:
+            if partition.empty:
+                return {"start": None, "end": None}
+            return {
+                "start": partition["time"].min().isoformat(),
+                "end": partition["time"].max().isoformat(),
+            }
+
+        timestamp_bounds = {
+            "train": timestamp_bound(train),
+            "validation": timestamp_bound(validation),
+            "test": timestamp_bound(test),
+            "sealed_holdout": timestamp_bound(sealed_holdout),
+        }
 
         split_info = {
             "total_rows": len(df),
@@ -208,10 +269,14 @@ class DataPipeline:
             "validation_rows": len(validation),
             "test_rows": len(test),
             "sealed_rows": len(sealed_holdout),
-            "train_date_range": f"{train[time_column].min()} to {train[time_column].max()}" if len(train) > 0 else "empty",
-            "validation_date_range": f"{validation[time_column].min()} to {validation[time_column].max()}" if len(validation) > 0 else "empty",
-            "test_date_range": f"{test[time_column].min()} to {test[time_column].max()}" if len(test) > 0 else "empty",
-            "sealed_date_range": f"{sealed_holdout[time_column].min()} to {sealed_holdout[time_column].max()}" if len(sealed_holdout) > 0 else "empty",
+            "label_horizon": label_horizon,
+            "purged_rows": purged_rows,
+            "dropped_target_rows": dropped_target_rows,
+            "timestamp_bounds": timestamp_bounds,
+            "train_date_range": f"{train['time'].min()} to {train['time'].max()}" if len(train) > 0 else "empty",
+            "validation_date_range": f"{validation['time'].min()} to {validation['time'].max()}" if len(validation) > 0 else "empty",
+            "test_date_range": f"{test['time'].min()} to {test['time'].max()}" if len(test) > 0 else "empty",
+            "sealed_date_range": f"{sealed_holdout['time'].min()} to {sealed_holdout['time'].max()}" if len(sealed_holdout) > 0 else "empty",
         }
 
         logger.info(f"Data splits: {split_info}")
@@ -271,6 +336,16 @@ class DataPipeline:
 class FeatureEngineer:
     """Point-in-time feature engineering."""
 
+    _GROUP_KEYS = ["symbol", "timeframe"]
+    _METADATA_COLUMNS = [
+        "time",
+        "source_file",
+        "source_kind",
+        "source_quality",
+        "symbol",
+        "timeframe",
+    ]
+
     def __init__(self):
         self.feature_names: List[str] = []
         self.feature_metadata: Dict[str, Dict[str, Any]] = {}
@@ -278,13 +353,26 @@ class FeatureEngineer:
     def engineer(
         self,
         df: pd.DataFrame,
+        *,
+        profit_barrier_pct: Optional[float] = None,
+        loss_barrier_pct: Optional[float] = None,
         label_horizon: int = 20,
         fit_scalers: bool = True,
         scaler_dict: Optional[Dict[str, Any]] = None,
     ) -> FeatureSet:
         """Engineer features with point-in-time correctness."""
+        profit_barrier_pct = self._validate_barrier(
+            "profit_barrier_pct", profit_barrier_pct
+        )
+        loss_barrier_pct = self._validate_barrier(
+            "loss_barrier_pct", loss_barrier_pct
+        )
+        if not isinstance(label_horizon, int) or label_horizon <= 0:
+            raise ValueError("label_horizon must be a positive integer")
+
         if df.empty:
             return FeatureSet(
+                canonical=pd.DataFrame(),
                 features=pd.DataFrame(),
                 labels=pd.DataFrame(),
                 feature_names=[],
@@ -297,9 +385,18 @@ class FeatureEngineer:
         # Ensure time column
         if "time" not in df.columns:
             raise ValueError("DataFrame must have 'time' column")
+        missing_group_columns = [
+            column for column in self._GROUP_KEYS if column not in df.columns
+        ]
+        if missing_group_columns:
+            raise ValueError(
+                f"DataFrame missing grouping columns: {missing_group_columns}"
+            )
 
         df["time"] = pd.to_datetime(df["time"], utc=True)
-        df = df.sort_values("time").reset_index(drop=True)
+        df = df.sort_values(
+            [*self._GROUP_KEYS, "time"], kind="stable"
+        ).reset_index(drop=True)
 
         features_df = df.copy()
         labels_df = pd.DataFrame(index=df.index)
@@ -318,11 +415,22 @@ class FeatureEngineer:
         self._add_microstructure_features(features_df)
 
         # Create labels with lookahead
-        labels_df = self._create_labels(features_df, horizon=label_horizon)
+        labels_df = self._create_labels(
+            features_df,
+            horizon=label_horizon,
+            profit_barrier_pct=profit_barrier_pct,
+            loss_barrier_pct=loss_barrier_pct,
+        )
 
         # Store feature names (exclude metadata columns)
-        exclude_cols = {"time", "source_file", "symbol", "timeframe"}
-        feature_cols = [c for c in features_df.columns if c not in labels_df.columns and c not in {"time", "source_file", "symbol", "timeframe"}]
+        metadata_cols = [
+            column for column in self._METADATA_COLUMNS if column in features_df.columns
+        ]
+        feature_cols = [
+            column
+            for column in features_df.columns
+            if column not in metadata_cols and column not in labels_df.columns
+        ]
         label_cols = list(labels_df.columns)
 
         self.feature_names = feature_cols
@@ -331,10 +439,15 @@ class FeatureEngineer:
             for name in feature_cols
         }
 
-        # Handle NaN/Inf
-        features_clean = features_df[feature_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
+        features_clean = features_df[feature_cols].replace(
+            [np.inf, -np.inf], np.nan
+        )
+        canonical = pd.concat(
+            [features_df[metadata_cols], features_clean, labels_df[label_cols]], axis=1
+        )
 
         return FeatureSet(
+            canonical=canonical,
             features=features_clean,
             labels=labels_df[label_cols],
             feature_names=feature_cols,
@@ -342,24 +455,42 @@ class FeatureEngineer:
             feature_metadata=self.feature_metadata,
         )
 
+    @staticmethod
+    def _validate_barrier(name: str, value: Optional[float]) -> float:
+        if value is None:
+            raise ValueError(f"{name} must be explicitly provided and positive")
+        try:
+            barrier = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be positive") from exc
+        if not np.isfinite(barrier) or barrier <= 0:
+            raise ValueError(f"{name} must be positive")
+        return barrier
+
     def _add_price_features(self, df: pd.DataFrame) -> None:
         """Add price-based features."""
+        grouped = df.groupby(self._GROUP_KEYS, sort=False, observed=True)
         # Returns
-        df["returns"] = df.groupby("symbol")["close"].pct_change()
-        df["log_returns"] = np.log(df["close"] / df.groupby("symbol")["close"].shift(1))
+        df["returns"] = grouped["close"].pct_change(fill_method=None)
+        df["log_returns"] = np.log(df["close"] / grouped["close"].shift(1))
 
         # Momentum
         for window in [1, 3, 5, 10, 15, 30]:
-            df[f"momentum_{window}"] = df.groupby("symbol")["close"].pct_change(window)
+            df[f"momentum_{window}"] = grouped["close"].pct_change(
+                window, fill_method=None
+            )
 
         # Acceleration
-        df["acceleration"] = df.groupby("symbol")["returns"].diff()
+        df["acceleration"] = df.groupby(
+            self._GROUP_KEYS, sort=False, observed=True
+        )["returns"].diff()
 
         # Distance from open
         df["dist_from_open"] = (df["close"] - df["open"]) / df["open"].replace(0, np.nan)
 
     def _add_volatility_features(self, df: pd.DataFrame) -> None:
         """Add volatility features."""
+        grouped = df.groupby(self._GROUP_KEYS, sort=False, observed=True)
         df["range"] = (df["high"] - df["low"]) / df["close"].replace(0, np.nan)
         df["body_size"] = abs(df["close"] - df["open"]) / df["close"].replace(0, np.nan)
         df["upper_wick"] = (df["high"] - df[["open", "close"]].max(axis=1)) / df["close"].replace(0, np.nan)
@@ -369,16 +500,20 @@ class FeatureEngineer:
         df["tr"] = np.maximum(
             df["high"] - df["low"],
             np.maximum(
-                abs(df["high"] - df.groupby("symbol")["close"].shift(1)),
-                abs(df["low"] - df.groupby("symbol")["close"].shift(1))
+                abs(df["high"] - grouped["close"].shift(1)),
+                abs(df["low"] - grouped["close"].shift(1))
             )
         )
         for window in [14, 30]:
-            df[f"atr_{window}"] = df.groupby("symbol")["tr"].rolling(window).mean().reset_index(level=0, drop=True)
+            df[f"atr_{window}"] = df.groupby(
+                self._GROUP_KEYS, sort=False, observed=True
+            )["tr"].transform(lambda values: values.rolling(window).mean())
 
         # Realized volatility
         for window in [10, 20, 50]:
-            df[f"realized_vol_{window}"] = df.groupby("symbol")["returns"].rolling(window).std().reset_index(level=0, drop=True)
+            df[f"realized_vol_{window}"] = df.groupby(
+                self._GROUP_KEYS, sort=False, observed=True
+            )["returns"].transform(lambda values: values.rolling(window).std())
 
     def _add_structure_features(self, df: pd.DataFrame) -> None:
         """Add market structure features."""
@@ -391,8 +526,12 @@ class FeatureEngineer:
 
         # Rolling support/resistance
         for window in [20, 50, 100]:
-            df[f"resistance_{window}"] = df.groupby("symbol")["high"].rolling(window).max().reset_index(level=0, drop=True)
-            df[f"support_{window}"] = df.groupby("symbol")["low"].rolling(window).min().reset_index(level=0, drop=True)
+            df[f"resistance_{window}"] = df.groupby(
+                self._GROUP_KEYS, sort=False, observed=True
+            )["high"].transform(lambda values: values.rolling(window).max())
+            df[f"support_{window}"] = df.groupby(
+                self._GROUP_KEYS, sort=False, observed=True
+            )["low"].transform(lambda values: values.rolling(window).min())
             df[f"dist_to_resistance_{window}"] = (df[f"resistance_{window}"] - df["close"]) / df["close"]
             df[f"dist_to_support_{window}"] = (df["close"] - df[f"support_{window}"]) / df["close"]
 
@@ -400,15 +539,24 @@ class FeatureEngineer:
         """Add multi-timeframe features using rolling windows."""
         for window in [5, 15, 30, 60, 120, 240]:
             # SMA
-            df[f"sma_{window}"] = df.groupby("symbol")["close"].rolling(window).mean().reset_index(level=0, drop=True)
-            df[f"ema_{window}"] = df.groupby("symbol")["close"].ewm(span=window).mean().reset_index(level=0, drop=True)
+            grouped_close = df.groupby(
+                self._GROUP_KEYS, sort=False, observed=True
+            )["close"]
+            df[f"sma_{window}"] = grouped_close.transform(
+                lambda values: values.rolling(window).mean()
+            )
+            df[f"ema_{window}"] = grouped_close.transform(
+                lambda values: values.ewm(span=window).mean()
+            )
 
             # Distance from MA
             df[f"dist_sma_{window}"] = (df["close"] - df[f"sma_{window}"]) / df[f"sma_{window}"]
             df[f"dist_ema_{window}"] = (df["close"] - df[f"ema_{window}"]) / df[f"ema_{window}"]
 
             # MA slope
-            df[f"sma_slope_{window}"] = df.groupby("symbol")[f"sma_{window}"].diff()
+            df[f"sma_slope_{window}"] = df.groupby(
+                self._GROUP_KEYS, sort=False, observed=True
+            )[f"sma_{window}"].diff()
 
     def _add_time_features(self, df: pd.DataFrame) -> None:
         """Add time/session features."""
@@ -440,13 +588,16 @@ class FeatureEngineer:
         df["session_progress"] = (df["hour"] - session_start) / 8
 
         # Session transitions
-        df["session_transition"] = (df["session"] != df["session"].shift(1)).astype(int)
+        previous_session = df.groupby(
+            self._GROUP_KEYS, sort=False, observed=True
+        )["session"].shift(1)
+        df["session_transition"] = (df["session"] != previous_session).astype(int)
 
     def _add_microstructure_features(self, df: pd.DataFrame) -> None:
         """Add microstructure features if spread/bid/ask available."""
         if "spread" in df.columns:
             df["spread_pct"] = df["spread"] / df["close"]
-            df["spread_zscore"] = df.groupby("symbol")["spread"].transform(
+            df["spread_zscore"] = df.groupby(self._GROUP_KEYS)["spread"].transform(
                 lambda x: (x - x.rolling(100).mean()) / x.rolling(100).std()
             )
 
@@ -455,58 +606,70 @@ class FeatureEngineer:
             df["spread_abs"] = df["ask"] - df["bid"]
 
         if "volume" in df.columns:
-            df["volume_zscore"] = df.groupby("symbol")["volume"].transform(
+            df["volume_zscore"] = df.groupby(self._GROUP_KEYS)["volume"].transform(
                 lambda x: (x - x.rolling(100).mean()) / x.rolling(100).std()
             )
-            df["volume_change"] = df.groupby("symbol")["volume"].pct_change()
+            df["volume_change"] = df.groupby(self._GROUP_KEYS)["volume"].pct_change(
+                fill_method=None
+            )
 
-    def _create_labels(self, df: pd.DataFrame, horizon: int = 20) -> pd.DataFrame:
-        """Create outcome labels with no lookahead bias."""
-        labels = pd.DataFrame(index=df.index)
+    def _create_labels(
+        self,
+        df: pd.DataFrame,
+        *,
+        horizon: int,
+        profit_barrier_pct: float,
+        loss_barrier_pct: float,
+    ) -> pd.DataFrame:
+        """Create independently matured outcomes for each market series."""
+        label_columns = [
+            "profit_barrier_first",
+            "mfe",
+            "mae",
+            "time_to_target",
+            "no_progress",
+            "tail_loss",
+            "direction",
+            "return_horizon",
+        ]
+        labels = pd.DataFrame(np.nan, index=df.index, columns=label_columns)
 
-        # Get symbol for grouping
-        symbols = df["symbol"] if "symbol" in df.columns else pd.Series("UNKNOWN", index=df.index)
+        for _, group in df.groupby(
+            self._GROUP_KEYS, sort=False, observed=True
+        ):
+            group = group.sort_values("time", kind="stable")
+            indices = group.index.to_list()
+            for position, index in enumerate(indices):
+                if position + horizon >= len(indices):
+                    continue
 
-        # Forward-looking labels (using shift to avoid lookahead)
-        # These are labels that WOULD be known after horizon bars
-        # In production, these are computed during replay/backtest
+                future_indices = indices[position + 1 : position + horizon + 1]
+                future = df.loc[future_indices]
+                close = float(df.at[index, "close"])
+                future_high = float(future["high"].max())
+                future_low = float(future["low"].min())
+                final_close = float(future.iloc[-1]["close"])
+                mfe = future_high - close
+                mae = close - future_low
+                profit_price = close * (1.0 + profit_barrier_pct)
+                loss_price = close * (1.0 - loss_barrier_pct)
 
-        # Future price extremes
-        future_high = df.groupby(symbols)["high"].shift(-horizon).rolling(horizon).max()
-        future_low = df.groupby(symbols)["low"].shift(-horizon).rolling(horizon).min()
+                labels.at[index, "mfe"] = mfe
+                labels.at[index, "mae"] = mae
+                labels.at[index, "no_progress"] = int(mfe <= 0.0)
+                labels.at[index, "tail_loss"] = int(future_low <= loss_price)
+                labels.at[index, "direction"] = float(np.sign(final_close - close))
+                labels.at[index, "return_horizon"] = final_close / close - 1.0
 
-        # Profit barrier first
-        labels["profit_barrier_first"] = (
-            (future_high - df["close"]) > (df["close"] - future_low)
-        ).astype(int)
-
-        # MFE and MAE
-        labels["mfe"] = future_high - df["close"]
-        labels["mae"] = df["close"] - future_low
-
-        # Time to target (simplified)
-        labels["time_to_target"] = horizon
-
-        # No progress
-        labels["no_progress"] = (labels["mfe"] < 1e-6).astype(int)
-
-        # Tail loss probability
-        mae_threshold = labels["mae"].quantile(0.95)
-        labels["tail_loss"] = (labels["mae"] > mae_threshold).astype(int)
-
-        # Direction
-        labels["direction"] = np.where(df["close"] > df["open"], 1, -1)
-
-        # Return over horizon
-        labels["return_horizon"] = (df["close"].shift(-horizon) / df["close"] - 1)
-
-        # Fill NaN labels with 0/neutral
-        label_cols = labels.columns
-        for col in label_cols:
-            if labels[col].dtype in [np.float64, np.float32]:
-                labels[col] = labels[col].fillna(0)
-            elif labels[col].dtype in [np.int64, np.int32]:
-                labels[col] = labels[col].fillna(0)
+                for offset, (_, bar) in enumerate(future.iterrows(), start=1):
+                    profit_hit = float(bar["high"]) >= profit_price
+                    loss_hit = float(bar["low"]) <= loss_price
+                    if profit_hit and loss_hit:
+                        break
+                    if profit_hit or loss_hit:
+                        labels.at[index, "profit_barrier_first"] = int(profit_hit)
+                        labels.at[index, "time_to_target"] = offset
+                        break
 
         return labels
 
@@ -546,6 +709,8 @@ def load_market_data(
 
 def create_research_splits(
     df: pd.DataFrame,
+    *,
+    label_horizon: int,
     train_ratio: float = 0.6,
     validation_ratio: float = 0.2,
     test_ratio: float = 0.15,
@@ -553,13 +718,21 @@ def create_research_splits(
 ) -> DatasetSplit:
     """Create chronological splits."""
     pipeline = DataPipeline(train_ratio, validation_ratio, test_ratio, sealed_ratio)
-    return pipeline.create_splits(df)
+    return pipeline.create_splits(df, label_horizon=label_horizon)
 
 
 def engineer_features(
     df: pd.DataFrame,
+    *,
+    profit_barrier_pct: Optional[float] = None,
+    loss_barrier_pct: Optional[float] = None,
     label_horizon: int = 20,
 ) -> FeatureSet:
     """Engineer features with point-in-time correctness."""
     engineer = FeatureEngineer()
-    return engineer.engineer(df, label_horizon=label_horizon)
+    return engineer.engineer(
+        df,
+        label_horizon=label_horizon,
+        profit_barrier_pct=profit_barrier_pct,
+        loss_barrier_pct=loss_barrier_pct,
+    )

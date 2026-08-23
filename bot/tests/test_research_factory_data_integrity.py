@@ -4,8 +4,13 @@ import json
 
 import numpy as np
 import pandas as pd
+import pytest
 
-from aegis.research_factory.data import DataPipeline, discover_csv_sources
+from aegis.research_factory.data import (
+    DataPipeline,
+    FeatureEngineer,
+    discover_csv_sources,
+)
 
 
 def _write_bar_csv(path, time: str = "2026-01-01T00:00:00Z") -> None:
@@ -121,3 +126,122 @@ def test_empty_fingerprints_include_column_names_and_dtypes():
     }
 
     assert len(fingerprints) == 3
+
+
+def _label_frame(symbol: str = "EURUSD", price_scale: float = 1.0) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "time": pd.date_range("2026-01-01", periods=3, freq="min", tz="UTC"),
+            "open": np.array([100.0, 100.0, 100.0]) * price_scale,
+            "high": np.array([101.0, 104.0, 101.0]) * price_scale,
+            "low": np.array([99.0, 99.0, 95.0]) * price_scale,
+            "close": np.array([100.0, 100.0, 100.0]) * price_scale,
+            "volume": [10.0, 20.0, 30.0],
+            "symbol": symbol,
+            "timeframe": "1m",
+        }
+    )
+
+
+def test_labels_record_first_barrier_and_leave_unmatured_tail_null():
+    feature_set = FeatureEngineer().engineer(
+        _label_frame(),
+        label_horizon=2,
+        profit_barrier_pct=0.02,
+        loss_barrier_pct=0.02,
+    )
+
+    first = feature_set.labels.iloc[0]
+    assert first["profit_barrier_first"] == 1
+    assert first["mfe"] == 4.0
+    assert first["mae"] == 5.0
+    assert first["time_to_target"] == 1
+    assert feature_set.labels.iloc[1:].isna().all().all()
+    assert feature_set.canonical.columns.is_unique
+    assert set(feature_set.label_names).isdisjoint(feature_set.feature_names)
+    assert feature_set.canonical["profit_barrier_first"].equals(
+        feature_set.labels["profit_barrier_first"]
+    )
+
+
+def test_label_barriers_are_required_and_must_be_positive():
+    frame = _label_frame()
+    engineer = FeatureEngineer()
+
+    with pytest.raises(ValueError, match="profit_barrier_pct"):
+        engineer.engineer(frame, label_horizon=2)
+    for profit_barrier_pct, loss_barrier_pct in (
+        (0.0, 0.02),
+        (-0.01, 0.02),
+        (0.02, 0.0),
+        (0.02, -0.01),
+    ):
+        with pytest.raises(ValueError, match="barrier_pct"):
+            engineer.engineer(
+                frame,
+                label_horizon=2,
+                profit_barrier_pct=profit_barrier_pct,
+                loss_barrier_pct=loss_barrier_pct,
+            )
+
+
+def test_symbol_groups_do_not_change_each_others_features_or_labels():
+    first = _label_frame()
+    second = _label_frame("XAUUSD", price_scale=100.0)
+    combined = pd.concat([second, first], ignore_index=True)
+    kwargs = {
+        "label_horizon": 2,
+        "profit_barrier_pct": 0.02,
+        "loss_barrier_pct": 0.02,
+    }
+
+    isolated = FeatureEngineer().engineer(first, **kwargs).canonical
+    together = FeatureEngineer().engineer(combined, **kwargs).canonical
+    actual = together.loc[together["symbol"] == "EURUSD"].reset_index(drop=True)
+
+    pd.testing.assert_frame_equal(actual, isolated)
+
+
+def test_splits_keep_timestamps_together_and_purge_each_series_horizon():
+    timestamps = pd.date_range("2026-01-01", periods=100, freq="min", tz="UTC")
+    frame = pd.DataFrame(
+        {
+            "time": timestamps.repeat(2),
+            "symbol": ["EURUSD", "XAUUSD"] * 100,
+            "timeframe": "1m",
+            "profit_barrier_first": 1.0,
+            "row_id": np.arange(200),
+        }
+    )
+    unknown_target_row = int(
+        frame.index[
+            (frame["time"] == timestamps[10]) & (frame["symbol"] == "EURUSD")
+        ][0]
+    )
+    frame.loc[unknown_target_row, "profit_barrier_first"] = np.nan
+
+    split = DataPipeline(min_train_size=1).create_splits(
+        frame, label_horizon=3
+    )
+    parts = (
+        split.train,
+        split.validation,
+        split.test,
+        split.sealed_holdout,
+    )
+
+    assert split.train.time.max() < split.validation.time.min()
+    assert split.validation.time.max() < split.test.time.min()
+    assert split.test.time.max() < split.sealed_holdout.time.min()
+    for timestamp in frame.time.unique():
+        memberships = sum(timestamp in set(part.time) for part in parts)
+        assert memberships <= 1
+    assert unknown_target_row not in set(
+        pd.concat(parts, ignore_index=True)["row_id"]
+    )
+    assert split.split_info["label_horizon"] == 3
+    assert split.split_info["purged_rows"] == 18
+    assert split.split_info["timestamp_bounds"]["train"] == {
+        "start": timestamps[0].isoformat(),
+        "end": timestamps[56].isoformat(),
+    }
