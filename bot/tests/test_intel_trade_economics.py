@@ -164,17 +164,20 @@ def test_missing_invalidation_is_rejected():
     assert _econ(invalidation=None).reason == "no_structural_invalidation"
 
 
-def test_absent_target_is_synthesised_at_the_payoff_floor():
+def test_absent_target_is_rejected_without_synthesised_geometry():
     result = _econ(target=None, p_win=0.6, min_payoff_ratio=1.5)
-    assert result.target_source == "risk_multiple"
-    assert result.reward_price is not None and result.risk_price is not None
-    assert round(result.reward_price / result.risk_price, 6) == 1.5
+    assert not result.acceptable
+    assert result.reason == "no_structural_target"
+    assert result.target is None
+    assert result.target_source == "none"
 
 
-def test_target_behind_entry_is_replaced_not_traded():
+def test_target_behind_entry_is_rejected_not_replaced():
     result = _econ(target=1.09000, p_win=0.6)
-    assert result.target_source == "risk_multiple_after_bad_structure"
-    assert result.target is not None and result.target > result.entry
+    assert not result.acceptable
+    assert result.reason == "target_not_above_entry"
+    assert result.target == 1.09000
+    assert result.target_source == "structure"
 
 
 def test_sell_side_geometry_is_symmetric():

@@ -168,10 +168,8 @@ def evaluate_trade_economics(
 ) -> TradeEconomics:
     """Decide whether one prospective trade is worth its own risk and cost.
 
-    ``invalidation`` and ``target`` are absolute prices. When structure supplies no
-    target, one is synthesised at ``min_payoff_ratio`` x the invalidation distance so
-    the trade still has a bounded, checkable reward - an unbounded target cannot be
-    scored, and refusing to score it is how cost-blind trades slip through.
+    ``invalidation`` and ``target`` are absolute structural prices. Missing or
+    side-invalid geometry is rejected rather than replaced with invented prices.
 
     ``p_win`` is used as supplied when given; otherwise the Wilson lower bound of the
     analogue win rate is used, so a thin sample cannot masquerade as a strong edge.
@@ -205,21 +203,32 @@ def evaluate_trade_economics(
             "contract_value_unavailable", entry=entry, lots=lots, invalidation=invalidation, risk_price=risk_price
         )
 
-    # Resolve the target. A structural target pointing the wrong way is unusable.
+    if target is None:
+        return _reject(
+            "no_structural_target",
+            entry=entry,
+            lots=lots,
+            invalidation=invalidation,
+            risk_price=risk_price,
+        )
+    resolved_target = float(target)
+    forward = (
+        resolved_target - entry
+        if resolved_side == "buy"
+        else entry - resolved_target
+    )
+    if not math.isfinite(forward) or forward <= 0:
+        reason = "target_not_above_entry" if resolved_side == "buy" else "target_not_below_entry"
+        return _reject(
+            reason,
+            entry=entry,
+            lots=lots,
+            invalidation=invalidation,
+            target=resolved_target,
+            target_source="structure",
+            risk_price=risk_price,
+        )
     target_source = "structure"
-    resolved_target: float | None = None
-    if target is not None:
-        candidate = float(target)
-        forward = (candidate - entry) if resolved_side == "buy" else (entry - candidate)
-        if forward > 0:
-            resolved_target = candidate
-        else:
-            target_source = "structure_behind_entry"
-    if resolved_target is None:
-        floor_ratio = max(float(min_payoff_ratio), 0.0) or DEFAULT_MIN_PAYOFF_RATIO
-        offset = floor_ratio * risk_price
-        resolved_target = entry + offset if resolved_side == "buy" else entry - offset
-        target_source = "risk_multiple" if target_source == "structure" else "risk_multiple_after_bad_structure"
 
     reward_price = abs(resolved_target - entry)
 

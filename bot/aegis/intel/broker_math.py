@@ -9,6 +9,7 @@ for USD <-> price/pip conversions. Single source of truth for MFE/MAE/LOCK.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -19,25 +20,39 @@ class BrokerSymbolSpec:
     trade_tick_value: float  # USD per tick per lot
     trade_tick_size: float   # price units per tick
     volume_min: float        # minimum lot size
-    trade_contract_size: float = 100000.0
+    trade_contract_size: float | None = None
 
     @classmethod
     def from_mapping(cls, spec: Mapping[str, Any] | None) -> "BrokerSymbolSpec":
-        """Create from broker symbol_info mapping."""
+        """Create from complete broker evidence without inferred defaults."""
         if spec is None:
-            return cls(trade_tick_value=1.0, trade_tick_size=0.00001,
-                       volume_min=0.01, trade_contract_size=100000.0)
-        tick_val = float(spec.get("trade_tick_value") or 1.0)
-        tick_sz = float(spec.get("trade_tick_size") or 0.00001)
-        vol_min = float(spec.get("volume_min") or 0.01)
-        contract = float(spec.get("trade_contract_size") or 100000.0)
+            raise ValueError("broker symbol specification is required")
+        try:
+            raw_values = (
+                spec["trade_tick_value"],
+                spec["trade_tick_size"],
+                spec["volume_min"],
+            )
+            if any(isinstance(value, bool) for value in raw_values):
+                raise ValueError
+            tick_val, tick_sz, vol_min = (float(value) for value in raw_values)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("positive tick value, tick size, and volume minimum are required") from exc
+        if not all(math.isfinite(value) and value > 0 for value in (tick_val, tick_sz, vol_min)):
+            raise ValueError("positive tick value, tick size, and volume minimum are required")
+
+        contract_raw = spec.get("trade_contract_size")
+        try:
+            contract = None if contract_raw is None else float(contract_raw)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("trade contract size must be numeric when provided") from exc
         return cls(trade_tick_value=tick_val, trade_tick_size=tick_sz,
-                   volume_min=vol_min, trade_contract_size=contract)
+                    volume_min=vol_min, trade_contract_size=contract)
 
     def usd_per_price_unit_per_lot(self) -> float:
         """USD per price unit per 1.0 lot."""
         if self.trade_tick_size <= 0:
-            return self.trade_contract_size
+            raise ValueError("trade_tick_size must be positive")
         return self.trade_tick_value / self.trade_tick_size
 
     def usd_per_pip_per_lot(self, pip_size: float) -> float:

@@ -248,12 +248,16 @@ class TestFastExitProductionHelper:
             assert verdict["action"] == "SCRATCH", f"max_hold={max_hold}: expected SCRATCH, got {verdict['action']}"
 
     def test_no_exception_on_missing_spec(self):
-        """FastExit handles missing engine spec gracefully."""
-        ctx = self.create_context(
-            engine_spec=None,
-        )
+        """FastExit fails closed when broker-native money math is unavailable."""
+        ctx = self.create_context()
+        ctx.engine_spec = None
         verdict = evaluate_fast_exit(ctx)
-        assert verdict["action"] != "ERROR"
+        assert verdict == {
+            "action": "HOLD",
+            "reason": "broker_spec_unavailable",
+            "why": "Broker-native tick value, tick size, and volume evidence are required",
+            "policy": "safety_noop",
+        }
 
     def test_no_exception_on_missing_brain(self):
         """FastExit handles missing intelligent_brain gracefully."""

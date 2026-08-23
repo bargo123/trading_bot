@@ -89,7 +89,15 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     _pnl_pips = ((_mark - _entry_px) / max(_pip_sz, 1e-10)) * (1 if pos_side == "buy" else -1)
 
     # Broker-native spec for current symbol
-    _spec_fast = BrokerSymbolSpec.from_mapping(ctx.engine_spec)
+    try:
+        _spec_fast = BrokerSymbolSpec.from_mapping(ctx.engine_spec)
+    except ValueError:
+        return {
+            "action": "HOLD",
+            "reason": "broker_spec_unavailable",
+            "why": "Broker-native tick value, tick size, and volume evidence are required",
+            "policy": "safety_noop",
+        }
     _lot_sz = float(ctx.quantity)
 
     # Convert MFE/MAE from USD to pips using broker-native math
