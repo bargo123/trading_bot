@@ -12,7 +12,7 @@ from typing import Any, Mapping, Optional
 from aegis.intel.fast_firehose import ExitAction, FastExitConfig, FastExitStateMachine
 from aegis.intel.fast_exit_runner import (
     FastExitContext, build_harvest_input, evaluate_fast_exit,
-    firehose_exit_trace, pip_size_for,
+    firehose_exit_trace, pip_size_for, spread_r_from_geometry,
 )
 from aegis.intel.quote_buffer import QuoteBuffer
 from aegis.intel.broker_math import BrokerSymbolSpec
@@ -324,6 +324,25 @@ class TestFirehoseHarvestAdapter:
         assert harvest.opened_ts == ctx.ticket_meta.opened_ts
         assert harvest.stop_loss == ctx.ticket_meta.stop_loss
         assert harvest.target_price == ctx.ticket_meta.target_price
+
+    def test_trailing_broker_stop_does_not_change_original_r_normalization(self):
+        ctx = self._context(quote_buffer=self._quotes())
+        # The broker has trailed the stop and adjusted its displayed average;
+        # original ticket geometry must remain the denominator for R.
+        ctx.avg_price = 1.10080
+        ctx.stop_loss = 1.10060
+        harvest = build_harvest_input(ctx)
+        assert harvest.gross_pnl_r == pytest.approx(0.5)
+        exact_spread_r = spread_r_from_geometry(
+            ctx.ticket_meta.entry_price, ctx.ticket_meta.stop_loss, ctx.quantity,
+            ctx.current_bid, ctx.current_ask, ctx.engine_spec,
+        )
+        trailed_spread_r = spread_r_from_geometry(
+            ctx.avg_price, ctx.stop_loss, ctx.quantity,
+            ctx.current_bid, ctx.current_ask, ctx.engine_spec,
+        )
+        assert exact_spread_r == pytest.approx(0.02)
+        assert exact_spread_r != trailed_spread_r
 
     def test_missing_quote_history_keeps_existing_safety_hold(self):
         ctx = self._context(quote_buffer=QuoteBuffer())

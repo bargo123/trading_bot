@@ -207,8 +207,12 @@ def main() -> None:
     # Exact ticket->hypothesis metadata persistence
     from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
     ticket_metadata_store = TicketMetadataStore(ROOT / "intel" / "ticket_metadata.json")
-    from aegis.intel.firehose_turnover import FirehoseReentryGuard, confirmed_close_cleanup
-    firehose_reentry_guard = FirehoseReentryGuard()
+    from aegis.intel.firehose_turnover import (
+        FirehoseReentryGuard, confirmed_close_cleanup, quote_fingerprint,
+    )
+    firehose_reentry_guard = FirehoseReentryGuard(
+        ROOT / "reports" / "firehose_reentry_guard.json"
+    )
     # Intelligent per-thesis profit management (spec B-H, O, P).
     from aegis.intel.profit_management import ProfitManager
 
@@ -219,7 +223,7 @@ def main() -> None:
     from aegis.intel.fast_firehose import FastExitStateMachine, FastExitConfig
     from aegis.intel.fast_exit_runner import (
         FastExitContext, evaluate_fast_exit, firehose_exit_trace,
-        MissingLiquidationMarkError,
+        MissingLiquidationMarkError, spread_r_from_geometry,
     )
 
     fast_exit_sm = FastExitStateMachine()
@@ -785,12 +789,9 @@ def main() -> None:
                         last_bar_time[sym] = bar_time
                     return
                 _thesis_key = str(decision.journal.get("thesis_key") or "")
-                _quote_fingerprint = "|".join((
-                    sym,
-                    str(decision.side or "").lower(),
-                    str(float(q.bid)),
-                    str(float(q.ask)),
-                ))
+                _quote_fingerprint = quote_fingerprint(
+                    sym, str(decision.side or ""), q.bid, q.ask,
+                )
                 _reentry_ok, _reentry_reason = firehose_reentry_guard.allows(
                     _thesis_key, _quote_fingerprint, now_ts,
                 )
@@ -1814,21 +1815,19 @@ def main() -> None:
                                     # harvester's fail-closed evidence requirement.
                                     _spread_r = None
                                     try:
-                                        _spec_cost = BrokerSymbolSpec.from_mapping(
-                                            eng.symbol_spec(_sym) if hasattr(eng, "symbol_spec") else None
+                                        _cost_entry = (
+                                            _ticket_meta.entry_price if _ticket_meta is not None else _entry_px
                                         )
-                                        _risk_usd = abs(
-                                            _entry_px - float(getattr(pos, "stop_loss", 0) or 0)
-                                        ) * _spec_cost.usd_per_price_unit_per_lot() * float(
-                                            getattr(pos, "quantity", 0) or 0
+                                        _cost_stop = (
+                                            _ticket_meta.stop_loss if _ticket_meta is not None
+                                            else float(getattr(pos, "stop_loss", 0) or 0)
                                         )
-                                        if _cur_bid and _cur_ask and _risk_usd > 0:
-                                            _spread_r = (
-                                                (float(_cur_ask) - float(_cur_bid))
-                                                * _spec_cost.usd_per_price_unit_per_lot()
-                                                * float(getattr(pos, "quantity", 0) or 0)
-                                                / _risk_usd
-                                            )
+                                        _spread_r = spread_r_from_geometry(
+                                            _cost_entry, _cost_stop,
+                                            float(getattr(pos, "quantity", 0) or 0),
+                                            _cur_bid, _cur_ask,
+                                            eng.symbol_spec(_sym) if hasattr(eng, "symbol_spec") else None,
+                                        )
                                     except (TypeError, ValueError):
                                         pass
                                     # Determine legacy hypothesis ID for legacy ticket fallback
@@ -1922,18 +1921,17 @@ def main() -> None:
                                     _marks_close = live_marks.get(
                                         str(getattr(pos, "symbol", "")), {}
                                     )
-                                    _fingerprint = "|".join((
-                                        str(getattr(pos, "symbol", "")),
-                                        str(getattr(pos, "side", "")).lower(),
-                                        str(_marks_close.get("bid")),
-                                        str(_marks_close.get("ask")),
-                                    ))
+                                    if _marks_close.get("bid") is not None and _marks_close.get("ask") is not None:
+                                        _fingerprint = quote_fingerprint(
+                                            str(getattr(pos, "symbol", "")),
+                                            str(getattr(pos, "side", "")),
+                                            _marks_close["bid"], _marks_close["ask"],
+                                        )
+                                    else:
+                                        _fingerprint = None
                                     confirmed_close_cleanup(
-                                        ticket_metadata_store,
-                                        firehose_reentry_guard,
-                                        tk,
-                                        quote_fingerprint=_fingerprint,
-                                        closed_at=time.time(),
+                                        ticket_metadata_store, firehose_reentry_guard, tk,
+                                        quote_fingerprint=_fingerprint, closed_at=time.time(),
                                     )
                                 if (
                                     res_close.ok

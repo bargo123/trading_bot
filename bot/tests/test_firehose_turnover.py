@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from aegis.intel.firehose_turnover import FirehoseReentryGuard, confirmed_close_cleanup
+from aegis.intel.firehose_turnover import (
+    FirehoseReentryGuard, confirmed_close_cleanup, quote_fingerprint,
+)
 from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
 
 
@@ -33,7 +35,36 @@ def test_failed_close_does_not_release_metadata_or_record_reentry(tmp_path: Path
     assert guard.allows("thesis", "quote-a", 101.0)[0] is True
 
 
+def test_confirmed_close_without_tracked_metadata_does_not_release_slot(tmp_path: Path):
+    result = confirmed_close_cleanup(
+        TicketMetadataStore(tmp_path / "tickets.json"), FirehoseReentryGuard(), "missing",
+        quote_fingerprint="quote-a", closed_at=100.0,
+    )
+    assert result.metadata_removed is False
+    assert result.slot_released is False
+
+
 def test_new_quote_fingerprint_allows_valid_fast_reentry():
     guard = FirehoseReentryGuard()
     guard.record_close("T1", "thesis", "quote-a", 100.0)
     assert guard.allows("thesis", "quote-b", 101.0)[0] is True
+
+
+def test_reentry_guard_survives_restart(tmp_path: Path):
+    path = tmp_path / "reports" / "firehose_reentry_guard.json"
+    FirehoseReentryGuard(path).record_close("T1", "thesis", "quote-a", 100.0)
+    restored = FirehoseReentryGuard(path)
+    assert restored.allows("thesis", "quote-a", 101.0) == (False, "stale_reentry")
+    assert restored.allows("thesis", "quote-b", 101.0) == (True, "fresh_quote")
+
+
+def test_runner_close_and_entry_share_quote_fingerprint():
+    closed = quote_fingerprint("EURUSD", "buy", 1.10000, 1.10020)
+    guard = FirehoseReentryGuard()
+    guard.record_close("T1", "thesis", closed, 100.0)
+    assert guard.allows("thesis", quote_fingerprint("EURUSD", "buy", 1.1, 1.1002), 101.0) == (
+        False, "stale_reentry",
+    )
+    assert guard.allows("thesis", quote_fingerprint("EURUSD", "buy", 1.10001, 1.10021), 101.0) == (
+        True, "fresh_quote",
+    )

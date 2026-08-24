@@ -278,6 +278,31 @@ def _risk_usd(ctx: FastExitContext, meta: TicketMetadata | None) -> float | None
         return None
 
 
+def spread_r_from_geometry(
+    entry_price: float,
+    stop_loss: float,
+    quantity: float,
+    bid: float,
+    ask: float,
+    engine_spec: Mapping[str, Any] | None,
+) -> float | None:
+    """Normalize observed spread against immutable ticket risk geometry."""
+    try:
+        spec = BrokerSymbolSpec.from_mapping(engine_spec)
+        entry = float(entry_price)
+        stop = float(stop_loss)
+        lots = float(quantity)
+        current_bid = float(bid)
+        current_ask = float(ask)
+        risk_usd = abs(entry - stop) * spec.usd_per_price_unit_per_lot() * lots
+        spread_usd = (current_ask - current_bid) * spec.usd_per_price_unit_per_lot() * lots
+        if not _finite_positive(risk_usd) or not _finite(spread_usd) or spread_usd < 0:
+            return None
+        return spread_usd / risk_usd
+    except (TypeError, ValueError):
+        return None
+
+
 def _finite(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
