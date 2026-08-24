@@ -82,24 +82,87 @@ def _positive_cli_barrier(name: str, value: str) -> float:
 
 
 def load_losses() -> List[Dict[str, Any]]:
-    """Load losses from the loss database."""
-    from aegis.intel.paths import INTEL_DIR
-    import json
-    
+    """Load explicit losses plus confirmed observed DEMO loss outcomes.
+
+    ``losses.jsonl`` remains authoritative when present.  The runner's
+    reconciler writes confirmed exits to ``outcome_log.jsonl`` instead, so
+    those rows are consumed as observed research inputs when the legacy loss
+    store is absent.  No labels, features, or metrics are invented here.
+    """
     losses_path = INTEL_DIR / "losses.jsonl"
-    if not losses_path.exists():
-        # NO synthetic data - real research requires real losses
-        logger.warning(f"Losses file not found at {losses_path}. Returning empty list.")
-        return []
-    
-    losses = []
-    with losses_path.open() as f:
-        for line in f:
-            try:
-                losses.append(json.loads(line))
-            except Exception:
-                pass
+    outcome_path = INTEL_DIR / "outcome_log.jsonl"
+    losses: list[dict[str, Any]] = []
+    seen_tickets: set[str] = set()
+
+    def read_rows(path: Path) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        if not path.is_file():
+            return rows
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                try:
+                    row = json.loads(line)
+                except (TypeError, json.JSONDecodeError):
+                    continue
+                if isinstance(row, dict):
+                    rows.append(row)
+        return rows
+
+    for row in read_rows(losses_path):
+        ticket = str(row.get("ticket") or "")
+        if ticket and ticket in seen_tickets:
+            continue
+        if ticket:
+            seen_tickets.add(ticket)
+        losses.append(row)
+
+    for row in read_rows(outcome_path):
+        if not row.get("is_exit"):
+            continue
+        try:
+            pnl = float(row["pnl"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if pnl > 0:
+            continue
+        ticket = str(row.get("ticket") or "")
+        if ticket and ticket in seen_tickets:
+            continue
+        observed = dict(row)
+        observed["loss_class"] = _observed_loss_class(row)
+        observed["loss_class_source"] = "derived_observed_exit"
+        if ticket:
+            seen_tickets.add(ticket)
+        losses.append(observed)
+
+    if not losses:
+        logger.warning(
+            "No explicit or reconciled loss outcomes found at %s / %s",
+            losses_path,
+            outcome_path,
+        )
     return losses
+
+
+def _observed_loss_class(row: Mapping[str, Any]) -> str:
+    """Map only explicit observed exit text to a conservative research class."""
+    text = " ".join(
+        str(row.get(key) or "").lower()
+        for key in ("close_reason", "reason", "action", "comment")
+    )
+    if "spread" in text:
+        return "SPREAD_COST"
+    if "giveback" in text or "winner" in text or "profit_floor" in text:
+        return "WINNER_GIVEBACK"
+    if "time" in text or "decay" in text or "no_progress" in text:
+        return "TIME_EXIT_TOO_LATE"
+    if "regime" in text or "structure" in text:
+        return "WRONG_REGIME"
+    if "break" in text:
+        return "FALSE_BREAKOUT"
+    if "sl" in text or "stop" in text:
+        return "ADVERSE_SELECTION"
+    return "OBSERVED_LOSS_UNCLASSIFIED"
 
 
 class LossClass(Enum):
@@ -419,7 +482,7 @@ Live trading: DISABLED
                 raw_data,
                 profit_barrier_pct=self.profit_barrier_pct,
                 loss_barrier_pct=self.loss_barrier_pct,
-                label_horizon=self.label_horizon,
+                label_horizon=getattr(self, "label_horizon", 0),
             )
         except Exception as exc:
             self._record_generation_outcome(

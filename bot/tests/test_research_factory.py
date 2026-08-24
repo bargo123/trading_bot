@@ -18,6 +18,28 @@ import pandas as pd
 import numpy as np
 
 
+def test_load_losses_consumes_observed_outcome_log_when_loss_store_is_absent(tmp_path, monkeypatch):
+    monkeypatch.setattr(research_factory_core, "INTEL_DIR", tmp_path)
+    (tmp_path / "outcome_log.jsonl").write_text(
+        "\n".join(
+            json.dumps(row)
+            for row in (
+                {"ticket": "W1", "is_exit": True, "pnl": 0.10, "symbol": "EURUSD"},
+                {"ticket": "L1", "is_exit": True, "pnl": -0.03, "symbol": "USDJPY", "close_reason": "time_decay_no_progress"},
+                {"ticket": "L2", "is_exit": False, "pnl": -0.50, "symbol": "GBPUSD"},
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    losses = research_factory_core.load_losses()
+
+    assert [row["ticket"] for row in losses] == ["L1"]
+    assert losses[0]["loss_class"] == "TIME_EXIT_TOO_LATE"
+    assert losses[0]["loss_class_source"] == "derived_observed_exit"
+
+
 def test_prepare_features_for_ml_is_a_research_factory_method():
     factory = object.__new__(ResearchFactory)
     frame = pd.DataFrame(
