@@ -28,10 +28,9 @@ def _trusted_book_index(tmp_path, monkeypatch):
     global _TRUSTED_INDEX
     books = tmp_path / "books"
     books.mkdir()
-    (books / "trusted.md").write_text(
-        "# Trusted\nUse a volume spike to confirm a breakout.\n"
-        "Avoid a failed breakout after a volume spike.\n",
-        encoding="utf-8",
+    (books / "trusted.md").write_bytes(
+        b"# Trusted\nUse a volume spike to confirm a breakout.\n"
+        b"Avoid a failed breakout after a volume spike.\n",
     )
     index = BookIndex(tmp_path / "books.sqlite")
     index.rebuild(books)
