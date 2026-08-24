@@ -208,8 +208,9 @@ def main() -> None:
     from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
     ticket_metadata_store = TicketMetadataStore(ROOT / "intel" / "ticket_metadata.json")
     from aegis.intel.firehose_turnover import (
-        FirehoseReentryGuard, confirmed_close_cleanup, quote_fingerprint,
+        FirehoseReentryGuard, TurnoverMetrics, confirmed_close_cleanup, quote_fingerprint,
     )
+    firehose_turnover = TurnoverMetrics()
     firehose_reentry_guard = FirehoseReentryGuard(
         ROOT / "reports" / "firehose_reentry_guard.json"
     )
@@ -239,6 +240,7 @@ def main() -> None:
         }
         if extra:
             payload.update(extra)
+        payload["firehose_turnover"] = firehose_turnover.snapshot(time.time())
         heartbeat.parent.mkdir(parents=True, exist_ok=True)
         heartbeat.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -1379,6 +1381,20 @@ def main() -> None:
                                 symbol=sym,
                             )
                             ticket_metadata_store.add(meta)
+                            firehose_turnover.record_open(
+                                tk, opened_at=now_s, slot_capacity=max_positions,
+                            )
+                            append_journal(
+                                journal,
+                                {
+                                    "event": "firehose_open",
+                                    "ticket": tk,
+                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                                    "symbol": sym,
+                                    "side": side.upper(),
+                                    "slot_capacity": max_positions,
+                                },
+                            )
                     intelligent_brain.memory.apply(
                         sym,
                         brain_decision.action,
@@ -1878,9 +1894,17 @@ def main() -> None:
                                             "bar": str(bar_time),
                                         })
                                         continue
-                                    append_journal(journal, firehose_exit_trace(
-                                        fast_exit_ctx, fast_verdict,
-                                    ))
+                                    trace = firehose_exit_trace(fast_exit_ctx, fast_verdict)
+                                    trace["timestamp"] = datetime.now(timezone.utc).isoformat()
+                                    trace["pnl_usd"] = _track.last_pnl if _track is not None else None
+                                    trace["mfe_usd"] = _track.mfe_usd if _track is not None else None
+                                    trace["cost_usd"] = None
+                                    trace["liquidation_bid"] = _cur_bid
+                                    trace["liquidation_ask"] = _cur_ask
+                                    firehose_turnover.record_exit_trace(
+                                        tk, observed_at=fast_exit_ctx.now_ts, mfe_usd=trace["mfe_usd"],
+                                    )
+                                    append_journal(journal, trace)
                                     if fast_verdict["action"] in {"TAKE", "QUICK_TAKE", "SCRATCH", "ABORT", "TIME_EXIT"}:
                                         verdict = {
                                             "action": "EXIT",
@@ -1918,6 +1942,24 @@ def main() -> None:
                                 # Ticket/slot release and re-entry state happen only
                                 # after the broker confirms this exact close.
                                 if res_close.ok:
+                                    closed_at = time.time()
+                                    firehose_turnover.record_close(
+                                        tk, closed_at=closed_at, gross_pnl_usd=None,
+                                        net_pnl_usd=None, cost_usd=None, confirmed=True,
+                                    )
+                                    append_journal(
+                                        journal,
+                                        {
+                                            "event": "firehose_close",
+                                            "ticket": tk,
+                                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                                            "confirmed": True,
+                                            "symbol": str(getattr(pos, "symbol", "")),
+                                            "realized_net_usd": None,
+                                            "gross_pnl_usd": None,
+                                            "cost_usd": None,
+                                        },
+                                    )
                                     _marks_close = live_marks.get(
                                         str(getattr(pos, "symbol", "")), {}
                                     )
@@ -1931,7 +1973,7 @@ def main() -> None:
                                         _fingerprint = None
                                     confirmed_close_cleanup(
                                         ticket_metadata_store, firehose_reentry_guard, tk,
-                                        quote_fingerprint=_fingerprint, closed_at=time.time(),
+                                        quote_fingerprint=_fingerprint, closed_at=closed_at,
                                     )
                                 if (
                                     res_close.ok

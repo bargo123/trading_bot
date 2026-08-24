@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from statistics import median
 from typing import Optional
 
 from aegis.intel.ticket_metadata import TicketMetadataStore
@@ -13,6 +14,88 @@ from aegis.intel.ticket_metadata import TicketMetadataStore
 class CloseCleanup:
     metadata_removed: bool
     slot_released: bool
+
+
+class TurnoverMetrics:
+    """In-memory observations for confirmed Firehose ticket lifecycles."""
+
+    def __init__(self) -> None:
+        self._opens: dict[str, tuple[float, int | None]] = {}
+        self._peaks: dict[str, float] = {}
+        self._closes: list[tuple[float, float, float | None, float | None, float | None, float | None, int | None]] = []
+
+    @property
+    def active_tickets(self) -> set[str]:
+        return set(self._opens)
+
+    def record_open(self, ticket: str, *, opened_at: float, slot_capacity: int | None) -> None:
+        if ticket and ticket not in self._opens:
+            self._opens[ticket] = (float(opened_at), slot_capacity if slot_capacity and slot_capacity > 0 else None)
+
+    def record_exit_trace(self, ticket: str, *, observed_at: float, mfe_usd: float | None) -> None:
+        del observed_at
+        if ticket not in self._opens or mfe_usd is None:
+            return
+        peak = float(mfe_usd)
+        if peak > 0:
+            self._peaks[ticket] = max(self._peaks.get(ticket, peak), peak)
+
+    def record_close(
+        self,
+        ticket: str,
+        *,
+        closed_at: float,
+        gross_pnl_usd: float | None,
+        net_pnl_usd: float | None,
+        cost_usd: float | None,
+        confirmed: bool,
+    ) -> None:
+        if not confirmed or ticket not in self._opens:
+            return
+        opened_at, slot_capacity = self._opens.pop(ticket)
+        self._closes.append((
+            opened_at, float(closed_at), gross_pnl_usd, net_pnl_usd, cost_usd,
+            self._peaks.pop(ticket, None), slot_capacity,
+        ))
+
+    def snapshot(self, now: float) -> dict[str, float | None]:
+        completed = self._closes
+        if not completed:
+            return {
+                "median_hold_seconds": None, "p90_hold_seconds": None,
+                "round_trips_per_hour": 0.0, "close_to_entry_interval_seconds": None,
+                "slot_utilization": None, "profit_capture_ratio": None,
+                "gross_profit_per_hour": None, "net_profit_per_hour": None,
+                "cost_per_round_trip_usd": None,
+            }
+        holds = sorted(closed - opened for opened, closed, _, _, _, _, _ in completed)
+        p90_index = (len(holds) - 1) * 0.9
+        lower, upper = int(p90_index), min(int(p90_index) + 1, len(holds) - 1)
+        p90 = holds[lower] + (holds[upper] - holds[lower]) * (p90_index - lower)
+        first_open = min(opened for opened, _, _, _, _, _, _ in completed)
+        elapsed = float(now) - first_open
+        rate = len(completed) / (elapsed / 3600.0) if elapsed > 0 else None
+        intervals = [
+            opened - prior_closed
+            for opened, _, _, _, _, _, _ in sorted(completed)
+            for prior_closed in [max((closed for _, closed, _, _, _, _, _ in completed if closed <= opened), default=None)]
+            if prior_closed is not None
+        ]
+        capacities = [capacity for _, _, _, _, _, _, capacity in completed]
+        gross = [value for _, _, value, _, _, _, _ in completed]
+        net = [value for _, _, _, value, _, _, _ in completed]
+        cost = [value for _, _, _, _, value, _, _ in completed]
+        peaks = [value for _, _, _, _, _, value, _ in completed]
+        return {
+            "median_hold_seconds": median(holds), "p90_hold_seconds": p90,
+            "round_trips_per_hour": rate,
+            "close_to_entry_interval_seconds": median(intervals) if intervals else None,
+            "slot_utilization": sum(holds) / (elapsed * median(capacities)) if elapsed > 0 and all(v is not None for v in capacities) else None,
+            "profit_capture_ratio": sum(net) / sum(peaks) if all(v is not None for v in net + peaks) and sum(peaks) > 0 else None,
+            "gross_profit_per_hour": sum(gross) / (elapsed / 3600.0) if elapsed > 0 and all(v is not None for v in gross) else None,
+            "net_profit_per_hour": sum(net) / (elapsed / 3600.0) if elapsed > 0 and all(v is not None for v in net) else None,
+            "cost_per_round_trip_usd": sum(cost) / len(cost) if cost and all(v is not None for v in cost) else None,
+        }
 
 
 class FirehoseReentryGuard:

@@ -27,7 +27,8 @@ def read_jsonl(path: Path, parser: argparse.ArgumentParser) -> list[dict]:
             try:
                 row = json.loads(line)
             except json.JSONDecodeError as exc:
-                parser.error(f"invalid JSONL in {path} at line {line_number}: {exc.msg}")
+                rows.append({"event": "journal_parse_error", "line": line_number, "error": exc.msg})
+                continue
             if not isinstance(row, dict):
                 parser.error(f"JSONL in {path} at line {line_number} must be an object")
             rows.append(row)

@@ -138,7 +138,7 @@ def test_sell_requires_observed_ask_liquidation_quote():
     assert report["completed_tickets"] == 1
 
 
-def test_unconfirmed_or_non_pm_deal_close_is_incomplete():
+def test_unconfirmed_firehose_close_is_incomplete():
     events = [dict(event) for event in COMPLETE_TICKET_EVENTS]
     events[2]["confirmed"] = False
     events[2]["ok"] = True
@@ -146,6 +146,7 @@ def test_unconfirmed_or_non_pm_deal_close_is_incomplete():
 
     events = [dict(event) for event in COMPLETE_TICKET_EVENTS]
     events[2]["event"] = "firehose_close"
+    events[2]["confirmed"] = False
     assert analyze_ticket_lifecycles(events)["completed_tickets"] == 0
 
 

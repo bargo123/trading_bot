@@ -11,7 +11,7 @@ from typing import Any, Iterable, Mapping
 
 
 USD_BUCKETS = (0.30, 0.50, 0.70, 0.80, 1.00)
-_EXIT_EVENTS = frozenset({"pm_exit", "deal_exit", "deal_close"})
+_EXIT_EVENTS = frozenset({"pm_exit", "deal_exit", "deal_close", "firehose_close"})
 
 
 def _number(value: Any) -> float | None:
@@ -129,8 +129,12 @@ def _complete_ticket(ticket: str, records: list[Mapping[str, Any]]) -> dict[str,
 def analyze_ticket_lifecycles(events: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     """Summarize only ticket records with observed open, traces, and confirmed exit."""
     indexed: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    incomplete_journal = False
     for event in events:
         if not isinstance(event, Mapping):
+            continue
+        if event.get("event") == "journal_parse_error":
+            incomplete_journal = True
             continue
         ticket = event.get("ticket")
         if isinstance(ticket, str) and ticket:
@@ -203,7 +207,10 @@ def analyze_ticket_lifecycles(events: Iterable[Mapping[str, Any]]) -> dict[str, 
     if capacities and len(capacities) == len(complete) and span_seconds > 0:
         utilization = sum(holds) / (span_seconds * mean(capacities))
 
-    status = "OK" if complete else "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    status = (
+        "INCOMPLETE_JOURNAL_EVIDENCE" if incomplete_journal
+        else "OK" if complete else "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    )
     return {
         "status": status,
         "completed_tickets": len(complete),

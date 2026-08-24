@@ -1,0 +1,140 @@
+{
+  "buckets": {
+    "0.30_usd": {
+      "cost_per_round_trip_usd": null,
+      "count": 0,
+      "peak_unrealized_usd": null,
+      "post_threshold_hold_seconds": null,
+      "profit_capture_ratio": null,
+      "realized_net_usd": null,
+      "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    },
+    "0.50_usd": {
+      "cost_per_round_trip_usd": null,
+      "count": 0,
+      "peak_unrealized_usd": null,
+      "post_threshold_hold_seconds": null,
+      "profit_capture_ratio": null,
+      "realized_net_usd": null,
+      "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    },
+    "0.70_usd": {
+      "cost_per_round_trip_usd": null,
+      "count": 0,
+      "peak_unrealized_usd": null,
+      "post_threshold_hold_seconds": null,
+      "profit_capture_ratio": null,
+      "realized_net_usd": null,
+      "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    },
+    "0.80_usd": {
+      "cost_per_round_trip_usd": null,
+      "count": 0,
+      "peak_unrealized_usd": null,
+      "post_threshold_hold_seconds": null,
+      "profit_capture_ratio": null,
+      "realized_net_usd": null,
+      "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    },
+    "1.00_usd": {
+      "cost_per_round_trip_usd": null,
+      "count": 0,
+      "peak_unrealized_usd": null,
+      "post_threshold_hold_seconds": null,
+      "profit_capture_ratio": null,
+      "realized_net_usd": null,
+      "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    }
+  },
+  "completed_tickets": 0,
+  "cost_per_round_trip_usd": null,
+  "giveback_magnitude_usd": {
+    "count": 0,
+    "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+  },
+  "hold_time_seconds": {
+    "count": 0,
+    "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+  },
+  "incomplete_tickets": [
+    "10140886639",
+    "10142797542",
+    "10142798064",
+    "10142845660",
+    "10143288771",
+    "10143304705",
+    "10143343205",
+    "10144340956",
+    "10144489965",
+    "10144525556",
+    "10144946497",
+    "10145539048",
+    "10145749907",
+    "10154363110",
+    "10154363345",
+    "10154479785",
+    "10154523920",
+    "10155333982",
+    "10155648178",
+    "10156588111",
+    "10156789674",
+    "10156857259",
+    "10156909845",
+    "10157006938",
+    "10157050977"
+  ],
+  "loser_distribution": {
+    "count": 0,
+    "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+  },
+  "max_loss_usd": null,
+  "policy_comparison": {
+    "selection_metric": "oos_expectancy_after_cost",
+    "status": "NO_EVIDENCE",
+    "winner": null
+  },
+  "profit_capture_ratio": null,
+  "round_trips_per_hour": null,
+  "slot_utilization": null,
+  "status": "INCOMPLETE_JOURNAL_EVIDENCE",
+  "time_between_close_and_entry_seconds": {
+    "count": 0,
+    "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+  },
+  "winner_distribution": {
+    "count": 0,
+    "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+  },
+  "wins_erased_by_bucket": {
+    "0.30_usd": {
+      "count": 0,
+      "rate": null,
+      "reached_count": 0,
+      "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    },
+    "0.50_usd": {
+      "count": 0,
+      "rate": null,
+      "reached_count": 0,
+      "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    },
+    "0.70_usd": {
+      "count": 0,
+      "rate": null,
+      "reached_count": 0,
+      "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    },
+    "0.80_usd": {
+      "count": 0,
+      "rate": null,
+      "reached_count": 0,
+      "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    },
+    "1.00_usd": {
+      "count": 0,
+      "rate": null,
+      "reached_count": 0,
+      "status": "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    }
+  }
+}
