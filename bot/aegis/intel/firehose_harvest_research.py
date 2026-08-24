@@ -11,7 +11,7 @@ from typing import Any, Iterable, Mapping
 
 
 USD_BUCKETS = (0.30, 0.50, 0.70, 0.80, 1.00)
-_EXIT_EVENTS = frozenset({"pm_exit", "firehose_close", "deal_exit", "deal_close"})
+_EXIT_EVENTS = frozenset({"pm_exit", "deal_exit", "deal_close"})
 
 
 def _number(value: Any) -> float | None:
@@ -77,9 +77,7 @@ def _empty_bucket() -> dict[str, Any]:
 
 
 def _confirmed_exit(event: Mapping[str, Any]) -> bool:
-    return event.get("event") in _EXIT_EVENTS and (
-        event.get("confirmed") is True or event.get("ok") is True
-    )
+    return event.get("event") in _EXIT_EVENTS and event.get("confirmed") is True
 
 
 def _complete_ticket(ticket: str, records: list[Mapping[str, Any]]) -> dict[str, Any] | None:
@@ -97,6 +95,9 @@ def _complete_ticket(ticket: str, records: list[Mapping[str, Any]]) -> dict[str,
         return None
     if realized is None or exit_cost is None:
         return None
+    side = opens[0].get("side")
+    if side not in {"BUY", "SELL"}:
+        return None
 
     observed: list[tuple[datetime, float, float]] = []
     for trace in traces:
@@ -104,7 +105,8 @@ def _complete_ticket(ticket: str, records: list[Mapping[str, Any]]) -> dict[str,
         pnl = _number(_field(trace, "pnl_usd", "net_pnl_usd", "pnl"))
         mfe = _number(_field(trace, "mfe_usd", "mfe"))
         cost = _number(_field(trace, "cost_usd", "total_cost_usd"))
-        if when is None or pnl is None or mfe is None or cost is None:
+        liquidation_quote = _number(trace.get("liquidation_bid" if side == "BUY" else "liquidation_ask"))
+        if when is None or pnl is None or mfe is None or cost is None or liquidation_quote is None or liquidation_quote <= 0:
             return None
         if when < opened_at or when > closed_at:
             return None
@@ -171,7 +173,21 @@ def analyze_ticket_lifecycles(events: Iterable[Mapping[str, Any]]) -> dict[str, 
     winners = [value for value in realized if value > 0]
     losers = [value for value in realized if value < 0]
     holds = [(item["closed_at"] - item["opened_at"]).total_seconds() for item in complete]
-    losses_erased = [item["peak"] - item["realized"] for item in complete if item["peak"] > 0]
+    giveback_magnitudes = [item["peak"] - item["realized"] for item in complete if item["peak"] > 0]
+    wins_erased_by_bucket = {}
+    for threshold in USD_BUCKETS:
+        reached = [item for item in complete if any(pnl >= threshold for _, pnl, _ in item["traces"])]
+        erased = [item for item in reached if item["realized"] < threshold]
+        wins_erased_by_bucket[f"{threshold:.2f}_usd"] = (
+            {
+                "status": "OK",
+                "reached_count": len(reached),
+                "count": len(erased),
+                "rate": len(erased) / len(reached),
+            }
+            if reached
+            else {"status": "NO_COMPLETE_LIFECYCLE_EVIDENCE", "reached_count": 0, "count": 0, "rate": None}
+        )
     close_to_entry = []
     for later in sorted(complete, key=lambda item: item["opened_at"]):
         earlier_closes = [item["closed_at"] for item in complete if item["closed_at"] <= later["opened_at"]]
@@ -196,7 +212,8 @@ def analyze_ticket_lifecycles(events: Iterable[Mapping[str, Any]]) -> dict[str, 
         "winner_distribution": _metric(winners),
         "loser_distribution": _metric(losers),
         "hold_time_seconds": _metric(holds),
-        "wins_erased_by_giveback_usd": _metric(losses_erased),
+        "wins_erased_by_bucket": wins_erased_by_bucket,
+        "giveback_magnitude_usd": _metric(giveback_magnitudes),
         "time_between_close_and_entry_seconds": _metric(close_to_entry),
         "round_trips_per_hour": len(complete) / (span_seconds / 3600) if span_seconds > 0 else None,
         "slot_utilization": utilization,
@@ -235,10 +252,50 @@ def write_harvest_report(report: Mapping[str, Any], json_path: Path, markdown_pa
     json_path.parent.mkdir(parents=True, exist_ok=True)
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
-    markdown_path.write_text(
-        "# Firehose Harvest Evidence\n\n"
-        f"Status: `{report.get('status', 'NO_EVIDENCE')}`\n\n"
-        f"Completed tickets: {report.get('completed_tickets', 0)}\n\n"
-        f"Incomplete tickets: {', '.join(report.get('incomplete_tickets', [])) or 'none'}\n",
-        encoding="utf-8",
-    )
+    def render(value: Any) -> str:
+        return "`NO_COMPLETE_LIFECYCLE_EVIDENCE`" if value is None else str(value)
+
+    lines = [
+        "# Firehose Harvest Evidence",
+        "",
+        f"Status: `{report.get('status', 'NO_EVIDENCE')}`",
+        "",
+        f"Completed tickets: {report.get('completed_tickets', 0)}",
+        f"Incomplete tickets: {', '.join(report.get('incomplete_tickets', [])) or 'none'}",
+        "",
+        "## Buckets",
+        "",
+    ]
+    for name, bucket in report.get("buckets", {}).items():
+        lines.append(
+            f"- {name}: `{bucket.get('status', 'NO_COMPLETE_LIFECYCLE_EVIDENCE')}`, "
+            f"count={bucket.get('count', 0)}, realized_net_usd={render(bucket.get('realized_net_usd'))}, "
+            f"peak_unrealized_usd={render(bucket.get('peak_unrealized_usd'))}, "
+            f"profit_capture_ratio={render(bucket.get('profit_capture_ratio'))}, "
+            f"post_threshold_hold_seconds={render(bucket.get('post_threshold_hold_seconds'))}, "
+            f"cost_per_round_trip_usd={render(bucket.get('cost_per_round_trip_usd'))}"
+        )
+    lines.extend(["", "## Lifecycle Metrics", ""])
+    for name in (
+        "winner_distribution",
+        "loser_distribution",
+        "hold_time_seconds",
+        "giveback_magnitude_usd",
+        "time_between_close_and_entry_seconds",
+    ):
+        metric = report.get(name, {})
+        lines.append(f"- {name}: `{metric.get('status', 'NO_COMPLETE_LIFECYCLE_EVIDENCE')}`, {metric}")
+    for name in ("round_trips_per_hour", "slot_utilization", "profit_capture_ratio", "cost_per_round_trip_usd", "max_loss_usd"):
+        lines.append(f"- {name}: {render(report.get(name))}")
+    lines.extend(["", "## Threshold Erasure", ""])
+    for name, metric in report.get("wins_erased_by_bucket", {}).items():
+        lines.append(f"- wins_erased_by_bucket {name}: `{metric.get('status')}`, {metric}")
+    policy = report.get("policy_comparison", {"status": "NO_EVIDENCE"})
+    lines.extend(["", "## Policy Comparison", "", f"Policy comparison: `{policy.get('status', 'NO_EVIDENCE')}`"])
+    if policy.get("status") == "OK":
+        lines.append(f"selection_metric: {policy.get('selection_metric')}")
+        lines.append(f"winner: {policy.get('winner')}")
+    else:
+        lines.append("selection_metric: `NO_EVIDENCE`")
+        lines.append("winner: `NO_EVIDENCE`")
+    markdown_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

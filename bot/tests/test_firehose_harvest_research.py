@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -17,6 +20,7 @@ COMPLETE_TICKET_EVENTS = [
         "event": "firehose_open",
         "ticket": "T1",
         "timestamp": "2026-08-24T10:00:00+00:00",
+        "side": "BUY",
         "slot_capacity": 2,
     },
     {
@@ -26,6 +30,7 @@ COMPLETE_TICKET_EVENTS = [
         "pnl_usd": 0.70,
         "mfe_usd": 0.80,
         "cost_usd": 0.05,
+        "liquidation_bid": 1.2345,
     },
     {
         "event": "pm_exit",
@@ -112,6 +117,46 @@ def test_missing_complete_fields_are_incomplete_not_zeroes():
     assert report["incomplete_tickets"] == ["T1"]
 
 
+def test_missing_applicable_liquidation_quote_is_incomplete():
+    events = [dict(event) for event in COMPLETE_TICKET_EVENTS]
+    events[0]["side"] = "BUY"
+    events[1].pop("liquidation_bid")
+
+    report = analyze_ticket_lifecycles(events)
+
+    assert report["status"] == "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    assert report["incomplete_tickets"] == ["T1"]
+
+
+def test_sell_requires_observed_ask_liquidation_quote():
+    events = [dict(event) for event in COMPLETE_TICKET_EVENTS]
+    events[0]["side"] = "SELL"
+    events[1]["liquidation_ask"] = events[1].pop("liquidation_bid")
+
+    report = analyze_ticket_lifecycles(events)
+
+    assert report["completed_tickets"] == 1
+
+
+def test_unconfirmed_or_non_pm_deal_close_is_incomplete():
+    events = [dict(event) for event in COMPLETE_TICKET_EVENTS]
+    events[2]["confirmed"] = False
+    events[2]["ok"] = True
+    assert analyze_ticket_lifecycles(events)["completed_tickets"] == 0
+
+    events = [dict(event) for event in COMPLETE_TICKET_EVENTS]
+    events[2]["event"] = "firehose_close"
+    assert analyze_ticket_lifecycles(events)["completed_tickets"] == 0
+
+
+def test_bucket_erasure_is_threshold_specific():
+    report = analyze_ticket_lifecycles(COMPLETE_TICKET_EVENTS)
+    erased = report["wins_erased_by_bucket"]["0.70_usd"]
+
+    assert erased == {"status": "OK", "reached_count": 1, "count": 1, "rate": 1.0}
+    assert report["giveback_magnitude_usd"]["average"] == pytest.approx(0.25)
+
+
 def test_policy_comparison_rejects_missing_cost_or_quote_evidence():
     result = compare_exit_policies(INCOMPLETE_REPLAY_ROWS)
 
@@ -128,10 +173,48 @@ def test_policy_comparison_ranks_by_oos_expectancy_not_win_rate():
 
 def test_report_writer_only_writes_requested_report_paths(tmp_path):
     report = analyze_ticket_lifecycles(COMPLETE_TICKET_EVENTS)
+    report["policy_comparison"] = compare_exit_policies(COSTED_OOS_ROWS)
     json_path = tmp_path / "report.json"
     markdown_path = tmp_path / "report.md"
 
     write_harvest_report(report, json_path, markdown_path)
 
     assert json.loads(json_path.read_text(encoding="utf-8"))["status"] == "OK"
-    assert "Firehose Harvest Evidence" in markdown_path.read_text(encoding="utf-8")
+    markdown = markdown_path.read_text(encoding="utf-8")
+    assert "Firehose Harvest Evidence" in markdown
+    assert "0.70_usd" in markdown
+    assert "wins_erased_by_bucket" in markdown
+    assert "round_trips_per_hour:" in markdown
+    assert "max_loss_usd: `NO_COMPLETE_LIFECYCLE_EVIDENCE`" in markdown
+    assert "profit_capture_ratio: 0.6875" in markdown
+    assert "Policy comparison: `OK`" in markdown
+
+
+def test_cli_includes_costed_oos_replay_comparison(tmp_path):
+    journal = tmp_path / "journal.jsonl"
+    replay = tmp_path / "replay.jsonl"
+    json_out = tmp_path / "report.json"
+    markdown_out = tmp_path / "report.md"
+    journal.write_text("\n".join(json.dumps(event) for event in COMPLETE_TICKET_EVENTS) + "\n", encoding="utf-8")
+    replay.write_text("\n".join(json.dumps(row) for row in COSTED_OOS_ROWS) + "\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).parents[1] / "scripts" / "analyze_firehose_harvest.py"),
+            "--journal",
+            str(journal),
+            "--replay",
+            str(replay),
+            "--json-out",
+            str(json_out),
+            "--markdown-out",
+            str(markdown_out),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(json_out.read_text(encoding="utf-8"))["policy_comparison"]["winner"] == "higher_expectancy_policy"
