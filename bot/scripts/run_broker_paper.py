@@ -58,6 +58,10 @@ from aegis.risk import RiskEngine  # noqa: E402
 from aegis.sizing import ContractSpec, size_lots_for_risk  # noqa: E402
 from aegis.strategy import prepare, signal_from_row  # noqa: E402
 from aegis.intel.firehose_basket import BasketMetadataStore  # noqa: E402
+from aegis.intel.firehose_runtime_evidence import (  # noqa: E402
+    attach_runtime_evidence,
+    build_runtime_snapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -2051,6 +2055,30 @@ def main() -> None:
                                     trace["cost_usd"] = None
                                     trace["liquidation_bid"] = _cur_bid
                                     trace["liquidation_ask"] = _cur_ask
+                                    if _ticket_meta is not None and _ticket_meta.basket_id:
+                                        evidence = build_runtime_snapshot(
+                                            ticket={
+                                                "ticket_id": tk,
+                                                "basket_id": _ticket_meta.basket_id,
+                                                "side": _ticket_meta.side,
+                                                "entry_price": _ticket_meta.entry_price,
+                                                "initial_risk_usd": _ticket_meta.initial_risk,
+                                            },
+                                            basket={
+                                                "basket_id": _ticket_meta.basket_id,
+                                                "hypothesis_id": _ticket_meta.hypothesis_id,
+                                                "family": _ticket_meta.strategy_family,
+                                                "symbol": _ticket_meta.symbol,
+                                            },
+                                            marks=live_marks.get(_sym, {}),
+                                            observed_at=fast_exit_ctx.now_ts,
+                                            costs=_ticket_meta.cost_evidence or {},
+                                            momentum={},
+                                            remaining_ev={"value": _rem_ev, "observed_at": fast_exit_ctx.now_ts},
+                                        )
+                                    else:
+                                        evidence = {"status": "NO_EVIDENCE", "reason": "missing_exact_basket_ownership"}
+                                    trace = attach_runtime_evidence(trace, evidence)
                                     firehose_turnover.record_exit_trace(
                                         tk, observed_at=fast_exit_ctx.now_ts, mfe_usd=trace["mfe_usd"],
                                     )

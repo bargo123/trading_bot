@@ -93,3 +93,12 @@ def evaluate_runtime_policy(snapshot: Mapping[str, Any], artifact: Mapping[str, 
     ):
         return {"action": "NO_EVIDENCE", "reason": "missing_validated_policy_artifact"}
     return {"action": "NOT_IMPLEMENTED", "reason": "activation_requires_governed_runtime_contract"}
+
+
+def attach_runtime_evidence(trace: Mapping[str, Any], evidence: Mapping[str, Any]) -> dict[str, Any]:
+    """Annotate an existing trace without deriving unavailable measurements."""
+    result = dict(trace)
+    result["evidence_status"] = str(evidence.get("status") or "NO_EVIDENCE")
+    if evidence.get("reason") is not None:
+        result["evidence_reason"] = str(evidence["reason"])
+    return result

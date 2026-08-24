@@ -237,6 +237,21 @@ def basket_lifecycle_trace(
         "session": metadata.session,
         "slot_released": bool(slot_released),
         "basket_closed": bool(basket_closed),
+        **{
+            key: values[key]
+            for key in (
+                "evidence_status",
+                "liquidation_mark",
+                "liquidation_mark_side",
+                "return_5s",
+                "return_15s",
+                "return_30s",
+                "remaining_ev_status",
+                "spread_usd",
+                "commission_usd",
+            )
+            if key in values
+        },
     }
 
 

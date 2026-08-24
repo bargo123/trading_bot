@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from aegis.intel.firehose_runtime_evidence import (
+    attach_runtime_evidence,
     build_runtime_snapshot,
     evaluate_runtime_policy,
 )
@@ -117,4 +118,18 @@ def test_policy_evaluation_rejects_untrusted_artifact():
     assert decision == {
         "action": "NO_EVIDENCE",
         "reason": "missing_validated_policy_artifact",
+    }
+
+
+def test_trace_annotation_preserves_no_evidence_reason_without_creating_metrics():
+    trace = attach_runtime_evidence(
+        {"event": "firehose_exit_trace", "ticket": "1001"},
+        {"status": "NO_EVIDENCE", "reason": "missing_cost_evidence"},
+    )
+
+    assert trace == {
+        "event": "firehose_exit_trace",
+        "ticket": "1001",
+        "evidence_status": "NO_EVIDENCE",
+        "evidence_reason": "missing_cost_evidence",
     }

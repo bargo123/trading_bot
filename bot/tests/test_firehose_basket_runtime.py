@@ -104,6 +104,35 @@ def test_trace_skips_unconfirmed_or_legacy_ticket_without_basket_ownership():
         confirmed=False,
         observation=_close_observation(),
     ) is None
+
+
+def test_confirmed_basket_trace_retains_point_in_time_evidence_fields():
+    trace = basket_lifecycle_trace(
+        _basket_metadata(),
+        event="firehose_exit_trace",
+        timestamp="2026-08-24T10:00:10+00:00",
+        confirmed=True,
+        observation={
+            "evidence_status": "OBSERVED",
+            "liquidation_mark": 1.1002,
+            "liquidation_mark_side": "BID",
+            "return_5s": 0.0001,
+            "return_15s": 0.0002,
+            "return_30s": 0.0003,
+            "remaining_ev": 0.04,
+            "remaining_ev_status": "OBSERVED",
+            "spread_usd": 0.01,
+            "commission_usd": 0.02,
+            "decision_reasons": ["missing_validated_policy_artifact"],
+        },
+    )
+
+    assert trace["evidence_status"] == "OBSERVED"
+    assert trace["liquidation_mark"] == 1.1002
+    assert trace["liquidation_mark_side"] == "BID"
+    assert trace["return_5s"] == 0.0001
+    assert trace["remaining_ev_status"] == "OBSERVED"
+    assert trace["commission_usd"] == 0.02
     legacy = create_ticket_metadata(
         ticket="legacy",
         hypothesis_id="hyp-legacy",
