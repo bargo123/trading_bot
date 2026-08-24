@@ -439,15 +439,6 @@ def test_factory_initializes_defined_collaborators(monkeypatch, tmp_path):
     ):
         (tmp_path / name).write_text("{}")
 
-    class UnavailableCodex:
-        codex_path = None
-
-        def __init__(self, budget):
-            self.budget = budget
-
-        def is_available(self):
-            return False
-
     analogue_store = object()
     monkeypatch.setattr(research_factory_core, "INTEL_DIR", tmp_path)
     monkeypatch.setattr(research_factory_core, "ensure_intel_dirs", lambda: None)
@@ -455,11 +446,10 @@ def test_factory_initializes_defined_collaborators(monkeypatch, tmp_path):
         research_factory_core.AnalogueStore, "load", lambda path: analogue_store
     )
     monkeypatch.setattr(research_factory_core, "load_losses", lambda: [])
-    monkeypatch.setattr(research_factory_core, "CodexClient", UnavailableCodex)
 
     factory = object.__new__(ResearchFactory)
-    factory.codex_budget = 0
     factory.claude_enabled = False
+    factory.state = ResearchState()
     factory._init_components()
 
     assert factory.analogue_store is analogue_store
@@ -471,8 +461,77 @@ def test_factory_initializes_defined_collaborators(monkeypatch, tmp_path):
     assert isinstance(factory.feature_engineer, FeatureEngineer)
     assert isinstance(factory.ml_pipeline, research_factory_core.MLPipeline)
     assert factory.losses == []
-    assert isinstance(factory.codex_client, UnavailableCodex)
-    assert factory.claude_client is None
+    assert factory.state.claude_available is False
+
+
+@pytest.mark.parametrize(
+    "agent_result",
+    [
+        {"ok": False, "status": "UNAVAILABLE_CLI", "error": "CLI not found"},
+        {"ok": True, "status": "AVAILABLE", "output": "not a serialized hypothesis"},
+    ],
+)
+def test_claude_adapter_failure_or_malformed_output_never_registers_hypothesis(
+    monkeypatch, agent_result
+):
+    """Accepting adapter failure or malformed text would fabricate a hypothesis."""
+    monkeypatch.setattr(
+        research_factory_core,
+        "ask_research_agent",
+        lambda *args, **kwargs: agent_result,
+    )
+    persisted = []
+    monkeypatch.setattr(research_factory_core, "record_outcome", lambda *args: persisted.append(args))
+
+    factory = object.__new__(ResearchFactory)
+    factory.state = ResearchState(claude_available=True)
+    factory.losses = []
+    factory.experiment_registry = object()
+    factory.agent_budget_ledger = object()
+    factory.reports_dir = Path(tempfile.mkdtemp())
+
+    factory._ask_claude_for_new_direction()
+
+    assert factory.state.hypothesis_registry == {}
+    assert factory.state.last_generation_status == "FAILED"
+    assert "Claude" in factory.state.last_generation_reason
+    assert persisted
+
+
+def test_public_factory_construction_does_not_start_an_agent_process(monkeypatch, tmp_path):
+    """Reintroducing a local client probe would create a process during construction."""
+    for name in (
+        "knowledge_table.json",
+        "cost_profiles.json",
+        "validated_states.json",
+        "validated_opportunities.json",
+    ):
+        (tmp_path / name).write_text("{}")
+
+    monkeypatch.setattr(research_factory_core, "INTEL_DIR", tmp_path)
+    monkeypatch.setattr(research_factory_core, "ensure_intel_dirs", lambda: None)
+    monkeypatch.setattr(research_factory_core.AnalogueStore, "load", lambda path: object())
+    monkeypatch.setattr(research_factory_core, "load_losses", lambda: [])
+    monkeypatch.setattr(
+        research_factory_core,
+        "ask_research_agent",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("no agent ask during construction")),
+    )
+    import ai_council.agents as agent_cli
+
+    monkeypatch.setattr(
+        agent_cli.subprocess,
+        "Popen",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("no process during construction")),
+    )
+
+    factory = ResearchFactory(
+        profit_barrier_pct=0.01,
+        loss_barrier_pct=0.01,
+        reports_dir=tmp_path / "reports",
+    )
+
+    assert factory.agent_budget_ledger.remaining("codex") == 0
 
 
 if __name__ == "__main__":

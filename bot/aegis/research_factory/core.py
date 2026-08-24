@@ -2,15 +2,12 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 import time
 import hashlib
 import argparse
 import logging
 import random
-import subprocess
-import shutil
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +40,7 @@ from aegis.research_factory.evaluation import record_outcome
 from aegis.research_factory.hypothesis import Hypothesis, HypothesisOrigin
 from aegis.research_factory.rules import compile_hypothesis
 from aegis.research_factory.walk_forward import walk_forward_evaluate
+from ai_council.live import AgentBudgetLedger, ask_research_agent
 
 # Configure logging
 logging.basicConfig(
@@ -102,204 +100,6 @@ def load_losses() -> List[Dict[str, Any]]:
             except Exception:
                 pass
     return losses
-
-
-# ============================================================
-# CODEX INTEGRATION
-# ============================================================
-
-class CodexClient:
-    """Codex CLI integration for automated code generation and analysis."""
-    
-    def __init__(self, budget: int = 1):
-        self.budget = budget
-        self.calls_used = 0
-        self.codex_path = self._find_codex()
-        
-    def _find_codex(self) -> Optional[str]:
-        """Find Codex CLI executable."""
-        # Check common locations
-        paths = [
-            "codex",  # In PATH
-            shutil.which("codex"),
-            os.path.expanduser("~/.local/bin/codex"),
-            os.path.expanduser("~/.codex/bin/codex"),
-            "/usr/local/bin/codex",
-            "/opt/homebrew/bin/codex",
-        ]
-        for p in paths:
-            if p and os.path.exists(p):
-                return p
-        return None
-    
-    def is_available(self) -> bool:
-        """Check if Codex CLI is available."""
-        return self.codex_path is not None and self.calls_used < self.budget
-    
-    def execute(self, prompt: str, timeout: int = 120) -> Dict[str, Any]:
-        """Execute Codex with a prompt."""
-        if not self.is_available():
-            return {"success": False, "error": "Codex not available or budget exhausted"}
-        
-        try:
-            # Use Codex CLI with prompt
-            cmd = [self.codex_path, "exec", "--prompt", prompt]
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                cwd=ROOT
-            )
-            
-            self.calls_used += 1
-            
-            return {
-                "success": result.returncode == 0,
-                "output": result.stdout,
-                "error": result.stderr if result.returncode != 0 else None,
-                "returncode": result.returncode,
-                "calls_used": self.calls_used,
-                "budget_remaining": self.budget - self.calls_used
-            }
-        except subprocess.TimeoutExpired:
-            return {"success": False, "error": f"Codex timed out after {timeout}s"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def get_status(self) -> Dict[str, Any]:
-        """Get Codex status."""
-        return {
-            "available": self.is_available(),
-            "path": self.codex_path,
-            "calls_used": self.calls_used,
-            "budget": self.budget,
-            "budget_remaining": self.budget - self.calls_used
-        }
-
-
-# ============================================================
-# CLAUDE INTEGRATION
-# ============================================================
-
-# ============================================================
-# CLAUDE CLI INTEGRATION
-# ============================================================
-
-class ClaudeClient:
-    """Claude CLI integration for hypothesis generation."""
-    
-    def __init__(self, model: str = "claude-3-opus-20240229"):
-        self.model = model
-        self.claude_path = self._find_claude()
-        self.calls_made = 0
-        
-    def _find_claude(self) -> Optional[str]:
-        """Find Claude CLI executable."""
-        paths = [
-            "claude",  # In PATH
-            shutil.which("claude"),
-            shutil.which("claude.cmd"),
-            os.path.expanduser("~/.local/bin/claude"),
-            os.path.expanduser("~/.claude/bin/claude"),
-            "/usr/local/bin/claude",
-            "/opt/homebrew/bin/claude",
-        ]
-        for p in paths:
-            if p and os.path.exists(p):
-                return p
-        return None
-    
-    def is_available(self) -> bool:
-        """Check if Claude CLI is available."""
-        return self.claude_path is not None
-    
-    def generate_hypothesis(self, context: str, timeout: int = 60) -> Dict[str, Any]:
-        """Generate a hypothesis using Claude CLI."""
-        if not self.is_available():
-            return {"success": False, "error": "Claude CLI not available"}
-        
-        try:
-            prompt = f"""You are a quantitative researcher. Based on the following research context, generate ONE falsifiable hypothesis to reduce losses.
-
-{context}
-
-Respond in this exact format:
-HYPOTHESIS: <one sentence>
-PROBLEM: <specific loss mechanism>
-MECHANISM: <why this happens>
-ENTRY: <precise entry rule>
-EXIT: <precise exit rule>
-FALSIFICATION: <what would prove this wrong>
-"""
-            
-            # Use Claude CLI with --print for non-interactive output
-            cmd = [
-                self.claude_path,
-                "--print",
-                "--model", self.model,
-                "--system-prompt", "You are a quantitative researcher specializing in identifying and eliminating loss mechanisms in algorithmic trading.",
-                prompt
-            ]
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                cwd=ROOT
-            )
-            
-            self.calls_made += 1
-            
-            if result.returncode != 0:
-                return {"success": False, "error": f"Claude CLI failed: {result.stderr}"}
-            
-            content = result.stdout.strip()
-            
-            # Parse the response
-            hypothesis = self._parse_response(content)
-            hypothesis["raw_response"] = content
-            
-            return {"success": True, "hypothesis": hypothesis, "raw_response": content}
-            
-        except subprocess.TimeoutExpired:
-            return {"success": False, "error": f"Claude CLI timed out after {timeout}s"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def _parse_response(self, response: str) -> Dict[str, Any]:
-        """Parse Claude's structured response."""
-        hyp_data = {}
-        for line in response.strip().split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                hyp_data[key.strip().lower().replace(' ', '_')] = value.strip()
-        
-        return {
-            "hypothesis": hyp_data.get("hypothesis", ""),
-            "problem": hyp_data.get("problem", ""),
-            "mechanism": hyp_data.get("mechanism", ""),
-            "entry": hyp_data.get("entry", ""),
-            "exit": hyp_data.get("exit", ""),
-            "falsification": hyp_data.get("falsification", ""),
-        }
-    
-    def get_status(self) -> Dict[str, Any]:
-        """Get Claude CLI status."""
-        return {
-            "available": self.is_available(),
-            "model": self.model,
-            "calls_made": self.calls_made,
-            "path": self.claude_path
-        }
-
-
-# Configure logging
-    """Market state for the research factory."""
-    CLOSED = "CLOSED"
-    WEEKEND_RESEARCH = "WEEKEND_RESEARCH"
-    OPEN = "OPEN"
 
 
 class LossClass(Enum):
@@ -448,6 +248,7 @@ class ResearchFactory:
         loss_barrier_pct: float,
         label_horizon: int = 20,
         source_roots: Optional[List[Path]] = None,
+        reports_dir: Optional[Path] = None,
     ):
         self.profit_barrier_pct = _positive_barrier(
             "profit_barrier_pct", profit_barrier_pct
@@ -479,8 +280,11 @@ class ResearchFactory:
 
         # Initialize paths
         self.state_path = Path("C:/Users/Zaid barghouthi/Desktop/trading_bot/bot/reports") / "research_factory" / "state.json"
-        self.reports_dir = Path("C:/Users/Zaid barghouthi/Desktop/trading_bot/bot/reports") / "research_factory"
+        self.reports_dir = reports_dir or Path("C:/Users/Zaid barghouthi/Desktop/trading_bot/bot/reports") / "research_factory"
         self.reports_dir.mkdir(parents=True, exist_ok=True)
+        self.agent_budget_ledger = AgentBudgetLedger(
+            self.reports_dir / "agent_budgets.json"
+        )
 
         # Load or create state
         if resume and self.state_path.exists():
@@ -513,21 +317,8 @@ class ResearchFactory:
         # Initialize loss database
         self.losses = load_losses()
 
-        # Initialize Codex client
-        self.codex_client = CodexClient(budget=self.codex_budget)
-        if self.codex_client.is_available():
-            logger.info(f"Codex CLI available at: {self.codex_client.codex_path}")
-        else:
-            logger.warning("Codex CLI not available or budget exhausted")
-
-        # Initialize Claude client
-        self.claude_client = None
-        if self.claude_enabled:
-            self.claude_client = ClaudeClient()
-            if self.claude_client.is_available():
-                logger.info(f"Claude API available (model: {self.claude_client.model})")
-            else:
-                logger.warning("Claude API not available (no API key or client init failed)")
+        # Availability is determined only by a real shared-adapter ask.
+        self.state.claude_available = self.claude_enabled
 
         logger.info("All components initialized")
 
@@ -1238,40 +1029,36 @@ Live trading: DISABLED
     
     def _ask_claude_for_new_direction(self) -> None:
         """Ask Claude for a new research direction with streaming output."""
-        if not self.state.claude_available or not self.claude_client or not self.claude_client.is_available():
-            self._log_event("CLAUDE", "Claude API not available, skipping")
+        if not self.state.claude_available:
+            self._log_event("CLAUDE", "Claude research is disabled, skipping")
             return
 
         self._log_event("CLAUDE", "Requesting new research direction from Claude")
         
-        # Prepare context for Claude
         context = self._prepare_claude_context()
-        
-        # Call real Claude API
         try:
-            result = self.claude_client.generate_hypothesis(context)
-            if result["success"]:
-                hypothesis = result["hypothesis"]
-                self._log_event("CLAUDE", f"New hypothesis from Claude: {hypothesis.hypothesis_id}")
-                # Register and test
-                self.state.hypothesis_registry[hypothesis.hypothesis_id] = hypothesis
-            else:
-                self._log_event("CLAUDE", f"Claude API error: {result.get('error', 'Unknown error')}")
-                # Fallback to simulation
-                response = self._simulate_claude_response()
-                hypothesis = self._parse_claude_hypothesis(response)
-                if hypothesis:
-                    self._log_event("CLAUDE", f"New hypothesis from Claude (fallback): {hypothesis.hypothesis_id}")
-                    self.state.hypothesis_registry[hypothesis.hypothesis_id] = hypothesis
-        except Exception as e:
-            logger.error(f"Claude API call failed: {e}")
-            self._log_event("CLAUDE", f"Claude API call failed: {e}")
-            # Fallback to simulation
-            response = self._simulate_claude_response()
-            hypothesis = self._parse_claude_hypothesis(response)
-            if hypothesis:
-                self._log_event("CLAUDE", f"New hypothesis from Claude (fallback): {hypothesis.hypothesis_id}")
-                self.state.hypothesis_registry[hypothesis.hypothesis_id] = hypothesis
+            result = ask_research_agent(
+                "claude",
+                context,
+                ledger=self.agent_budget_ledger,
+                line_sink=lambda line: self._log_event("CLAUDE", line),
+                cwd=ROOT,
+            )
+        except Exception as exc:
+            self._record_generation_outcome("FAILED", f"Claude adapter failed: {exc}")
+            return
+        if not result.get("ok"):
+            self._record_generation_outcome(
+                "FAILED", f"Claude agent failed: {result.get('error', result.get('status', 'unknown error'))}"
+            )
+            return
+        try:
+            hypothesis = Hypothesis.from_dict(result["parsed"])
+        except (KeyError, TypeError, ValueError) as exc:
+            self._record_generation_outcome("FAILED", f"Claude output was malformed: {exc}")
+            return
+        self.state.hypothesis_registry[hypothesis.hypothesis_id] = hypothesis
+        self._log_event("CLAUDE", f"New hypothesis from Claude: {hypothesis.hypothesis_id}")
 
     def _prepare_claude_context(self) -> str:
         """Prepare context for Claude."""
@@ -1307,126 +1094,14 @@ Live trading: DISABLED
         for l in losses:
             cls = l.get("loss_class", "UNKNOWN")
             classes[cls] = classes.get(cls, 0) + 1
-        return "\n".join([f"  {k}: {v}" for k, v in 
-                         sorted(classes.items(), key=lambda x: x[1], reverse=True)[:5]])
-
-    def _simulate_claude_response(self) -> str:
-        """Simulate Claude response for testing (replace with real API call)."""
-        return """
-        HYPOTHESIS: Adverse selection on breakout entries during low liquidity sessions
-        PROBLEM: 34% of losses are ADVERSE_SELECTION during asia session breakouts
-        MECHANISM: During asia session, breakout entries face informed counter-parties
-        ENTRY: Only enter breakouts when volume > 2x avg and spread < p50
-        EXIT: Exit on volume drop > 50% or spread expansion > 2x
-        FALSIFICATION: If asia breakouts with high volume/low spread still lose, hypothesis wrong
-        """
-
-    def _parse_claude_hypothesis(self, response: str) -> Optional[Hypothesis]:
-        """Parse Claude's response into a hypothesis."""
-        try:
-            lines = response.strip().split('\n')
-            hyp_data = {}
-            for line in lines:
-                if ':' in line:
-                    key, value = line.split(':', 1)
-                    hyp_data[key.strip().lower()] = value.strip()
-            
-            if not hyp_data.get('hypothesis') and not hyp_data.get('problem'):
-                return None
-            
-            return Hypothesis(
-                hypothesis_id=f"hyp_claude_{int(time.time())}",
-                origin=HypothesisOrigin.NOVEL_SYNTHESIZED,
-                problem=hyp_data.get('problem', 'Claude proposed hypothesis'),
-                proposed_mechanism=hyp_data.get('mechanism', 'Claude proposed mechanism'),
-                features_required=["regime", "structure", "volatility", "momentum", "session", "volume", "spread"],
-                entry_rule=hyp_data.get('entry', 'Claude proposed entry'),
-                exit_rule=hyp_data.get('exit', 'Claude proposed exit'),
-                expected_effect="Reduce adverse selection losses",
-                falsification_criterion=hyp_data.get('falsification', 'Test fails OOS'),
-                training_period="2024-01-01 to 2024-06-30",
-                validation_period="2024-07-01 to 2024-09-30",
-                book_evidence=[],
-                ml_evidence={"source": "claude"},
-            )
-        except Exception as e:
-            logger.warning(f"Failed to parse Claude hypothesis: {e}")
-            return None
-
-    def _should_promote_challenger(self) -> bool:
-        """Check if challenger should be promoted to champion."""
-        if not self.state.challenger or not self.state.champion:
-            return False
-
-        challenger_metrics = self.state.challenger.metrics
-        champion_metrics = self.state.champion.metrics
-
-        # Challenger must beat champion on key metrics
-        return (
-            challenger_metrics["expectancy"] > champion_metrics["expectancy"] and
-            challenger_metrics["profit_factor"] > champion_metrics["profit_factor"] and
-            challenger_metrics["max_drawdown"] <= champion_metrics["max_drawdown"] * 1.1
+        return "\n".join(
+            f"  {key}: {count}"
+            for key, count in sorted(classes.items(), key=lambda item: item[1], reverse=True)[:5]
         )
 
-    def _should_promote_challenger(self) -> bool:
-        """Promote challenger to champion."""
-        self.state.champion = self.state.challenger
-        self.state.challenger = None
-        self._log_event("CHAMPION", f"NEW CHAMPION: {self.state.champion.hypothesis_id}")
-
-    def _check_plateau(self) -> bool:
-        """Check if research has plateaued."""
-        if len(self.state.experiments) < 20:
-            return False
-
-        recent = self.state.experiments[-10:]
-        improvements = [e.metrics.get("expectancy", 0) for e in recent]
-        return max(improvements) - min(improvements) < 0.01
-
-    def _ask_claude_for_new_direction(self) -> None:
-        """Ask Claude for a new research direction."""
-        if not self.state.claude_available:
-            return
-
-        # This would call the Claude API
-        # For now, just log
-        self._log_event("CLAUDE", "Requesting new research direction from Claude")
-        # In real implementation, would call Claude API
-
-    def _log_learning(self) -> None:
-        """Log learning from this generation."""
-        if not self.state.experiments:
-            return
-
-        latest = self.state.experiments[-1]
-        self._log_event("LEARNING", f"Generation {self.state.generation} learning",
-                       hypothesis=latest.hypothesis_id,
-                       decision=latest.decision,
-                       metrics=latest.metrics)
-
-    def save_report(self) -> None:
-        """Save final weekend report."""
-        report = {
-            "generation": self.state.generation,
-            "champion": asdict(self.state.champion) if self.state.champion else None,
-            "total_experiments": len(self.state.experiments),
-            "rejected": len([e for e in self.state.experiments if e.decision == "REJECTED"]),
-            "challengers": len([e for e in self.state.experiments if e.decision == "CHALLENGER"]),
-            "champions": len([e for e in self.state.experiments if e.decision == "CHAMPION"]),
-            "failed_hypotheses": self.state.failed_hypotheses,
-            "dataset_fingerprint": self.state.dataset_fingerprint,
-            "codex_calls": self.state.codex_calls,
-            "claude_available": self.state.claude_available,
-            "final_generation": self.state.generation,
-        }
-
-        report_path = self.reports_dir / "final_weekend_report.json"
-        report_path.write_text(json.dumps(report, indent=2, default=str))
-        logger.info(f"Final report saved to {report_path}")
-
-
-
-def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
+    def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
+        """Return whether this hypothesis is already registered."""
+        return hypothesis_id in self.state.hypothesis_registry
 
     def _test_hypothesis(
         self,
