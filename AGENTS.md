@@ -5,8 +5,60 @@ trading bot. Everything here is **research-only unless explicitly governed**.
 
 ## Non-negotiable safety rules
 
-1. **Never trade.** No order placement, no `allow_live`, no live account access.
-   MT5 terminal access is **read-only** (fetch bars/quotes, never trade).
+1. ## MT5 Trading Policy
+
+MT5 DEMO order execution is explicitly allowed for the designated AEGIS Firehose execution runner.
+
+Allowed:
+- MT5 DEMO accounts only
+- `engine: mt5`
+- `mode: mt5_demo`
+- `allow_live: false`
+- `paper_trading_enabled: true`
+- `dry_run: false`
+- actual DEMO `mt5.order_send()` through the existing governed Firehose execution path
+- opening, modifying, and closing DEMO positions
+- exactly one broker-execution owner process
+
+The designated execution owner is:
+`bot/scripts/run_broker_paper.py`
+
+Research components remain strictly read-only:
+- AI Council
+- Claude
+- Hermes/free-model Council agents
+- Research Factory
+- Research Fast Watcher
+- Book Brain
+- research probes
+- historical/ML processes
+
+These components must never call `mt5.order_send()` or directly modify broker positions.
+
+STRICTLY FORBIDDEN:
+- real-money/live account execution
+- `allow_live: true`
+- bypassing the DEMO account check
+- submitting orders from Council/Research processes
+- silently increasing configured trading risk
+- duplicate broker execution processes
+
+Before any MT5 mutation, the runtime must verify:
+- account is DEMO/contest
+- `allow_live == false`
+- `mode == mt5_demo`
+- `paper_trading_enabled == true`
+- terminal `trade_allowed == true`
+- account `trade_expert == true`
+
+If the account is not DEMO, fail closed and submit no order.
+
+The Firehose may place actual MT5 DEMO positions when its existing strategy,
+risk, quote, spread, economics, OMS, portfolio, and execution gates authorize
+a trade.
+
+Do not force trades merely to demonstrate execution.
+
 2. **Never edit live trading YAML.** `bot/config*.yaml`,
    `bot/aegis/research/ingest.py`'s `PROTECTED_LIVE_YAML`, and any runner
    config are immutable. Research configs are separate and safe.
