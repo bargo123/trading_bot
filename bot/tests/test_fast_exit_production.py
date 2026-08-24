@@ -10,7 +10,11 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
 from aegis.intel.fast_firehose import ExitAction, FastExitConfig, FastExitStateMachine
-from aegis.intel.fast_exit_runner import FastExitContext, evaluate_fast_exit, pip_size_for
+from aegis.intel.fast_exit_runner import (
+    FastExitContext, build_harvest_input, evaluate_fast_exit,
+    firehose_exit_trace, pip_size_for,
+)
+from aegis.intel.quote_buffer import QuoteBuffer
 from aegis.intel.broker_math import BrokerSymbolSpec
 from aegis.intel.ticket_metadata import TicketMetadata, create_ticket_metadata
 
@@ -57,6 +61,13 @@ class TestFastExitProductionHelper:
         engine_spec: Optional[Mapping[str, Any]] = None,
         intelligent_brain: Optional[Any] = None,
         live_marks: Optional[Mapping[str, Mapping[str, float]]] = None,
+        quote_buffer=None,
+        remaining_ev=None,
+        remaining_ev_status="UNKNOWN",
+        observed_spread_r=None,
+        observed_slippage_r=None,
+        observed_commission_r=None,
+        spread_normal=None,
     ) -> FastExitContext:
         """Create a test context with sensible defaults."""
         live_marks = live_marks or {symbol: {"bid": current_bid, "ask": current_ask}}
@@ -102,6 +113,13 @@ class TestFastExitProductionHelper:
             intelligent_brain=brain,
             profit_manager=profit_manager,
             now_ts=now_ts,
+            quote_buffer=quote_buffer,
+            remaining_ev=remaining_ev,
+            remaining_ev_status=remaining_ev_status,
+            observed_spread_r=observed_spread_r,
+            observed_slippage_r=observed_slippage_r,
+            observed_commission_r=observed_commission_r,
+            spread_normal=spread_normal,
         )
 
     def test_buy_uses_bid(self):
@@ -266,6 +284,65 @@ class TestFastExitProductionHelper:
         )
         verdict = evaluate_fast_exit(ctx)
         assert verdict["action"] != "ERROR"
+
+
+class TestFirehoseHarvestAdapter:
+    def _context(self, *, side="buy", ticket_meta=None, quote_buffer=None):
+        helper = TestFastExitProductionHelper()
+        meta = ticket_meta or create_ticket_metadata(
+            ticket="T_HARVEST", hypothesis_id="hyp", thesis_key="thesis",
+            strategy_family="micro", expected_mechanism="test", side=side,
+            entry_price=1.10000, stop_loss=1.09900 if side == "buy" else 1.10100,
+            target_price=1.10200 if side == "buy" else 1.09800, max_hold_s=120,
+            regime="trend", session="london", symbol="EURUSD",
+        )
+        meta.opened_ts = 1000.0
+        return helper.create_context(
+            ticket="T_HARVEST", side=side, ticket_meta=meta,
+            stop_loss=meta.stop_loss, quote_buffer=quote_buffer,
+            remaining_ev=0.2, remaining_ev_status="ESTIMATED",
+            observed_spread_r=0.01, observed_slippage_r=0.01,
+            observed_commission_r=0.01, spread_normal=True,
+        )
+
+    def _quotes(self):
+        quotes = QuoteBuffer()
+        for timestamp, bid, ask in ((1000.0, 1.10000, 1.10002), (1015.0, 1.10010, 1.10012),
+                                    (1025.0, 1.10020, 1.10022), (1030.0, 1.10030, 1.10032)):
+            quotes.record("EURUSD", timestamp, bid, ask)
+        return quotes
+
+    def test_buy_harvest_uses_bid_and_sell_harvest_uses_ask(self):
+        buy = self._context(quote_buffer=self._quotes())
+        sell = self._context(side="sell", quote_buffer=self._quotes())
+        assert build_harvest_input(buy).liquidation_mark == buy.current_bid
+        assert build_harvest_input(sell).liquidation_mark == sell.current_ask
+
+    def test_exact_ticket_metadata_supplies_stop_target_and_opened_time(self):
+        ctx = self._context(quote_buffer=self._quotes())
+        harvest = build_harvest_input(ctx)
+        assert harvest.opened_ts == ctx.ticket_meta.opened_ts
+        assert harvest.stop_loss == ctx.ticket_meta.stop_loss
+        assert harvest.target_price == ctx.ticket_meta.target_price
+
+    def test_missing_quote_history_keeps_existing_safety_hold(self):
+        ctx = self._context(quote_buffer=QuoteBuffer())
+        ctx.mfe_usd = 0.0
+        assert build_harvest_input(ctx) is None
+        assert evaluate_fast_exit(ctx)["action"] == "HOLD"
+
+    def test_unvalidated_harvester_keeps_legacy_ev_behavior(self):
+        ctx = self._context(quote_buffer=QuoteBuffer())
+        ctx.mfe_usd = 0.0
+        ctx.remaining_ev = -1.0
+        assert evaluate_fast_exit(ctx)["action"] == "HOLD"
+
+    def test_trace_contains_observed_values_and_nulls_for_unavailable_evidence(self):
+        ctx = self._context(quote_buffer=QuoteBuffer())
+        trace = firehose_exit_trace(ctx, {"action": "HOLD", "reason": "test"})
+        assert {"pnl_r", "mfe_r", "profit_floor_r", "return_5s_r", "remaining_ev", "reason"} <= trace.keys()
+        assert trace["return_5s_r"] is None
+        assert trace["profit_floor_r"] is None
 
 
 class TestFastExitRunnerIntegration:

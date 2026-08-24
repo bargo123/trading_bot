@@ -80,6 +80,11 @@ class HarvestInput:
     observed_spread_r: float | None
     observed_slippage_r: float | None
     observed_commission_r: float | None
+    # Adapter evidence retained for audit traces; not policy thresholds.
+    liquidation_mark: float | None = None
+    opened_ts: float | None = None
+    stop_loss: float | None = None
+    target_price: float | None = None
 
     @property
     def observed_cost_r(self) -> float | None:

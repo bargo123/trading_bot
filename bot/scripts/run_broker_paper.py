@@ -207,6 +207,8 @@ def main() -> None:
     # Exact ticket->hypothesis metadata persistence
     from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
     ticket_metadata_store = TicketMetadataStore(ROOT / "intel" / "ticket_metadata.json")
+    from aegis.intel.firehose_turnover import FirehoseReentryGuard, confirmed_close_cleanup
+    firehose_reentry_guard = FirehoseReentryGuard()
     # Intelligent per-thesis profit management (spec B-H, O, P).
     from aegis.intel.profit_management import ProfitManager
 
@@ -215,7 +217,10 @@ def main() -> None:
     )
     # Fast exit state machine for FAST_TURNOVER_FIREHOSE tickets.
     from aegis.intel.fast_firehose import FastExitStateMachine, FastExitConfig
-    from aegis.intel.fast_exit_runner import FastExitContext, evaluate_fast_exit, MissingLiquidationMarkError
+    from aegis.intel.fast_exit_runner import (
+        FastExitContext, evaluate_fast_exit, firehose_exit_trace,
+        MissingLiquidationMarkError,
+    )
 
     fast_exit_sm = FastExitStateMachine()
     last_inventory_journal: dict[str, float] = {"ts": 0.0}
@@ -778,6 +783,28 @@ def main() -> None:
                         )
                     if decision.action != "hold" and firehose_consume_bar(no_signal=True):
                         last_bar_time[sym] = bar_time
+                    return
+                _thesis_key = str(decision.journal.get("thesis_key") or "")
+                _quote_fingerprint = "|".join((
+                    sym,
+                    str(decision.side or "").lower(),
+                    str(float(q.bid)),
+                    str(float(q.ask)),
+                ))
+                _reentry_ok, _reentry_reason = firehose_reentry_guard.allows(
+                    _thesis_key, _quote_fingerprint, now_ts,
+                )
+                if not _reentry_ok:
+                    append_journal(
+                        journal,
+                        {
+                            "event": "open_skip",
+                            "symbol": sym,
+                            "reason": _reentry_reason,
+                            "thesis_key": _thesis_key,
+                            "bar": str(bar_time),
+                        },
+                    )
                     return
                 sig = Signal(
                     decision.side or "buy",
@@ -1781,6 +1808,29 @@ def main() -> None:
                                     _entry_px = float(getattr(pos, "avg_price", 0) or 0)
                                     _cur_bid = live_marks.get(_sym, {}).get("bid")
                                     _cur_ask = live_marks.get(_sym, {}).get("ask")
+                                    # Spread is observed at the current executable
+                                    # quote. Slippage/commission remain unavailable
+                                    # unless the broker supplies them, preserving the
+                                    # harvester's fail-closed evidence requirement.
+                                    _spread_r = None
+                                    try:
+                                        _spec_cost = BrokerSymbolSpec.from_mapping(
+                                            eng.symbol_spec(_sym) if hasattr(eng, "symbol_spec") else None
+                                        )
+                                        _risk_usd = abs(
+                                            _entry_px - float(getattr(pos, "stop_loss", 0) or 0)
+                                        ) * _spec_cost.usd_per_price_unit_per_lot() * float(
+                                            getattr(pos, "quantity", 0) or 0
+                                        )
+                                        if _cur_bid and _cur_ask and _risk_usd > 0:
+                                            _spread_r = (
+                                                (float(_cur_ask) - float(_cur_bid))
+                                                * _spec_cost.usd_per_price_unit_per_lot()
+                                                * float(getattr(pos, "quantity", 0) or 0)
+                                                / _risk_usd
+                                            )
+                                    except (TypeError, ValueError):
+                                        pass
                                     # Determine legacy hypothesis ID for legacy ticket fallback
                                     _legacy_hyp_id = None
                                     if _ticket_meta is None:
@@ -1811,6 +1861,10 @@ def main() -> None:
                                         profit_manager=profit_manager,
                                         now_ts=time.time(),
                                         legacy_hypothesis_id=_legacy_hyp_id,
+                                        quote_buffer=quote_buffer,
+                                        remaining_ev=_rem_ev,
+                                        remaining_ev_status=_rem_status,
+                                        observed_spread_r=_spread_r,
                                     )
                                     try:
                                         fast_verdict = evaluate_fast_exit(fast_exit_ctx)
@@ -1825,7 +1879,10 @@ def main() -> None:
                                             "bar": str(bar_time),
                                         })
                                         continue
-                                    if fast_verdict["action"] in {"TAKE", "SCRATCH", "ABORT", "TIME_EXIT"}:
+                                    append_journal(journal, firehose_exit_trace(
+                                        fast_exit_ctx, fast_verdict,
+                                    ))
+                                    if fast_verdict["action"] in {"TAKE", "QUICK_TAKE", "SCRATCH", "ABORT", "TIME_EXIT"}:
                                         verdict = {
                                             "action": "EXIT",
                                             "reason": f"fast_{fast_verdict['action'].lower()}:{fast_verdict['reason']}",
@@ -1859,9 +1916,25 @@ def main() -> None:
                                         **(summary or {}),
                                     },
                                 )
-                                # Remove ticket metadata on successful close.
+                                # Ticket/slot release and re-entry state happen only
+                                # after the broker confirms this exact close.
                                 if res_close.ok:
-                                    ticket_metadata_store.remove(tk)
+                                    _marks_close = live_marks.get(
+                                        str(getattr(pos, "symbol", "")), {}
+                                    )
+                                    _fingerprint = "|".join((
+                                        str(getattr(pos, "symbol", "")),
+                                        str(getattr(pos, "side", "")).lower(),
+                                        str(_marks_close.get("bid")),
+                                        str(_marks_close.get("ask")),
+                                    ))
+                                    confirmed_close_cleanup(
+                                        ticket_metadata_store,
+                                        firehose_reentry_guard,
+                                        tk,
+                                        quote_fingerprint=_fingerprint,
+                                        closed_at=time.time(),
+                                    )
                                 if (
                                     res_close.ok
                                     and summary
