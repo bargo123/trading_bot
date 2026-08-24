@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from aegis.intel.firehose_turnover import (
-    FirehoseReentryGuard, confirmed_close_cleanup, quote_fingerprint,
+    FirehoseReentryGuard, TurnoverMetrics, confirmed_close_cleanup, quote_fingerprint,
 )
 from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
 
@@ -68,3 +68,28 @@ def test_runner_close_and_entry_share_quote_fingerprint():
     assert guard.allows("thesis", quote_fingerprint("EURUSD", "buy", 1.10001, 1.10021), 101.0) == (
         True, "fresh_quote",
     )
+
+
+def test_confirmed_turnover_reports_average_loss_erasure_geometry():
+    metrics = TurnoverMetrics()
+    for ticket, opened, closed, net in (
+        ("W1", 0.0, 10.0, 0.5),
+        ("W2", 20.0, 30.0, 0.5),
+        ("L1", 40.0, 50.0, -1.0),
+    ):
+        metrics.record_open(ticket, opened_at=opened, slot_capacity=1)
+        metrics.record_close(
+            ticket,
+            closed_at=closed,
+            gross_pnl_usd=net,
+            net_pnl_usd=net,
+            cost_usd=0.0,
+            confirmed=True,
+        )
+
+    snapshot = metrics.snapshot(now=60.0)
+
+    assert snapshot["average_winner_usd"] == 0.5
+    assert snapshot["average_loser_usd"] == -1.0
+    assert snapshot["wins_erased_by_avg_loss"] == 2.0
+    assert snapshot["p95_loss_usd"] == -1.0

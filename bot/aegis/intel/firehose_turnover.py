@@ -68,6 +68,9 @@ class TurnoverMetrics:
                 "slot_utilization": None, "profit_capture_ratio": None,
                 "gross_profit_per_hour": None, "net_profit_per_hour": None,
                 "cost_per_round_trip_usd": None,
+                "average_winner_usd": None, "average_loser_usd": None,
+                "p95_loss_usd": None, "p99_loss_usd": None,
+                "max_loss_usd": None, "wins_erased_by_avg_loss": None,
             }
         holds = sorted(closed - opened for opened, closed, _, _, _, _, _ in completed)
         p90_index = (len(holds) - 1) * 0.9
@@ -87,6 +90,14 @@ class TurnoverMetrics:
         net = [value for _, _, _, value, _, _, _ in completed]
         cost = [value for _, _, _, _, value, _, _ in completed]
         peaks = [value for _, _, _, _, _, value, _ in completed]
+        confirmed_net = [value for value in net if value is not None]
+        winners = [value for value in confirmed_net if value > 0]
+        losers = sorted(value for value in confirmed_net if value < 0)
+        average_winner = sum(winners) / len(winners) if winners else None
+        average_loser = sum(losers) / len(losers) if losers else None
+        tail_index = lambda percentile: min(len(losers) - 1, int((len(losers) - 1) * percentile))
+        p95_loss = losers[tail_index(0.05)] if losers else None
+        p99_loss = losers[tail_index(0.01)] if losers else None
         return {
             "median_hold_seconds": median(holds), "p90_hold_seconds": p90,
             "round_trips_per_hour": rate,
@@ -96,6 +107,16 @@ class TurnoverMetrics:
             "gross_profit_per_hour": sum(gross) / (elapsed / 3600.0) if elapsed > 0 and all(v is not None for v in gross) else None,
             "net_profit_per_hour": sum(net) / (elapsed / 3600.0) if elapsed > 0 and all(v is not None for v in net) else None,
             "cost_per_round_trip_usd": sum(cost) / len(cost) if cost and all(v is not None for v in cost) else None,
+            "average_winner_usd": average_winner,
+            "average_loser_usd": average_loser,
+            "p95_loss_usd": p95_loss,
+            "p99_loss_usd": p99_loss,
+            "max_loss_usd": min(losers) if losers else None,
+            "wins_erased_by_avg_loss": (
+                abs(average_loser) / average_winner
+                if average_loser is not None and average_winner is not None and average_winner > 0
+                else None
+            ),
         }
 
 
