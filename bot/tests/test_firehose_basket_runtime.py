@@ -55,6 +55,12 @@ def _close_observation():
 
 
 def test_confirmed_basket_close_trace_preserves_exact_lifecycle_fields():
+    expected_observation = _close_observation()
+    expected_observation.update({
+        "realized_net_usd": None,
+        "capture_ratio": None,
+        "cost_usd": None,
+    })
     trace = basket_lifecycle_trace(
         _basket_metadata(),
         event="firehose_basket_close",
@@ -80,7 +86,7 @@ def test_confirmed_basket_close_trace_preserves_exact_lifecycle_fields():
         "entry_geometry": {"entry_price": 1.1, "stop_loss": 1.098},
         "initial_risk_usd": 10.0,
         "cost_evidence": {"spread_usd": 0.2, "commission_usd": 0.1},
-        **_close_observation(),
+        **expected_observation,
         "regime": "trend",
         "session": "london",
         "slot_released": True,
@@ -155,7 +161,8 @@ def test_confirmed_full_basket_close_releases_slot_after_last_owned_ticket(tmp_p
         store, guard, "T2", quote_fingerprint="quote-2", closed_at=20.0,
     )
 
-    assert first_close.slot_released is True
+    assert first_close.metadata_removed is True
+    assert first_close.slot_released is False
     assert first_close.basket_closed is False
     assert final_close.slot_released is True
     assert final_close.basket_closed is True

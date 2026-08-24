@@ -173,9 +173,10 @@ def confirmed_close_cleanup(
         metadata_store.remove(ticket)
         if quote_fingerprint:
             guard.record_close(ticket, meta.thesis_key, quote_fingerprint, closed_at)
-    released = meta is not None
+    removed = meta is not None
+    released = removed and (not meta.basket_id or basket_closed)
     return CloseCleanup(
-        metadata_removed=released,
+        metadata_removed=removed,
         slot_released=released,
         basket_closed=basket_closed,
     )
@@ -224,13 +225,13 @@ def basket_lifecycle_trace(
         "mfe_usd": values.get("mfe_usd"),
         "mae_usd": values.get("mae_usd"),
         "peak_net_profit_usd": values.get("peak_net_profit_usd"),
-        "realized_net_usd": values.get("realized_net_usd"),
-        "capture_ratio": values.get("capture_ratio"),
+        "realized_net_usd": None,
+        "capture_ratio": None,
         "age_seconds": values.get("age_seconds"),
         "clips": values.get("clips", metadata.clip_sequence),
         "decision_reasons": values.get("decision_reasons", []),
         "ev": values.get("ev"),
-        "cost_usd": values.get("cost_usd"),
+        "cost_usd": None,
         "turnover": values.get("turnover"),
         "regime": metadata.regime,
         "session": metadata.session,

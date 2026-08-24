@@ -2024,16 +2024,7 @@ def main() -> None:
                                         ticket_metadata_store, firehose_reentry_guard, tk,
                                         quote_fingerprint=_fingerprint, closed_at=closed_at,
                                     )
-                                    basket_cost = None
-                                    if _ticket_meta is not None and _ticket_meta.cost_evidence:
-                                        basket_cost = _ticket_meta.cost_evidence.get("cost_usd")
-                                    realized = (summary or {}).get("realized_pnl")
                                     peak = (summary or {}).get("mfe_before_close")
-                                    capture = (
-                                        float(realized) / float(peak)
-                                        if peak is not None and float(peak) > 0 and realized is not None
-                                        else None
-                                    )
                                     basket_trace = basket_lifecycle_trace(
                                         _ticket_meta,
                                         event="firehose_basket_close",
@@ -2043,8 +2034,8 @@ def main() -> None:
                                             "mfe_usd": peak,
                                             "mae_usd": (summary or {}).get("mae_before_close"),
                                             "peak_net_profit_usd": peak,
-                                            "realized_net_usd": realized,
-                                            "capture_ratio": capture,
+                                            "realized_net_usd": None,
+                                            "capture_ratio": None,
                                             "age_seconds": (summary or {}).get("duration_s"),
                                             "clips": (
                                                 _ticket_meta.clip_sequence
@@ -2052,7 +2043,7 @@ def main() -> None:
                                             ),
                                             "decision_reasons": [str(verdict.get("reason") or "unknown")],
                                             "ev": _rem_ev,
-                                            "cost_usd": basket_cost,
+                                            "cost_usd": None,
                                             "turnover": 1.0,
                                         },
                                         slot_released=close_cleanup.slot_released,
