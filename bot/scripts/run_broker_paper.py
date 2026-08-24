@@ -145,6 +145,16 @@ def normalize_protective_stops(
     return sl_out, tp_out
 
 
+def close_ticket_confirmed(positions, ticket: str) -> bool:
+    """Confirm a close only when the exact ticket has no remaining volume."""
+    ticket_s = str(ticket)
+    return not any(
+        str(getattr(position, "ticket", "")) == ticket_s
+        and float(getattr(position, "quantity", 0) or 0) > 0
+        for position in positions
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Aegis broker-engine paper runner")
     parser.add_argument("--config", default=str(ROOT / "config_ib_paper_eurusd.yaml"))
@@ -1957,9 +1967,15 @@ def main() -> None:
                                         **(summary or {}),
                                     },
                                 )
-                                # Ticket/slot release and re-entry state happen only
-                                # after the broker confirms this exact close.
+                                # MT5 may acknowledge a placed/partial close as OK. Re-fetch
+                                # positions before releasing any local lifecycle state.
+                                close_confirmed = False
                                 if res_close.ok:
+                                    try:
+                                        close_confirmed = close_ticket_confirmed(eng.positions(), tk)
+                                    except Exception:
+                                        close_confirmed = False
+                                if close_confirmed:
                                     closed_at = time.time()
                                     firehose_turnover.record_close(
                                         tk, closed_at=closed_at, gross_pnl_usd=None,
@@ -1993,8 +2009,19 @@ def main() -> None:
                                         ticket_metadata_store, firehose_reentry_guard, tk,
                                         quote_fingerprint=_fingerprint, closed_at=closed_at,
                                     )
+                                elif res_close.ok:
+                                    append_journal(
+                                        journal,
+                                        {
+                                            "event": "firehose_close_unconfirmed",
+                                            "ticket": tk,
+                                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                                            "symbol": str(getattr(pos, "symbol", "")),
+                                            "ok": True,
+                                        },
+                                    )
                                 if (
-                                    res_close.ok
+                                    close_confirmed
                                     and summary
                                     and summary.get("hypothesis_id")
                                     and intelligent_brain is not None

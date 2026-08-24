@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from scripts.run_broker_paper import normalize_protective_stops
+from aegis.engines.base import PositionSnapshot
+from scripts.run_broker_paper import close_ticket_confirmed, normalize_protective_stops
 
 
 def test_normalize_protective_stops_buy_respects_broker_min_distance():
@@ -27,3 +28,24 @@ def test_normalize_protective_stops_sell_respects_broker_min_distance():
     )
     assert sl == 159.510
     assert tp == 159.490
+
+
+def test_close_ticket_confirmed_rejects_ok_response_when_ticket_remains_open():
+    """A pending or partial close must not release Firehose lifecycle state."""
+    positions = [
+        PositionSnapshot(
+            symbol="EURUSD", side="buy", quantity=0.01, avg_price=1.1, ticket="T1",
+        )
+    ]
+
+    assert close_ticket_confirmed(positions, "T1") is False
+
+
+def test_close_ticket_confirmed_accepts_absent_exact_ticket():
+    positions = [
+        PositionSnapshot(
+            symbol="EURUSD", side="buy", quantity=0.01, avg_price=1.1, ticket="T2",
+        )
+    ]
+
+    assert close_ticket_confirmed(positions, "T1") is True
