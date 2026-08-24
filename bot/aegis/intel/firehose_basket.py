@@ -5,6 +5,8 @@ import json
 import math
 import os
 import tempfile
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -13,6 +15,14 @@ from typing import Any, Mapping
 
 def _geometry_items(geometry: Mapping[str, Any]) -> tuple[tuple[str, Any], ...]:
     return tuple(sorted((str(key), value) for key, value in geometry.items()))
+
+
+def _finite_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
 
 
 @dataclass(frozen=True)
@@ -159,17 +169,33 @@ def can_add_clip(
         return _decision(basket, False, "invalid_risk", 0.0)
     if not math.isfinite(risk) or risk <= 0:
         return _decision(basket, False, "invalid_risk", risk)
+    risk_budget = _finite_float(basket.risk_budget)
+    total_risk = _finite_float(basket.total_risk)
+    if risk_budget is None or risk_budget <= 0:
+        return _decision(basket, False, "invalid_risk_budget", risk)
+    if total_risk is None or total_risk < 0:
+        return _decision(basket, False, "invalid_risk", risk)
     if not isinstance(continuation, Mapping):
         return _decision(basket, False, "no_validated_policy", risk)
     if str(continuation.get("side", "")).lower() != basket.side:
         return _decision(basket, False, "opposite_side_self_hedge", risk)
     if len(basket.tickets) >= basket.clip_cap:
         return _decision(basket, False, "clip_cap", risk)
-    if basket.unrealized_pnl < 0:
-        return _decision(basket, False, "losing_basket", risk)
     artifact = continuation.get("policy_artifact")
     if not isinstance(artifact, Mapping) or not (artifact.get("validated") and artifact.get("complete")):
         return _decision(basket, False, "no_validated_policy", risk)
+    broker_pnl = continuation.get("broker_pnl")
+    if not isinstance(broker_pnl, Mapping):
+        return _decision(basket, False, "missing_broker_pnl", risk)
+    pnl = _finite_float(broker_pnl.get("unrealized_pnl"))
+    observed_at = _finite_float(broker_pnl.get("observed_at"))
+    evaluated_at = _finite_float(continuation.get("evaluated_at"))
+    if pnl is None or observed_at is None or evaluated_at is None:
+        return _decision(basket, False, "missing_broker_pnl", risk)
+    if observed_at > evaluated_at or evaluated_at - observed_at > 5.0:
+        return _decision(basket, False, "stale_broker_pnl", risk)
+    if pnl < 0:
+        return _decision(basket, False, "losing_basket", risk)
     trigger_id = str(continuation.get("trigger_id", "")).strip()
     if not continuation.get("fresh_trigger") or not trigger_id or trigger_id in {
         ticket.trigger_id for ticket in basket.tickets
@@ -179,11 +205,12 @@ def can_add_clip(
         return _decision(basket, False, "no_positive_continuation", risk)
     if not continuation.get("normal_spread"):
         return _decision(basket, False, "abnormal_spread", risk)
-    if float(continuation.get("remaining_ev", 0.0) or 0.0) <= 0:
+    remaining_ev = _finite_float(continuation.get("remaining_ev"))
+    if remaining_ev is None or remaining_ev <= 0:
         return _decision(basket, False, "nonpositive_remaining_ev", risk)
     if continuation.get("adverse_selection"):
         return _decision(basket, False, "adverse_selection", risk)
-    if basket.total_risk + risk > basket.risk_budget:
+    if total_risk + risk > risk_budget:
         return _decision(basket, False, "risk_budget", risk)
     return _decision(basket, True, "allowed", risk)
 
@@ -195,11 +222,22 @@ def _broker_native_risk(
     tick_value: float,
     tick_size: float,
 ) -> float:
-    values = (entry_price, stop_loss, volume, tick_value, tick_size)
-    if any(not math.isfinite(float(value)) for value in values) or volume <= 0 or tick_value <= 0 or tick_size <= 0:
+    values = tuple(_finite_float(value) for value in (
+        entry_price, stop_loss, volume, tick_value, tick_size,
+    ))
+    if any(value is None for value in values):
         raise ValueError("invalid_broker_risk")
-    ticks = abs(Decimal(str(entry_price)) - Decimal(str(stop_loss))) / Decimal(str(tick_size))
-    return float(ticks * Decimal(str(tick_value)) * Decimal(str(volume)))
+    entry, stop, lots, value, size = values
+    if lots <= 0 or value <= 0 or size <= 0:
+        raise ValueError("invalid_broker_risk")
+    try:
+        ticks = abs(Decimal(str(entry)) - Decimal(str(stop))) / Decimal(str(size))
+        risk = float(ticks * Decimal(str(value)) * Decimal(str(lots)))
+    except (ArithmeticError, ValueError):
+        raise ValueError("invalid_broker_risk") from None
+    if not math.isfinite(risk):
+        raise ValueError("invalid_broker_risk")
+    return risk
 
 
 class BasketMetadataStore:
@@ -247,6 +285,40 @@ class BasketMetadataStore:
                     Path(temp_path).unlink(missing_ok=True)
                 except OSError:
                     pass
+            raise
+
+    @contextmanager
+    def _admission_lock(self):
+        """Serialize reload, validation, and persistence across processes."""
+        lock_path = self.persist_path.with_name(f".{self.persist_path.name}.lock")
+        with lock_path.open("a+b") as handle:
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() == 0:
+                handle.write(b"\0")
+                handle.flush()
+            handle.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                while True:
+                    try:
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                        break
+                    except OSError:
+                        time.sleep(0.01)
+                try:
+                    yield
+                finally:
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def create_basket(
         self,
@@ -265,31 +337,45 @@ class BasketMetadataStore:
         entry_geometry: Mapping[str, Any],
         unrealized_pnl: float = 0.0,
     ) -> BasketMetadata:
-        basket_id = str(basket_id).strip()
-        if not basket_id or basket_id in self._store:
-            raise ValueError("basket_id")
-        if str(side).lower() not in {"buy", "sell"}:
-            raise ValueError("side")
-        if risk_budget <= 0 or clip_cap <= 0 or tick_value <= 0 or tick_size <= 0:
-            raise ValueError("invalid_basket_limits")
-        basket = BasketMetadata(
-            basket_id=basket_id,
-            hypothesis_id=str(hypothesis_id),
-            family=str(family),
-            symbol=str(symbol).upper(),
-            side=str(side).lower(),
-            risk_budget=float(risk_budget),
-            clip_cap=int(clip_cap),
-            tick_value=float(tick_value),
-            tick_size=float(tick_size),
-            regime=str(regime),
-            session=str(session),
-            _entry_geometry=_geometry_items(entry_geometry),
-            unrealized_pnl=float(unrealized_pnl),
-        )
-        self._store[basket_id] = basket
-        self._save()
-        return basket
+        with self._admission_lock():
+            self._load()
+            basket_id = str(basket_id).strip()
+            if not basket_id or basket_id in self._store:
+                raise ValueError("basket_id")
+            if str(side).lower() not in {"buy", "sell"}:
+                raise ValueError("side")
+            budget = _finite_float(risk_budget)
+            value = _finite_float(tick_value)
+            size = _finite_float(tick_size)
+            pnl = _finite_float(unrealized_pnl)
+            if (
+                budget is None or budget <= 0 or value is None or value <= 0
+                or size is None or size <= 0 or pnl is None
+                or isinstance(clip_cap, bool) or int(clip_cap) != clip_cap or int(clip_cap) <= 0
+            ):
+                raise ValueError("invalid_basket_limits")
+            basket = BasketMetadata(
+                basket_id=basket_id,
+                hypothesis_id=str(hypothesis_id),
+                family=str(family),
+                symbol=str(symbol).upper(),
+                side=str(side).lower(),
+                risk_budget=budget,
+                clip_cap=int(clip_cap),
+                tick_value=value,
+                tick_size=size,
+                regime=str(regime),
+                session=str(session),
+                _entry_geometry=_geometry_items(entry_geometry),
+                unrealized_pnl=pnl,
+            )
+            self._store[basket_id] = basket
+            try:
+                self._save()
+            except Exception:
+                self._store.pop(basket_id, None)
+                raise
+            return basket
 
     def get_basket(self, basket_id: str) -> BasketMetadata | None:
         return self._store.get(str(basket_id))
@@ -317,34 +403,40 @@ class BasketMetadataStore:
         session: str,
         continuation: Mapping[str, Any] | None = None,
     ) -> BasketTicket:
-        basket = self.get_basket(basket_id)
-        if basket is None:
-            raise KeyError(str(basket_id))
-        if self.get_ticket(ticket_id) is not None:
-            raise ValueError("ticket_id")
-        if clip_sequence != len(basket.tickets) + 1:
-            raise ValueError("clip_sequence")
-        risk = _broker_native_risk(entry_price, stop_loss, volume, basket.tick_value, basket.tick_size)
-        if basket.total_risk + risk > basket.risk_budget:
-            raise ValueError("risk_budget")
-        if basket.tickets:
-            allowed, reason = can_add_clip(basket, continuation, risk)
+        with self._admission_lock():
+            self._load()
+            basket = self.get_basket(basket_id)
+            if basket is None:
+                raise KeyError(str(basket_id))
+            if self.get_ticket(ticket_id) is not None:
+                raise ValueError("ticket_id")
+            if clip_sequence != len(basket.tickets) + 1:
+                raise ValueError("clip_sequence")
+            risk = _broker_native_risk(entry_price, stop_loss, volume, basket.tick_value, basket.tick_size)
+            allowed, reason = can_add_clip(basket, continuation, risk) if basket.tickets else (
+                basket.total_risk + risk <= basket.risk_budget,
+                "allowed" if basket.total_risk + risk <= basket.risk_budget else "risk_budget",
+            )
             if not allowed:
                 raise ValueError(reason)
-        ticket = BasketTicket(
-            ticket_id=str(ticket_id),
-            trigger_id=str(trigger_id),
-            clip_sequence=int(clip_sequence),
-            volume=float(volume),
-            initial_risk=risk,
-            _entry_geometry=_geometry_items({"entry_price": float(entry_price), "stop_loss": float(stop_loss)}),
-            cost_evidence=dict(cost_evidence),
-            regime=str(regime),
-            session=str(session),
-        )
-        updated = BasketMetadata(
-            **{**basket.__dict__, "tickets": (*basket.tickets, ticket)}
-        )
-        self._store[basket.basket_id] = updated
-        self._save()
-        return ticket
+            ticket = BasketTicket(
+                ticket_id=str(ticket_id),
+                trigger_id=str(trigger_id),
+                clip_sequence=int(clip_sequence),
+                volume=float(volume),
+                initial_risk=risk,
+                _entry_geometry=_geometry_items({"entry_price": float(entry_price), "stop_loss": float(stop_loss)}),
+                cost_evidence=dict(cost_evidence),
+                regime=str(regime),
+                session=str(session),
+            )
+            updated = BasketMetadata(
+                **{**basket.__dict__, "tickets": (*basket.tickets, ticket)}
+            )
+            self._store[basket.basket_id] = updated
+            try:
+                self._save()
+            except Exception:
+                self._store[basket.basket_id] = basket
+                raise
+            return ticket

@@ -29,3 +29,20 @@
 
 - No runner wiring, configuration, Factory, Council, MT5, order placement, or
   live-enablement changes were made.
+
+## Follow-Up Hardening
+
+- Basket creation and ticket admission now acquire a cross-process lock, reload
+  the persisted state while locked, validate it, and only then atomically
+  persist the accepted state.
+- Persistence failures now raise and restore the prior in-memory basket state;
+  callers cannot receive a successful admission for a failed write.
+- Adds require a finite, fresh broker PnL snapshot (`observed_at` within five
+  seconds of `evaluated_at`); missing, stale, non-finite, and losing snapshots
+  reject the add.
+- Basket limits and proposed risks reject non-finite and non-positive values.
+- Added deterministic regressions for stale-process admission, failed writes,
+  fresh PnL requirements, and NaN/non-finite risk inputs. Focused verification
+  completed with `14 passed`.
+- Full follow-up verification: `pytest -q` completed with `1049 passed` in
+  82.04s, with the same existing `eventkit` deprecation warning.

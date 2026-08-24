@@ -1,17 +1,20 @@
+import multiprocessing
+from pathlib import Path
+
 import pytest
 
 from aegis.intel.firehose_basket import BasketMetadataStore, can_add_clip
 from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
 
 
-def _store_basket(store, *, clip_cap=3, unrealized_pnl=5.0):
+def _store_basket(store, *, clip_cap=3, unrealized_pnl=5.0, risk_budget=20.0):
     return store.create_basket(
         basket_id="basket-1",
         hypothesis_id="hypothesis-1",
         family="breakout",
         symbol="EURUSD",
         side="buy",
-        risk_budget=20.0,
+        risk_budget=risk_budget,
         clip_cap=clip_cap,
         tick_value=2.5,
         tick_size=0.0001,
@@ -32,6 +35,8 @@ def _continuation(**overrides):
         "remaining_ev": 0.25,
         "adverse_selection": False,
         "policy_artifact": {"validated": True, "complete": True},
+        "broker_pnl": {"unrealized_pnl": 5.0, "observed_at": 100.0},
+        "evaluated_at": 101.0,
     }
     continuation.update(overrides)
     return continuation
@@ -50,6 +55,25 @@ def _record_initial_clip(store):
         regime="trend",
         session="london",
     )
+
+
+def _record_competing_clip(path, ready, proceed, outcomes):
+    store = BasketMetadataStore(Path(path))
+    ready.set()
+    if not proceed.wait(10):
+        outcomes.put(("timeout", ""))
+        return
+    try:
+        store.record_ticket(
+            "basket-1", ticket_id="ticket-competing", trigger_id="trigger-competing",
+            clip_sequence=2, entry_price=1.1000, stop_loss=1.0980, volume=0.2,
+            cost_evidence={"spread_ticks": 1.0}, regime="trend", session="london",
+            continuation=_continuation(trigger_id="trigger-competing"),
+        )
+    except ValueError as exc:
+        outcomes.put(("rejected", str(exc)))
+    else:
+        outcomes.put(("admitted", ""))
 
 
 def test_restart_preserves_exact_basket_ticket_ownership_and_geometry(tmp_path):
@@ -137,7 +161,9 @@ def test_losing_basket_cannot_add_a_clip(tmp_path):
     _store_basket(store, unrealized_pnl=-0.01)
     _record_initial_clip(store)
 
-    assert can_add_clip(store.get_basket("basket-1"), _continuation(), 1.0) == (
+    assert can_add_clip(store.get_basket("basket-1"), _continuation(
+        broker_pnl={"unrealized_pnl": -0.01, "observed_at": 100.0},
+    ), 1.0) == (
         False, "losing_basket",
     )
 
@@ -149,4 +175,85 @@ def test_opposite_side_continuation_cannot_self_hedge(tmp_path):
 
     assert can_add_clip(store.get_basket("basket-1"), _continuation(side="sell"), 1.0) == (
         False, "opposite_side_self_hedge",
+    )
+
+
+def test_add_rejects_missing_or_stale_broker_pnl(tmp_path):
+    store = BasketMetadataStore(tmp_path / "baskets.json")
+    _store_basket(store)
+    _record_initial_clip(store)
+    basket = store.get_basket("basket-1")
+
+    assert can_add_clip(basket, _continuation(broker_pnl=None), 1.0) == (
+        False, "missing_broker_pnl",
+    )
+    assert can_add_clip(basket, _continuation(
+        broker_pnl={"unrealized_pnl": 5.0, "observed_at": 90.0},
+    ), 1.0) == (False, "stale_broker_pnl")
+
+
+@pytest.mark.parametrize("proposed_risk", [float("nan"), float("inf"), 0.0, -1.0])
+def test_add_rejects_nonfinite_or_nonpositive_risk(tmp_path, proposed_risk):
+    store = BasketMetadataStore(tmp_path / "baskets.json")
+    _store_basket(store)
+    _record_initial_clip(store)
+
+    assert can_add_clip(store.get_basket("basket-1"), _continuation(), proposed_risk) == (
+        False, "invalid_risk",
+    )
+
+
+def test_create_basket_rejects_nan_risk_budget(tmp_path):
+    store = BasketMetadataStore(tmp_path / "baskets.json")
+
+    with pytest.raises(ValueError, match="invalid_basket_limits"):
+        _store_basket(store, risk_budget=float("nan"))
+
+
+def test_record_ticket_rolls_back_and_raises_when_persistence_fails(tmp_path, monkeypatch):
+    path = tmp_path / "baskets.json"
+    store = BasketMetadataStore(path)
+    _store_basket(store)
+
+    def fail_save():
+        raise OSError("disk full")
+
+    monkeypatch.setattr(store, "_save", fail_save)
+    with pytest.raises(OSError, match="disk full"):
+        _record_initial_clip(store)
+
+    assert store.get_basket("basket-1").ticket_ids == ()
+    assert BasketMetadataStore(path).get_basket("basket-1").ticket_ids == ()
+
+
+def test_admission_reloads_current_state_inside_cross_process_lock(tmp_path):
+    path = tmp_path / "baskets.json"
+    initial = BasketMetadataStore(path)
+    _store_basket(initial)
+    _record_initial_clip(initial)
+
+    context = multiprocessing.get_context("spawn")
+    ready = context.Event()
+    proceed = context.Event()
+    outcomes = context.Queue()
+    competing = context.Process(
+        target=_record_competing_clip, args=(str(path), ready, proceed, outcomes),
+    )
+    competing.start()
+    assert ready.wait(10)
+
+    primary = BasketMetadataStore(path)
+    primary.record_ticket(
+        "basket-1", ticket_id="ticket-primary", trigger_id="trigger-primary",
+        clip_sequence=2, entry_price=1.1000, stop_loss=1.0980, volume=0.2,
+        cost_evidence={"spread_ticks": 1.0}, regime="trend", session="london",
+        continuation=_continuation(trigger_id="trigger-primary"),
+    )
+    proceed.set()
+    competing.join(10)
+
+    assert competing.exitcode == 0
+    assert outcomes.get(timeout=1)[0] == "rejected"
+    assert BasketMetadataStore(path).get_basket("basket-1").ticket_ids == (
+        "ticket-1", "ticket-primary",
     )
