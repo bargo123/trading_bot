@@ -266,3 +266,64 @@ exit values.
 - The evaluator intentionally returns `NO_EVIDENCE` when the trusted BookIndex
   is missing, unreadable, corrupt, or lacks a cited record. Unrelated worktree
   artifacts and the existing single `eventkit` warning remain untouched.
+
+## Round 4/5 Fix: Lazy Novel Provenance And Path Failure Closure
+
+### Files Changed
+
+- `bot/aegis/research/firehose_basket_replay.py`
+- `bot/tests/test_firehose_basket_replay.py`
+- `task-3-report.md`
+
+### Behavior
+
+- `NOVEL_SYNTHESIZED_HYPOTHESIS` packets with no direct-source evidence no
+  longer load `BookIndex`; they retain their existing empirical, chronological,
+  policy-outcome, and complete OOS gates.
+- Direct-source support or contradiction records still load and require the
+  trusted indexed corpus before their provenance is accepted.
+- Indexed and caller evidence paths are resolved through a fail-closed helper.
+  Missing, malformed, or corrupt paths return `NO_EVIDENCE` with
+  `missing_policy_evidence` instead of raising.
+
+### TDD Evidence
+
+- RED command: `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py -q`
+- RED output: `3 failed, 15 passed in 1.51s`. A novel-only packet returned
+  `NO_EVIDENCE` when the index was unavailable; embedded-NUL caller and indexed
+  paths raised `ValueError: stat: embedded null character in path`.
+- GREEN focused command: `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py -q`
+- GREEN focused output: `18 passed in 1.32s`.
+
+### Broader Verification
+
+- `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py tests\test_firehose_basket_evidence.py tests\test_firehose_basket.py -q`
+  completed with `51 passed in 3.94s`.
+- `..\.venv\Scripts\python.exe -m pytest -q` completed with
+  `1079 passed, 1 warning in 80.35s`.
+- The warning is the existing `eventkit` no-current-event-loop deprecation
+  warning in `test_ibkr_order_hygiene.py`.
+- `git diff --check` completed with no whitespace errors; Git emitted only
+  existing LF-to-CRLF conversion warnings.
+
+### Safety And Self-Review
+
+- Reviewed the final evaluator and tests: direct-source evidence continues to
+  require trusted BookIndex records, while novel-only packets do not treat an
+  unavailable index as evidence failure.
+- Confirmed corrupt index entries and malformed caller locations return
+  `NO_EVIDENCE` without propagating path-resolution errors.
+- The public `evaluate_basket_policies(rows, policy_packets)` interface and all
+  complete empirical, chronological, cost, lifecycle, policy-outcome, and OOS
+  gates remain unchanged.
+- No runtime, configuration, YAML, live-trading, MT5, order, or unrelated
+  dirty file was changed.
+
+### Commit
+
+- `6800b45 fix: fail close firehose provenance`
+
+### Concerns
+
+- The existing full-suite `eventkit` warning and unrelated dirty worktree files
+  remain untouched.
