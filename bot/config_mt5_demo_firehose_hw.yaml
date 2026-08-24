@@ -195,7 +195,7 @@ intelligent_bootstrap_canary: true
 # exposure. NOT profitable, NOT validated; information gain only. These limits
 # are independent of champion/canary limits and never bypass portfolio,
 # spread, stale-quote, or live-account protections.
-intelligent_exploration_enabled: false
+intelligent_exploration_enabled: true
 exploration_max_positions: 2
 exploration_max_positions_per_symbol: 1
 exploration_max_daily_loss_usd: 1.0

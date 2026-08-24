@@ -232,7 +232,7 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert cfg["engine"] == "mt5"
     assert cfg["mode"] == "mt5_demo"
     assert cfg["allow_live"] is False
-    assert cfg["intelligent_exploration_enabled"] is False
+    assert cfg["intelligent_exploration_enabled"] is True
     assert float(cfg["exploration_max_risk_per_trade_usd"]) == 0.15
     assert cfg["paper_trading_enabled"] is True
     assert cfg["firehose_every_bar"] is True
@@ -279,6 +279,13 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert cfg.get("intelligent_edge_sizing") is True
     # Fabricated analogue evidence must never authorise a demo trade.
     assert cfg.get("intelligent_allow_synthetic_evidence") is False
+    assert cfg.get("intelligent_exploration_enabled") is True
+    assert int(cfg["exploration_max_positions"]) == 2
+    assert int(cfg["exploration_max_positions_per_symbol"]) == 1
+    assert float(cfg["exploration_max_daily_loss_usd"]) == 1.0
+    assert float(cfg["exploration_max_risk_per_trade_usd"]) == 0.15
+    assert int(cfg["exploration_max_trades_per_hypothesis"]) == 5
+    assert int(cfg["exploration_cooldown_after_failure_s"]) == 1800
     # Future-dated ticks must be rejected, not clamped to age 0.0.
     assert float(cfg["max_quote_future_skew_s"]) > 0
     assert float(cfg.get("intel_scratch_pips") or 0) == 4
