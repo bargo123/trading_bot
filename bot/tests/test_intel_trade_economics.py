@@ -152,6 +152,17 @@ def test_commission_is_included_in_cost():
     assert swamped.reason == "expected_net_value_not_positive"
 
 
+def test_measured_slippage_is_included_and_can_reject_net_ev():
+    free = _econ(p_win=0.36, spread_price=0.0, slippage_price=0.0)
+    slipped = _econ(p_win=0.36, spread_price=0.0, slippage_price=8.0 * PIP)
+
+    assert free.acceptable
+    assert not slipped.acceptable
+    assert slipped.reason == "expected_net_value_not_positive"
+    assert slipped.cost_usd is not None and free.cost_usd is not None
+    assert slipped.cost_usd == pytest.approx(free.cost_usd + 0.80)
+
+
 def test_invalidation_must_sit_on_the_losing_side():
     assert _econ(invalidation=1.10500).reason == "invalidation_not_below_entry"
     assert (

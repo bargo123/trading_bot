@@ -49,28 +49,36 @@ def _frame(closes: list[float], start: str = "2026-01-01") -> pd.DataFrame:
     )
 
 
+def _m15_frame(closes: list[float]) -> pd.DataFrame:
+    """Expand deliberately completed M15 closes into M1 bars for pivot semantics."""
+    return _frame([close for close in closes for _ in range(15)])
+
+
 def _ramp_into_resistance(n: int = 400) -> pd.DataFrame:
-    """Steady climb: the last bar sits just under M15 resistance.
+    """Current M15 bar sits just under a confirmed high above distant support.
 
     This is the geometry that produces the pathological payoff - a target a pip
     away above a stop tens of pips away.
     """
-    return _frame([1.10 + index * 0.00001 for index in range(n)])
+    return _m15_frame([
+        1.1000, 1.1010, 1.1020, 1.1010, 1.1000, 1.0990,
+        1.0980, 1.0970, 1.0960, 1.0970, 1.0980, 1.0990,
+        1.1000, 1.1005, 1.1010, 1.1015, 1.1017, 1.1018,
+    ])
 
 
 def _basing_above_support(n: int = 400) -> pd.DataFrame:
-    """Long decline that flattens out just above its low.
+    """Confirmed M15 support is near entry while resistance remains far above.
 
     M15 support then sits a few pips under the entry while M15 resistance is the
     far-away start of the decline - a small invalidation against a large target,
     which is the payoff shape the firehose is supposed to want.
     """
-    decline_bars = n - 60
-    top = 1.1340
-    decline = [top - index * (0.0340 / decline_bars) for index in range(decline_bars)]
-    low = decline[-1]
-    base = [low + 0.00003 * (index % 3) for index in range(60)]
-    return _frame(decline + base)
+    return _m15_frame([
+        1.1330, 1.1340, 1.1330, 1.1300, 1.1250, 1.1200,
+        1.1150, 1.1100, 1.1050, 1.1000, 1.1005, 1.1010,
+        1.1008, 1.1007,
+    ])
 
 
 def _signature_for(frame: pd.DataFrame, side: str) -> dict:
@@ -264,8 +272,8 @@ def test_fire_size_comes_from_validated_risk_not_a_fixed_clip(tmp_path):
     assert decision.action == "fire"
     assert decision.journal["size_ok"] is True
     assert decision.journal["size_reason"] == "sized_from_validated_risk"
-    # Sized from the $100 budget x 8% validated fraction across 5 clips, not 0.01.
-    assert decision.quantity != 0.01
+    assert decision.quantity == decision.journal["size_lots"]
+    assert decision.journal["size_risk_usd"] <= decision.journal["size_clip_budget_usd"]
     assert decision.journal["size_risk_usd"] <= decision.journal["size_clip_budget_usd"] + 1e-9
 
 

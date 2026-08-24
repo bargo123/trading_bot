@@ -160,6 +160,7 @@ def evaluate_trade_economics(
     spec: Mapping[str, Any] | None,
     spread_price: float | None,
     commission_round_trip_usd: float = 0.0,
+    slippage_price: float | None = None,
     p_win: float | None = None,
     analogue_n: int = 0,
     analogue_n_losses: int = 0,
@@ -238,7 +239,13 @@ def evaluate_trade_economics(
     spread = 0.0 if spread_price is None else abs(float(spread_price))
     if not math.isfinite(spread):
         spread = 0.0
-    cost_usd = spread * per_unit + max(0.0, float(commission_round_trip_usd or 0.0))
+    slippage = 0.0 if slippage_price is None else abs(float(slippage_price))
+    if not math.isfinite(slippage):
+        slippage = 0.0
+    cost_usd = (
+        (spread + slippage) * per_unit
+        + max(0.0, float(commission_round_trip_usd or 0.0))
+    )
 
     payoff_ratio = expected_win_usd / expected_loss_usd if expected_loss_usd > 0 else None
 
