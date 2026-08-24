@@ -20,3 +20,18 @@
 ## Evidence Result And Concern
 
 The existing journal contains a NUL-prefixed malformed line at 136303. The generated report therefore states `INCOMPLETE_JOURNAL_EVIDENCE`, has zero completed lifecycles, null aggregate metrics, and `NO_EVIDENCE` policy comparison. No policy selection or profitability claim is made. No MT5/order/external process was started.
+
+## Review Fix Round 1
+
+- A `journal_parse_error` now short-circuits lifecycle analysis to a canonical `INCOMPLETE_JOURNAL_EVIDENCE` report. No valid-row aggregate, bucket, or policy computation survives journal corruption.
+- `round_trips_per_hour` is `null` when no confirmed round trip supplies an observable duration; a failed close does not release its active ticket.
+- The runner heartbeat writer is a tested boundary. Its test uses metric and forbidden Research Factory/Council spies plus an import guard, and verifies the emitted observed metric snapshot.
+
+### Verification
+
+- `..\.venv\Scripts\python.exe -m pytest tests\test_fast_firehose.py tests\test_fast_exit_production.py tests\test_fast_exit_integration.py tests\test_profit_harvester.py tests\test_firehose_turnover.py tests\test_firehose_harvest_research.py tests\test_firehose_harvest_integration.py -q`: 93 passed.
+- `..\.venv\Scripts\python.exe -m pytest tests\test_research_factory.py tests\test_council_cycle.py tests\test_council_live.py -q`: 53 passed.
+- `..\.venv\Scripts\python.exe -c "from aegis.research_factory.core import ResearchFactory; from ai_council.agents import ask_agent; print('imports-ok')"`: `imports-ok`.
+- `..\.venv\Scripts\python.exe -c "import yaml; cfg=yaml.safe_load(open('config_mt5_demo_firehose_hw.yaml', encoding='utf-8')); assert cfg['allow_live'] is False; assert cfg['exploration_max_risk_per_trade_usd'] == 0.15; print('demo-safety-ok')"`: `demo-safety-ok`.
+- `..\.venv\Scripts\python.exe scripts\analyze_firehose_harvest.py --journal reports\mt5_demo_firehose_hw_journal.jsonl --json-out reports\research\firehose_profit_harvest.json --markdown-out reports\research\firehose_profit_harvest.md`: completed; canonical incomplete/no-evidence report written.
+- `..\.venv\Scripts\python.exe -m pytest -q`: 1026 passed, 1 existing event-loop deprecation warning.

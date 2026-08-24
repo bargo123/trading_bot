@@ -43,7 +43,11 @@ def main() -> None:
     parser.add_argument("--markdown-out", type=Path, required=True, help="Output Markdown report path")
     args = parser.parse_args()
     report = analyze_ticket_lifecycles(read_jsonl(args.journal, parser))
-    report["policy_comparison"] = compare_exit_policies(read_jsonl(args.replay, parser) if args.replay else [])
+    report["policy_comparison"] = (
+        {"status": "NO_EVIDENCE", "selection_metric": "oos_expectancy_after_cost", "winner": None}
+        if report["status"] == "INCOMPLETE_JOURNAL_EVIDENCE"
+        else compare_exit_policies(read_jsonl(args.replay, parser) if args.replay else [])
+    )
     write_harvest_report(report, args.json_out, args.markdown_out)
 
 

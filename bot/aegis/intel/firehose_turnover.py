@@ -63,7 +63,7 @@ class TurnoverMetrics:
         if not completed:
             return {
                 "median_hold_seconds": None, "p90_hold_seconds": None,
-                "round_trips_per_hour": 0.0, "close_to_entry_interval_seconds": None,
+                "round_trips_per_hour": None, "close_to_entry_interval_seconds": None,
                 "slot_utilization": None, "profit_capture_ratio": None,
                 "gross_profit_per_hour": None, "net_profit_per_hour": None,
                 "cost_per_round_trip_usd": None,

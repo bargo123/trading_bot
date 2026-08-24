@@ -82,6 +82,32 @@ def append_journal(path: Path, event: dict) -> None:
         f.write(json.dumps(event, default=str) + "\n")
 
 
+def write_runner_heartbeat(
+    path: Path,
+    *,
+    pid: int,
+    symbols: list[str],
+    qty: float,
+    metrics,
+    extra: Optional[dict] = None,
+    now: float | None = None,
+) -> None:
+    """Persist runner health and observed Firehose metrics without research calls."""
+    timestamp = time.time() if now is None else float(now)
+    payload = {
+        "pid": pid,
+        "ts": timestamp,
+        "iso": datetime.fromtimestamp(timestamp, timezone.utc).isoformat(),
+        "symbols": symbols,
+        "qty": qty,
+        "firehose_turnover": metrics.snapshot(timestamp),
+    }
+    if extra:
+        payload.update(extra)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def normalize_protective_stops(
     *,
     side: str,
@@ -231,18 +257,10 @@ def main() -> None:
     last_inventory_journal: dict[str, float] = {"ts": 0.0}
 
     def write_heartbeat(extra: Optional[dict] = None) -> None:
-        payload = {
-            "pid": os.getpid(),
-            "ts": time.time(),
-            "iso": datetime.now(timezone.utc).isoformat(),
-            "symbols": symbols,
-            "qty": qty,
-        }
-        if extra:
-            payload.update(extra)
-        payload["firehose_turnover"] = firehose_turnover.snapshot(time.time())
-        heartbeat.parent.mkdir(parents=True, exist_ok=True)
-        heartbeat.write_text(json.dumps(payload), encoding="utf-8")
+        write_runner_heartbeat(
+            heartbeat, pid=os.getpid(), symbols=symbols, qty=qty,
+            metrics=firehose_turnover, extra=extra,
+        )
 
     try:
         acct = eng.account()

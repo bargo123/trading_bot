@@ -76,6 +76,33 @@ def _empty_bucket() -> dict[str, Any]:
     }
 
 
+def _incomplete_journal_report() -> dict[str, Any]:
+    unavailable = "INCOMPLETE_JOURNAL_EVIDENCE"
+    buckets = {f"{value:.2f}_usd": {**_empty_bucket(), "status": unavailable} for value in USD_BUCKETS}
+    erased = {
+        f"{value:.2f}_usd": {"status": unavailable, "reached_count": 0, "count": 0, "rate": None}
+        for value in USD_BUCKETS
+    }
+    metric = {"status": unavailable, "count": 0}
+    return {
+        "status": unavailable,
+        "completed_tickets": 0,
+        "incomplete_tickets": [],
+        "buckets": buckets,
+        "winner_distribution": dict(metric),
+        "loser_distribution": dict(metric),
+        "hold_time_seconds": dict(metric),
+        "wins_erased_by_bucket": erased,
+        "giveback_magnitude_usd": dict(metric),
+        "time_between_close_and_entry_seconds": dict(metric),
+        "round_trips_per_hour": None,
+        "slot_utilization": None,
+        "profit_capture_ratio": None,
+        "cost_per_round_trip_usd": None,
+        "max_loss_usd": None,
+    }
+
+
 def _confirmed_exit(event: Mapping[str, Any]) -> bool:
     return event.get("event") in _EXIT_EVENTS and event.get("confirmed") is True
 
@@ -128,13 +155,12 @@ def _complete_ticket(ticket: str, records: list[Mapping[str, Any]]) -> dict[str,
 
 def analyze_ticket_lifecycles(events: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     """Summarize only ticket records with observed open, traces, and confirmed exit."""
+    events = list(events)
+    if any(isinstance(event, Mapping) and event.get("event") == "journal_parse_error" for event in events):
+        return _incomplete_journal_report()
     indexed: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
-    incomplete_journal = False
     for event in events:
         if not isinstance(event, Mapping):
-            continue
-        if event.get("event") == "journal_parse_error":
-            incomplete_journal = True
             continue
         ticket = event.get("ticket")
         if isinstance(ticket, str) and ticket:
@@ -207,10 +233,7 @@ def analyze_ticket_lifecycles(events: Iterable[Mapping[str, Any]]) -> dict[str, 
     if capacities and len(capacities) == len(complete) and span_seconds > 0:
         utilization = sum(holds) / (span_seconds * mean(capacities))
 
-    status = (
-        "INCOMPLETE_JOURNAL_EVIDENCE" if incomplete_journal
-        else "OK" if complete else "NO_COMPLETE_LIFECYCLE_EVIDENCE"
-    )
+    status = "OK" if complete else "NO_COMPLETE_LIFECYCLE_EVIDENCE"
     return {
         "status": status,
         "completed_tickets": len(complete),
@@ -259,8 +282,14 @@ def write_harvest_report(report: Mapping[str, Any], json_path: Path, markdown_pa
     json_path.parent.mkdir(parents=True, exist_ok=True)
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+    unavailable = (
+        "INCOMPLETE_JOURNAL_EVIDENCE"
+        if report.get("status") == "INCOMPLETE_JOURNAL_EVIDENCE"
+        else "NO_COMPLETE_LIFECYCLE_EVIDENCE"
+    )
+
     def render(value: Any) -> str:
-        return "`NO_COMPLETE_LIFECYCLE_EVIDENCE`" if value is None else str(value)
+        return f"`{unavailable}`" if value is None else str(value)
 
     lines = [
         "# Firehose Harvest Evidence",
