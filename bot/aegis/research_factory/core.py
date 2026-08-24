@@ -868,16 +868,14 @@ Live trading: DISABLED
     def test_conflict(self, conflict: Dict[str, Any], 
                       train_data: pd.DataFrame, val_data: pd.DataFrame,
                       test_data: pd.DataFrame) -> Dict[str, Any]:
-        """Test a book-data conflict with empirical evidence."""
-        # This would run a specific hypothesis test
-        # For now, return structure
+        """Report that a conflict needs governed OOS evaluation, not a fake result."""
         result = {
             "conflict_id": conflict.get("conflict", "unknown"),
-            "winner": "DATA" if conflict.get("resolution") == "DATA_WINS" else "PENDING",
-            "evidence": "OOS test results needed",
-            "tested": True,
+            "status": "NOT_IMPLEMENTED",
+            "reason": "governed OOS conflict evaluation is not wired",
+            "tested": False,
         }
-        conflict["tested"] = True
+        conflict["tested"] = False
         conflict["test_result"] = result
         return result
 
@@ -1447,6 +1445,28 @@ Live trading: DISABLED
             "net_pnl": sum(pnls),
         }
 
+    def _prepare_features_for_ml(
+        self,
+        df: pd.DataFrame,
+        target_col: str = "profit_barrier_first",
+    ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+        """Prepare numeric features and labels for ML analysis."""
+        exclude_cols = {
+            "time", "source_file", "symbol", "timeframe",
+            "target", "label", "future_max_high", "future_min_low",
+            "profit_barrier_first", "mfe", "mae", "time_to_target",
+            "no_progress", "tail_loss", "direction", "return_horizon",
+        }
+        feature_cols = [
+            column for column in df.columns
+            if column not in exclude_cols
+            and df[column].dtype in [np.float64, np.float32, np.int64, np.int32]
+        ]
+        features = df[feature_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
+        labels = df.get(target_col, pd.Series(0, index=df.index)).astype(int)
+        return features.values, labels.values, feature_cols
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="AEGIS Autonomous Weekend Research Factory")
@@ -1484,35 +1504,6 @@ def main():
 
     factory.run()
     factory.save_report()
-
-
-# ============================================================
-# HELPER METHODS
-# ============================================================
-
-    def _prepare_features_for_ml(
-        self,
-        df: pd.DataFrame,
-        target_col: str = "profit_barrier_first",
-    ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
-        """Prepare features and labels for ML training."""
-        # Identify feature columns (exclude metadata columns)
-        exclude_cols = {
-            "time", "source_file", "symbol", "timeframe",
-            "target", "label", "future_max_high", "future_min_low",
-            "profit_barrier_first", "mfe", "mae", "time_to_target",
-            "no_progress", "tail_loss", "direction", "return_horizon",
-        }
-
-        feature_cols = [
-            c for c in df.columns 
-            if c not in exclude_cols and df[c].dtype in [np.float64, np.float32, np.int64, np.int32]
-        ]
-
-        X = df[feature_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
-        y = df.get(target_col, pd.Series(0, index=df.index)).astype(int)
-
-        return X.values, y.values, feature_cols
 
 
 if __name__ == "__main__":

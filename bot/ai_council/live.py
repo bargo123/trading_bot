@@ -9,7 +9,7 @@ from ai_council.agents import ask_agent
 
 
 class AgentBudgetLedger:
-    """Persist per-agent call budgets; Codex begins permanently exhausted."""
+    """Persist per-agent call budgets; a new session grants Codex one review."""
 
     def __init__(self, path: Path):
         self.path = Path(path)
@@ -21,12 +21,12 @@ class AgentBudgetLedger:
             if not isinstance(payload, dict) or not isinstance(payload.get("agents"), dict):
                 raise ValueError("invalid budget ledger")
         except (OSError, ValueError, json.JSONDecodeError):
-            payload = {"agents": {"codex": {"used": 1, "limit": 1}}}
+            payload = {"agents": {"codex": {"used": 0, "limit": 1}}}
             self._payload = payload
             self._persist()
             return payload
         if "codex" not in payload["agents"]:
-            payload["agents"]["codex"] = {"used": 1, "limit": 1}
+            payload["agents"]["codex"] = {"used": 0, "limit": 1}
             self._payload = payload
             self._persist()
         return payload

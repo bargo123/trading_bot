@@ -18,6 +18,35 @@ import pandas as pd
 import numpy as np
 
 
+def test_prepare_features_for_ml_is_a_research_factory_method():
+    factory = object.__new__(ResearchFactory)
+    frame = pd.DataFrame(
+        {
+            "time": pd.date_range("2026-01-01", periods=2, freq="min", tz="UTC"),
+            "symbol": ["EURUSD", "EURUSD"],
+            "feature_a": [1.0, 2.0],
+            "profit_barrier_first": [1, 0],
+        }
+    )
+
+    features, labels, names = factory._prepare_features_for_ml(frame)
+
+    assert names == ["feature_a"]
+    assert features.tolist() == [[1.0], [2.0]]
+    assert labels.tolist() == [1, 0]
+
+
+def test_conflict_without_governed_oos_evidence_is_not_marked_tested():
+    factory = object.__new__(ResearchFactory)
+    conflict = {"conflict": "book_vs_data", "resolution": "NEEDS_TEST"}
+
+    result = factory.test_conflict(conflict, pd.DataFrame(), pd.DataFrame(), pd.DataFrame())
+
+    assert result["status"] == "NOT_IMPLEMENTED"
+    assert result["tested"] is False
+    assert conflict["tested"] is False
+
+
 class TestDataPipeline:
     """Tests for data pipeline."""
 
@@ -532,7 +561,7 @@ def test_public_factory_construction_does_not_start_an_agent_process(monkeypatch
         reports_dir=tmp_path / "reports",
     )
 
-    assert factory.agent_budget_ledger.remaining("codex") == 0
+    assert factory.agent_budget_ledger.remaining("codex") == 1
 
 
 def test_factory_restart_keeps_state_and_codex_budget_in_reports_dir(monkeypatch, tmp_path):
@@ -568,11 +597,11 @@ def test_factory_restart_keeps_state_and_codex_budget_in_reports_dir(monkeypatch
 
     assert first.state_path == reports_dir / "state.json"
     assert resumed.state.generation == 7
-    assert resumed.agent_budget_ledger.remaining("codex") == 0
+    assert resumed.agent_budget_ledger.remaining("codex") == 1
 
 
-def test_factory_dashboard_uses_durable_exhausted_codex_ledger(capsys, tmp_path):
-    """Using ResearchState counters would display a usable Codex budget."""
+def test_factory_dashboard_uses_durable_codex_ledger(capsys, tmp_path):
+    """Dashboard status reflects the persisted session budget, not state counters."""
     factory = object.__new__(ResearchFactory)
     factory.state = ResearchState(codex_calls=0, codex_budget=99)
     factory.agent_budget_ledger = research_factory_core.AgentBudgetLedger(
@@ -583,13 +612,13 @@ def test_factory_dashboard_uses_durable_exhausted_codex_ledger(capsys, tmp_path)
     factory._print_dashboard()
     factory.save_report()
 
-    assert "Codex: EXHAUSTED (1 / 1)" in capsys.readouterr().out
+    assert "Codex: 1 REMAINING (0 / 1)" in capsys.readouterr().out
     report = json.loads((tmp_path / "final_weekend_report.json").read_text())
     assert report["codex"] == {
-        "used": 1,
+        "used": 0,
         "limit": 1,
-        "remaining": 0,
-        "status": "EXHAUSTED",
+        "remaining": 1,
+        "status": "AVAILABLE",
     }
 
 

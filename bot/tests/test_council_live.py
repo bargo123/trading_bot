@@ -6,31 +6,39 @@ import json
 import ai_council.live as live
 
 
-def test_exhausted_codex_budget_blocks_adapter_and_survives_restart(
-    monkeypatch, tmp_path
-):
-    """Removing the exhaustion check must permit a prohibited Codex call."""
+def test_fresh_codex_budget_allows_one_adapter_call_then_locks(monkeypatch, tmp_path):
+    """A new research session has exactly one Codex review available."""
     ledger_path = tmp_path / "agent_budgets.json"
     ledger = live.AgentBudgetLedger(ledger_path)
+    assert ledger.usage("codex") == (0, 1)
 
-    def forbidden(*args, **kwargs):
-        raise AssertionError("an exhausted Codex budget must not create a process")
+    calls = []
 
-    monkeypatch.setattr(live, "ask_agent", forbidden)
-
-    result = live.ask_research_agent(
-        "codex", "do not invoke", ledger=ledger, line_sink=None, cwd=tmp_path
+    monkeypatch.setattr(
+        live,
+        "ask_agent",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"agent": "codex", "ok": True},
     )
 
-    assert result["status"] == "BUDGET_EXHAUSTED"
-    assert result["ok"] is False
-    assert live.AgentBudgetLedger(ledger_path).remaining("codex") == 0
+    result = live.ask_research_agent(
+        "codex", "review", ledger=ledger, line_sink=None, cwd=tmp_path
+    )
+    assert result["ok"] is True
+    assert len(calls) == 1
+    assert ledger.usage("codex") == (1, 1)
+
+    locked = live.ask_research_agent(
+        "codex", "second review", ledger=ledger, line_sink=None, cwd=tmp_path
+    )
+    assert locked["status"] == "BUDGET_EXHAUSTED"
+    assert len(calls) == 1
+    assert live.AgentBudgetLedger(ledger_path).usage("codex") == (1, 1)
 
 
-def test_legacy_ledger_without_codex_entry_is_migrated_to_exhausted(
+def test_ledger_without_codex_entry_is_migrated_to_fresh_session_budget(
     monkeypatch, tmp_path
 ):
-    """A missing Codex entry must not permit an unapproved process invocation."""
+    """A missing Codex entry represents an unused one-call research session."""
     ledger_path = tmp_path / "agent_budgets.json"
     ledger_path.write_text(
         json.dumps({"agents": {"claude": {"used": 0, "limit": 1}}}),
@@ -38,19 +46,20 @@ def test_legacy_ledger_without_codex_entry_is_migrated_to_exhausted(
     )
     ledger = live.AgentBudgetLedger(ledger_path)
 
-    def forbidden(*args, **kwargs):
-        raise AssertionError("a legacy ledger must not start Codex")
+    calls = []
 
-    monkeypatch.setattr(live, "ask_agent", forbidden)
-    import ai_council.agents as agent_cli
-
-    monkeypatch.setattr(agent_cli.subprocess, "Popen", forbidden)
-
-    result = live.ask_research_agent(
-        "codex", "do not invoke", ledger=ledger, line_sink=None, cwd=tmp_path
+    monkeypatch.setattr(
+        live,
+        "ask_agent",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"agent": "codex", "ok": True},
     )
 
-    assert result["status"] == "BUDGET_EXHAUSTED"
+    result = live.ask_research_agent(
+        "codex", "review", ledger=ledger, line_sink=None, cwd=tmp_path
+    )
+
+    assert result["ok"] is True
+    assert len(calls) == 1
     assert json.loads(ledger_path.read_text(encoding="utf-8"))["agents"]["codex"] == {
         "used": 1,
         "limit": 1,
