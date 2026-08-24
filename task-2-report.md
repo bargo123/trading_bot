@@ -75,3 +75,16 @@
   Focused verification completed with `23 passed`.
 - Full Round 3 verification: `pytest -q` completed with `1058 passed` in
   83.96s, with the same existing `eventkit` deprecation warning.
+
+## Round 4 Hardening
+
+- `BasketMetadataStore` now accepts runtime-supplied `ContractSpec` evidence.
+  Creation, reload, and ticket admission fail closed without a matching,
+  finite broker contract for the basket symbol.
+- Persisted tick value and size must exactly match the trusted contract; ticket
+  risk is recomputed using the trusted ticks, never file-supplied ticks.
+- Added regressions for missing contract evidence, persisted contract mismatch,
+  and coordinated persisted tick/risk tampering. Focused verification completed
+  with `26 passed`.
+- Full Round 4 verification: `pytest -q` completed with `1061 passed` in
+  85.36s, with the same existing `eventkit` deprecation warning.

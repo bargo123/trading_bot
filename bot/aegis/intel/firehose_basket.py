@@ -12,6 +12,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Mapping
 
+from aegis.sizing import ContractSpec
+
 
 def _geometry_items(geometry: Mapping[str, Any]) -> tuple[tuple[str, Any], ...]:
     return tuple(sorted((str(key), value) for key, value in geometry.items()))
@@ -56,6 +58,15 @@ def _finite_mapping(value: Any, field: str) -> dict[str, Any]:
         else:
             copied[str(key)] = item
     return copied
+
+
+def _trusted_ticks(contract: ContractSpec | None, symbol: str) -> tuple[float, float]:
+    if contract is None or str(contract.symbol).upper() != str(symbol).upper():
+        raise ValueError("missing_trusted_contract")
+    return (
+        _positive_float(contract.tick_value, "trusted_tick_value"),
+        _positive_float(contract.tick_size, "trusted_tick_size"),
+    )
 
 
 @dataclass(frozen=True)
@@ -159,7 +170,7 @@ class BasketMetadata:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "BasketMetadata":
+    def from_dict(cls, data: Mapping[str, Any], trusted_contract: ContractSpec | None) -> "BasketMetadata":
         basket_id = str(data["basket_id"]).strip()
         hypothesis_id = str(data["hypothesis_id"]).strip()
         family = str(data["family"]).strip()
@@ -176,8 +187,12 @@ class BasketMetadata:
             raise ValueError("basket")
         risk_budget = _positive_float(data["risk_budget"], "risk_budget")
         clip_cap = _positive_int(data["clip_cap"], "clip_cap")
-        tick_value = _positive_float(data["tick_value"], "tick_value")
-        tick_size = _positive_float(data["tick_size"], "tick_size")
+        tick_value, tick_size = _trusted_ticks(trusted_contract, symbol)
+        if (
+            _positive_float(data["tick_value"], "tick_value") != tick_value
+            or _positive_float(data["tick_size"], "tick_size") != tick_size
+        ):
+            raise ValueError("persisted_contract_mismatch")
         tickets = tuple(BasketTicket.from_dict(ticket) for ticket in data.get("tickets", []))
         if len(tickets) > clip_cap:
             raise ValueError("clip_cap")
@@ -324,14 +339,18 @@ def _broker_native_risk(
 class BasketMetadataStore:
     """Atomically persists exact basket-to-ticket ownership records."""
 
-    def __init__(self, persist_path: Path):
+    def __init__(self, persist_path: Path, *, trusted_contract: ContractSpec | None = None):
         self.persist_path = Path(persist_path)
+        self.trusted_contract = trusted_contract
         self.persist_path.parent.mkdir(parents=True, exist_ok=True)
         self._store: dict[str, BasketMetadata] = {}
         self._load()
 
     def _load(self) -> None:
         if not self.persist_path.is_file():
+            return
+        if self.trusted_contract is None:
+            self._store = {}
             return
         try:
             data = json.loads(self.persist_path.read_text(encoding="utf-8"))
@@ -341,7 +360,7 @@ class BasketMetadataStore:
                 raise ValueError("persisted_basket_store")
             loaded: dict[str, BasketMetadata] = {}
             for basket_id, basket in data.items():
-                restored = BasketMetadata.from_dict(basket)
+                restored = BasketMetadata.from_dict(basket, self.trusted_contract)
                 if basket_id != restored.basket_id:
                     raise ValueError("basket_id")
                 loaded[basket_id] = restored
@@ -426,6 +445,7 @@ class BasketMetadataStore:
     ) -> BasketMetadata:
         with self._admission_lock():
             self._load()
+            trusted_value, trusted_size = _trusted_ticks(self.trusted_contract, symbol)
             basket_id = str(basket_id).strip()
             if not basket_id or basket_id in self._store:
                 raise ValueError("basket_id")
@@ -439,6 +459,7 @@ class BasketMetadataStore:
                 budget is None or budget <= 0 or value is None or value <= 0
                 or size is None or size <= 0 or pnl is None
                 or isinstance(clip_cap, bool) or int(clip_cap) != clip_cap or int(clip_cap) <= 0
+                or value != trusted_value or size != trusted_size
             ):
                 raise ValueError("invalid_basket_limits")
             basket = BasketMetadata(
@@ -494,7 +515,10 @@ class BasketMetadataStore:
             self._load()
             basket = self.get_basket(basket_id)
             if basket is None:
+                if self.trusted_contract is None:
+                    raise ValueError("missing_trusted_contract")
                 raise KeyError(str(basket_id))
+            _trusted_ticks(self.trusted_contract, basket.symbol)
             if self.get_ticket(ticket_id) is not None:
                 raise ValueError("ticket_id")
             if clip_sequence != len(basket.tickets) + 1:

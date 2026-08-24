@@ -7,6 +7,7 @@ import pytest
 
 from aegis.intel.firehose_basket import BasketMetadataStore, can_add_clip
 from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
+from aegis.sizing import ContractSpec
 
 
 def _store_basket(store, *, clip_cap=3, unrealized_pnl=5.0, risk_budget=20.0):
@@ -25,6 +26,17 @@ def _store_basket(store, *, clip_cap=3, unrealized_pnl=5.0, risk_budget=20.0):
         entry_geometry={"entry_price": 1.1000, "stop_loss": 1.0980},
         unrealized_pnl=unrealized_pnl,
     )
+
+
+def _trusted_contract(*, tick_value=2.5, tick_size=0.0001):
+    return ContractSpec(
+        symbol="EURUSD", tick_size=tick_size, tick_value=tick_value,
+        contract_size=100000.0, volume_min=0.01, volume_max=100.0, volume_step=0.01,
+    )
+
+
+def _metadata_store(path):
+    return BasketMetadataStore(path, trusted_contract=_trusted_contract())
 
 
 def _continuation(**overrides):
@@ -61,7 +73,7 @@ def _record_initial_clip(store):
 
 
 def _record_competing_clip(path, ready, proceed, outcomes):
-    store = BasketMetadataStore(Path(path))
+    store = _metadata_store(Path(path))
     ready.set()
     if not proceed.wait(10):
         outcomes.put(("timeout", ""))
@@ -82,7 +94,7 @@ def _record_competing_clip(path, ready, proceed, outcomes):
 def test_restart_preserves_exact_basket_ticket_ownership_and_geometry(tmp_path):
     basket_path = tmp_path / "baskets.json"
     ticket_path = tmp_path / "tickets.json"
-    basket_store = BasketMetadataStore(basket_path)
+    basket_store = _metadata_store(basket_path)
     _store_basket(basket_store)
     _record_initial_clip(basket_store)
 
@@ -97,7 +109,7 @@ def test_restart_preserves_exact_basket_ticket_ownership_and_geometry(tmp_path):
         initial_risk=10.0, cost_evidence={"spread_ticks": 1.0, "commission_usd": 0.4},
     ))
 
-    restored_basket = BasketMetadataStore(basket_path).get_basket("basket-1")
+    restored_basket = _metadata_store(basket_path).get_basket("basket-1")
     restored_ticket = TicketMetadataStore(ticket_path).get("ticket-1")
 
     assert restored_basket.ticket_ids == ("ticket-1",)
@@ -114,7 +126,7 @@ def test_restart_preserves_exact_basket_ticket_ownership_and_geometry(tmp_path):
 
 
 def test_broker_native_risk_budget_uses_tick_value_and_tick_size(tmp_path):
-    store = BasketMetadataStore(tmp_path / "baskets.json")
+    store = _metadata_store(tmp_path / "baskets.json")
     _store_basket(store)
     _record_initial_clip(store)
     basket = store.get_basket("basket-1")
@@ -133,7 +145,7 @@ def test_broker_native_risk_budget_uses_tick_value_and_tick_size(tmp_path):
 
 
 def test_clip_cap_rejects_another_clip(tmp_path):
-    store = BasketMetadataStore(tmp_path / "baskets.json")
+    store = _metadata_store(tmp_path / "baskets.json")
     _store_basket(store, clip_cap=1)
     _record_initial_clip(store)
 
@@ -143,7 +155,7 @@ def test_clip_cap_rejects_another_clip(tmp_path):
 
 
 def test_add_requires_fresh_same_side_continuation_and_validated_policy(tmp_path):
-    store = BasketMetadataStore(tmp_path / "baskets.json")
+    store = _metadata_store(tmp_path / "baskets.json")
     _store_basket(store)
     _record_initial_clip(store)
     basket = store.get_basket("basket-1")
@@ -160,7 +172,7 @@ def test_add_requires_fresh_same_side_continuation_and_validated_policy(tmp_path
 
 
 def test_losing_basket_cannot_add_a_clip(tmp_path):
-    store = BasketMetadataStore(tmp_path / "baskets.json")
+    store = _metadata_store(tmp_path / "baskets.json")
     _store_basket(store, unrealized_pnl=-0.01)
     _record_initial_clip(store)
 
@@ -172,7 +184,7 @@ def test_losing_basket_cannot_add_a_clip(tmp_path):
 
 
 def test_opposite_side_continuation_cannot_self_hedge(tmp_path):
-    store = BasketMetadataStore(tmp_path / "baskets.json")
+    store = _metadata_store(tmp_path / "baskets.json")
     _store_basket(store)
     _record_initial_clip(store)
 
@@ -182,7 +194,7 @@ def test_opposite_side_continuation_cannot_self_hedge(tmp_path):
 
 
 def test_add_rejects_missing_or_stale_broker_pnl(tmp_path):
-    store = BasketMetadataStore(tmp_path / "baskets.json")
+    store = _metadata_store(tmp_path / "baskets.json")
     _store_basket(store)
     _record_initial_clip(store)
     basket = store.get_basket("basket-1")
@@ -197,7 +209,7 @@ def test_add_rejects_missing_or_stale_broker_pnl(tmp_path):
 
 @pytest.mark.parametrize("proposed_risk", [float("nan"), float("inf"), 0.0, -1.0])
 def test_add_rejects_nonfinite_or_nonpositive_risk(tmp_path, proposed_risk):
-    store = BasketMetadataStore(tmp_path / "baskets.json")
+    store = _metadata_store(tmp_path / "baskets.json")
     _store_basket(store)
     _record_initial_clip(store)
 
@@ -207,7 +219,7 @@ def test_add_rejects_nonfinite_or_nonpositive_risk(tmp_path, proposed_risk):
 
 
 def test_create_basket_rejects_nan_risk_budget(tmp_path):
-    store = BasketMetadataStore(tmp_path / "baskets.json")
+    store = _metadata_store(tmp_path / "baskets.json")
 
     with pytest.raises(ValueError, match="invalid_basket_limits"):
         _store_basket(store, risk_budget=float("nan"))
@@ -215,7 +227,7 @@ def test_create_basket_rejects_nan_risk_budget(tmp_path):
 
 def test_record_ticket_rolls_back_and_raises_when_persistence_fails(tmp_path, monkeypatch):
     path = tmp_path / "baskets.json"
-    store = BasketMetadataStore(path)
+    store = _metadata_store(path)
     _store_basket(store)
 
     def fail_save():
@@ -226,12 +238,12 @@ def test_record_ticket_rolls_back_and_raises_when_persistence_fails(tmp_path, mo
         _record_initial_clip(store)
 
     assert store.get_basket("basket-1").ticket_ids == ()
-    assert BasketMetadataStore(path).get_basket("basket-1").ticket_ids == ()
+    assert _metadata_store(path).get_basket("basket-1").ticket_ids == ()
 
 
 def test_admission_reloads_current_state_inside_cross_process_lock(tmp_path):
     path = tmp_path / "baskets.json"
-    initial = BasketMetadataStore(path)
+    initial = _metadata_store(path)
     _store_basket(initial)
     _record_initial_clip(initial)
 
@@ -245,7 +257,7 @@ def test_admission_reloads_current_state_inside_cross_process_lock(tmp_path):
     competing.start()
     assert ready.wait(10)
 
-    primary = BasketMetadataStore(path)
+    primary = _metadata_store(path)
     primary.record_ticket(
         "basket-1", ticket_id="ticket-primary", trigger_id="trigger-primary",
         clip_sequence=2, entry_price=1.1000, stop_loss=1.0980, volume=0.2,
@@ -257,7 +269,7 @@ def test_admission_reloads_current_state_inside_cross_process_lock(tmp_path):
 
     assert competing.exitcode == 0
     assert outcomes.get(timeout=1)[0] == "rejected"
-    assert BasketMetadataStore(path).get_basket("basket-1").ticket_ids == (
+    assert _metadata_store(path).get_basket("basket-1").ticket_ids == (
         "ticket-1", "ticket-primary",
     )
 
@@ -273,7 +285,7 @@ def test_admission_reloads_current_state_inside_cross_process_lock(tmp_path):
 )
 def test_reload_fails_closed_on_nonfinite_serialized_basket_fields(tmp_path, field, value):
     path = tmp_path / "baskets.json"
-    store = BasketMetadataStore(path)
+    store = _metadata_store(path)
     _store_basket(store)
     _record_initial_clip(store)
     persisted = json.loads(path.read_text(encoding="utf-8"))
@@ -283,7 +295,7 @@ def test_reload_fails_closed_on_nonfinite_serialized_basket_fields(tmp_path, fie
         persisted["basket-1"][field] = value
     path.write_text(json.dumps(persisted), encoding="utf-8")
 
-    reloaded = BasketMetadataStore(path)
+    reloaded = _metadata_store(path)
 
     assert reloaded.get_basket("basket-1") is None
     with pytest.raises(KeyError):
@@ -296,7 +308,7 @@ def test_reload_fails_closed_on_nonfinite_serialized_basket_fields(tmp_path, fie
 
 
 def test_initial_ticket_rejects_zero_broker_native_risk(tmp_path):
-    store = BasketMetadataStore(tmp_path / "baskets.json")
+    store = _metadata_store(tmp_path / "baskets.json")
     _store_basket(store)
 
     with pytest.raises(ValueError, match="invalid_broker_risk"):
@@ -308,7 +320,7 @@ def test_initial_ticket_rejects_zero_broker_native_risk(tmp_path):
 
 
 def test_pnl_freshness_uses_trusted_clock_not_caller_timestamp(tmp_path, monkeypatch):
-    store = BasketMetadataStore(tmp_path / "baskets.json")
+    store = _metadata_store(tmp_path / "baskets.json")
     _store_basket(store)
     _record_initial_clip(store)
     monkeypatch.setattr("aegis.intel.firehose_basket.time.time", lambda: 100.0)
@@ -322,18 +334,18 @@ def test_reload_fails_closed_when_persisted_root_is_not_a_basket_mapping(tmp_pat
     path = tmp_path / "baskets.json"
     path.write_text("[]", encoding="utf-8")
 
-    assert BasketMetadataStore(path).get_basket("basket-1") is None
+    assert _metadata_store(path).get_basket("basket-1") is None
 
 
 def test_reload_rejects_root_key_that_does_not_match_embedded_basket_id(tmp_path):
     path = tmp_path / "baskets.json"
-    store = BasketMetadataStore(path)
+    store = _metadata_store(path)
     _store_basket(store)
     persisted = json.loads(path.read_text(encoding="utf-8"))
     persisted["alias-basket"] = persisted.pop("basket-1")
     path.write_text(json.dumps(persisted), encoding="utf-8")
 
-    reloaded = BasketMetadataStore(path)
+    reloaded = _metadata_store(path)
 
     assert reloaded.get_basket("basket-1") is None
     assert reloaded.get_basket("alias-basket") is None
@@ -341,14 +353,14 @@ def test_reload_rejects_root_key_that_does_not_match_embedded_basket_id(tmp_path
 
 def test_reload_rejects_reduced_finite_ticket_risk_before_another_clip_can_admit(tmp_path):
     path = tmp_path / "baskets.json"
-    store = BasketMetadataStore(path)
+    store = _metadata_store(path)
     _store_basket(store)
     _record_initial_clip(store)
     persisted = json.loads(path.read_text(encoding="utf-8"))
     persisted["basket-1"]["tickets"][0]["initial_risk"] = 1.0
     path.write_text(json.dumps(persisted), encoding="utf-8")
 
-    reloaded = BasketMetadataStore(path)
+    reloaded = _metadata_store(path)
 
     assert reloaded.get_basket("basket-1") is None
     with pytest.raises(KeyError):
@@ -358,3 +370,37 @@ def test_reload_rejects_reduced_finite_ticket_risk_before_another_clip_can_admit
             cost_evidence={"spread_ticks": 1.0}, regime="trend", session="london",
             continuation=_continuation(),
         )
+
+
+def test_reload_requires_trusted_contract_evidence(tmp_path):
+    path = tmp_path / "baskets.json"
+    store = _metadata_store(path)
+    _store_basket(store)
+
+    assert BasketMetadataStore(path).get_basket("basket-1") is None
+
+
+def test_reload_rejects_persisted_contract_mismatch(tmp_path):
+    path = tmp_path / "baskets.json"
+    store = _metadata_store(path)
+    _store_basket(store)
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    persisted["basket-1"]["tick_value"] = 5.0
+    path.write_text(json.dumps(persisted), encoding="utf-8")
+
+    assert BasketMetadataStore(path, trusted_contract=_trusted_contract()).get_basket("basket-1") is None
+
+
+def test_reload_rejects_coordinated_persisted_tick_and_risk_tampering(tmp_path):
+    path = tmp_path / "baskets.json"
+    store = _metadata_store(path)
+    _store_basket(store)
+    _record_initial_clip(store)
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    persisted["basket-1"]["tick_value"] = 5.0
+    persisted["basket-1"]["tickets"][0]["initial_risk"] = 20.0
+    path.write_text(json.dumps(persisted), encoding="utf-8")
+
+    reloaded = BasketMetadataStore(path, trusted_contract=_trusted_contract())
+
+    assert reloaded.get_basket("basket-1") is None
