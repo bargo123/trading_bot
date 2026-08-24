@@ -734,6 +734,85 @@ def test_undercovered_state_reaches_exploration_without_legacy_geometry(tmp_path
     assert decision.action == "fire"
 
 
+def test_undercovered_state_cannot_bypass_measured_spread_limit(tmp_path, monkeypatch):
+    """Exploration is denied before candidate construction above session p90 spread."""
+    from aegis.intel import firehose_brain as fb
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1", "records": []}), encoding="utf-8")
+    costs = tmp_path / "cost_profiles.json"
+    costs.write_text(
+        json.dumps(
+            {
+                "symbols": {
+                    "EURUSD": {
+                        "sessions": {
+                            "asia": {
+                                "evidence_sufficient": True,
+                                "observations": 30,
+                                "spread_p90": 1.0,
+                                "slippage_pips": 0.1,
+                                "commission_pips": 0.0,
+                            }
+                        }
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    brain = IntelligentFirehoseBrain(
+        {
+            "analogue_index_path": str(index),
+            "cost_profiles_path": str(costs),
+            "intelligent_gate_validated_states": True,
+            "validated_states_path": str(tmp_path / "empty_states.json"),
+            "intelligent_firehose_bootstrap": True,
+            "intelligent_exploration_enabled": True,
+            "intelligent_risk_budget_usd": 100.0,
+            "order_quantity": 0.01,
+            "max_positions": 40,
+        }
+    )
+    monkeypatch.setattr(
+        fb,
+        "build_runtime_state",
+        lambda **kwargs: {
+            "structure": {"M15": {"kind": "none", "support": None, "resistance": None}},
+            "session": "asia",
+            "regime": {"label": "range"},
+            "multi_timeframe": {"H1": {"direction": "up"}, "M5": {"direction": "down"}},
+            "volatility": {"phase": "stable"},
+        },
+    )
+    monkeypatch.setattr(
+        fb,
+        "runtime_signature",
+        lambda state, side, setup: {
+            "symbol": "EURUSD", "side": side, "setup": setup, "regime": "range",
+            "structure": "none", "volatility": "stable", "session": "asia",
+            "h1_direction": "up", "m5_direction": "down",
+        },
+    )
+    monkeypatch.setattr(
+        brain,
+        "_maybe_explore",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("spread-rejected exploration must not run")),
+    )
+    frame = _exploration_frame()
+    row = frame.iloc[-1].copy()
+    row["time"] = frame["time"].iloc[-1]
+
+    decision = brain.evaluate(
+        symbol="EURUSD", row=row, completed_m1=frame.iloc[:-1], positions=[], equity=100.0,
+        pip=0.0001, core_side="buy", spread_price=0.00011, entry_price=float(row["close"]),
+    )
+
+    assert decision.action == "skip"
+    assert decision.reason == "spread_above_measured_session_limit"
+
+
 def test_book_logic_non_empty_via_real_explore_path(tmp_path, monkeypatch):
     """Audited defect 4: at $0.15 risk, economics correctly reject wide-stop
     candidates (proving check_entry_economics IS wired). Book logic retrieval

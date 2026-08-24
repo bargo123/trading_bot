@@ -1030,8 +1030,11 @@ def main() -> None:
                 append_journal(journal, {"event": "hr_halt", "reason": hr_reason, "equity": equity})
                 return
 
+            intelligent_mode = bool(cfg.get("intelligent_firehose", False))
             max_spread = max_spread_for(sym, cfg)
-            if max_spread > 0 and live_spread > max_spread + 1e-12:
+            # Intelligent Firehose applies the measured per-symbol/session p90 in
+            # its brain. Legacy modes retain the configured universal guard.
+            if not intelligent_mode and max_spread > 0 and live_spread > max_spread + 1e-12:
                 logger.info(
                     "Skip %s: live spread %.5f > max %.5f",
                     sym,
@@ -1074,7 +1077,6 @@ def main() -> None:
                     logger.info("Skip %s: daily trade cap %s", sym, max_day)
                     return
 
-            intelligent_mode = bool(cfg.get("intelligent_firehose", False))
             sig = None
             if intelligent_mode:
                 nonlocal intelligent_brain

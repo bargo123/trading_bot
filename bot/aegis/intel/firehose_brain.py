@@ -582,6 +582,20 @@ class IntelligentFirehoseBrain:
         except (OSError, json.JSONDecodeError, KeyError, ValueError, TypeError):
             return None
 
+    def _measured_spread_limit(self, symbol: str, session: str):
+        """Load the fail-closed measured spread limit for this runtime state."""
+        from aegis.intel.spread_policy import measured_spread_limit_pips
+
+        try:
+            profile = json.loads(
+                resolve_bot_path(
+                    self.cfg.get("cost_profiles_path"), INTEL_DIR / "cost_profiles.json"
+                ).read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            return None
+        return measured_spread_limit_pips(profile, symbol=symbol, session=session)
+
     def find_experiment_by_tag(self, tag: str) -> dict[str, Any] | None:
         """Attribute a broker-side close via its compact EXP tag.
 
@@ -1197,6 +1211,7 @@ class IntelligentFirehoseBrain:
         lots: float,
         spec: Mapping[str, Any] | None,
         spread_price: float | None,
+        slippage_price: float | None,
         evidence: Any,
     ) -> TradeEconomics:
         """Price the prospective trade. Win probability comes from analogue evidence.
@@ -1219,6 +1234,7 @@ class IntelligentFirehoseBrain:
             lots=lots,
             spec=spec,
             spread_price=spread_price,
+            slippage_price=slippage_price,
             commission_round_trip_usd=float(self.cfg.get("commission_round_trip_usd", 0.0) or 0.0),
             analogue_n=analogue_n,
             analogue_n_losses=analogue_losses,
@@ -1270,6 +1286,19 @@ class IntelligentFirehoseBrain:
         )
         invalidation, target = _geometry(side, m15, pip)
         signature = runtime_signature(state, side=side, setup=setup)
+        measured_spread = self._measured_spread_limit(
+            symbol, str(signature.get("session") or "")
+        )
+        if spread_price is not None:
+            spread_pips = abs(float(spread_price)) / max(float(pip), 1e-12)
+            if measured_spread is None:
+                self._note_skip("spread_policy_no_measured_evidence")
+                self.counts["skip"] += 1
+                return DemoDecision("skip", "spread_policy_no_measured_evidence", side=side)
+            if not measured_spread.allows(spread_pips):
+                self._note_skip("spread_above_measured_session_limit")
+                self.counts["skip"] += 1
+                return DemoDecision("skip", "spread_above_measured_session_limit", side=side)
         self.regime_by_symbol[str(symbol).upper()] = str(
             signature.get("regime") or ""
         )
@@ -1441,6 +1470,9 @@ class IntelligentFirehoseBrain:
             lots=clip_qty,
             spec=symbol_spec,
             spread_price=spread_price,
+            slippage_price=(
+                None if measured_spread is None else measured_spread.slippage_pips * float(pip)
+            ),
             evidence=evidence,
         )
         if fire.action == "fire" and not econ.acceptable:

@@ -257,7 +257,9 @@ def test_fire_decision_reports_costs_and_probability_provenance(tmp_path):
     econ = decision.journal
     # Cost is charged from the live spread at the size actually being sent.
     lots = decision.quantity
-    assert econ["econ_cost_usd"] == pytest.approx(HALF_PIP_SPREAD * 100000.0 * lots)
+    assert econ["econ_cost_usd"] == pytest.approx(
+        (HALF_PIP_SPREAD + 0.1 * PIP) * 100000.0 * lots
+    )
     # Probability is the conservative bound on the sample, not the point estimate.
     assert econ["econ_p_win_source"] == "analogue_wilson_lower_bound"
     assert econ["econ_p_win"] < 0.75
