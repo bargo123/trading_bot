@@ -96,3 +96,89 @@ Implementation commit: `6b677a0 feat: trace firehose basket evidence`
 ## Concerns
 
 No runtime source for a Task 3 validated policy artifact exists by design. Therefore, this task correctly leaves new basket creation inactive and observes only exact persisted basket ownership if present. A future, separately approved artifact-consumption task is required before new runtime basket ownership can be created.
+
+## Fix Round 1/5
+
+### Findings And Root Cause
+
+- `confirmed_close_cleanup` used a single `released` value for both metadata removal and basket slot release. A confirmed non-final basket clip therefore reported `slot_released=True` even though exact persisted ownership still contained another ticket.
+- The confirmed `firehose_close` event already used null economics when no broker deal record was available. The subsequent basket trace contradicted that fail-closed path by using pre-close `close_summary()` floating PnL and metadata cost fields as realized economics.
+
+### Changes
+
+- Kept `metadata_removed=True` for every confirmed owned ticket close, but set `slot_released=True` only for a legacy non-basket ticket or the final exact ticket in a basket.
+- Kept `realized_net_usd`, `cost_usd`, and derived `capture_ratio` null in basket close traces until broker-confirmed close economics are available. This leaves replay evidence incomplete rather than labeling local estimates as realized values.
+- Removed the runner's local realized-PnL, cost, and capture calculations from the basket close observation.
+- Added regression assertions for non-final basket slots and no-evidence close economics.
+
+### RED / GREEN Evidence
+
+Initial RED command:
+
+```text
+..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_runtime.py -q
+```
+
+Initial RED output:
+
+```text
+2 failed, 4 passed in 1.22s
+```
+
+The failures were the expected local `realized_net_usd=3.0`, `cost_usd=0.3`, and `capture_ratio=0.75` values and the expected incorrect `slot_released=True` for the first of two owned tickets.
+
+Self-review RED command after separating the slot result:
+
+```text
+..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_runtime.py -q
+```
+
+Self-review RED output:
+
+```text
+1 failed, 5 passed in 1.15s
+```
+
+This caught that `metadata_removed` had been coupled to slot release. The final fix preserves metadata removal while withholding only the basket slot release.
+
+Final GREEN command and output:
+
+```text
+..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_runtime.py tests\test_firehose_turnover.py -q
+12 passed in 1.06s
+```
+
+### Broader Verification
+
+```text
+..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_runtime.py tests\test_firehose_turnover.py tests\test_firehose_basket.py tests\test_firehose_basket_replay.py -q
+56 passed in 4.35s
+
+..\.venv\Scripts\python.exe -m pytest tests\test_research_factory.py tests\test_council_cycle.py tests\test_run_broker_paper_helpers.py tests\test_research_isolation.py -q
+56 passed in 7.88s
+
+..\.venv\Scripts\python.exe -m compileall -q aegis\intel\firehose_turnover.py scripts\run_broker_paper.py
+exit 0; no output
+
+..\.venv\Scripts\python.exe -m pytest -q
+1085 passed, 1 warning in 98.85s
+```
+
+The existing full-suite `eventkit` no-current-event-loop `DeprecationWarning` remains the only warning.
+
+### Safety And Self-Review
+
+- No orders, runner, MT5 process, live trading, configuration, YAML, entry path, or order-placement path was changed or invoked.
+- No Research Factory, AI Council, Book Brain, or unrelated dirty file was changed.
+- The runner still appends basket traces only after its existing broker-confirmed close check.
+- The final review verified exact metadata remains removed for confirmed intermediate clips, while their basket slot remains unavailable until the final exact ticket closes.
+- The final review verified no pre-close local PnL or metadata cost can populate realized/cost/capture close fields.
+- `git diff --check` reported no whitespace errors (only pre-existing LF-to-CRLF warnings).
+
+### Fix Commit
+
+`527dd11 fix: fail close firehose basket traces`
+
+### Remaining Concern
+
+Broker-confirmed deal economics are not exposed in this runner path. Close traces now correctly remain `NO_EVIDENCE` for realized/cost/capture until a separately approved broker-deal reconciliation integration supplies those values.
