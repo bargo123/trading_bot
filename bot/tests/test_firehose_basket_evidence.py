@@ -118,3 +118,55 @@ def test_only_explicit_book_or_novel_origins_are_accepted(tmp_path):
             {"symbol": "EURUSD"},
             "Reject without evidence.",
         )
+
+
+def test_packet_keeps_more_than_eight_complete_phrase_sources(tmp_path):
+    index = _index_books(
+        tmp_path,
+        {
+            f"source-{number}.md": f"# Source {number}\nA volume spike confirms breakout {number}.\n"
+            for number in range(9)
+        },
+    )
+
+    packet = build_evidence_packet(
+        index,
+        {"hypothesis_id": "basket:all-sources", "origin": "BOOK_DIRECT"},
+        "volume spike",
+        "",
+        {"symbol": "EURUSD"},
+        "Reject without costed evidence.",
+    )
+
+    assert len(packet["supporting_evidence"]) == 9
+    assert packet["contextual_candidates"] == []
+
+
+def test_fallback_term_matches_are_contextual_and_do_not_supply_coverage(tmp_path):
+    index = _index_books(
+        tmp_path,
+        {
+            "support-context.md": "# Support context\nA volume imbalance appeared.\n",
+            "contradiction-context.md": "# Contradiction context\nA failed auction followed.\n",
+        },
+    )
+
+    packet = build_evidence_packet(
+        index,
+        {"hypothesis_id": "basket:novel", "origin": "NOVEL_SYNTHESIZED_HYPOTHESIS"},
+        "volume spike",
+        "failed breakout",
+        {"symbol": "EURUSD"},
+        "Reject without sealed evidence.",
+    )
+
+    assert packet["BOOK_COVERAGE"] == "INSUFFICIENT"
+    assert packet["supporting_evidence"] == []
+    assert packet["contradicting_evidence"] == []
+    assert {item["filename"] for item in packet["contextual_candidates"]} == {
+        "support-context.md",
+        "contradiction-context.md",
+    }
+    assert {item["evidence_label"] for item in packet["contextual_candidates"]} == {
+        "CONTEXTUAL_CANDIDATE"
+    }
