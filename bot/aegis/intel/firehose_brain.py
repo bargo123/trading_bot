@@ -298,6 +298,38 @@ def video_style_micro_candidate(
     )
 
 
+def short_horizon_gate(
+    prediction: Mapping[str, Any] | None,
+    *,
+    min_probability: float = 0.5,
+) -> tuple[bool, str]:
+    """Fail-closed gate for an optional calibrated short-horizon prediction."""
+    if prediction is None:
+        return False, "short_horizon_prediction_missing"
+    if str(prediction.get("calibration_status") or "") != "calibrated":
+        return False, "short_horizon_not_calibrated"
+    if bool(prediction.get("abstain", True)):
+        return False, "short_horizon_abstain"
+    try:
+        probability = float(prediction["probability"])
+    except (KeyError, TypeError, ValueError):
+        return False, "short_horizon_probability_invalid"
+    if probability != probability or not 0.0 <= probability <= 1.0:
+        return False, "short_horizon_probability_invalid"
+    if probability < float(min_probability):
+        return False, "short_horizon_probability_below_threshold"
+    if "decision" in prediction and not bool(prediction["decision"]):
+        return False, "short_horizon_negative_prediction"
+    if "expected_net_pnl" in prediction:
+        try:
+            expected = float(prediction["expected_net_pnl"])
+        except (TypeError, ValueError):
+            return False, "short_horizon_expected_value_invalid"
+        if expected != expected or expected <= 0.0:
+            return False, "short_horizon_negative_expected_value"
+    return True, "short_horizon_eligible"
+
+
 def _load_strategy(cfg: Mapping[str, Any]) -> ValidatedStrategyModel | None:
     """Load a promoted champion. Only a sealed-validation accepted artifact can
     reach DEMO_CHAMPION stage; anything else returns None (no pseudo-champion)."""
@@ -1388,6 +1420,7 @@ class IntelligentFirehoseBrain:
         quote_buffer: Any = None,
         now_ts: float | None = None,
         video_style: bool = False,
+        short_horizon_prediction: Mapping[str, Any] | None = None,
     ) -> DemoDecision:
         clip_qty = float(self.cfg.get("order_quantity", 0.01))
         clip_risk = max(self._risk_budget * float(self.cfg.get("intelligent_risk_fraction", 0.08)) / 5.0, 0.01)
@@ -1564,6 +1597,29 @@ class IntelligentFirehoseBrain:
         # and no states are validated, nothing fires.
         if gating and current_state not in allowed:
             fire = ThesisFireDecision("skip", "state_not_in_validated_set", None)
+        short_horizon_journal: dict[str, Any] = {}
+        if short_horizon_prediction is not None:
+            prediction_ok, prediction_reason = short_horizon_gate(
+                short_horizon_prediction,
+                min_probability=float(
+                    self.cfg.get("short_horizon_min_probability", 0.5) or 0.5
+                ),
+            )
+            short_horizon_journal = {
+                "short_horizon_prediction": {
+                    key: short_horizon_prediction.get(key)
+                    for key in (
+                        "probability",
+                        "expected_net_pnl",
+                        "calibration_status",
+                        "abstain",
+                    )
+                    if key in short_horizon_prediction
+                },
+                "short_horizon_gate": prediction_reason,
+            }
+            if not prediction_ok:
+                fire = ThesisFireDecision("skip", prediction_reason, fire.expected_net_value)
         info_id = _information_id(
             symbol=symbol,
             side=side,
@@ -1834,6 +1890,7 @@ class IntelligentFirehoseBrain:
             "analogue_measured": is_measured_provenance(getattr(evidence, "provenance", "unknown")),
             **econ.journal(),
             **({} if sizing is None else sizing.journal()),
+            **short_horizon_journal,
             **(exploration_journal or {}),
         }
         return DemoDecision(
