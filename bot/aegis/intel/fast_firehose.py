@@ -374,6 +374,80 @@ def generate_micro_candidates(ctx: FastMarketContext) -> list[MicroCandidate]:
     return candidates
 
 
+def diagnose_micro_candidates(
+    ctx: FastMarketContext,
+) -> tuple[list[MicroCandidate], dict[str, str]]:
+    """Generate existing micro candidates with fail-closed per-family reasons.
+
+    This is observability only. Candidate generation remains delegated to the
+    current family functions so diagnostics cannot change execution decisions.
+    """
+    diagnostics: dict[str, str] = {}
+    candidates: list[MicroCandidate] = []
+    families = (
+        ("micro_momentum_burst", micro_momentum_burst),
+        ("failed_breakout_fade", failed_breakout_fade),
+        ("fair_value_snapback", fair_value_snapback),
+    )
+    for family, fn in families:
+        if family == "micro_momentum_burst":
+            if ctx.return_30s_buy is None and ctx.return_30s_sell is None:
+                diagnostics[family] = "missing_return_30s"
+                continue
+            if ctx.m5_compression is None:
+                diagnostics[family] = "missing_m5_compression"
+                continue
+            required = {
+                "m1_atr": ctx.m1_atr,
+                "bid": ctx.bid,
+                "ask": ctx.ask,
+                "m1_low": ctx.m1_low,
+                "m1_high": ctx.m1_high,
+                "m15_direction": ctx.m15_direction,
+                "m5_direction": ctx.m5_direction,
+            }
+        elif family == "failed_breakout_fade":
+            if ctx.m15_resistance is None or ctx.m15_support is None:
+                diagnostics[family] = "missing_m15_range"
+                continue
+            if ctx.m1_prev_close is None:
+                diagnostics[family] = "missing_m1_prev_close"
+                continue
+            required = {
+                "m1_close": ctx.m1_close,
+                "bid": ctx.bid,
+                "ask": ctx.ask,
+                "m1_atr": ctx.m1_atr,
+                "m1_low": ctx.m1_low,
+                "m1_high": ctx.m1_high,
+            }
+        else:
+            if ctx.m15_range_mid is None or ctx.m15_range_half_width is None:
+                diagnostics[family] = "missing_m15_range"
+                continue
+            required = {
+                "m1_close": ctx.m1_close,
+                "bid": ctx.bid,
+                "ask": ctx.ask,
+                "m1_atr": ctx.m1_atr,
+            }
+        missing = next((name for name, value in required.items() if value is None), None)
+        if missing is not None:
+            diagnostics[family] = f"missing_{missing}"
+            continue
+        try:
+            candidate = fn(ctx)
+        except Exception:
+            diagnostics[family] = "evaluation_error"
+            continue
+        if candidate is None:
+            diagnostics[family] = "no_match"
+        else:
+            candidates.append(candidate)
+            diagnostics[family] = "candidate_matched"
+    return candidates, diagnostics
+
+
 # ---------------------------------------------------------------------------
 # Entry economics pre-check (Phase 8)
 # ---------------------------------------------------------------------------

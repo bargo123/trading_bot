@@ -16,6 +16,7 @@ from aegis.intel.fast_firehose import (  # noqa: E402
     MicroCandidate,
     check_entry_economics,
     classify_firehose_mode,
+    diagnose_micro_candidates,
     generate_micro_candidates,
     micro_momentum_burst,
     failed_breakout_fade,
@@ -116,6 +117,25 @@ def test_generate_multiple_independent_candidates():
         bid=1.1041, ask=1.1043, spread_pips=0.2))
     families = {c.family for c in results}
     assert len(families) >= 2, f"expected multiple families, got: {families}"
+
+
+def test_micro_diagnostics_identify_missing_return_without_candidate():
+    candidates, reasons = diagnose_micro_candidates(_ctx(
+        return_30s_buy=None,
+        return_30s_sell=None,
+    ))
+
+    assert candidates == []
+    assert reasons["micro_momentum_burst"] == "missing_return_30s"
+
+
+def test_micro_diagnostics_identify_missing_m15_range():
+    _, reasons = diagnose_micro_candidates(_ctx(
+        m15_range_mid=None,
+        m15_range_half_width=None,
+    ))
+
+    assert reasons["fair_value_snapback"] == "missing_m15_range"
 
 
 def test_entry_economics_blocks_min_lot_risk_exceeding_budget():

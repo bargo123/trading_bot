@@ -734,6 +734,116 @@ def test_undercovered_state_reaches_exploration_without_legacy_geometry(tmp_path
     assert decision.action == "fire"
 
 
+def test_exploration_journal_records_micro_rejection_reason(tmp_path, monkeypatch):
+    from aegis.intel import firehose_brain as fb
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1", "records": []}), encoding="utf-8")
+    brain = IntelligentFirehoseBrain({
+        "analogue_index_path": str(index),
+        "intelligent_gate_validated_states": True,
+        "validated_states_path": str(tmp_path / "empty_states.json"),
+        "intelligent_firehose_bootstrap": True,
+        "intelligent_exploration_enabled": True,
+        "intelligent_min_analogues": 20,
+        "intelligent_min_similarity": 0.5,
+        "intelligent_risk_budget_usd": 100.0,
+        "order_quantity": 0.01,
+        "max_positions": 40,
+    })
+    monkeypatch.setattr(
+        fb,
+        "build_runtime_state",
+        lambda **kwargs: {
+            "structure": {"M15": {"kind": "none", "support": None, "resistance": None}},
+            "session": "asia",
+            "regime": {"label": "range"},
+            "multi_timeframe": {"H1": {"direction": "up"}, "M5": {"direction": "down"}},
+            "volatility": {"phase": "stable"},
+        },
+    )
+    monkeypatch.setattr(
+        fb,
+        "runtime_signature",
+        lambda state, side, setup: {
+            "symbol": "EURUSD", "side": side, "setup": setup, "regime": "range",
+            "structure": "none", "volatility": "stable", "session": "asia",
+            "h1_direction": "up", "m5_direction": "down",
+        },
+    )
+    frame = _exploration_frame()
+    row = frame.iloc[-1].copy()
+    row["time"] = frame["time"].iloc[-1]
+
+    decision = brain.evaluate(
+        symbol="EURUSD", row=row, completed_m1=frame.iloc[:-1], positions=[], equity=100.0,
+        pip=0.0001, core_side="buy", entry_price=float(row["close"]),
+        actual_bid=float(row["close"]) - 0.00005,
+        actual_ask=float(row["close"]) + 0.00005,
+    )
+
+    assert decision.journal["exploration_skip"] == "no_micro_candidate_matched"
+    assert decision.journal["micro_candidate_count"] == 0
+    assert decision.journal["micro_diagnostics"]["fair_value_snapback"] == "missing_m15_range"
+
+
+def test_no_quote_exploration_skip_does_not_reuse_micro_diagnostics(tmp_path, monkeypatch):
+    from aegis.intel import firehose_brain as fb
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1", "records": []}), encoding="utf-8")
+    brain = IntelligentFirehoseBrain({
+        "analogue_index_path": str(index),
+        "intelligent_gate_validated_states": True,
+        "validated_states_path": str(tmp_path / "empty_states.json"),
+        "intelligent_firehose_bootstrap": True,
+        "intelligent_exploration_enabled": True,
+        "intelligent_min_analogues": 20,
+        "intelligent_min_similarity": 0.5,
+        "intelligent_risk_budget_usd": 100.0,
+        "order_quantity": 0.01,
+        "max_positions": 40,
+    })
+    brain._last_exploration_micro_diagnostics = {
+        "micro_candidate_count": 1,
+        "micro_diagnostics": {"micro_momentum_burst": "candidate_matched"},
+    }
+    monkeypatch.setattr(
+        fb,
+        "build_runtime_state",
+        lambda **kwargs: {
+            "structure": {"M15": {"kind": "none", "support": None, "resistance": None}},
+            "session": "asia",
+            "regime": {"label": "range"},
+            "multi_timeframe": {"H1": {"direction": "up"}, "M5": {"direction": "down"}},
+            "volatility": {"phase": "stable"},
+        },
+    )
+    monkeypatch.setattr(
+        fb,
+        "runtime_signature",
+        lambda state, side, setup: {
+            "symbol": "EURUSD", "side": side, "setup": setup, "regime": "range",
+            "structure": "none", "volatility": "stable", "session": "asia",
+            "h1_direction": "up", "m5_direction": "down",
+        },
+    )
+    frame = _exploration_frame()
+    row = frame.iloc[-1].copy()
+    row["time"] = frame["time"].iloc[-1]
+
+    decision = brain.evaluate(
+        symbol="EURUSD", row=row, completed_m1=frame.iloc[:-1], positions=[], equity=100.0,
+        pip=0.0001, core_side="buy", entry_price=float(row["close"]),
+    )
+
+    assert decision.journal["exploration_skip"] == "no_genuine_quote"
+    assert "micro_candidate_count" not in decision.journal
+    assert "micro_diagnostics" not in decision.journal
+
+
 def test_undercovered_state_cannot_bypass_measured_spread_limit(tmp_path, monkeypatch):
     """Exploration is denied before candidate construction above session p90 spread."""
     from aegis.intel import firehose_brain as fb

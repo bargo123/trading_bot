@@ -487,6 +487,7 @@ class IntelligentFirehoseBrain:
         )
         self._exploration_limits = ExplorationLimits.from_cfg(cfg)
         self._exploration_theses: set[str] = set()
+        self._last_exploration_micro_diagnostics: dict[str, Any] = {}
         self._seen_hypotheses: dict[str, float] = {}
         self._stage_events: dict[str, list[float]] = {
             "candidate": [], "shadow": [], "exploration_fire": [],
@@ -650,6 +651,7 @@ class IntelligentFirehoseBrain:
         independent limits. Champion validation is NOT required here and this
         NEVER weakens champion requirements.
         """
+        self._last_exploration_micro_diagnostics = {}
         if not bool(self.cfg.get("intelligent_exploration_enabled", True)):
             return None, None
         regime = str(signature.get("regime") or "")
@@ -757,7 +759,7 @@ class IntelligentFirehoseBrain:
         from aegis.intel.fast_firehose import (
             FastMarketContext,
             check_entry_economics,
-            generate_micro_candidates,
+            diagnose_micro_candidates,
         )
 
         bid_px = float(actual_bid) if actual_bid is not None else None
@@ -880,7 +882,11 @@ class IntelligentFirehoseBrain:
         # otherwise build from genuine row/completed_m1/state data.
         if market_ctx is not None:
             ctx = market_ctx
-        micro_cands = generate_micro_candidates(ctx)
+        micro_cands, micro_diagnostics = diagnose_micro_candidates(ctx)
+        self._last_exploration_micro_diagnostics = {
+            "micro_candidate_count": len(micro_cands),
+            "micro_diagnostics": micro_diagnostics,
+        }
         if not micro_cands:
             return None, "no_micro_candidate_matched"
 
@@ -1052,6 +1058,7 @@ class IntelligentFirehoseBrain:
             "sizing": sizing,
             "exit_plan": exit_plan,
             "book_logic": book_logic,
+            **self._last_exploration_micro_diagnostics,
         }
         decision = DemoDecision(
             "fire",
@@ -1607,6 +1614,10 @@ class IntelligentFirehoseBrain:
                 )
             if exp_skip:
                 self._note_skip(exp_skip)
+                exploration_journal = {
+                    "exploration_skip": exp_skip,
+                    **self._last_exploration_micro_diagnostics,
+                }
         action = evaluate_thesis_action(
             fire_decision=fire,
             information_id=info_id,
@@ -1664,6 +1675,7 @@ class IntelligentFirehoseBrain:
             "analogue_measured": is_measured_provenance(getattr(evidence, "provenance", "unknown")),
             **econ.journal(),
             **({} if sizing is None else sizing.journal()),
+            **(exploration_journal or {}),
         }
         return DemoDecision(
             mapped,
