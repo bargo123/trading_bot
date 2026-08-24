@@ -133,3 +133,24 @@ def test_trace_annotation_preserves_no_evidence_reason_without_creating_metrics(
         "evidence_status": "NO_EVIDENCE",
         "evidence_reason": "missing_cost_evidence",
     }
+
+
+def test_trace_annotation_preserves_complete_observed_fields():
+    trace = attach_runtime_evidence(
+        {"event": "firehose_exit_trace", "ticket": "1001"},
+        {
+            "status": "OBSERVED",
+            "liquidation_mark": 1.1002,
+            "liquidation_mark_side": "BID",
+            "return_5s": 0.0001,
+            "remaining_ev": 0.04,
+            "cost_usd": 0.03,
+        },
+    )
+
+    assert trace["evidence_status"] == "OBSERVED"
+    assert trace["liquidation_mark"] == 1.1002
+    assert trace["liquidation_mark_side"] == "BID"
+    assert trace["return_5s"] == 0.0001
+    assert trace["remaining_ev"] == 0.04
+    assert trace["cost_usd"] == 0.03

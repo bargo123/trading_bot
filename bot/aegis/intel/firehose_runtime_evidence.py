@@ -101,4 +101,18 @@ def attach_runtime_evidence(trace: Mapping[str, Any], evidence: Mapping[str, Any
     result["evidence_status"] = str(evidence.get("status") or "NO_EVIDENCE")
     if evidence.get("reason") is not None:
         result["evidence_reason"] = str(evidence["reason"])
+    if evidence.get("status") == "OBSERVED":
+        for field in (
+            "liquidation_mark",
+            "liquidation_mark_side",
+            "return_5s",
+            "return_15s",
+            "return_30s",
+            "remaining_ev",
+            "cost_usd",
+            "spread_usd",
+            "commission_usd",
+        ):
+            if field in evidence:
+                result[field] = evidence[field]
     return result
