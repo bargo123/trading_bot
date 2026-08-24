@@ -82,9 +82,20 @@ def evaluate_basket_policies(rows: Sequence[Mapping[str, Any]], policy_packets: 
 def _validated_packets(policy_packets: Any) -> dict[str, Mapping[str, float]] | None:
     if not isinstance(policy_packets, Mapping) or set(policy_packets) != set(_POLICIES):
         return None
-    trusted_sources = _trusted_sources()
-    if trusted_sources is None:
-        return None
+    trusted_sources: dict[tuple[str, str], dict[str, str]] | None = None
+
+    def valid_evidence_records(records: Any, label: str) -> bool:
+        nonlocal trusted_sources
+        if not isinstance(records, list):
+            return False
+        if not records:
+            return True
+        if trusted_sources is None:
+            trusted_sources = _trusted_sources()
+        return trusted_sources is not None and all(
+            _valid_evidence_record(record, label, trusted_sources) for record in records
+        )
+
     parameters: dict[str, Mapping[str, float]] = {}
     for policy in _POLICIES:
         packet = policy_packets[policy]
@@ -98,16 +109,14 @@ def _validated_packets(policy_packets: Any) -> dict[str, Mapping[str, float]] | 
         coverage = packet.get("BOOK_COVERAGE")
         support = packet.get("supporting_evidence")
         contradictions = packet.get("contradicting_evidence")
-        if not isinstance(contradictions, list) or not all(
-            _valid_evidence_record(record, "CONTRADICTION", trusted_sources) for record in contradictions
-        ):
+        if not valid_evidence_records(contradictions, "CONTRADICTION"):
             return None
         if origin == "BOOK_DIRECT":
             if (
                 coverage != "SUFFICIENT"
                 or not isinstance(support, list)
                 or not support
-                or not all(_valid_evidence_record(record, "SUPPORT", trusted_sources) for record in support)
+                or not valid_evidence_records(support, "SUPPORT")
             ):
                 return None
         elif origin == "NOVEL_SYNTHESIZED_HYPOTHESIS":
@@ -190,26 +199,32 @@ def _valid_evidence_record(
 def _trusted_sources() -> dict[tuple[str, str], dict[str, str]] | None:
     try:
         rows = BookIndex().all_rows(include_body=True)
+        sources: dict[tuple[str, str], dict[str, str]] = {}
+        for row in rows:
+            path = row.get("path")
+            file_hash = row.get("file_hash")
+            body = row.get("body")
+            if not _text(path) or not _hash(file_hash) or not isinstance(body, str):
+                return None
+            if sha256(body.encode("utf-8", errors="replace")).hexdigest() != file_hash:
+                return None
+            resolved_path = _resolved_path(path)
+            if resolved_path is None:
+                return None
+            sources[(resolved_path, file_hash)] = {"path": path, "body": body}
+        return sources
     except Exception:
         return None
-    sources: dict[tuple[str, str], dict[str, str]] = {}
-    for row in rows:
-        path = row.get("path")
-        file_hash = row.get("file_hash")
-        body = row.get("body")
-        if not _text(path) or not _hash(file_hash) or not isinstance(body, str):
-            return None
-        if sha256(body.encode("utf-8", errors="replace")).hexdigest() != file_hash:
-            return None
-        sources[(str(Path(path).resolve()), file_hash)] = {"path": path, "body": body}
-    return sources
 
 
 def _matches_indexed_source(
     record: Mapping[str, Any], trusted_sources: Mapping[tuple[str, str], Mapping[str, str]],
 ) -> bool:
     location = record["location"]
-    source = trusted_sources.get((str(Path(location["path"]).resolve()), record["file_hash"]))
+    resolved_path = _resolved_path(location["path"])
+    if resolved_path is None:
+        return False
+    source = trusted_sources.get((resolved_path, record["file_hash"]))
     if source is None or Path(source["path"]).name != record["filename"]:
         return False
     lines = source["body"].splitlines()
@@ -218,6 +233,13 @@ def _matches_indexed_source(
     if line_end > len(lines):
         return False
     return "\n".join(lines[line_start - 1:line_end]) == record["passage"]
+
+
+def _resolved_path(path: str) -> str | None:
+    try:
+        return str(Path(path).resolve())
+    except Exception:
+        return None
 
 
 def _feature_status(features: Any, timestamp: float) -> str | None:

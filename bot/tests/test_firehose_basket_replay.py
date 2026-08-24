@@ -185,6 +185,47 @@ def test_rejects_a_self_consistent_source_that_is_not_in_the_trusted_index(tmp_p
     assert result == {"status": "NO_EVIDENCE", "reason": "missing_policy_evidence"}
 
 
+def test_accepts_novel_only_packets_when_the_book_index_is_unavailable(monkeypatch):
+    packets = _policy_packets()
+    for packet in packets.values():
+        packet.update({
+            "origin": "NOVEL_SYNTHESIZED_HYPOTHESIS",
+            "BOOK_COVERAGE": "INSUFFICIENT",
+            "supporting_evidence": [],
+            "contradicting_evidence": [],
+        })
+
+    def unavailable_index():
+        raise OSError("trusted index is unavailable")
+
+    monkeypatch.setattr("aegis.research.firehose_basket_replay.BookIndex", unavailable_index)
+
+    assert evaluate_basket_policies(_rows(), packets)["status"] == "VALIDATED"
+
+
+@pytest.mark.parametrize("corrupt_index_path", [False, True])
+def test_rejects_malformed_provenance_paths_without_raising(monkeypatch, corrupt_index_path):
+    packets = _policy_packets()
+    if corrupt_index_path:
+        assert _TRUSTED_INDEX is not None
+        rows = deepcopy(_TRUSTED_INDEX.all_rows(include_body=True))
+        rows[0]["path"] = "\0"
+
+        class CorruptIndex:
+            def all_rows(self, include_body):
+                return rows
+
+        monkeypatch.setattr(
+            "aegis.research.firehose_basket_replay.BookIndex", lambda: CorruptIndex(),
+        )
+    else:
+        packets["structural"]["supporting_evidence"][0]["location"]["path"] = "\0"
+
+    result = evaluate_basket_policies(_rows(), packets)
+
+    assert result == {"status": "NO_EVIDENCE", "reason": "missing_policy_evidence"}
+
+
 def test_requires_recorded_cost_evidence_for_every_row():
     rows = _rows()
     del rows[1]["cost_usd"]
