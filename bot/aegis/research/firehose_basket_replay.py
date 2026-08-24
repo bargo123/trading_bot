@@ -29,6 +29,11 @@ def evaluate_basket_policies(rows: Sequence[Mapping[str, Any]], policy_packets: 
     packets = _validated_packets(policy_packets)
     if packets is None:
         return _no_evidence("missing_policy_evidence")
+    if any(
+        packet.get("origin") == "NOVEL_SYNTHESIZED_HYPOTHESIS"
+        for packet in policy_packets.values()
+    ):
+        return _no_evidence("missing_stronger_novel_empirical_gate")
 
     prepared = _prepare_rows(rows)
     if prepared is None:
@@ -58,6 +63,8 @@ def evaluate_basket_policies(rows: Sequence[Mapping[str, Any]], policy_packets: 
     winner = _winner(walk_forward_by_policy)
     if winner is None or not _has_policy_outcomes(oos_rows, (winner,)):
         return _no_evidence("incomplete_oos_evidence")
+    if not _passes_governed_oos_policy_gate(_metrics(oos_rows, winner)):
+        return _no_evidence("missing_governed_oos_policy_gate")
     validation_by_policy = {
         policy: _metrics(validation_rows, policy) for policy in _POLICIES
     }
@@ -77,6 +84,12 @@ def evaluate_basket_policies(rows: Sequence[Mapping[str, Any]], policy_packets: 
             "normalized_parameters": dict(packets[winner]),
         },
     }
+
+
+def _passes_governed_oos_policy_gate(metrics: Mapping[str, float]) -> bool:
+    """Fail closed until basket OOS thresholds govern all required metrics."""
+    del metrics
+    return False
 
 
 def _validated_packets(policy_packets: Any) -> dict[str, Mapping[str, float]] | None:

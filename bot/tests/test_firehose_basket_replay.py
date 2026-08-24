@@ -185,7 +185,7 @@ def test_rejects_a_self_consistent_source_that_is_not_in_the_trusted_index(tmp_p
     assert result == {"status": "NO_EVIDENCE", "reason": "missing_policy_evidence"}
 
 
-def test_accepts_novel_only_packets_when_the_book_index_is_unavailable(monkeypatch):
+def test_rejects_novel_only_packets_even_when_the_book_index_is_unavailable(monkeypatch):
     packets = _policy_packets()
     for packet in packets.values():
         packet.update({
@@ -200,7 +200,10 @@ def test_accepts_novel_only_packets_when_the_book_index_is_unavailable(monkeypat
 
     monkeypatch.setattr("aegis.research.firehose_basket_replay.BookIndex", unavailable_index)
 
-    assert evaluate_basket_policies(_rows(), packets)["status"] == "VALIDATED"
+    assert evaluate_basket_policies(_rows(), packets) == {
+        "status": "NO_EVIDENCE",
+        "reason": "missing_stronger_novel_empirical_gate",
+    }
 
 
 @pytest.mark.parametrize("corrupt_index_path", [False, True])
@@ -249,17 +252,9 @@ def test_oos_and_sealed_rows_do_not_change_the_validation_winner():
 
     result = evaluate_basket_policies(rows, _policy_packets())
 
-    assert result["winner"] == "structural"
-    assert result["oos_metrics"]["expectancy_r"] == -10.2
-    assert result["artifact"] == {
-        "validated": True,
-        "complete": True,
-        "policy": "structural",
-        "normalized_parameters": {
-            "r_multiple": 1.0,
-            "cost_r": 0.1,
-            "momentum_threshold": 0.5,
-        },
+    assert result == {
+        "status": "NO_EVIDENCE",
+        "reason": "missing_governed_oos_policy_gate",
     }
 
 
@@ -290,12 +285,10 @@ def test_selects_by_costed_pf_tail_and_drawdown_not_win_rate():
 
     result = evaluate_basket_policies(rows, _policy_packets())
 
-    assert result["winner"] == "harvest"
-    assert result["validation_metrics"]["win_rate"] == 0.5
-    assert result["validation_metrics"]["expectancy_r"] == 0.0
-    assert result["validation_metrics"]["profit_factor"] == 1.0
-    assert result["validation_metrics"]["tail_r"] == -1.0
-    assert result["validation_metrics"]["max_drawdown_r"] == 1.0
+    assert result == {
+        "status": "NO_EVIDENCE",
+        "reason": "missing_governed_oos_policy_gate",
+    }
 
 
 def test_omits_artifact_when_selected_policy_lacks_complete_oos_evidence():
@@ -311,6 +304,15 @@ def test_omits_artifact_when_selected_policy_lacks_complete_oos_evidence():
     assert result == {"status": "NO_EVIDENCE", "reason": "incomplete_oos_evidence"}
 
 
+def test_rejects_complete_positive_direct_source_oos_without_a_governed_policy_gate():
+    result = evaluate_basket_policies(_rows(), _policy_packets())
+
+    assert result == {
+        "status": "NO_EVIDENCE",
+        "reason": "missing_governed_oos_policy_gate",
+    }
+
+
 def test_selects_the_winner_from_realized_walk_forward_outcomes():
     rows = _rows()
     for row in rows:
@@ -324,7 +326,7 @@ def test_selects_the_winner_from_realized_walk_forward_outcomes():
 
     result = evaluate_basket_policies(rows, _policy_packets())
 
-    assert result["winner"] == "structural"
-    assert [decision["winner"] for decision in result["walk_forward"]] == ["structural"] * 4
-    assert [decision["costed_return_r"] for decision in result["walk_forward"]] == pytest.approx([0.1] * 4)
-    assert result["walk_forward_metrics"]["expectancy_r"] == pytest.approx(0.1)
+    assert result == {
+        "status": "NO_EVIDENCE",
+        "reason": "missing_governed_oos_policy_gate",
+    }

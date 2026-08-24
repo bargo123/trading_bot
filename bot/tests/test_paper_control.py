@@ -232,6 +232,8 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert cfg["engine"] == "mt5"
     assert cfg["mode"] == "mt5_demo"
     assert cfg["allow_live"] is False
+    assert cfg["intelligent_exploration_enabled"] is False
+    assert float(cfg["exploration_max_risk_per_trade_usd"]) == 0.15
     assert cfg["paper_trading_enabled"] is True
     assert cfg["firehose_every_bar"] is True
     assert cfg["firehose_book_filter"] is False
