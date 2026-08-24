@@ -49,6 +49,17 @@ def normalize_firehose_lifecycle_rows(rows: Sequence[Mapping[str, Any]]) -> dict
             return _no_evidence("missing_confirmed_close")
         if opened is None or not traced:
             return _no_evidence("missing_lifecycle_evidence")
+        realized_net = closed.get("realized_net_usd")
+        cost = closed.get("cost_usd")
+        if (
+            not isinstance(realized_net, (int, float))
+            or isinstance(realized_net, bool)
+            or not isfinite(realized_net)
+            or not isinstance(cost, (int, float))
+            or isinstance(cost, bool)
+            or not isfinite(cost)
+        ):
+            return _no_evidence("missing_cost_evidence")
         normalized.append({"ticket": ticket, "open": dict(opened), "traces": [dict(event) for event in traced], "close": dict(closed)})
     return {"status": "OBSERVED", "rows": normalized}
 
