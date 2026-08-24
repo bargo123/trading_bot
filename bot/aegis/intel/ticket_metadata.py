@@ -24,6 +24,8 @@ when exact metadata does not exist.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -48,6 +50,12 @@ class TicketMetadata:
     opened_ts: float
     information_id: str | None = None
     symbol: str = ""
+    basket_id: str | None = None
+    trigger_id: str | None = None
+    clip_sequence: int | None = None
+    entry_geometry: dict[str, Any] | None = None
+    initial_risk: float | None = None
+    cost_evidence: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -78,12 +86,24 @@ class TicketMetadataStore:
             pass
 
     def _save(self) -> None:
+        temp_path: str | None = None
         try:
             data = {t: m.to_dict() for t, m in self._store.items()}
-            self.persist_path.write_text(
-                json.dumps(data, indent=2), encoding="utf-8")
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=self.persist_path.parent,
+                prefix=f".{self.persist_path.name}.", suffix=".tmp", delete=False,
+            ) as handle:
+                temp_path = handle.name
+                handle.write(json.dumps(data, indent=2))
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, self.persist_path)
         except OSError:
-            pass
+            if temp_path:
+                try:
+                    Path(temp_path).unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     def add(self, meta: TicketMetadata) -> None:
         """Add or update ticket metadata."""
@@ -135,6 +155,12 @@ def create_ticket_metadata(
     session: str,
     information_id: str | None = None,
     symbol: str = "",
+    basket_id: str | None = None,
+    trigger_id: str | None = None,
+    clip_sequence: int | None = None,
+    entry_geometry: dict[str, Any] | None = None,
+    initial_risk: float | None = None,
+    cost_evidence: dict[str, Any] | None = None,
 ) -> TicketMetadata:
     """Create ticket metadata with current timestamp."""
     return TicketMetadata(
@@ -153,4 +179,10 @@ def create_ticket_metadata(
         opened_ts=time.time(),
         information_id=information_id,
         symbol=str(symbol).upper(),
+        basket_id=str(basket_id).strip() if basket_id is not None else None,
+        trigger_id=str(trigger_id).strip() if trigger_id is not None else None,
+        clip_sequence=int(clip_sequence) if clip_sequence is not None else None,
+        entry_geometry=dict(entry_geometry) if entry_geometry is not None else None,
+        initial_risk=float(initial_risk) if initial_risk is not None else None,
+        cost_evidence=dict(cost_evidence) if cost_evidence is not None else None,
     )
