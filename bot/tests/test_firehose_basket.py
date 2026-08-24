@@ -1,4 +1,6 @@
+import json
 import multiprocessing
+import time
 from pathlib import Path
 
 import pytest
@@ -26,6 +28,7 @@ def _store_basket(store, *, clip_cap=3, unrealized_pnl=5.0, risk_budget=20.0):
 
 
 def _continuation(**overrides):
+    observed_at = time.time()
     continuation = {
         "side": "buy",
         "trigger_id": "trigger-2",
@@ -35,8 +38,8 @@ def _continuation(**overrides):
         "remaining_ev": 0.25,
         "adverse_selection": False,
         "policy_artifact": {"validated": True, "complete": True},
-        "broker_pnl": {"unrealized_pnl": 5.0, "observed_at": 100.0},
-        "evaluated_at": 101.0,
+        "broker_pnl": {"unrealized_pnl": 5.0, "observed_at": observed_at},
+        "evaluated_at": observed_at,
     }
     continuation.update(overrides)
     return continuation
@@ -162,7 +165,7 @@ def test_losing_basket_cannot_add_a_clip(tmp_path):
     _record_initial_clip(store)
 
     assert can_add_clip(store.get_basket("basket-1"), _continuation(
-        broker_pnl={"unrealized_pnl": -0.01, "observed_at": 100.0},
+        broker_pnl={"unrealized_pnl": -0.01, "observed_at": time.time()},
     ), 1.0) == (
         False, "losing_basket",
     )
@@ -257,3 +260,66 @@ def test_admission_reloads_current_state_inside_cross_process_lock(tmp_path):
     assert BasketMetadataStore(path).get_basket("basket-1").ticket_ids == (
         "ticket-1", "ticket-primary",
     )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("risk_budget", float("inf")),
+        ("tick_value", float("nan")),
+        ("ticket.initial_risk", float("nan")),
+        ("ticket.volume", float("inf")),
+    ],
+)
+def test_reload_fails_closed_on_nonfinite_serialized_basket_fields(tmp_path, field, value):
+    path = tmp_path / "baskets.json"
+    store = BasketMetadataStore(path)
+    _store_basket(store)
+    _record_initial_clip(store)
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    if field.startswith("ticket."):
+        persisted["basket-1"]["tickets"][0][field.removeprefix("ticket.")] = value
+    else:
+        persisted["basket-1"][field] = value
+    path.write_text(json.dumps(persisted), encoding="utf-8")
+
+    reloaded = BasketMetadataStore(path)
+
+    assert reloaded.get_basket("basket-1") is None
+    with pytest.raises(KeyError):
+        reloaded.record_ticket(
+            "basket-1", ticket_id="ticket-2", trigger_id="trigger-2", clip_sequence=2,
+            entry_price=1.1000, stop_loss=1.0980, volume=0.2,
+            cost_evidence={"spread_ticks": 1.0}, regime="trend", session="london",
+            continuation=_continuation(),
+        )
+
+
+def test_initial_ticket_rejects_zero_broker_native_risk(tmp_path):
+    store = BasketMetadataStore(tmp_path / "baskets.json")
+    _store_basket(store)
+
+    with pytest.raises(ValueError, match="invalid_broker_risk"):
+        store.record_ticket(
+            "basket-1", ticket_id="ticket-1", trigger_id="trigger-1", clip_sequence=1,
+            entry_price=1.1000, stop_loss=1.1000, volume=0.2,
+            cost_evidence={"spread_ticks": 1.0}, regime="trend", session="london",
+        )
+
+
+def test_pnl_freshness_uses_trusted_clock_not_caller_timestamp(tmp_path, monkeypatch):
+    store = BasketMetadataStore(tmp_path / "baskets.json")
+    _store_basket(store)
+    _record_initial_clip(store)
+    monkeypatch.setattr("aegis.intel.firehose_basket.time.time", lambda: 100.0)
+
+    assert can_add_clip(store.get_basket("basket-1"), _continuation(
+        broker_pnl={"unrealized_pnl": 5.0, "observed_at": 0.0}, evaluated_at=0.0,
+    ), 1.0) == (False, "stale_broker_pnl")
+
+
+def test_reload_fails_closed_when_persisted_root_is_not_a_basket_mapping(tmp_path):
+    path = tmp_path / "baskets.json"
+    path.write_text("[]", encoding="utf-8")
+
+    assert BasketMetadataStore(path).get_basket("basket-1") is None

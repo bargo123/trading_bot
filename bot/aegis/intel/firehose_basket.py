@@ -25,6 +25,39 @@ def _finite_float(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def _positive_float(value: Any, field: str) -> float:
+    number = _finite_float(value)
+    if number is None or number <= 0:
+        raise ValueError(field)
+    return number
+
+
+def _positive_int(value: Any, field: str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(field)
+    number = _finite_float(value)
+    if number is None or number <= 0 or not number.is_integer():
+        raise ValueError(field)
+    return int(number)
+
+
+def _finite_mapping(value: Any, field: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(field)
+    copied: dict[str, Any] = {}
+    for key, item in value.items():
+        if isinstance(item, Mapping):
+            copied[str(key)] = _finite_mapping(item, field)
+        elif isinstance(item, (int, float)) and not isinstance(item, bool):
+            number = _finite_float(item)
+            if number is None:
+                raise ValueError(field)
+            copied[str(key)] = number
+        else:
+            copied[str(key)] = item
+    return copied
+
+
 @dataclass(frozen=True)
 class BasketTicket:
     """An immutable record of one broker ticket owned by a basket."""
@@ -58,14 +91,19 @@ class BasketTicket:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "BasketTicket":
+        ticket_id = str(data["ticket_id"]).strip()
+        trigger_id = str(data["trigger_id"]).strip()
+        geometry = _finite_mapping(data["entry_geometry"], "entry_geometry")
+        if not ticket_id or not trigger_id or not geometry:
+            raise ValueError("ticket")
         return cls(
-            ticket_id=str(data["ticket_id"]),
-            trigger_id=str(data["trigger_id"]),
-            clip_sequence=int(data["clip_sequence"]),
-            volume=float(data["volume"]),
-            initial_risk=float(data["initial_risk"]),
-            _entry_geometry=_geometry_items(data["entry_geometry"]),
-            cost_evidence=dict(data["cost_evidence"]),
+            ticket_id=ticket_id,
+            trigger_id=trigger_id,
+            clip_sequence=_positive_int(data["clip_sequence"], "clip_sequence"),
+            volume=_positive_float(data["volume"], "volume"),
+            initial_risk=_positive_float(data["initial_risk"], "initial_risk"),
+            _entry_geometry=_geometry_items(geometry),
+            cost_evidence=_finite_mapping(data["cost_evidence"], "cost_evidence"),
             regime=str(data["regime"]),
             session=str(data["session"]),
         )
@@ -122,21 +160,45 @@ class BasketMetadata:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "BasketMetadata":
+        basket_id = str(data["basket_id"]).strip()
+        hypothesis_id = str(data["hypothesis_id"]).strip()
+        family = str(data["family"]).strip()
+        symbol = str(data["symbol"]).strip().upper()
+        side = str(data["side"]).lower()
+        regime = str(data["regime"]).strip()
+        session = str(data["session"]).strip()
+        geometry = _finite_mapping(data["entry_geometry"], "entry_geometry")
+        if (
+            not all((basket_id, hypothesis_id, family, symbol, regime, session))
+            or side not in {"buy", "sell"} or not geometry
+            or not isinstance(data.get("tickets", []), list)
+        ):
+            raise ValueError("basket")
+        tickets = tuple(BasketTicket.from_dict(ticket) for ticket in data.get("tickets", []))
+        if len(tickets) > _positive_int(data["clip_cap"], "clip_cap"):
+            raise ValueError("clip_cap")
+        if tuple(ticket.clip_sequence for ticket in tickets) != tuple(range(1, len(tickets) + 1)):
+            raise ValueError("clip_sequence")
+        if len({ticket.ticket_id for ticket in tickets}) != len(tickets):
+            raise ValueError("ticket_id")
+        pnl = _finite_float(data.get("unrealized_pnl", 0.0))
+        if pnl is None:
+            raise ValueError("unrealized_pnl")
         return cls(
-            basket_id=str(data["basket_id"]),
-            hypothesis_id=str(data["hypothesis_id"]),
-            family=str(data["family"]),
-            symbol=str(data["symbol"]),
-            side=str(data["side"]),
-            risk_budget=float(data["risk_budget"]),
-            clip_cap=int(data["clip_cap"]),
-            tick_value=float(data["tick_value"]),
-            tick_size=float(data["tick_size"]),
-            regime=str(data["regime"]),
-            session=str(data["session"]),
-            _entry_geometry=_geometry_items(data["entry_geometry"]),
-            unrealized_pnl=float(data.get("unrealized_pnl", 0.0)),
-            tickets=tuple(BasketTicket.from_dict(ticket) for ticket in data.get("tickets", [])),
+            basket_id=basket_id,
+            hypothesis_id=hypothesis_id,
+            family=family,
+            symbol=symbol,
+            side=side,
+            risk_budget=_positive_float(data["risk_budget"], "risk_budget"),
+            clip_cap=_positive_int(data["clip_cap"], "clip_cap"),
+            tick_value=_positive_float(data["tick_value"], "tick_value"),
+            tick_size=_positive_float(data["tick_size"], "tick_size"),
+            regime=regime,
+            session=session,
+            _entry_geometry=_geometry_items(geometry),
+            unrealized_pnl=pnl,
+            tickets=tickets,
         )
 
 
@@ -161,6 +223,8 @@ def can_add_clip(
     basket: BasketMetadata,
     continuation: Mapping[str, Any] | None,
     proposed_risk: float,
+    *,
+    now: float | None = None,
 ) -> tuple[bool, str]:
     """Return whether a fresh, same-side clip is allowed for this basket."""
     try:
@@ -189,10 +253,10 @@ def can_add_clip(
         return _decision(basket, False, "missing_broker_pnl", risk)
     pnl = _finite_float(broker_pnl.get("unrealized_pnl"))
     observed_at = _finite_float(broker_pnl.get("observed_at"))
-    evaluated_at = _finite_float(continuation.get("evaluated_at"))
-    if pnl is None or observed_at is None or evaluated_at is None:
+    trusted_now = _finite_float(time.time() if now is None else now)
+    if pnl is None or observed_at is None or trusted_now is None:
         return _decision(basket, False, "missing_broker_pnl", risk)
-    if observed_at > evaluated_at or evaluated_at - observed_at > 5.0:
+    if observed_at > trusted_now or trusted_now - observed_at > 5.0:
         return _decision(basket, False, "stale_broker_pnl", risk)
     if pnl < 0:
         return _decision(basket, False, "losing_basket", risk)
@@ -235,7 +299,7 @@ def _broker_native_risk(
         risk = float(ticks * Decimal(str(value)) * Decimal(str(lots)))
     except (ArithmeticError, ValueError):
         raise ValueError("invalid_broker_risk") from None
-    if not math.isfinite(risk):
+    if not math.isfinite(risk) or risk <= 0:
         raise ValueError("invalid_broker_risk")
     return risk
 
@@ -254,10 +318,13 @@ class BasketMetadataStore:
             return
         try:
             data = json.loads(self.persist_path.read_text(encoding="utf-8"))
+            if not isinstance(data, Mapping) or any(
+                not isinstance(basket, Mapping) for basket in data.values()
+            ):
+                raise ValueError("persisted_basket_store")
             self._store = {
                 str(basket_id): BasketMetadata.from_dict(basket)
                 for basket_id, basket in data.items()
-                if isinstance(basket, Mapping)
             }
         except (OSError, json.JSONDecodeError, TypeError, ValueError, KeyError):
             self._store = {}

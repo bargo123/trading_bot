@@ -46,3 +46,19 @@
   completed with `14 passed`.
 - Full follow-up verification: `pytest -q` completed with `1049 passed` in
   82.04s, with the same existing `eventkit` deprecation warning.
+
+## Round 2 Hardening
+
+- Reload now validates every persisted basket and ticket record before it can
+  participate in admission. Non-finite values, invalid positive fields,
+  malformed geometry/cost maps, duplicate tickets, and invalid clip sequences
+  discard the persisted store fail closed.
+- Broker-native risk must be strictly positive for the initial ticket as well
+  as additions.
+- PnL freshness now compares broker `observed_at` against the internal clock
+  (or an explicit trusted `now` argument); caller `evaluated_at` is ignored.
+- Added regressions for serialized Infinity/NaN values, malformed persisted
+  roots, zero-risk initial tickets, and forged equal stale timestamps. Focused
+  verification completed with `21 passed`.
+- Full Round 2 verification: `pytest -q` completed with `1056 passed` in
+  81.68s, with the same existing `eventkit` deprecation warning.
