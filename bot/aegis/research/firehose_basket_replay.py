@@ -29,8 +29,13 @@ def evaluate_basket_policies(rows: Sequence[Mapping[str, Any]], policy_packets: 
     prepared = _prepare_rows(rows)
     if prepared is None:
         return _no_evidence("non_chronological_rows")
-    if prepared == "missing_cost":
-        return _no_evidence("missing_cost_evidence")
+    if isinstance(prepared, str):
+        return _no_evidence({
+            "missing_cost": "missing_cost_evidence",
+            "missing_features": "missing_feature_evidence",
+            "future_features": "future_feature_evidence",
+            "missing_lifecycle": "missing_lifecycle_evidence",
+        }[prepared])
 
     partitions = [row["partition"] for row in prepared]
     if not {"TRAIN", "VALIDATION"}.issubset(partitions) or not any(
@@ -45,12 +50,13 @@ def evaluate_basket_policies(rows: Sequence[Mapping[str, Any]], policy_packets: 
         return _no_evidence("incomplete_policy_outcomes")
 
     walk_forward = _walk_forward(train_rows, validation_rows)
+    walk_forward_by_policy = _walk_forward_metrics(walk_forward)
+    winner = _winner(walk_forward_by_policy)
+    if winner is None or not _has_policy_outcomes(oos_rows, (winner,)):
+        return _no_evidence("incomplete_oos_evidence")
     validation_by_policy = {
         policy: _metrics(validation_rows, policy) for policy in _POLICIES
     }
-    winner = _winner(validation_by_policy)
-    if winner is None or not _has_policy_outcomes(oos_rows, (winner,)):
-        return _no_evidence("incomplete_oos_evidence")
 
     return {
         "status": "VALIDATED",
@@ -58,6 +64,7 @@ def evaluate_basket_policies(rows: Sequence[Mapping[str, Any]], policy_packets: 
         "train_metrics": _metrics(train_rows, winner),
         "validation_metrics": validation_by_policy[winner],
         "walk_forward": walk_forward,
+        "walk_forward_metrics": walk_forward_by_policy[winner],
         "oos_metrics": _metrics(oos_rows, winner),
         "artifact": {
             "validated": True,
@@ -83,8 +90,18 @@ def _validated_packets(policy_packets: Any) -> dict[str, Mapping[str, float]] | 
         origin = packet.get("origin")
         coverage = packet.get("BOOK_COVERAGE")
         support = packet.get("supporting_evidence")
+        contradictions = packet.get("contradicting_evidence")
+        if not isinstance(contradictions, list) or not all(
+            _valid_evidence_record(record, "CONTRADICTION") for record in contradictions
+        ):
+            return None
         if origin == "BOOK_DIRECT":
-            if coverage != "SUFFICIENT" or not isinstance(support, list) or not support:
+            if (
+                coverage != "SUFFICIENT"
+                or not isinstance(support, list)
+                or not support
+                or not all(_valid_evidence_record(record, "SUPPORT") for record in support)
+            ):
                 return None
         elif origin == "NOVEL_SYNTHESIZED_HYPOTHESIS":
             if coverage != "INSUFFICIENT" or support != []:
@@ -127,10 +144,81 @@ def _prepare_rows(rows: Any) -> list[dict[str, Any]] | str | None:
             return None
         if row["turnover"] < 0:
             return None
+        feature_status = _feature_status(row.get("features"), timestamp)
+        if feature_status is not None:
+            return feature_status
+        if not _complete_lifecycle(row.get("lifecycle"), timestamp):
+            return "missing_lifecycle"
         prepared.append(dict(row))
         last_timestamp = timestamp
         last_partition = _PARTITION_ORDER[partition]
     return prepared
+
+
+def _valid_evidence_record(record: Any, label: str) -> bool:
+    if not isinstance(record, Mapping):
+        return False
+    source_id = record.get("source_id")
+    file_hash = record.get("file_hash")
+    location = record.get("location")
+    line_start = location.get("line_start") if isinstance(location, Mapping) else None
+    line_end = location.get("line_end") if isinstance(location, Mapping) else None
+    return (
+        _text(record.get("filename"))
+        and _hash(file_hash)
+        and source_id == file_hash
+        and record.get("evidence_label") == label
+        and _text(record.get("passage"))
+        and isinstance(location, Mapping)
+        and _text(location.get("path"))
+        and _positive_int(line_start)
+        and _positive_int(line_end)
+        and line_end >= line_start
+    )
+
+
+def _feature_status(features: Any, timestamp: float) -> str | None:
+    if not isinstance(features, Mapping) or not features:
+        return "missing_features"
+    for feature in features.values():
+        if not isinstance(feature, Mapping) or "value" not in feature:
+            return "missing_features"
+        available_at = _timestamp(feature.get("available_at"))
+        if available_at is None:
+            return "missing_features"
+        if available_at > timestamp:
+            return "future_features"
+    return None
+
+
+def _complete_lifecycle(lifecycle: Any, timestamp: float) -> bool:
+    if not isinstance(lifecycle, Mapping):
+        return False
+    opened_at = _timestamp(lifecycle.get("opened_at"))
+    closed_at = _timestamp(lifecycle.get("closed_at"))
+    if opened_at is None or closed_at is None or not opened_at < closed_at <= timestamp:
+        return False
+    if lifecycle.get("confirmed_close") is not True:
+        return False
+    if not _text(lifecycle.get("basket_id")) or not _text(lifecycle.get("ticket_id")):
+        return False
+    if not all(_finite_number(lifecycle.get(field)) for field in (
+        "mfe_usd", "mae_usd", "peak_net_profit_usd", "realized_net_usd",
+        "capture_ratio", "age_seconds", "ev", "cost_usd", "turnover",
+    )):
+        return False
+    if lifecycle["age_seconds"] < 0 or lifecycle["cost_usd"] < 0 or lifecycle["turnover"] < 0:
+        return False
+    if not _positive_int(lifecycle.get("clips")):
+        return False
+    reasons = lifecycle.get("decision_reasons")
+    return (
+        isinstance(reasons, list)
+        and bool(reasons)
+        and all(_text(reason) for reason in reasons)
+        and _text(lifecycle.get("regime"))
+        and _text(lifecycle.get("session"))
+    )
 
 
 def _has_policy_outcomes(rows: Sequence[Mapping[str, Any]], policies: Sequence[str]) -> bool:
@@ -153,9 +241,34 @@ def _walk_forward(train_rows: Sequence[Mapping[str, Any]], validation_rows: Sequ
         winner = _winner(historical_metrics)
         if winner is None:
             return []
-        replay.append({"timestamp": row["timestamp"], "winner": winner})
+        outcome = row["policy_outcomes"][winner]
+        costed_return = (outcome["gross_pnl_usd"] - row["cost_usd"]) / row["initial_risk_usd"]
+        replay.append({
+            "timestamp": row["timestamp"],
+            "winner": winner,
+            "gross_pnl_usd": outcome["gross_pnl_usd"],
+            "cost_usd": row["cost_usd"],
+            "initial_risk_usd": row["initial_risk_usd"],
+            "costed_return_r": costed_return,
+            "capture_ratio": row["capture_ratio"],
+            "turnover": row["turnover"],
+        })
         history.append(row)
     return replay
+
+
+def _walk_forward_metrics(decisions: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, float]]:
+    by_policy: dict[str, list[Mapping[str, Any]]] = {}
+    for decision in decisions:
+        by_policy.setdefault(decision["winner"], []).append(decision)
+    return {
+        policy: _metrics_from_observations(
+            [decision["costed_return_r"] for decision in values],
+            [decision["capture_ratio"] for decision in values],
+            [decision["turnover"] for decision in values],
+        )
+        for policy, values in by_policy.items()
+    }
 
 
 def _metrics(rows: Sequence[Mapping[str, Any]], policy: str) -> dict[str, float]:
@@ -164,6 +277,16 @@ def _metrics(rows: Sequence[Mapping[str, Any]], policy: str) -> dict[str, float]
         / row["initial_risk_usd"]
         for row in rows
     ]
+    return _metrics_from_observations(
+        returns,
+        [row["capture_ratio"] for row in rows],
+        [row["turnover"] for row in rows],
+    )
+
+
+def _metrics_from_observations(
+    returns: Sequence[float], capture_ratios: Sequence[float], turnovers: Sequence[float],
+) -> dict[str, float]:
     gross_profit = sum(value for value in returns if value > 0)
     gross_loss = -sum(value for value in returns if value < 0)
     profit_factor = gross_profit / gross_loss if gross_loss else float("inf")
@@ -178,8 +301,8 @@ def _metrics(rows: Sequence[Mapping[str, Any]], policy: str) -> dict[str, float]
         "profit_factor": profit_factor,
         "tail_r": min(returns),
         "max_drawdown_r": max_drawdown,
-        "capture_ratio": sum(row["capture_ratio"] for row in rows) / len(rows),
-        "turnover": sum(row["turnover"] for row in rows),
+        "capture_ratio": sum(capture_ratios) / len(capture_ratios),
+        "turnover": sum(turnovers),
         "win_rate": sum(value > 0 for value in returns) / len(returns),
     }
 
@@ -221,6 +344,18 @@ def _timestamp(value: Any) -> float | None:
 
 def _finite_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(value)
+
+
+def _positive_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _hash(value: Any) -> bool:
+    return _text(value) and len(value) == 64 and all(character in "0123456789abcdef" for character in value)
 
 
 def _no_evidence(reason: str) -> dict[str, str]:
