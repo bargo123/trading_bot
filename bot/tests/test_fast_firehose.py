@@ -22,6 +22,7 @@ from aegis.intel.fast_firehose import (  # noqa: E402
     fair_value_snapback,
     pip_value,
 )
+from aegis.intel.profit_harvester import HarvestDecision  # noqa: E402
 
 
 def _ctx(**overrides) -> FastMarketContext:
@@ -203,6 +204,69 @@ def test_fast_exit_hold_with_positive_ev():
         remaining_ev=0.03, remaining_ev_status="ESTIMATED")
     assert v["action"] == "HOLD"
     assert "positive" in v["why"].lower() or "mfe" in v["why"].lower()
+
+
+def test_fast_exit_legacy_target_take_behavior_is_unchanged():
+    """A structural target must remain higher priority than a harvest hint."""
+    v = _sm().evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.10199,
+        stop_loss=1.0990, target=1.1020,
+        opened_ts=1000, now=1030, pnl_pips=19.9,
+        mfe_pips=20, mae_pips=-1,
+        stop_pips=10, pip=0.0001,
+        harvest_decision=HarvestDecision("MOMENTUM_HOLD", "bounded_favorable_momentum"),
+    )
+
+    assert v["action"] == "TAKE"
+    assert v["reason"] == "target_reached"
+
+
+def test_fast_exit_maps_quick_take_after_existing_protections():
+    """A supported harvest close must replace only the legacy default HOLD."""
+    v = _sm().evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.1003,
+        stop_loss=1.0990, target=1.1020,
+        opened_ts=1000, now=1020, pnl_pips=3.0,
+        mfe_pips=3.0, mae_pips=-0.5,
+        stop_pips=10, pip=0.0001,
+        remaining_ev=0.03, remaining_ev_status="ESTIMATED",
+        harvest_decision=HarvestDecision("QUICK_TAKE", "momentum_stall_profit_harvest"),
+    )
+
+    assert v["action"] == "QUICK_TAKE"
+    assert v["reason"] == "momentum_stall_profit_harvest"
+
+
+def test_fast_exit_honors_harvest_floor_breach_before_legacy_lock():
+    """An armed floor breach must close rather than merely adjust the stop."""
+    v = _sm(giveback_frac=0.70).evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.10045,
+        stop_loss=1.0990, target=1.1020,
+        opened_ts=1000, now=1020, pnl_pips=4.5,
+        mfe_pips=10.0, mae_pips=-0.5,
+        stop_pips=10, pip=0.0001,
+        remaining_ev=0.03, remaining_ev_status="ESTIMATED",
+        harvest_decision=HarvestDecision("QUICK_TAKE", "profit_floor_breach"),
+    )
+
+    assert v["action"] == "QUICK_TAKE"
+    assert v["reason"] == "profit_floor_breach"
+
+
+def test_fast_exit_maps_profit_lock_to_existing_lock_path():
+    """A harvest lock must preserve the established stop-lock execution path."""
+    v = _sm().evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.1003,
+        stop_loss=1.0990, target=1.1020,
+        opened_ts=1000, now=1020, pnl_pips=3.0,
+        mfe_pips=3.0, mae_pips=-0.5,
+        stop_pips=10, pip=0.0001,
+        remaining_ev=0.03, remaining_ev_status="ESTIMATED",
+        harvest_decision=HarvestDecision("PROFIT_LOCK", "profit_floor_protected"),
+    )
+
+    assert v["action"] == "LOCK"
+    assert v["reason"] == "profit_floor_protected"
 
 
 def test_one_large_loser_cannot_occur_from_old_geometry():

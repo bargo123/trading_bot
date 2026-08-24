@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
+from aegis.intel.profit_harvester import HarvestDecision
+
 
 class ExitAction(str, Enum):
     HOLD = "HOLD"
@@ -33,6 +35,8 @@ class ExitAction(str, Enum):
     TRAIL = "TRAIL"
     STOP = "STOP"
     TIME_EXIT = "TIME_EXIT"
+    QUICK_TAKE = "QUICK_TAKE"
+    MOMENTUM_HOLD = "MOMENTUM_HOLD"
 
 
 class FirehoseLane(str, Enum):
@@ -463,6 +467,7 @@ class FastExitStateMachine:
         regime_at_entry: str = "",
         remaining_ev: float | None = None,
         remaining_ev_status: str = "UNKNOWN",
+        harvest_decision: HarvestDecision | None = None,
     ) -> dict[str, Any]:
         R = max(stop_pips, 0.1)
         age = now - opened_ts
@@ -495,16 +500,32 @@ class FastExitStateMachine:
                 return self._decide(ExitAction.TAKE, "mfe_giveback_limit",
                                     f"gave back {giveback_pips:.1f} of mfe {mfe_pips:.1f} "
                                     f"(max {max_giveback:.1f})")
-            # 5. Breakeven/cost-plus lock via stop adjustment
-            if pnl_pips > self.cfg.breakeven_buffer_r * R:
-                return self._decide(ExitAction.LOCK, "breakeven_lock_armed",
-                                    f"mfe {mfe_r:.1f}R armed cost-plus lock at "
-                                    f"+{self.cfg.breakeven_buffer_r * R:.1f} pips")
 
-        # 6. Current EV exit (if estimable)
+        # 5. Current EV exit (if estimable)
         if remaining_ev_status == "ESTIMATED" and remaining_ev is not None and remaining_ev <= 0:
             return self._decide(ExitAction.ABORT, "remaining_ev_negative",
                                 f"remaining costed EV={remaining_ev:.4f} <= 0")
+
+        # A policy may only replace the legacy default HOLD after all
+        # structural, regime, time, giveback, and EV protections above.
+        if harvest_decision is not None:
+            harvest_actions = {
+                "QUICK_TAKE": ExitAction.QUICK_TAKE,
+                "PROFIT_LOCK": ExitAction.LOCK,
+                "MOMENTUM_HOLD": ExitAction.MOMENTUM_HOLD,
+                "SCRATCH": ExitAction.SCRATCH,
+                "ABORT": ExitAction.ABORT,
+            }
+            action = harvest_actions.get(harvest_decision.action)
+            if action is not None:
+                return self._decide(action, harvest_decision.reason,
+                                    f"harvest policy: {harvest_decision.reason}")
+
+        # 6. Breakeven/cost-plus lock via stop adjustment.
+        if mfe_r >= self.cfg.mfe_arm_r and pnl_pips > self.cfg.breakeven_buffer_r * R:
+            return self._decide(ExitAction.LOCK, "breakeven_lock_armed",
+                                f"mfe {mfe_r:.1f}R armed cost-plus lock at "
+                                f"+{self.cfg.breakeven_buffer_r * R:.1f} pips")
 
         # Default: HOLD with explanation
         hold_reasons = []
