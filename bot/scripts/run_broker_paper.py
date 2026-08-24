@@ -213,7 +213,22 @@ def persist_confirmed_firehose_basket(
         "basket_id": basket_id,
         "ticket_id": str(ticket_id),
         "initial_risk_usd": recorded.initial_risk,
+        "entry_price": recorded.entry_geometry["entry_price"],
+        "stop_loss": recorded.entry_geometry["stop_loss"],
     }
+
+
+def confirmed_position_geometry(position) -> dict[str, float | str]:
+    """Return only broker-confirmed fill geometry needed for exact basket risk."""
+    try:
+        entry_price = float(getattr(position, "avg_price"))
+        stop_loss = float(getattr(position, "stop_loss"))
+        volume = float(getattr(position, "quantity"))
+    except (AttributeError, TypeError, ValueError):
+        return {"status": "NO_EVIDENCE", "reason": "missing_confirmed_geometry"}
+    if entry_price <= 0 or stop_loss <= 0 or volume <= 0:
+        return {"status": "NO_EVIDENCE", "reason": "missing_confirmed_geometry"}
+    return {"entry_price": entry_price, "stop_loss": stop_loss, "volume": volume}
 
 
 def close_ticket_confirmed(positions, ticket: str) -> bool:
@@ -1471,7 +1486,10 @@ def main() -> None:
                                     None,
                                 )
                                 if position is not None:
+                                    geometry = confirmed_position_geometry(position)
                                     try:
+                                        if geometry.get("status") == "NO_EVIDENCE":
+                                            raise ValueError("missing_confirmed_geometry")
                                         basket_result = persist_confirmed_firehose_basket(
                                             root=ROOT,
                                             ticket_id=tk,
@@ -1482,8 +1500,8 @@ def main() -> None:
                                                 "symbol": sym,
                                                 "side": side,
                                                 "trigger_id": str(information_id),
-                                                "entry_price": entry_price,
-                                                "stop_loss": stop_loss,
+                                                "entry_price": geometry["entry_price"],
+                                                "stop_loss": geometry["stop_loss"],
                                                 "risk_budget": float(cfg.get("exploration_max_risk_per_trade_usd", 0.15)),
                                                 "clip_cap": 1,
                                                 "regime": regime,
@@ -1491,7 +1509,7 @@ def main() -> None:
                                                 "cost_evidence": {"spread_price": max(0.0, float(q.ask) - float(q.bid))},
                                             },
                                             contract=eng.symbol_spec(sym),
-                                            volume=float(getattr(position, "quantity", 0.0)),
+                                            volume=float(geometry["volume"]),
                                         )
                                     except (AttributeError, OSError, TypeError, ValueError):
                                         basket_result = {"status": "NO_EVIDENCE"}
@@ -1513,7 +1531,10 @@ def main() -> None:
                                 basket_id=basket_result.get("basket_id"),
                                 trigger_id=str(information_id) if basket_result.get("status") == "PERSISTED" else None,
                                 clip_sequence=1 if basket_result.get("status") == "PERSISTED" else None,
-                                entry_geometry={"entry_price": entry_price, "stop_loss": stop_loss}
+                                entry_geometry={
+                                    "entry_price": float(basket_result["entry_price"]),
+                                    "stop_loss": float(basket_result["stop_loss"]),
+                                }
                                 if basket_result.get("status") == "PERSISTED" else None,
                                 initial_risk=float(basket_result["initial_risk_usd"])
                                 if basket_result.get("status") == "PERSISTED" else None,

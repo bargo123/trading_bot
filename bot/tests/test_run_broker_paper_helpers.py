@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from aegis.engines.base import PositionSnapshot
 from scripts.run_broker_paper import (
+    confirmed_position_geometry,
     close_ticket_confirmed,
     normalize_protective_stops,
     persist_confirmed_firehose_basket,
@@ -98,6 +99,8 @@ def test_confirmed_fill_persists_exact_one_clip_basket_in_symbol_store(tmp_path)
         "basket_id": "basket-1001",
         "ticket_id": "T1",
         "initial_risk_usd": 0.15,
+        "entry_price": 1.1,
+        "stop_loss": 1.09985,
     }
     assert (tmp_path / "intel" / "firehose_baskets" / "EURUSD.json").is_file()
 
@@ -126,3 +129,22 @@ def test_invalid_symbol_contract_does_not_persist_basket(tmp_path):
 
     assert result == {"status": "NO_EVIDENCE", "reason": "invalid_broker_contract"}
     assert not (tmp_path / "intel" / "firehose_baskets").exists()
+
+
+def test_confirmed_position_geometry_uses_broker_average_and_stop():
+    geometry = confirmed_position_geometry(
+        PositionSnapshot(
+            symbol="EURUSD", side="buy", quantity=0.01,
+            avg_price=1.10012, stop_loss=1.09985, ticket="T1",
+        ),
+    )
+
+    assert geometry == {"entry_price": 1.10012, "stop_loss": 1.09985, "volume": 0.01}
+
+
+def test_confirmed_position_geometry_rejects_missing_broker_stop():
+    geometry = confirmed_position_geometry(
+        PositionSnapshot(symbol="EURUSD", side="buy", quantity=0.01, avg_price=1.10012, ticket="T1"),
+    )
+
+    assert geometry == {"status": "NO_EVIDENCE", "reason": "missing_confirmed_geometry"}
