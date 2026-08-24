@@ -347,6 +347,31 @@ def _validated_allowlist(tmp_path, states) -> Path:
     return path
 
 
+def test_refresh_reloads_watcher_regenerated_validated_states(tmp_path):
+    """The runner can pick up watcher artifacts without a process restart."""
+    index = tmp_path / "analogue_index.json"
+    index.write_text(
+        json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1", "records": []}),
+        encoding="utf-8",
+    )
+    allowlist = tmp_path / "validated_states.json"
+    brain = IntelligentFirehoseBrain(
+        {
+            "analogue_index_path": str(index),
+            "validated_states_path": str(allowlist),
+        }
+    )
+    assert brain.validated_states == frozenset()
+
+    _validated_allowlist(
+        tmp_path,
+        [{"regime": "trend", "structure": "none", "session": "asia", "side": "buy"}],
+    )
+    brain.refresh()
+
+    assert len(brain.validated_states) == 1
+
+
 def _evaluate_brain(brain, frame, side="buy"):
     m1 = frame
     row = m1.iloc[-1].copy()
