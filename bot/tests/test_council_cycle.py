@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -10,6 +11,79 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from ai_council import agents as agent_cli  # noqa: E402
 from ai_council import cases as case_store  # noqa: E402
 from ai_council.cycle import run_council_cycle  # noqa: E402
+
+
+class FakePopen:
+    """Controlled process double: no test can invoke an external CLI."""
+
+    def __init__(self, stdout_lines=(), stderr_lines=(), *, timeout=False):
+        self.stdout = iter(stdout_lines)
+        self.stderr = iter(stderr_lines)
+        self.returncode = 0
+        self.timeout = timeout
+        self.terminated = False
+        self.killed = False
+
+    def wait(self, timeout=None):
+        if self.timeout and not self.terminated:
+            raise subprocess.TimeoutExpired(["fake"], timeout)
+        return self.returncode
+
+    def poll(self):
+        return None if self.timeout and not self.terminated else self.returncode
+
+    def terminate(self):
+        self.terminated = True
+        self.returncode = -15
+
+    def kill(self):
+        self.killed = True
+        self.returncode = -9
+
+
+def _fake_agent_popen(monkeypatch, name, process):
+    monkeypatch.setattr(agent_cli, "load_agents_config", lambda: {name: {"ask_cmd": ["ask"]}})
+    monkeypatch.setattr(agent_cli, "_agent_argv", lambda agent: [f"fake-{agent}"])
+    monkeypatch.setattr(agent_cli.subprocess, "Popen", lambda *args, **kwargs: process)
+
+
+def test_ask_agent_streams_claude_lines_and_retains_parseable_output(monkeypatch):
+    """Missing streamed lines would hide a live Claude response from the operator."""
+    process = FakePopen(["first\n", '{"answer": 1}\n'])
+    _fake_agent_popen(monkeypatch, "claude", process)
+    seen = []
+
+    result = agent_cli.ask_agent("claude", "hi", line_sink=seen.append)
+
+    assert seen == ["[CLAUDE] first", '[CLAUDE] {"answer": 1}']
+    assert result["output"] == 'first\n{"answer": 1}\n'
+    assert result["parsed"] == {"answer": 1}
+
+
+def test_ask_agent_streams_codex_lines_with_codex_prefix(monkeypatch):
+    """A wrong prefix would make live Codex output indistinguishable in shared logs."""
+    process = FakePopen(["review\n"])
+    _fake_agent_popen(monkeypatch, "codex", process)
+    seen = []
+
+    result = agent_cli.ask_agent("codex", "hi", line_sink=seen.append)
+
+    assert seen == ["[CODEX] review"]
+    assert result["output"] == "review\n"
+
+
+def test_ask_agent_stream_timeout_terminates_popen_without_fabricating_output(monkeypatch):
+    """An unresponsive process must report TIMEOUT rather than a successful answer."""
+    process = FakePopen(timeout=True)
+    _fake_agent_popen(monkeypatch, "claude", process)
+    seen = []
+
+    result = agent_cli.ask_agent("claude", "hi", timeout_s=1, line_sink=seen.append)
+
+    assert process.terminated is True
+    assert seen == []
+    assert result["ok"] is False
+    assert result["status"] == "TIMEOUT"
 
 
 def test_dry_run_cycle_completes_full_round(monkeypatch, tmp_path):

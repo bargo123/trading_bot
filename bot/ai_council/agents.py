@@ -241,7 +241,14 @@ def _auth_required(stdout: str, stderr: str) -> bool:
     return any(marker in blob for marker in AUTH_MARKERS)
 
 
-def ask_agent(name: str, prompt: str, *, timeout_s: int = 240, cwd: Path | None = None) -> dict[str, Any]:
+def ask_agent(
+    name: str,
+    prompt: str,
+    *,
+    timeout_s: int = 240,
+    cwd: Path | None = None,
+    line_sink: Any = None,
+) -> dict[str, Any]:
     """Run one non-interactive ask against an agent. Never blocks the cycle.
 
     If the config lists alternative ``models``, a quota/timeout failure on the
@@ -270,6 +277,7 @@ def ask_agent(name: str, prompt: str, *, timeout_s: int = 240, cwd: Path | None 
             name, cmd, argv=argv, config=config, prompt=prompt,
             timeout_s=timeout_s, cwd=cwd, started=started,
             started_utc=started_utc, requested_model=variant,
+            line_sink=line_sink,
         )
         if result.get("ok") or attempt_index == len(variants) - 1:
             break
@@ -292,29 +300,57 @@ def _run_ask(
     started: float,
     started_utc: str,
     requested_model: str | None,
+    line_sink: Any,
 ) -> dict[str, Any]:
     import time
+    from threading import Thread
 
     base: dict[str, Any] = {"agent": name, "ok": False, "started_utc": started_utc}
+    out_parts: list[str] = []
+    err_parts: list[str] = []
+
+    def drain(stream: Any, parts: list[str]) -> None:
+        for line in stream:
+            parts.append(line)
+            if line_sink is not None:
+                line_sink(f"[{name.upper()}] {line.rstrip(chr(10)).rstrip(chr(13))}")
+
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=timeout_s, cwd=str(cwd or REPO_ROOT),
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            encoding="utf-8", errors="replace", cwd=str(cwd or REPO_ROOT),
         )
-    except subprocess.TimeoutExpired:
-        base.update({"status": "TIMEOUT",
-                     "error": f"timed out after {timeout_s}s",
-                     "finished_utc": datetime.now(timezone.utc).isoformat(),
-                     "duration_s": round(time.time() - started, 2)})
-        return base
     except OSError as exc:
         base.update({"status": "UNAVAILABLE_CLI", "error": str(exc),
                      "finished_utc": datetime.now(timezone.utc).isoformat(),
                      "duration_s": round(time.time() - started, 2)})
         return base
+
+    out_thread = Thread(target=drain, args=(proc.stdout, out_parts), daemon=True)
+    err_thread = Thread(target=drain, args=(proc.stderr, err_parts), daemon=True)
+    out_thread.start()
+    err_thread.start()
+    try:
+        proc.wait(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+        out_thread.join()
+        err_thread.join()
+        base.update({"status": "TIMEOUT",
+                      "error": f"timed out after {timeout_s}s",
+                      "finished_utc": datetime.now(timezone.utc).isoformat(),
+                      "duration_s": round(time.time() - started, 2)})
+        return base
+    out_thread.join()
+    err_thread.join()
     finished = time.time()
-    out = proc.stdout or ""
-    err = proc.stderr or ""
+    out = "".join(out_parts)
+    err = "".join(err_parts)
     duration = round(finished - started, 2)
     finished_utc = datetime.now(timezone.utc).isoformat()
     base.update({
