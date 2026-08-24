@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ai_council.agents import ask_agent, probe_agent
+from ai_council.agents import ask_agent
 
 
 class AgentBudgetLedger:
@@ -22,6 +22,11 @@ class AgentBudgetLedger:
                 raise ValueError("invalid budget ledger")
         except (OSError, ValueError, json.JSONDecodeError):
             payload = {"agents": {"codex": {"used": 1, "limit": 1}}}
+            self._payload = payload
+            self._persist()
+            return payload
+        if "codex" not in payload["agents"]:
+            payload["agents"]["codex"] = {"used": 1, "limit": 1}
             self._payload = payload
             self._persist()
         return payload
@@ -52,6 +57,16 @@ class AgentBudgetLedger:
         entry["used"] = int(entry["used"]) + 1
         self._persist()
         return True
+
+    def usage(self, agent: str) -> tuple[int, int] | None:
+        """Return persisted used and limit values for status displays."""
+        entry = self._payload["agents"].get(agent)
+        if entry is None:
+            return None
+        try:
+            return int(entry["used"]), int(entry["limit"])
+        except (KeyError, TypeError, ValueError):
+            return None
 
 
 def ask_research_agent(

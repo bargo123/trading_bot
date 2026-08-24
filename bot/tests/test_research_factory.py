@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 import sys
 import tempfile
+import json
 from pathlib import Path
 
 import aegis.research_factory.core as research_factory_core
@@ -532,6 +533,100 @@ def test_public_factory_construction_does_not_start_an_agent_process(monkeypatch
     )
 
     assert factory.agent_budget_ledger.remaining("codex") == 0
+
+
+def test_factory_restart_keeps_state_and_codex_budget_in_reports_dir(monkeypatch, tmp_path):
+    """A separate state path would lose restart state or share another ledger."""
+    for name in (
+        "knowledge_table.json",
+        "cost_profiles.json",
+        "validated_states.json",
+        "validated_opportunities.json",
+    ):
+        (tmp_path / name).write_text("{}")
+
+    monkeypatch.setattr(research_factory_core, "INTEL_DIR", tmp_path)
+    monkeypatch.setattr(research_factory_core, "ensure_intel_dirs", lambda: None)
+    monkeypatch.setattr(research_factory_core.AnalogueStore, "load", lambda path: object())
+    monkeypatch.setattr(research_factory_core, "load_losses", lambda: [])
+
+    reports_dir = tmp_path / "reports"
+    first = ResearchFactory(
+        profit_barrier_pct=0.01,
+        loss_barrier_pct=0.01,
+        reports_dir=reports_dir,
+    )
+    first.state.generation = 7
+    first.state.save(first.state_path)
+
+    resumed = ResearchFactory(
+        profit_barrier_pct=0.01,
+        loss_barrier_pct=0.01,
+        reports_dir=reports_dir,
+        resume=True,
+    )
+
+    assert first.state_path == reports_dir / "state.json"
+    assert resumed.state.generation == 7
+    assert resumed.agent_budget_ledger.remaining("codex") == 0
+
+
+def test_factory_dashboard_uses_durable_exhausted_codex_ledger(capsys, tmp_path):
+    """Using ResearchState counters would display a usable Codex budget."""
+    factory = object.__new__(ResearchFactory)
+    factory.state = ResearchState(codex_calls=0, codex_budget=99)
+    factory.agent_budget_ledger = research_factory_core.AgentBudgetLedger(
+        tmp_path / "agent_budgets.json"
+    )
+    factory.reports_dir = tmp_path
+
+    factory._print_dashboard()
+    factory.save_report()
+
+    assert "Codex: EXHAUSTED (1 / 1)" in capsys.readouterr().out
+    report = json.loads((tmp_path / "final_weekend_report.json").read_text())
+    assert report["codex"] == {
+        "used": 1,
+        "limit": 1,
+        "remaining": 0,
+        "status": "EXHAUSTED",
+    }
+
+
+def test_run_reaches_restored_plateau_check_without_agent_call(monkeypatch, tmp_path):
+    """Removing _check_plateau makes every completed generation fail late."""
+    factory = object.__new__(ResearchFactory)
+    factory.state = ResearchState(claude_available=False)
+    factory.max_generations = 1
+    factory.continuous = False
+    factory.state_path = tmp_path / "state.json"
+    factory._print_dashboard = lambda: None
+    factory._run_generation = lambda: None
+    factory._ask_claude_for_new_direction = lambda: (_ for _ in ()).throw(
+        AssertionError("no agent ask expected")
+    )
+
+    assert factory._check_plateau() is False
+    factory.run()
+
+    assert factory.state.generation == 1
+    assert factory.state_path.exists()
+
+
+def test_restored_promotion_gate_and_learning_log_are_not_unconditional():
+    """The removed gate must reject weaker challengers and retain learning events."""
+    factory = object.__new__(ResearchFactory)
+    factory.state = ResearchState(
+        champion=Champion("champion", {"expectancy": 1.0, "profit_factor": 2.0, "max_drawdown": 0.1}, "", "", "", 1),
+        challenger=Champion("challenger", {"expectancy": 0.5, "profit_factor": 1.0, "max_drawdown": 0.5}, "", "", "", 1),
+        experiments=[ExperimentResult("hypothesis", 1, {"expectancy": 0.1}, "REJECTED")],
+    )
+    events = []
+    factory._log_event = lambda *args, **kwargs: events.append((args, kwargs))
+
+    assert factory._should_promote_challenger() is False
+    factory._log_learning()
+    assert events[0][0][:2] == ("LEARNING", "Generation 0 learning")
 
 
 if __name__ == "__main__":

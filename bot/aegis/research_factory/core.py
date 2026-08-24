@@ -275,13 +275,12 @@ class ResearchFactory:
         self.continuous = continuous
         self.max_generations = max_generations
         self.claude_enabled = claude_enabled
-        self.codex_budget = codex_budget
         self.sealed_holdout = sealed_holdout
 
         # Initialize paths
-        self.state_path = Path("C:/Users/Zaid barghouthi/Desktop/trading_bot/bot/reports") / "research_factory" / "state.json"
         self.reports_dir = reports_dir or Path("C:/Users/Zaid barghouthi/Desktop/trading_bot/bot/reports") / "research_factory"
         self.reports_dir.mkdir(parents=True, exist_ok=True)
+        self.state_path = self.reports_dir / "state.json"
         self.agent_budget_ledger = AgentBudgetLedger(
             self.reports_dir / "agent_budgets.json"
         )
@@ -324,6 +323,9 @@ class ResearchFactory:
 
     def _print_dashboard(self) -> None:
         """Print live dashboard."""
+        codex_used, codex_limit = self.agent_budget_ledger.usage("codex") or (1, 1)
+        codex_remaining = self.agent_budget_ledger.remaining("codex") or 0
+        codex_status = "EXHAUSTED" if codex_remaining == 0 else f"{codex_remaining} REMAINING"
         dashboard = f"""
 ==============================================================
 AEGIS ZERO-LOSS RESEARCH FACTORY
@@ -335,7 +337,7 @@ Experiments tested: {len(self.state.experiments)}
 Experiments rejected: {len([e for e in self.state.experiments if e.decision == 'REJECTED'])}
 Current hypothesis: {self.state.hypothesis_registry.get(self.state.challenger.hypothesis_id, 'N/A') if self.state.challenger else 'N/A'}
 Claude: {'AVAILABLE' if self.state.claude_available else 'UNAVAILABLE'}
-Codex calls: {self.state.codex_calls} / {self.state.codex_budget}
+Codex: {codex_status} ({codex_used} / {codex_limit})
 Market: {'CLOSED / WEEKEND_RESEARCH' if self.state.market_state == MarketState.WEEKEND_RESEARCH else 'OPEN'}
 Live trading: DISABLED
 ==============================================================
@@ -809,6 +811,8 @@ Live trading: DISABLED
 
     def save_report(self) -> None:
         """Save final weekend report."""
+        codex_used, codex_limit = self.agent_budget_ledger.usage("codex") or (1, 1)
+        codex_remaining = self.agent_budget_ledger.remaining("codex") or 0
         report = {
             "generation": self.state.generation,
             "champion": asdict(self.state.champion) if self.state.champion else None,
@@ -818,7 +822,12 @@ Live trading: DISABLED
             "champions": len([e for e in self.state.experiments if e.decision == "CHAMPION"]),
             "failed_hypotheses": self.state.failed_hypotheses,
             "dataset_fingerprint": self.state.dataset_fingerprint,
-            "codex_calls": self.state.codex_calls,
+            "codex": {
+                "used": codex_used,
+                "limit": codex_limit,
+                "remaining": codex_remaining,
+                "status": "EXHAUSTED" if codex_remaining == 0 else "AVAILABLE",
+            },
             "claude_available": self.state.claude_available,
             "final_generation": self.state.generation,
         }
@@ -1097,6 +1106,38 @@ Live trading: DISABLED
         return "\n".join(
             f"  {key}: {count}"
             for key, count in sorted(classes.items(), key=lambda item: item[1], reverse=True)[:5]
+        )
+
+    def _should_promote_challenger(self) -> bool:
+        """Require a challenger to improve expectancy and profit factor safely."""
+        if not self.state.challenger or not self.state.champion:
+            return False
+        challenger = self.state.challenger.metrics
+        champion = self.state.champion.metrics
+        return (
+            challenger["expectancy"] > champion["expectancy"]
+            and challenger["profit_factor"] > champion["profit_factor"]
+            and challenger["max_drawdown"] <= champion["max_drawdown"] * 1.1
+        )
+
+    def _check_plateau(self) -> bool:
+        """Return whether the latest experiments show negligible expectancy change."""
+        if len(self.state.experiments) < 20:
+            return False
+        improvements = [result.metrics.get("expectancy", 0) for result in self.state.experiments[-10:]]
+        return max(improvements) - min(improvements) < 0.01
+
+    def _log_learning(self) -> None:
+        """Record the latest governed experiment outcome."""
+        if not self.state.experiments:
+            return
+        latest = self.state.experiments[-1]
+        self._log_event(
+            "LEARNING",
+            f"Generation {self.state.generation} learning",
+            hypothesis=latest.hypothesis_id,
+            decision=latest.decision,
+            metrics=latest.metrics,
         )
 
     def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
