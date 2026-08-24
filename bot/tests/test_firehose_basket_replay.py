@@ -1,4 +1,6 @@
 from copy import deepcopy
+from hashlib import sha256
+from pathlib import Path
 
 import pytest
 
@@ -16,32 +18,28 @@ POLICIES = (
 )
 
 
+def _source_record(label, line_number):
+    path = Path(__file__).resolve()
+    lines = path.read_text(encoding="utf-8").splitlines()
+    file_hash = sha256(path.read_bytes()).hexdigest()
+    return {
+        "filename": path.name,
+        "file_hash": file_hash,
+        "source_id": file_hash,
+        "evidence_label": label,
+        "location": {"path": str(path), "line_start": line_number, "line_end": line_number},
+        "passage": lines[line_number - 1],
+    }
+
+
 def _policy_packets():
     return {
         policy: {
             "hypothesis_id": f"basket:{policy}",
             "origin": "BOOK_DIRECT",
             "BOOK_COVERAGE": "SUFFICIENT",
-            "supporting_evidence": [
-                {
-                    "filename": f"{policy}.md",
-                    "file_hash": "1" * 64,
-                    "source_id": "1" * 64,
-                    "evidence_label": "SUPPORT",
-                    "location": {"path": f"books/{policy}.md", "line_start": 2, "line_end": 2},
-                    "passage": f"Verbatim support for {policy}.",
-                }
-            ],
-            "contradicting_evidence": [
-                {
-                    "filename": f"{policy}-risk.md",
-                    "file_hash": "2" * 64,
-                    "source_id": "2" * 64,
-                    "evidence_label": "CONTRADICTION",
-                    "location": {"path": f"books/{policy}-risk.md", "line_start": 4, "line_end": 4},
-                    "passage": f"Verbatim contradiction for {policy}.",
-                }
-            ],
+            "supporting_evidence": [_source_record("SUPPORT", 1)],
+            "contradicting_evidence": [_source_record("CONTRADICTION", 3)],
             "data_observation": {"source": "recorded"},
             "falsification": "Reject on incomplete sealed OOS evidence.",
             "normalized_parameters": {
@@ -143,6 +141,16 @@ def test_requires_a_confirmed_complete_lifecycle_for_every_row():
 def test_rejects_book_evidence_without_complete_verbatim_provenance(collection, record):
     packets = _policy_packets()
     packets["structural"][collection] = [record]
+
+    result = evaluate_basket_policies(_rows(), packets)
+
+    assert result == {"status": "NO_EVIDENCE", "reason": "missing_policy_evidence"}
+
+
+def test_rejects_provenance_with_a_fabricated_digest_for_the_declared_source():
+    packets = _policy_packets()
+    packets["structural"]["supporting_evidence"][0]["file_hash"] = "f" * 64
+    packets["structural"]["supporting_evidence"][0]["source_id"] = "f" * 64
 
     result = evaluate_basket_policies(_rows(), packets)
 

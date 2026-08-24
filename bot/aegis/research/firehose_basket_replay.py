@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime
+from hashlib import sha256
 from math import isfinite
+from pathlib import Path
 from typing import Any
 
 
@@ -174,6 +176,25 @@ def _valid_evidence_record(record: Any, label: str) -> bool:
         and _positive_int(line_start)
         and _positive_int(line_end)
         and line_end >= line_start
+        and _matches_source_content(record)
+    )
+
+
+def _matches_source_content(record: Mapping[str, Any]) -> bool:
+    location = record["location"]
+    try:
+        path = Path(location["path"])
+        body = path.read_bytes()
+        lines = body.decode("utf-8").splitlines()
+    except (OSError, UnicodeDecodeError, TypeError):
+        return False
+    line_start = location["line_start"]
+    line_end = location["line_end"]
+    if path.name != record["filename"] or line_end > len(lines):
+        return False
+    return (
+        sha256(body).hexdigest() == record["file_hash"]
+        and "\n".join(lines[line_start - 1:line_end]) == record["passage"]
     )
 
 
