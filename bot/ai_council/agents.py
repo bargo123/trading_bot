@@ -8,7 +8,9 @@ auto-paid and never blocks the cycle.
 from __future__ import annotations
 
 import json
+import os
 import re
+import signal
 import shutil
 import subprocess
 from datetime import datetime, timezone
@@ -33,6 +35,13 @@ AUTH_MARKERS = (
 )
 
 JSON_BLOCK_RE = re.compile(r"\{[\s\S]*?\}")
+OUTPUT_TRUNCATION_MARKER = "[OUTPUT TRUNCATED]\n"
+MAX_STDOUT_CHARS = 20_000
+MAX_STDERR_CHARS = 2_000
+STDOUT_TAIL_CHARS = 2_000
+STDERR_TAIL_CHARS = 500
+PIPE_JOIN_TIMEOUT_S = 1
+PROCESS_CLEANUP_TIMEOUT_S = 5
 
 _MODEL_RES = (
     re.compile(r"\b(gemini-[0-9.]+(?:-[a-z0-9]+)*)\b", re.I),
@@ -241,6 +250,64 @@ def _auth_required(stdout: str, stderr: str) -> bool:
     return any(marker in blob for marker in AUTH_MARKERS)
 
 
+class _BoundedBuffer:
+    """Keep only a bounded tail while the caller still receives every line."""
+
+    def __init__(self, limit: int):
+        self.limit = limit
+        self.text = ""
+        self.truncated = False
+
+    def append(self, chunk: str) -> None:
+        combined = self.text + chunk
+        if len(combined) > self.limit:
+            self.text = combined[-self.limit:]
+            self.truncated = True
+        else:
+            self.text = combined
+
+    def tail(self, limit: int) -> str:
+        if not self.truncated:
+            return self.text[-limit:]
+        available = max(0, limit - len(OUTPUT_TRUNCATION_MARKER))
+        return OUTPUT_TRUNCATION_MARKER + self.text[-available:]
+
+
+def _close_pipe(stream: Any) -> None:
+    close = getattr(stream, "close", None)
+    if close is not None:
+        try:
+            close()
+        except OSError:
+            pass
+
+
+def _terminate_process_tree(proc: Any, *, force: bool = False) -> None:
+    """Signal the isolated process group, falling back to the direct process."""
+    try:
+        if os.name == "nt" and getattr(proc, "pid", None):
+            if not force:
+                break_signal = getattr(signal, "CTRL_BREAK_EVENT", None)
+                if break_signal is not None:
+                    proc.send_signal(break_signal)
+                    return
+            subprocess.run(
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=PROCESS_CLEANUP_TIMEOUT_S, check=False,
+            )
+            return
+        if os.name != "nt" and getattr(proc, "pid", None):
+            os.killpg(proc.pid, signal.SIGKILL if force else signal.SIGTERM)
+            return
+    except (OSError, subprocess.SubprocessError):
+        pass
+    if force:
+        proc.kill()
+    else:
+        proc.terminate()
+
+
 def ask_agent(
     name: str,
     prompt: str,
@@ -253,7 +320,10 @@ def ask_agent(
 
     If the config lists alternative ``models``, a quota/timeout failure on the
     default model retries once per fallback model (free/local only - never a
-    paid credential). The model that actually answered is recorded.
+    paid credential). ``line_sink`` receives every complete prefixed line.
+    Returned stdout/stderr are bounded tails; a stdout overflow returns
+    ``ERROR``/``OUTPUT_TOO_LARGE`` with empty ``output`` rather than partial
+    parseable content. The model that actually answered is recorded.
     """
     import time
 
@@ -306,51 +376,78 @@ def _run_ask(
     from threading import Thread
 
     base: dict[str, Any] = {"agent": name, "ok": False, "started_utc": started_utc}
-    out_parts: list[str] = []
-    err_parts: list[str] = []
+    out_buffer = _BoundedBuffer(MAX_STDOUT_CHARS)
+    err_buffer = _BoundedBuffer(MAX_STDERR_CHARS)
 
-    def drain(stream: Any, parts: list[str]) -> None:
+    def drain(stream: Any, buffer: _BoundedBuffer) -> None:
         for line in stream:
-            parts.append(line)
+            buffer.append(line)
             if line_sink is not None:
-                line_sink(f"[{name.upper()}] {line.rstrip(chr(10)).rstrip(chr(13))}")
+                try:
+                    line_sink(f"[{name.upper()}] {line.rstrip(chr(10)).rstrip(chr(13))}")
+                except Exception:
+                    pass
 
     try:
-        proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-            encoding="utf-8", errors="replace", cwd=str(cwd or REPO_ROOT),
-        )
+        popen_kwargs: dict[str, Any] = {
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "text": True,
+            "encoding": "utf-8",
+            "errors": "replace",
+            "cwd": str(cwd or REPO_ROOT),
+        }
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            popen_kwargs["start_new_session"] = True
+        proc = subprocess.Popen(cmd, **popen_kwargs)
     except OSError as exc:
         base.update({"status": "UNAVAILABLE_CLI", "error": str(exc),
                      "finished_utc": datetime.now(timezone.utc).isoformat(),
                      "duration_s": round(time.time() - started, 2)})
         return base
 
-    out_thread = Thread(target=drain, args=(proc.stdout, out_parts), daemon=True)
-    err_thread = Thread(target=drain, args=(proc.stderr, err_parts), daemon=True)
+    out_thread = Thread(target=drain, args=(proc.stdout, out_buffer), daemon=True)
+    err_thread = Thread(target=drain, args=(proc.stderr, err_buffer), daemon=True)
     out_thread.start()
     err_thread.start()
     try:
         proc.wait(timeout=timeout_s)
     except subprocess.TimeoutExpired:
-        proc.terminate()
+        _terminate_process_tree(proc)
         try:
-            proc.wait(timeout=5)
+            proc.wait(timeout=PROCESS_CLEANUP_TIMEOUT_S)
         except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-        out_thread.join()
-        err_thread.join()
+            _terminate_process_tree(proc, force=True)
+            try:
+                proc.wait(timeout=PROCESS_CLEANUP_TIMEOUT_S)
+            except subprocess.TimeoutExpired:
+                pass
+        _close_pipe(proc.stdout)
+        _close_pipe(proc.stderr)
+        out_thread.join(PIPE_JOIN_TIMEOUT_S)
+        err_thread.join(PIPE_JOIN_TIMEOUT_S)
         base.update({"status": "TIMEOUT",
                       "error": f"timed out after {timeout_s}s",
                       "finished_utc": datetime.now(timezone.utc).isoformat(),
                       "duration_s": round(time.time() - started, 2)})
         return base
-    out_thread.join()
-    err_thread.join()
+    out_thread.join(PIPE_JOIN_TIMEOUT_S)
+    err_thread.join(PIPE_JOIN_TIMEOUT_S)
+    if out_thread.is_alive() or err_thread.is_alive():
+        _close_pipe(proc.stdout)
+        _close_pipe(proc.stderr)
+        out_thread.join(PIPE_JOIN_TIMEOUT_S)
+        err_thread.join(PIPE_JOIN_TIMEOUT_S)
+        if out_thread.is_alive() or err_thread.is_alive():
+            base.update({"status": "ERROR", "error": "OUTPUT_DRAIN_TIMEOUT",
+                         "finished_utc": datetime.now(timezone.utc).isoformat(),
+                         "duration_s": round(time.time() - started, 2)})
+            return base
     finished = time.time()
-    out = "".join(out_parts)
-    err = "".join(err_parts)
+    out = out_buffer.text
+    err = err_buffer.text
     duration = round(finished - started, 2)
     finished_utc = datetime.now(timezone.utc).isoformat()
     base.update({
@@ -361,10 +458,14 @@ def _run_ask(
         "cli_class": _cli_class(argv),
         "provider": config.get("provider"),
         "tool_version": _tool_version(f"{err}\n{out}"),
-        "output": out[:20000],
-        "stdout_tail": out[-2000:],
-        "stderr_tail": err[-500:],
+        "output": "" if out_buffer.truncated else out,
+        "stdout_tail": out_buffer.tail(STDOUT_TAIL_CHARS),
+        "stderr_tail": err_buffer.tail(STDERR_TAIL_CHARS),
     })
+    if out_buffer.truncated:
+        base["status"] = "ERROR"
+        base["error"] = "OUTPUT_TOO_LARGE"
+        return base
     if _auth_required(out, err):
         base["status"] = "AUTH_REQUIRED"
         base["error"] = "authentication required (login needed)"

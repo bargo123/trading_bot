@@ -45,3 +45,40 @@ current event loop in `test_ibkr_order_hygiene.py`.
   probed or consumed by this Task 1 implementation.
 - Existing unstaged `research_factory/core.py` Claude/fallback cleanup remains
   unmodified and unstaged.
+
+## Review Fix Round 1
+
+The original Popen implementation could block forever when a descendant kept a
+pipe open and retained unbounded output. The adapter now creates an isolated
+process tree (`CREATE_NEW_PROCESS_GROUP` on Windows and `start_new_session` on
+POSIX), sends tree termination then force-kill on timeout, closes parent pipes,
+and joins drains only for bounded intervals. A drain that still cannot finish
+returns the explicit `OUTPUT_DRAIN_TIMEOUT` error; timeout always returns
+`TIMEOUT` deterministically.
+
+Stdout and stderr now retain bounded tails. Every complete line still reaches
+`line_sink`; sink exceptions are ignored so draining continues. Oversized
+stdout returns `ERROR` with `OUTPUT_TOO_LARGE`, empty `output`, and the ASCII
+`[OUTPUT TRUNCATED]` marker in `stdout_tail`, preventing a partial response
+from being treated as parseable evidence.
+
+### Review TDD Evidence
+
+Before the fix, the new controlled FakePopen tests produced:
+
+```text
+3 failed, 4 passed, 15 deselected, 1 warning
+```
+
+The failures demonstrated an available oversized response, missing tree
+cleanup helper, and a timeout blocked by inherited pipes.
+
+### Review Verification
+
+```text
+..\\.venv\\Scripts\\python.exe -m pytest tests\\test_council_cycle.py -q
+24 passed in 2.93s
+
+..\\.venv\\Scripts\\python.exe -m pytest -q
+971 passed, 1 warning in 84.44s
+```

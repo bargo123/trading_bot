@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -16,16 +17,19 @@ from ai_council.cycle import run_council_cycle  # noqa: E402
 class FakePopen:
     """Controlled process double: no test can invoke an external CLI."""
 
-    def __init__(self, stdout_lines=(), stderr_lines=(), *, timeout=False):
+    def __init__(self, stdout_lines=(), stderr_lines=(), *, timeout=False, kill_required=False):
         self.stdout = iter(stdout_lines)
         self.stderr = iter(stderr_lines)
         self.returncode = 0
         self.timeout = timeout
+        self.kill_required = kill_required
         self.terminated = False
         self.killed = False
+        self.pid = 1234
+        self.signals = []
 
     def wait(self, timeout=None):
-        if self.timeout and not self.terminated:
+        if self.timeout and (not self.terminated or self.kill_required and not self.killed):
             raise subprocess.TimeoutExpired(["fake"], timeout)
         return self.returncode
 
@@ -40,11 +44,19 @@ class FakePopen:
         self.killed = True
         self.returncode = -9
 
+    def send_signal(self, signal):
+        self.signals.append(signal)
+
 
 def _fake_agent_popen(monkeypatch, name, process):
     monkeypatch.setattr(agent_cli, "load_agents_config", lambda: {name: {"ask_cmd": ["ask"]}})
     monkeypatch.setattr(agent_cli, "_agent_argv", lambda agent: [f"fake-{agent}"])
     monkeypatch.setattr(agent_cli.subprocess, "Popen", lambda *args, **kwargs: process)
+    monkeypatch.setattr(
+        agent_cli,
+        "_terminate_process_tree",
+        lambda proc, force=False: proc.kill() if force else proc.terminate(),
+    )
 
 
 def test_ask_agent_streams_claude_lines_and_retains_parseable_output(monkeypatch):
@@ -70,6 +82,123 @@ def test_ask_agent_streams_codex_lines_with_codex_prefix(monkeypatch):
 
     assert seen == ["[CODEX] review"]
     assert result["output"] == "review\n"
+
+
+def test_ask_agent_streams_stderr_and_ignores_line_sink_errors(monkeypatch):
+    """A failing display sink must not discard later process output."""
+    process = FakePopen(["answer\n"], ["warning\n"])
+    _fake_agent_popen(monkeypatch, "claude", process)
+    seen = []
+
+    def flaky_sink(line):
+        seen.append(line)
+        if len(seen) == 1:
+            raise RuntimeError("display disconnected")
+
+    result = agent_cli.ask_agent("claude", "hi", line_sink=flaky_sink)
+
+    assert set(seen) == {"[CLAUDE] answer", "[CLAUDE] warning"}
+    assert result["status"] == "AVAILABLE"
+    assert result["stderr_tail"] == "warning\n"
+
+
+def test_ask_agent_isolates_process_tree_without_shell(monkeypatch):
+    """Missing process isolation would let descendants retain the output pipes."""
+    process = FakePopen(["answer\n"])
+    captured = {}
+    monkeypatch.setattr(agent_cli, "load_agents_config", lambda: {"claude": {"ask_cmd": ["ask"]}})
+    monkeypatch.setattr(agent_cli, "_agent_argv", lambda agent: [f"fake-{agent}"])
+
+    def fake_popen(*args, **kwargs):
+        captured.update(kwargs)
+        return process
+
+    monkeypatch.setattr(agent_cli.subprocess, "Popen", fake_popen)
+    agent_cli.ask_agent("claude", "hi")
+
+    assert captured.get("shell", False) is False
+    if agent_cli.os.name == "nt":
+        assert captured["creationflags"] == agent_cli.subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        assert captured["start_new_session"] is True
+
+
+def test_windows_tree_cleanup_breaks_group_then_uses_taskkill_for_force(monkeypatch):
+    """Using taskkill first would skip the required graceful process-group stop."""
+    process = FakePopen()
+    calls = []
+    monkeypatch.setattr(agent_cli.os, "name", "nt")
+    monkeypatch.setattr(agent_cli.signal, "CTRL_BREAK_EVENT", 123, raising=False)
+    monkeypatch.setattr(agent_cli.subprocess, "run", lambda *args, **kwargs: calls.append(args))
+
+    agent_cli._terminate_process_tree(process)
+    agent_cli._terminate_process_tree(process, force=True)
+
+    assert process.signals == [123]
+    assert calls == [(["taskkill", "/PID", "1234", "/T", "/F"],)]
+
+
+def test_ask_agent_rejects_stdout_larger_than_retained_buffer(monkeypatch):
+    """A truncated answer must not be returned as if it were complete evidence."""
+    oversized = "x" * 20_001 + "\n"
+    process = FakePopen([oversized])
+    _fake_agent_popen(monkeypatch, "claude", process)
+    seen = []
+
+    result = agent_cli.ask_agent("claude", "hi", line_sink=seen.append)
+
+    assert seen == [f"[CLAUDE] {oversized.rstrip()}"]
+    assert result["ok"] is False
+    assert result["status"] == "ERROR"
+    assert result["error"] == "OUTPUT_TOO_LARGE"
+    assert result["output"] == ""
+    assert "[OUTPUT TRUNCATED]" in result["stdout_tail"]
+
+
+def test_ask_agent_timeout_escalates_terminate_to_kill(monkeypatch):
+    """A process that ignores terminate must be force-killed before return."""
+    process = FakePopen(timeout=True, kill_required=True)
+    _fake_agent_popen(monkeypatch, "claude", process)
+    result = agent_cli.ask_agent("claude", "hi", timeout_s=1)
+
+    assert process.terminated is True
+    assert process.killed is True
+    assert result["status"] == "TIMEOUT"
+
+
+class BlockingInheritedPipe:
+    """Simulates a child that inherited the write end until the parent closes it."""
+
+    def __init__(self):
+        self.closed = threading.Event()
+
+    def __iter__(self):
+        yield "child output\n"
+        self.closed.wait()
+
+    def close(self):
+        self.closed.set()
+
+
+def test_ask_agent_timeout_returns_when_descendant_keeps_pipe_open(monkeypatch):
+    """An inherited pipe must not make timeout handling wait forever."""
+    process = FakePopen(timeout=True)
+    process.stdout = BlockingInheritedPipe()
+    process.stderr = BlockingInheritedPipe()
+    _fake_agent_popen(monkeypatch, "claude", process)
+    result = {}
+    finished = threading.Event()
+
+    def ask():
+        result.update(agent_cli.ask_agent("claude", "hi", timeout_s=1))
+        finished.set()
+
+    worker = threading.Thread(target=ask, daemon=True)
+    worker.start()
+    worker.join(0.25)
+
+    assert finished.is_set()
+    assert result["status"] == "TIMEOUT"
 
 
 def test_ask_agent_stream_timeout_terminates_popen_without_fabricating_output(monkeypatch):
