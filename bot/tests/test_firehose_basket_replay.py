@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from aegis.research.books_index import BookIndex
+from aegis.research.firehose_basket_evidence import build_evidence_packet
 from aegis.research.firehose_basket_replay import evaluate_basket_policies
 
 
@@ -18,30 +20,39 @@ POLICIES = (
 )
 
 
-def _source_record(label, line_number):
-    path = Path(__file__).resolve()
-    lines = path.read_text(encoding="utf-8").splitlines()
-    file_hash = sha256(path.read_bytes()).hexdigest()
-    return {
-        "filename": path.name,
-        "file_hash": file_hash,
-        "source_id": file_hash,
-        "evidence_label": label,
-        "location": {"path": str(path), "line_start": line_number, "line_end": line_number},
-        "passage": lines[line_number - 1],
-    }
+_TRUSTED_INDEX = None
+
+
+@pytest.fixture(autouse=True)
+def _trusted_book_index(tmp_path, monkeypatch):
+    global _TRUSTED_INDEX
+    books = tmp_path / "books"
+    books.mkdir()
+    (books / "trusted.md").write_text(
+        "# Trusted\nUse a volume spike to confirm a breakout.\n"
+        "Avoid a failed breakout after a volume spike.\n",
+        encoding="utf-8",
+    )
+    index = BookIndex(tmp_path / "books.sqlite")
+    index.rebuild(books)
+    _TRUSTED_INDEX = index
+    monkeypatch.setattr("aegis.research.firehose_basket_replay.BookIndex", lambda: index, raising=False)
+    yield
+    _TRUSTED_INDEX = None
 
 
 def _policy_packets():
+    assert _TRUSTED_INDEX is not None
     return {
         policy: {
-            "hypothesis_id": f"basket:{policy}",
-            "origin": "BOOK_DIRECT",
-            "BOOK_COVERAGE": "SUFFICIENT",
-            "supporting_evidence": [_source_record("SUPPORT", 1)],
-            "contradicting_evidence": [_source_record("CONTRADICTION", 3)],
-            "data_observation": {"source": "recorded"},
-            "falsification": "Reject on incomplete sealed OOS evidence.",
+            **build_evidence_packet(
+                _TRUSTED_INDEX,
+                {"hypothesis_id": f"basket:{policy}", "origin": "BOOK_DIRECT"},
+                "volume spike",
+                "failed breakout",
+                {"source": "recorded"},
+                "Reject on incomplete sealed OOS evidence.",
+            ),
             "normalized_parameters": {
                 "r_multiple": 1.0,
                 "cost_r": 0.1,
@@ -151,6 +162,24 @@ def test_rejects_provenance_with_a_fabricated_digest_for_the_declared_source():
     packets = _policy_packets()
     packets["structural"]["supporting_evidence"][0]["file_hash"] = "f" * 64
     packets["structural"]["supporting_evidence"][0]["source_id"] = "f" * 64
+
+    result = evaluate_basket_policies(_rows(), packets)
+
+    assert result == {"status": "NO_EVIDENCE", "reason": "missing_policy_evidence"}
+
+
+def test_rejects_a_self_consistent_source_that_is_not_in_the_trusted_index(tmp_path):
+    attacker = tmp_path / "attacker.md"
+    attacker.write_text("Fabricated support.\n", encoding="utf-8")
+    body = attacker.read_bytes()
+    packets = _policy_packets()
+    packets["structural"]["supporting_evidence"][0].update({
+        "filename": attacker.name,
+        "file_hash": sha256(body).hexdigest(),
+        "source_id": sha256(body).hexdigest(),
+        "location": {"path": str(attacker), "line_start": 1, "line_end": 1},
+        "passage": "Fabricated support.",
+    })
 
     result = evaluate_basket_policies(_rows(), packets)
 
