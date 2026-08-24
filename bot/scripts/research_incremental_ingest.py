@@ -14,6 +14,7 @@ import json
 import time
 import sys
 from pathlib import Path
+from typing import Any, Mapping
 
 BOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BOT))
@@ -27,6 +28,20 @@ from aegis.research.incremental_ingest import (  # noqa: E402
 )
 
 MT5_PATH = r"C:\Program Files\MetaTrader 5\terminal64.exe"
+
+
+def ingest_rows(rows: list[Any], *, symbol: str) -> dict[str, Any]:
+    """Validate an ingest boundary without accepting malformed row objects."""
+    sym = str(symbol).upper()
+    try:
+        normalized = []
+        for index, row in enumerate(rows):
+            if not isinstance(row, Mapping):
+                raise TypeError(f"mapping row {index} expected")
+            normalized.append(dict(row))
+    except (TypeError, ValueError) as exc:
+        return {"status": "FAILED", "symbol": sym, "reason": f"mapping: {exc}"}
+    return {"status": "OK", "symbol": sym, "rows": normalized, "count": len(normalized)}
 
 
 def main() -> int:
@@ -98,7 +113,13 @@ def main() -> int:
                     lookback_days=int(args.lookback_days),
                 )
             except Exception as exc:  # one symbol failing never blocks the rest
-                res = {"symbol": symbol, "error": str(exc)[:160]}
+                res = {
+                    "symbol": str(symbol).upper(),
+                    "status": "FAILED",
+                    "reason": f"mapping: {exc}",
+                    "error": str(exc)[:160],
+                }
+            res.setdefault("status", "OK")
             results.append(res)
             last = res.get("last_bar")
             if last and not res.get("error"):

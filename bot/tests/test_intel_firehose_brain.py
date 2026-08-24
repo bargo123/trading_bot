@@ -9,9 +9,60 @@ from pathlib import Path
 import pandas as pd
 
 from aegis.intel.analogue_store import AnalogueStore
-from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+from aegis.intel.firehose_brain import IntelligentFirehoseBrain, _load_validated_opportunities
 from aegis.intel.strategy_model import ValidatedStrategyModel, strategy_model_ready
 from aegis.intel.expected_value import payoff_metrics
+
+
+def _v2_opportunity(*, family: str = "failed_breakout_fade", with_cost: bool = True) -> dict:
+    record = {
+        "level": "A",
+        "symbol": "EURUSD",
+        "strategy_family": family,
+        "strategy_version": "rule-v1",
+        "rule_fingerprint": "rule-hash",
+        "regime": "range",
+        "structure": "none",
+        "session": "asia",
+        "side": "sell",
+        "dataset_hash": "dataset-hash",
+        "config_hash": "config-hash",
+        "code_version": "code-hash",
+        "index_hash": "index-hash",
+        "survives_validate": True,
+        "expectancy_validate": 0.2,
+    }
+    if with_cost:
+        record["session_cost_provenance"] = {
+            "source": "measured_quotes",
+            "symbol": "EURUSD",
+            "session": "asia",
+            "spread_pips": 0.8,
+        }
+    return record
+
+
+def test_v2_validated_family_cannot_authorize_different_runtime_family(tmp_path):
+    artifact = tmp_path / "validated_opportunities.json"
+    artifact.write_text(json.dumps({
+        "schema": "validated_opportunities.v2",
+        "opportunities": [_v2_opportunity()],
+    }), encoding="utf-8")
+
+    loaded = _load_validated_opportunities(artifact)
+
+    assert "EURUSD|failed_breakout_fade|range|none|asia|sell" in loaded
+    assert "EURUSD|micro_momentum_burst|range|none|asia|sell" not in loaded
+
+
+def test_v2_permission_requires_measured_session_cost_provenance(tmp_path):
+    artifact = tmp_path / "validated_opportunities.json"
+    artifact.write_text(json.dumps({
+        "schema": "validated_opportunities.v2",
+        "opportunities": [_v2_opportunity(with_cost=False)],
+    }), encoding="utf-8")
+
+    assert _load_validated_opportunities(artifact) == {}
 
 
 def _write_canary(index_path: Path, *, symbol: str = "EURUSD") -> Path:

@@ -187,6 +187,8 @@ def test_eurusd_buy_and_sell_charge_each_cost_once(side, stop, target):
     assert trade.cost_usd == pytest.approx(expected_cost)
     assert trade.net_pnl_usd == pytest.approx(expected_gross - expected_cost)
     assert trade.exit_reason == "target"
+    assert trade.mfe_r is not None and trade.mae_r is not None
+    assert trade.holding_s is not None and trade.loss_r is not None
     assert trade.exit_price == target
 
 

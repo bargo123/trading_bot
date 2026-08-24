@@ -331,6 +331,8 @@ def _load_validated_opportunities(path: Path) -> dict[str, dict[str, Any]]:
         return {}
     out: dict[str, dict[str, Any]] = {}
     rank = {"A": 3, "B": 2, "C": 1}
+    schema = str(payload.get("schema") or "validated_opportunities.v1")
+    v2 = schema == "validated_opportunities.v2"
 
     def _rank(rec: dict[str, Any]) -> int:
         return rank.get(str(rec.get("level") or "C"), 0)
@@ -343,13 +345,44 @@ def _load_validated_opportunities(path: Path) -> dict[str, dict[str, Any]]:
         if not isinstance(rec, dict):
             continue
         sym = str(rec.get("symbol") or "*").upper()
-        key = "|".join([
-            sym,
-            str(rec.get("regime") or ""),
-            str(rec.get("structure") or ""),
-            str(rec.get("session") or ""),
-            str(rec.get("side") or ""),
-        ])
+        if v2:
+            required_identity = (
+                "strategy_family", "strategy_version", "rule_fingerprint",
+                "dataset_hash", "config_hash", "code_version", "index_hash",
+            )
+            if not str(rec.get("strategy_family") or "").strip() or str(
+                rec.get("strategy_family") or ""
+            ).strip() in {"*", "*pooled*"}:
+                continue
+            if any(not str(rec.get(field) or "").strip() for field in required_identity):
+                continue
+            cost_provenance = (
+                rec.get("session_cost_provenance")
+                or rec.get("measured_session_cost")
+                or rec.get("cost_provenance")
+            )
+            if not cost_provenance:
+                continue
+            if isinstance(cost_provenance, Mapping) and not str(
+                cost_provenance.get("source") or ""
+            ).strip():
+                continue
+            key = "|".join([
+                sym,
+                str(rec.get("strategy_family") or ""),
+                str(rec.get("regime") or ""),
+                str(rec.get("structure") or ""),
+                str(rec.get("session") or ""),
+                str(rec.get("side") or ""),
+            ])
+        else:
+            key = "|".join([
+                sym,
+                str(rec.get("regime") or ""),
+                str(rec.get("structure") or ""),
+                str(rec.get("session") or ""),
+                str(rec.get("side") or ""),
+            ])
         cur = out.get(key)
         # Runtime preference on collision: higher level, then higher OOS EV.
         if cur is None or (_rank(rec), _ev(rec)) > (_rank(cur), _ev(cur)):
@@ -1119,7 +1152,40 @@ class IntelligentFirehoseBrain:
                 "validation_hash": model.validation_hash or None,
                 "promotion_stage": model.promotion_stage,
             }
+        skip_reasons = self.counts.get("skip_reasons", {})
+
+        def rejected(*needles: str) -> int:
+            return sum(
+                int(value)
+                for reason, value in skip_reasons.items()
+                if any(needle in str(reason).lower() for needle in needles)
+            )
+
         funnel = {
+            # Truthful broker funnel names. Brain intent is never FIRES/FILLS.
+            "SCANS": int(self.counts.get("scans", 0)),
+            "MICRO_CANDIDATES": int(self.counts.get("micro_candidates", self.counts.get("candidates", 0))),
+            "BOOK_SUPPORTED": int(self.counts.get("book_supported", 0)),
+            "VALIDATED_MATCH": int(self.counts.get("validated_match", 0)),
+            "EXPLORATION_ELIGIBLE": int(self.counts.get("exploration_eligible", 0)),
+            "SPREAD_REJECT": rejected("spread"),
+            "ECONOMICS_REJECT": rejected("economics", "expected_net", "ev_"),
+            "GEOMETRY_REJECT": rejected("geometry", "invalid_stop", "target"),
+            "RISK_REJECT": rejected("risk", "margin", "sizing", "lot", "halt"),
+            "STALE_REJECT": rejected("stale", "quote_refresh", "future_quote"),
+            "OTHER_REJECT": max(0, int(self.counts.get("skip", 0)) - sum(
+                rejected_group
+                for rejected_group in (
+                    rejected("spread"),
+                    rejected("economics", "expected_net", "ev_"),
+                    rejected("geometry", "invalid_stop", "target"),
+                    rejected("risk", "margin", "sizing", "lot", "halt"),
+                    rejected("stale", "quote_refresh", "future_quote"),
+                )
+            )),
+            "FIRES": int(self.counts.get("broker_fires", 0)),
+            "FILLS": int(self.counts.get("broker_fills", 0)),
+            # Legacy brain-only labels retained for existing consumers.
             "scans": int(self.counts.get("scans", 0)),
             "candidates": int(self.counts.get("candidates", 0)),
             "shadow": int(self.counts.get("shadow_fires", 0)),
@@ -1333,15 +1399,26 @@ class IntelligentFirehoseBrain:
                     "side": side,
                 }
             )
-            # Symbol-aware opportunities first (LEVEL A/B), then pooled LEVEL C.
+            # V2 permissions are family-scoped before state matching. V1 is
+            # retained as a legacy state-only read path for old artifacts.
             opp_key = "|".join([
                 str(symbol).upper(),
+                setup,
                 str(signature.get("regime") or ""),
                 str(signature.get("structure") or ""),
                 str(signature.get("session") or ""),
                 side,
             ])
             opportunity = self.validated_opportunities.get(opp_key)
+            if opportunity is None:
+                legacy_key = "|".join([
+                    str(symbol).upper(),
+                    str(signature.get("regime") or ""),
+                    str(signature.get("structure") or ""),
+                    str(signature.get("session") or ""),
+                    side,
+                ])
+                opportunity = self.validated_opportunities.get(legacy_key)
             if opportunity is not None:
                 exact_state = {
                     "regime": signature.get("regime") or "",

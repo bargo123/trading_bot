@@ -138,6 +138,111 @@ def test_micro_diagnostics_identify_missing_m15_range():
     assert reasons["fair_value_snapback"] == "missing_m15_range"
 
 
+@pytest.mark.parametrize(
+    ("overrides", "family", "reason"),
+    [
+        (
+            {"return_30s_buy": 0.00001, "return_30s_sell": -0.00001},
+            "micro_momentum_burst",
+            "insufficient_impulse",
+        ),
+        (
+            {"m5_compression": 0.9},
+            "micro_momentum_burst",
+            "excessive_compression",
+        ),
+        (
+            {"m5_direction": "down"},
+            "micro_momentum_burst",
+            "timeframe_alignment_failure",
+        ),
+        (
+            {"m1_atr": 0.00001, "m1_low": 1.09999, "m1_high": 1.10001},
+            "micro_momentum_burst",
+            "invalid_geometry",
+        ),
+        (
+            {
+                "m15_resistance": 1.1050,
+                "m15_support": 1.0950,
+                "m1_close": 1.1000,
+                "m1_prev_close": 1.1001,
+            },
+            "failed_breakout_fade",
+            "no_failed_break_trigger",
+        ),
+        (
+            {
+                "m15_range_mid": 1.1000,
+                "m15_range_half_width": 0.0040,
+                "m1_close": 1.1000,
+            },
+            "fair_value_snapback",
+            "no_snapback_trigger",
+        ),
+        (
+            {"m15_range_half_width": 0.0},
+            "fair_value_snapback",
+            "invalid_m15_range",
+        ),
+    ],
+)
+def test_micro_diagnostics_report_precise_family_rejection(
+    overrides, family, reason,
+):
+    candidates, reasons = diagnose_micro_candidates(_ctx(**overrides))
+
+    assert candidates == generate_micro_candidates(_ctx(**overrides))
+    assert family not in {candidate.family for candidate in candidates}
+    assert reasons[family] == reason
+
+
+def test_micro_diagnostics_preserve_generator_candidates_for_matching_context():
+    ctx = _ctx(
+        m15_direction="up", m5_direction="up",
+        return_30s_buy=0.0008, return_30s_sell=-0.0008,
+        m15_resistance=1.1050, m15_support=1.0950,
+        m1_close=1.1042, m1_prev_close=1.1052,
+        m1_low=1.1028, m1_high=1.1053,
+        m1_atr=0.0020, bid=1.1041, ask=1.1043,
+        m15_range_mid=1.1000, m15_range_half_width=0.0040,
+    )
+
+    generated = generate_micro_candidates(ctx)
+    diagnosed, _ = diagnose_micro_candidates(ctx)
+
+    assert diagnosed == generated
+
+
+def test_micro_diagnostics_fail_closed_and_preserve_empty_set_for_malformed_context():
+    malformed = _ctx(m1_atr="not-a-number")
+
+    generated = generate_micro_candidates(malformed)
+    diagnosed, reasons = diagnose_micro_candidates(malformed)
+
+    assert diagnosed == generated == []
+    assert reasons["micro_momentum_burst"] == "evaluation_error"
+    assert all(reason != "no_match" for reason in reasons.values())
+
+
+def test_micro_diagnostics_fail_closed_and_preserve_empty_set_for_exception_context():
+    class ExceptionContext:
+        symbol = "EURUSD"
+
+        def __getattribute__(self, name):
+            if name in {"return_30s_buy", "m15_resistance", "m15_range_mid"}:
+                raise RuntimeError("broken market context")
+            return object.__getattribute__(self, name)
+
+    context = ExceptionContext()
+
+    generated = generate_micro_candidates(context)
+    diagnosed, reasons = diagnose_micro_candidates(context)
+
+    assert diagnosed == generated == []
+    assert all(reason == "evaluation_error" for reason in reasons.values())
+
+
 def test_entry_economics_blocks_min_lot_risk_exceeding_budget():
     """Spec P6/audit defect 1: broker min lot risk > budget = BLOCKED."""
     cand = MicroCandidate(

@@ -339,3 +339,26 @@ def test_throughput_report_counts_skip_reasons(tmp_path):
     assert report["orders_sent"] == 2
     assert report["executed"] == 1
     assert report["pretrade_guards"]["margin_precheck_skip"] == 1
+
+
+def test_brain_intent_does_not_count_as_broker_fire():
+    from scripts.firehose_throughput import aggregate_funnel
+
+    report = aggregate_funnel([{"event": "intel_brain_fire", "submitted": False}])
+
+    assert {
+        "SCANS", "MICRO_CANDIDATES", "BOOK_SUPPORTED", "VALIDATED_MATCH",
+        "EXPLORATION_ELIGIBLE", "SPREAD_REJECT", "ECONOMICS_REJECT",
+        "GEOMETRY_REJECT", "RISK_REJECT", "STALE_REJECT", "OTHER_REJECT",
+        "FIRES", "FILLS",
+    } <= report.keys()
+    assert report["FIRES"] == 0
+
+
+def test_margin_rejection_is_a_risk_terminal_outcome():
+    from scripts.firehose_throughput import aggregate_funnel
+
+    report = aggregate_funnel([{"event": "margin_precheck_skip"}])
+
+    assert report["RISK_REJECT"] == 1
+    assert report["FIRES"] == 0

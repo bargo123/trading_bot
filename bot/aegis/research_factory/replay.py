@@ -36,6 +36,10 @@ class ReplayTrade:
     gross_pnl_usd: float
     cost_usd: float
     net_pnl_usd: float
+    mfe_r: float | None = None
+    mae_r: float | None = None
+    holding_s: float | None = None
+    loss_r: float | None = None
 
 
 @dataclass(frozen=True)
@@ -245,6 +249,9 @@ def _closed_trade(
     costs: ReplayCostEvidence,
     entry_spread: float,
     exit_spread: float,
+    mfe_r: float | None = None,
+    mae_r: float | None = None,
+    risk_usd: float | None = None,
 ) -> ReplayTrade:
     direction = 1.0 if side == "buy" else -1.0
     gross_pnl = costs.symbol_spec.price_units_to_usd(
@@ -254,6 +261,12 @@ def _closed_trade(
     cost_usd = costs.symbol_spec.price_units_to_usd(
         round_trip_spread + costs.slippage_price, costs.lots
     ) + costs.commission_usd
+    net_pnl = gross_pnl - cost_usd
+    try:
+        holding_s = float((exit_time - position["time"]).total_seconds())
+    except (AttributeError, TypeError, ValueError):
+        holding_s = None
+    loss_r = None if risk_usd is None or risk_usd <= 0 else min(net_pnl / risk_usd, 0.0)
     return ReplayTrade(
         side=side,
         entry_time=position["time"],
@@ -263,7 +276,11 @@ def _closed_trade(
         exit_reason=exit_reason,
         gross_pnl_usd=gross_pnl,
         cost_usd=cost_usd,
-        net_pnl_usd=gross_pnl - cost_usd,
+        net_pnl_usd=net_pnl,
+        mfe_r=mfe_r,
+        mae_r=mae_r,
+        holding_s=holding_s,
+        loss_r=loss_r,
     )
 
 
@@ -357,6 +374,12 @@ def replay_hypothesis(
                 "reference": reference,
                 "offset": offset,
                 "spread": observed_spread,
+                "risk_price": (
+                    abs(reference - float(compiled.invalidation_price))
+                    if compiled.invalidation_price is not None else None
+                ),
+                "mfe_r": 0.0,
+                "mae_r": 0.0,
             }
             continue
 
@@ -378,6 +401,16 @@ def replay_hypothesis(
             )
         except (KeyError, OverflowError, TypeError, ValueError) as exc:
             return _result("NO_EVIDENCE", str(exc))
+        risk_price = position.get("risk_price")
+        if risk_price is not None and risk_price > 0:
+            if side == "buy":
+                favorable = max(0.0, executable_high - position["reference"])
+                adverse = max(0.0, position["reference"] - executable_low)
+            else:
+                favorable = max(0.0, position["reference"] - executable_low)
+                adverse = max(0.0, executable_high - position["reference"])
+            position["mfe_r"] = max(position["mfe_r"], favorable / risk_price)
+            position["mae_r"] = max(position["mae_r"], adverse / risk_price)
         stop = compiled.invalidation_price
         target = compiled.target_price
         stop_hit = stop is not None and (
@@ -426,6 +459,12 @@ def replay_hypothesis(
                 costs=costs,
                 entry_spread=position["spread"],
                 exit_spread=observed_spread,
+                mfe_r=position["mfe_r"],
+                mae_r=position["mae_r"],
+                risk_usd=(
+                    costs.symbol_spec.price_units_to_usd(risk_price, costs.lots)
+                    if risk_price is not None and risk_price > 0 else None
+                ),
             )
         )
         position = None
@@ -452,6 +491,13 @@ def replay_hypothesis(
                 costs=costs,
                 entry_spread=position["spread"],
                 exit_spread=observed_spread,
+                mfe_r=position["mfe_r"],
+                mae_r=position["mae_r"],
+                risk_usd=(
+                    costs.symbol_spec.price_units_to_usd(position["risk_price"], costs.lots)
+                    if position.get("risk_price") is not None and position["risk_price"] > 0
+                    else None
+                ),
             )
         )
     closed = tuple(trades)

@@ -83,6 +83,24 @@ def test_analyzer_accepts_only_confirmed_firehose_close_lifecycles():
     assert report["profit_capture_ratio"] == pytest.approx(0.75)
 
 
+def test_confirmed_close_event_preserves_numeric_cost_and_net_pnl():
+    from aegis.intel.fast_exit_runner import confirmed_close_event
+
+    event = confirmed_close_event({
+        "ticket": "T1",
+        "symbol": "EURUSD",
+        "confirmed": True,
+        "cost_usd": 0.2,
+        "realized_net_usd": 3.0,
+        "mfe_usd": 4.0,
+        "mae_usd": 0.5,
+        "exit_reason": "target",
+    })
+
+    assert isinstance(event["cost_usd"], float)
+    assert isinstance(event["realized_net_usd"], float)
+
+
 def test_cli_marks_malformed_journal_as_incomplete_evidence(tmp_path):
     journal = tmp_path / "journal.jsonl"
     json_out = tmp_path / "report.json"

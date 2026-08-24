@@ -19,12 +19,44 @@ from aegis.research.incremental_ingest import (  # noqa: E402
 from scripts.research_ml_pipeline import (  # noqa: E402
     hierarchical_strategy_selection,
     ml_advances,
+    write_validated_opportunities,
 )
 
 
 # ---------------------------------------------------------------------------
 # Defect 1/2: watcher heartbeat accepts ingest; stdout JSON parsing
 # ---------------------------------------------------------------------------
+
+
+def test_writer_emits_v2_only_for_family_scoped_costed_records(tmp_path):
+    record = {
+        "level": "A",
+        "symbol": "EURUSD",
+        "strategy_family": "failed_breakout_fade",
+        "regime": "range",
+        "structure": "none",
+        "session": "asia",
+        "side": "sell",
+        "survives_validate": True,
+        "strategy_version": "rule-v1",
+        "rule_fingerprint": "rule-hash",
+        "index_hash": "index-hash",
+        "session_cost_provenance": {"source": "measured_quotes"},
+    }
+    path = write_validated_opportunities(
+        {"opportunities": [record]},
+        dataset_hash="dataset-hash",
+        config_hash="config-hash",
+        code_version="code-hash",
+        cost_model={},
+        path=tmp_path / "validated_opportunities.json",
+    )
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    assert payload["schema"] == "validated_opportunities.v2"
+    assert payload["opportunities"][0]["strategy_family"] == "failed_breakout_fade"
+    assert payload["v1_opportunities"][0]["strategy_family"] == "failed_breakout_fade"
 
 
 def test_write_heartbeat_persists_ingest_status(tmp_path, monkeypatch):

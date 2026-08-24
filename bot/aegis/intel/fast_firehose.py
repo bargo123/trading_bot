@@ -374,6 +374,126 @@ def generate_micro_candidates(ctx: FastMarketContext) -> list[MicroCandidate]:
     return candidates
 
 
+def _micro_rejection_reason(ctx: FastMarketContext, family: str) -> str:
+    """Explain a family function's existing ``None`` predicates.
+
+    The caller has already invoked the family function, so this helper is
+    strictly observational.  Keep the predicate order aligned with that
+    function and let the caller's exception boundary classify malformed
+    contexts as ``evaluation_error``.
+    """
+    if family == "micro_momentum_burst":
+        required = (
+            ("m1_atr", ctx.m1_atr),
+            ("bid", ctx.bid),
+            ("ask", ctx.ask),
+            ("m1_low", ctx.m1_low),
+            ("m1_high", ctx.m1_high),
+            ("m15_direction", ctx.m15_direction),
+            ("m5_direction", ctx.m5_direction),
+        )
+        missing = next((name for name, value in required if value is None), None)
+        if missing is not None:
+            return f"missing_{missing}"
+        ret_30s_buy = ctx.get_return(30, "buy")
+        ret_30s_sell = ctx.get_return(30, "sell")
+        if ret_30s_buy is None and ret_30s_sell is None:
+            return "missing_return_30s"
+        compression = ctx.m5_compression
+        if compression is None:
+            return "missing_m5_compression"
+        if ret_30s_buy is not None and abs(ret_30s_buy) >= abs(ret_30s_sell or 0):
+            direction = "buy" if ret_30s_buy > 0 else "sell"
+            m1_ret = ret_30s_buy if direction == "buy" else -abs(ret_30s_buy)
+        else:
+            direction = "sell" if ret_30s_sell < 0 else "buy"
+            m1_ret = ret_30s_sell if direction == "sell" else abs(ret_30s_sell or 0)
+        if abs(m1_ret) < ctx.m1_atr * 0.3:
+            return "insufficient_impulse"
+        if compression > 0.8:
+            return "excessive_compression"
+        direction = "buy" if m1_ret > 0 else "sell"
+        if direction == "buy" and (ctx.m15_direction != "up" or ctx.m5_direction != "up"):
+            return "timeframe_alignment_failure"
+        if direction == "sell" and (ctx.m15_direction != "down" or ctx.m5_direction != "down"):
+            return "timeframe_alignment_failure"
+        entry = ctx.ask if direction == "buy" else ctx.bid
+        inv = _micro_invalidation(
+            side=direction, entry=entry, m1_low=ctx.m1_low,
+            m1_high=ctx.m1_high, atr_m1=ctx.m1_atr,
+        )
+        if inv is None or abs(entry - inv) < pip_value(ctx.symbol) * 1.5:
+            return "invalid_geometry"
+        return "other_rejection"
+
+    if family == "failed_breakout_fade":
+        if ctx.m15_resistance is None or ctx.m15_support is None:
+            return "missing_m15_range"
+        required = (
+            ("m1_close", ctx.m1_close),
+            ("bid", ctx.bid),
+            ("ask", ctx.ask),
+            ("m1_atr", ctx.m1_atr),
+            ("m1_low", ctx.m1_low),
+            ("m1_high", ctx.m1_high),
+        )
+        missing = next((name for name, value in required if value is None), None)
+        if missing is not None:
+            return f"missing_{missing}"
+        if ctx.m1_prev_close is None:
+            return "missing_m1_prev_close"
+        res, sup = ctx.m15_resistance, ctx.m15_support
+        close, prev_close = ctx.m1_close, ctx.m1_prev_close
+        if prev_close > res and close < res:
+            direction = "sell"
+            entry = ctx.bid
+            inv = max(ctx.m1_high, res) + ctx.m1_atr * 0.2
+            target = sup if sup < entry else entry - ctx.m1_atr * 2
+        elif prev_close < sup and close > sup:
+            direction = "buy"
+            entry = ctx.ask
+            inv = min(ctx.m1_low, sup) - ctx.m1_atr * 0.2
+            target = res if res > entry else entry + ctx.m1_atr * 2
+        else:
+            return "no_failed_break_trigger"
+        pip = pip_value(ctx.symbol)
+        if abs(entry - inv) / pip < 1.0 or abs(entry - target) / pip < 1.0:
+            return "invalid_geometry"
+        return "other_rejection"
+
+    if ctx.m15_range_mid is None or ctx.m15_range_half_width is None:
+        return "missing_m15_range"
+    required = (
+        ("m1_close", ctx.m1_close),
+        ("bid", ctx.bid),
+        ("ask", ctx.ask),
+        ("m1_atr", ctx.m1_atr),
+    )
+    missing = next((name for name, value in required if value is None), None)
+    if missing is not None:
+        return f"missing_{missing}"
+    mid, half_width = ctx.m15_range_mid, ctx.m15_range_half_width
+    if half_width <= 0:
+        return "invalid_m15_range"
+    edge_upper = mid + half_width
+    edge_lower = mid - half_width
+    close, atr = ctx.m1_close, ctx.m1_atr
+    if close > edge_upper:
+        entry = ctx.bid
+        invalidation = close + atr * 0.4
+        target = mid
+    elif close < edge_lower:
+        entry = ctx.ask
+        invalidation = close - atr * 0.4
+        target = mid
+    else:
+        return "no_snapback_trigger"
+    pip = pip_value(ctx.symbol)
+    if abs(entry - invalidation) / pip < 1.0 or abs(entry - target) / pip < 0.8:
+        return "invalid_geometry"
+    return "other_rejection"
+
+
 def diagnose_micro_candidates(
     ctx: FastMarketContext,
 ) -> tuple[list[MicroCandidate], dict[str, str]]:
@@ -390,61 +510,15 @@ def diagnose_micro_candidates(
         ("fair_value_snapback", fair_value_snapback),
     )
     for family, fn in families:
-        if family == "micro_momentum_burst":
-            if ctx.return_30s_buy is None and ctx.return_30s_sell is None:
-                diagnostics[family] = "missing_return_30s"
-                continue
-            if ctx.m5_compression is None:
-                diagnostics[family] = "missing_m5_compression"
-                continue
-            required = {
-                "m1_atr": ctx.m1_atr,
-                "bid": ctx.bid,
-                "ask": ctx.ask,
-                "m1_low": ctx.m1_low,
-                "m1_high": ctx.m1_high,
-                "m15_direction": ctx.m15_direction,
-                "m5_direction": ctx.m5_direction,
-            }
-        elif family == "failed_breakout_fade":
-            if ctx.m15_resistance is None or ctx.m15_support is None:
-                diagnostics[family] = "missing_m15_range"
-                continue
-            if ctx.m1_prev_close is None:
-                diagnostics[family] = "missing_m1_prev_close"
-                continue
-            required = {
-                "m1_close": ctx.m1_close,
-                "bid": ctx.bid,
-                "ask": ctx.ask,
-                "m1_atr": ctx.m1_atr,
-                "m1_low": ctx.m1_low,
-                "m1_high": ctx.m1_high,
-            }
-        else:
-            if ctx.m15_range_mid is None or ctx.m15_range_half_width is None:
-                diagnostics[family] = "missing_m15_range"
-                continue
-            required = {
-                "m1_close": ctx.m1_close,
-                "bid": ctx.bid,
-                "ask": ctx.ask,
-                "m1_atr": ctx.m1_atr,
-            }
-        missing = next((name for name, value in required.items() if value is None), None)
-        if missing is not None:
-            diagnostics[family] = f"missing_{missing}"
-            continue
         try:
             candidate = fn(ctx)
+            if candidate is not None:
+                candidates.append(candidate)
+                diagnostics[family] = "candidate_matched"
+                continue
+            diagnostics[family] = _micro_rejection_reason(ctx, family)
         except Exception:
             diagnostics[family] = "evaluation_error"
-            continue
-        if candidate is None:
-            diagnostics[family] = "no_match"
-        else:
-            candidates.append(candidate)
-            diagnostics[family] = "candidate_matched"
     return candidates, diagnostics
 
 

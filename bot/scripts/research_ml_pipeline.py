@@ -428,16 +428,41 @@ def write_validated_opportunities(
     which config, which code version, and why each record was accepted.
     """
     survivors = [o for o in selection.get("opportunities", []) if o.get("survives_validate")]
+    v2_survivors: list[dict[str, Any]] = []
+    for source in survivors:
+        family = str(source.get("strategy_family") or "").strip()
+        cost_provenance = source.get("session_cost_provenance")
+        if (
+            not family or family in {"*", "*pooled*"}
+            or not str(source.get("strategy_version") or "").strip()
+            or not str(source.get("rule_fingerprint") or "").strip()
+            or not str(source.get("index_hash") or "").strip()
+            or not isinstance(cost_provenance, dict)
+            or not str(cost_provenance.get("source") or "").strip()
+        ):
+            continue
+        record = dict(source)
+        record.update({
+            "dataset_hash": dataset_hash,
+            "config_hash": config_hash,
+            "code_version": code_version,
+        })
+        v2_survivors.append(record)
+    schema = "validated_opportunities.v2" if v2_survivors else "validated_opportunities.v1"
     payload = {
-        "schema": "validated_opportunities.v1",
+        "schema": schema,
         "built_at": datetime.now(timezone.utc).isoformat(),
         "code_version": code_version,
         "dataset_hash": dataset_hash,
         "config_hash": config_hash,
         "cost_model": cost_model,
-        "n_opportunities": len(survivors),
-        "opportunities": survivors,
+        "n_opportunities": len(v2_survivors if v2_survivors else survivors),
+        "opportunities": v2_survivors if v2_survivors else survivors,
     }
+    if v2_survivors:
+        # Keep the prior artifact data auditable without allowing unscoped v1
+        # rows to authorize a v2 runtime lookup.
+        payload["v1_opportunities"] = survivors
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     return path

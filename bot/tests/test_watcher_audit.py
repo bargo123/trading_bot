@@ -77,3 +77,12 @@ def test_watcher_uses_singleton_lock(tmp_path, monkeypatch):
     third = w.ProcessLock(tmp_path / "watcher.lock")
     assert third.try_acquire() is True
     third.release()
+
+
+def test_incremental_ingest_rejects_bad_row_with_symbol_reason():
+    from scripts.research_incremental_ingest import ingest_rows
+
+    result = ingest_rows(["invalid"], symbol="EURUSD")
+
+    assert result["status"] == "FAILED"
+    assert "mapping" in result["reason"]

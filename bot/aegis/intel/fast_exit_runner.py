@@ -278,6 +278,20 @@ def firehose_exit_trace(ctx: FastExitContext, verdict: Mapping[str, Any]) -> dic
     }
 
 
+def confirmed_close_event(close: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize broker-confirmed close facts; missing facts stay fail-closed."""
+    if close.get("confirmed") is not True:
+        return {"status": "NO_EVIDENCE", "reason": "close_not_confirmed"}
+    required = ("cost_usd", "realized_net_usd", "mfe_usd", "mae_usd")
+    if any(not _finite(close.get(field)) for field in required):
+        return {"status": "NO_EVIDENCE", "reason": "numeric_close_facts_required"}
+    return {
+        **dict(close),
+        "status": "OK",
+        **{field: float(close[field]) for field in required},
+    }
+
+
 def _risk_usd(ctx: FastExitContext, meta: TicketMetadata | None) -> float | None:
     if meta is None:
         return None

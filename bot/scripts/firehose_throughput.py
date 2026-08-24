@@ -13,10 +13,18 @@ import collections
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Iterable, Mapping
 
 BOT = Path(__file__).resolve().parents[1]
 SESSIONS = (("00", "07", "asia"), ("07", "12", "london"), ("12", "16", "london"),
             ("16", "21", "newyork"), ("21", "24", "asia"))
+FUNNEL_STAGES = (
+    "SCANS", "MICRO_CANDIDATES", "BOOK_SUPPORTED", "VALIDATED_MATCH",
+    "EXPLORATION_ELIGIBLE", "SPREAD_REJECT", "ECONOMICS_REJECT",
+    "GEOMETRY_REJECT", "RISK_REJECT", "STALE_REJECT", "OTHER_REJECT",
+    "FIRES", "FILLS",
+)
+_TERMINAL_STAGES = set(FUNNEL_STAGES) - {"SCANS", "MICRO_CANDIDATES", "BOOK_SUPPORTED", "VALIDATED_MATCH", "EXPLORATION_ELIGIBLE", "FIRES", "FILLS"}
 
 
 def session_of(ts: str) -> str:
@@ -25,6 +33,91 @@ def session_of(ts: str) -> str:
         if start <= hour < end:
             return name
     return "unknown"
+
+
+def _funnel_terminal(reason: str) -> str:
+    text = str(reason or "").lower()
+    if "stale" in text or "future_quote" in text or "quote_refresh" in text:
+        return "STALE_REJECT"
+    if "spread" in text:
+        return "SPREAD_REJECT"
+    if "economics" in text or "expected" in text or "ev_" in text:
+        return "ECONOMICS_REJECT"
+    if "geometry" in text or "stop" in text or "target" in text:
+        return "GEOMETRY_REJECT"
+    if any(token in text for token in ("risk", "margin", "sizing", "lot", "position", "circuit", "halt")):
+        return "RISK_REJECT"
+    return "OTHER_REJECT"
+
+
+def aggregate_funnel(rows: Iterable[Mapping]) -> dict[str, int]:
+    """Aggregate truthful funnel rows without treating brain intent as a fire.
+
+    Versioned ``firehose_funnel.v1`` rows are terminal per ``scan_id``; the
+    last row wins when a scan moves from intent to a broker outcome. Legacy
+    journal events are retained as a read-only compatibility path.
+    """
+    counts = {stage: 0 for stage in FUNNEL_STAGES}
+    versioned: dict[str, Mapping] = {}
+    legacy = []
+    for row in rows:
+        if str(row.get("event") or "") == "firehose_funnel.v1" and row.get("scan_id"):
+            versioned[str(row["scan_id"])] = row
+        else:
+            legacy.append(row)
+
+    for row in versioned.values():
+        counts["SCANS"] += 1
+        for field, stage in (
+            ("micro_candidate_count", "MICRO_CANDIDATES"),
+            ("book_supported", "BOOK_SUPPORTED"),
+            ("validated_match", "VALIDATED_MATCH"),
+            ("exploration_eligible", "EXPLORATION_ELIGIBLE"),
+        ):
+            value = row.get(field)
+            if (isinstance(value, (int, float)) and value > 0) or value is True:
+                counts[stage] += 1 if stage != "MICRO_CANDIDATES" else int(value)
+        terminal = str(row.get("terminal") or "")
+        if terminal in _TERMINAL_STAGES:
+            counts[terminal] += 1
+        if row.get("submitted") is True:
+            counts["FIRES"] += 1
+        if row.get("filled") is True:
+            counts["FILLS"] += 1
+
+    for row in legacy:
+        event = str(row.get("event") or "")
+        reason = str(row.get("reason") or row.get("msg") or "")
+        if event in {"intel_brain_skip", "intel_brain_fire", "intel_brain_hold"}:
+            counts["SCANS"] += 1
+        if event == "intel_brain_fire":
+            if row.get("exploration") or row.get("promotion_stage") == "EXPLORATION_CANARY":
+                counts["EXPLORATION_ELIGIBLE"] += 1
+            else:
+                counts["VALIDATED_MATCH"] += 1
+            if row.get("submitted") is True:
+                counts["FIRES"] += 1
+            if row.get("filled") is True:
+                counts["FILLS"] += 1
+        elif event == "intel_brain_skip":
+            counts[_funnel_terminal(reason)] += 1
+        elif event in {"margin_precheck_skip", "sizing_skip", "exploration_limit_skip", "halt", "hr_halt"}:
+            counts["RISK_REJECT"] += 1
+        elif event in {"spread_skip", "quote_spread_reject"}:
+            counts["SPREAD_REJECT"] += 1
+        elif event in {"quote_stale", "quote_future", "quote_refresh_failed", "quote_refresh_invalid"}:
+            counts["STALE_REJECT"] += 1
+        elif event == "oms_reject":
+            counts[_funnel_terminal(reason)] += 1
+        elif event == "order":
+            if row.get("scan_id") and str(row["scan_id"]) in versioned:
+                continue
+            if row.get("submitted", True) is True:
+                counts["FIRES"] += 1
+            status = str(row.get("execution_status") or "")
+            if row.get("filled") is True or status in {"POSITION_CONFIRMED", "DEAL_EXECUTED"}:
+                counts["FILLS"] += 1
+    return counts
 
 
 def main() -> int:
@@ -44,6 +137,7 @@ def main() -> int:
     reject_msgs = collections.Counter()
     brain_events = 0
     funnel = collections.Counter()
+    raw_rows: list[dict] = []
 
     with args.journal.open(encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -51,6 +145,7 @@ def main() -> int:
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            raw_rows.append(row)
             ev = row.get("event")
             bar = str(row.get("bar") or "")
             sym = str(row.get("symbol") or "?")
@@ -95,6 +190,8 @@ def main() -> int:
                 orders["min_lot_precheck_skip"] += 1
 
     eligible = decisions["fire"] + decisions["scale"] + decisions["skip"]
+    truthful_funnel = aggregate_funnel(raw_rows)
+    funnel.update(truthful_funnel)
     report = {
         "schema": "firehose_throughput.v2",
         "generated_utc": datetime.now(timezone.utc).isoformat(),
@@ -103,6 +200,7 @@ def main() -> int:
         "fire_candidates": decisions["fire"],
         "scale_candidates": decisions["scale"],
         "funnel": dict(funnel),
+        "truthful_funnel": truthful_funnel,
         "orders_sent": orders["sent"],
         "executed": orders["executed"],
         "rejected": orders["rejected"] + orders["oms_rejected"],

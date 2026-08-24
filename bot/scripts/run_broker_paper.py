@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -87,6 +88,27 @@ def append_journal(path: Path, event: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(event, default=str) + "\n")
+
+
+def firehose_scan_id(symbol: str, bar: object) -> str:
+    """Stable identity for one symbol/completed-bar evaluation."""
+    payload = f"firehose-scan|{str(symbol).upper()}|{bar}"
+    return "scan_" + hashlib.sha256(payload.encode()).hexdigest()[:20]
+
+
+def funnel_terminal_for_reason(reason: object) -> str:
+    text = str(reason or "").lower()
+    if "stale" in text or "future_quote" in text or "quote_refresh" in text:
+        return "STALE_REJECT"
+    if "spread" in text:
+        return "SPREAD_REJECT"
+    if "economics" in text or "expected" in text or "ev_" in text:
+        return "ECONOMICS_REJECT"
+    if "geometry" in text or "stop" in text or "target" in text:
+        return "GEOMETRY_REJECT"
+    if any(token in text for token in ("risk", "margin", "sizing", "lot", "position", "circuit", "halt")):
+        return "RISK_REJECT"
+    return "OTHER_REJECT"
 
 
 def write_runner_heartbeat(
@@ -951,6 +973,7 @@ def main() -> None:
             frame = prepare(raw, prep_cfg)
             row = frame.iloc[-2]
             bar_time = pd.Timestamp(row["time"])
+            scan_id = firehose_scan_id(sym, bar_time)
             prev = last_bar_time.get(sym)
             if prev is not None and bar_time <= prev:
                 return
@@ -1116,6 +1139,31 @@ def main() -> None:
                     now_ts=now_ts,
                 )
                 brain_decision = decision
+                _book_logic = decision.journal.get("book_logic") or {}
+                _micro_count = int(decision.journal.get("micro_candidate_count", 0) or 0)
+                _is_exploration = bool(decision.journal.get("exploration"))
+                _terminal = (
+                    "EXPLORATION_ELIGIBLE" if decision.action in {"fire", "scale"} and _is_exploration
+                    else "VALIDATED_MATCH" if decision.action in {"fire", "scale"}
+                    else funnel_terminal_for_reason(decision.reason)
+                )
+                append_journal(
+                    journal,
+                    {
+                        "event": "firehose_funnel.v1",
+                        "scan_id": scan_id,
+                        "symbol": sym,
+                        "bar": str(bar_time),
+                        "terminal": _terminal,
+                        "micro_candidate_count": _micro_count,
+                        "book_supported": bool(_book_logic.get("source_book")),
+                        "validated_match": decision.action in {"fire", "scale"} and not _is_exploration,
+                        "exploration_eligible": decision.action in {"fire", "scale"} and _is_exploration,
+                        "brain_intent": decision.action in {"fire", "scale"},
+                        "submitted": False,
+                        "filled": False,
+                    },
+                )
                 if decision.action in {"exit", "reduce"}:
                     open_pos = list(eng.positions(sym))
                     thesis_key_now = str(decision.journal.get("thesis_key") or "")
@@ -1459,6 +1507,8 @@ def main() -> None:
                     journal,
                     {
                         "event": "intel_brain_fire",
+                        "scan_id": scan_id,
+                        "submitted": False,
                         "symbol": sym,
                         "action": brain_decision.action,
                         "reason": brain_decision.reason,
@@ -1693,6 +1743,24 @@ def main() -> None:
                         },
                     )
                     return
+            if brain_decision is not None:
+                append_journal(
+                    journal,
+                    {
+                        "event": "firehose_funnel.v1",
+                        "scan_id": scan_id,
+                        "symbol": sym,
+                        "bar": str(bar_time),
+                        "terminal": _terminal,
+                        "micro_candidate_count": _micro_count,
+                        "book_supported": bool(_book_logic.get("source_book")),
+                        "validated_match": bool(_terminal == "VALIDATED_MATCH"),
+                        "exploration_eligible": bool(_terminal == "EXPLORATION_ELIGIBLE"),
+                        "brain_intent": True,
+                        "submitted": True,
+                        "filled": False,
+                    },
+                )
             latency.request_ts = time.time()
             res = eng.place_order(req)
             latency.response_ts = time.time()
@@ -1704,6 +1772,24 @@ def main() -> None:
                 positions_after=list(eng.positions(sym)),
             )
             status = audit["status"]
+            if brain_decision is not None:
+                append_journal(
+                    journal,
+                    {
+                        "event": "firehose_funnel.v1",
+                        "scan_id": scan_id,
+                        "symbol": sym,
+                        "bar": str(bar_time),
+                        "terminal": _terminal,
+                        "micro_candidate_count": _micro_count,
+                        "book_supported": bool(_book_logic.get("source_book")),
+                        "validated_match": bool(_terminal == "VALIDATED_MATCH"),
+                        "exploration_eligible": bool(_terminal == "EXPLORATION_ELIGIBLE"),
+                        "brain_intent": True,
+                        "submitted": True,
+                        "filled": status in {"POSITION_CONFIRMED", "DEAL_EXECUTED"},
+                    },
+                )
             execution_status_counts[status] = int(execution_status_counts.get(status, 0)) + 1
             if status in {"POSITION_CONFIRMED", "DEAL_EXECUTED"}:
                 latency.confirmed_ts = time.time()
@@ -1739,6 +1825,9 @@ def main() -> None:
                 journal,
                 {
                     "event": "order",
+                    "scan_id": scan_id,
+                    "submitted": True,
+                    "filled": status in {"POSITION_CONFIRMED", "DEAL_EXECUTED"},
                     "ok": res.ok,
                     "id": res.broker_order_id,
                     "msg": res.message,
