@@ -49,6 +49,20 @@ def normalize_firehose_lifecycle_rows(rows: Sequence[Mapping[str, Any]]) -> dict
             return _no_evidence("missing_confirmed_close")
         if opened is None or not traced:
             return _no_evidence("missing_lifecycle_evidence")
+        identity = tuple(opened.get(field) for field in ("basket_id", "trigger_id", "clip_sequence"))
+        if (
+            not all(value not in (None, "") for value in identity)
+            or any(tuple(event.get(field) for field in ("basket_id", "trigger_id", "clip_sequence")) != identity for event in traced + [closed])
+        ):
+            return _no_evidence("missing_lifecycle_evidence")
+        try:
+            opened_at = datetime.fromisoformat(str(opened["timestamp"]))
+            trace_times = [datetime.fromisoformat(str(event["timestamp"])) for event in traced]
+            closed_at = datetime.fromisoformat(str(closed["timestamp"]))
+        except (KeyError, TypeError, ValueError):
+            return _no_evidence("non_chronological_lifecycle")
+        if not all(opened_at < observed_at < closed_at for observed_at in trace_times):
+            return _no_evidence("non_chronological_lifecycle")
         realized_net = closed.get("realized_net_usd")
         cost = closed.get("cost_usd")
         if (
