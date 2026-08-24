@@ -188,6 +188,9 @@ def test_report_writer_only_writes_requested_report_paths(tmp_path):
     assert "max_loss_usd: `NO_COMPLETE_LIFECYCLE_EVIDENCE`" in markdown
     assert "profit_capture_ratio: 0.6875" in markdown
     assert "Policy comparison: `OK`" in markdown
+    assert "highest_win_rate_policy: oos_count=2, oos_expectancy_after_cost=0.05" in markdown
+    assert "higher_expectancy_policy: oos_count=2, oos_expectancy_after_cost=0.25" in markdown
+    assert "profit_factor=`NO_EVIDENCE`, tail=`NO_EVIDENCE`, drawdown=`NO_EVIDENCE`" in markdown
 
 
 def test_cli_includes_costed_oos_replay_comparison(tmp_path):

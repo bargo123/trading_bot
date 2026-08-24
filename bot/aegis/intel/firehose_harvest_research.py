@@ -295,6 +295,14 @@ def write_harvest_report(report: Mapping[str, Any], json_path: Path, markdown_pa
     if policy.get("status") == "OK":
         lines.append(f"selection_metric: {policy.get('selection_metric')}")
         lines.append(f"winner: {policy.get('winner')}")
+        for name, evidence in policy.get("policies", {}).items():
+            lines.append(
+                f"- {name}: oos_count={evidence.get('count', '`NO_EVIDENCE`')}, "
+                f"oos_expectancy_after_cost={evidence.get('oos_expectancy_after_cost', '`NO_EVIDENCE`')}, "
+                f"profit_factor={evidence.get('profit_factor', '`NO_EVIDENCE`')}, "
+                f"tail={evidence.get('tail', '`NO_EVIDENCE`')}, "
+                f"drawdown={evidence.get('drawdown', '`NO_EVIDENCE`')}"
+            )
     else:
         lines.append("selection_metric: `NO_EVIDENCE`")
         lines.append("winner: `NO_EVIDENCE`")
