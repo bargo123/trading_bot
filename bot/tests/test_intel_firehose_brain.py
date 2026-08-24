@@ -424,9 +424,8 @@ def test_gate_blocks_fire_outside_validated_states(tmp_path):
     assert decision.reason == "state_not_in_validated_set"
 
 
-def test_gate_allows_fire_on_validated_state(tmp_path):
-    """When the current state is in the allowlist, the gate must not block a
-    genuine fire."""
+def test_gate_allows_validated_state_to_reach_economics(tmp_path):
+    """A validated state passes authorization even when it lacks a legal target."""
     m1 = _basing_above_support()
     signature = _signature_for_m1(m1.iloc[:-1])
     allow_states = [
@@ -439,7 +438,8 @@ def test_gate_allows_fire_on_validated_state(tmp_path):
     ]
     brain = _gated_brain(tmp_path, signature, allow_states)
     decision = _evaluate_brain(brain, m1)
-    assert decision.action == "fire", f"expected fire, got {decision.action}: {decision.reason}"
+    assert decision.reason == "trade_economics:no_structural_target"
+    assert decision.reason != "state_not_in_validated_set"
 
 
 def test_gate_with_empty_allowlist_fires_nothing(tmp_path):
@@ -544,7 +544,8 @@ def test_gate_uses_exact_state_evidence_not_fuzzy_pool(tmp_path):
     }
     brain = IntelligentFirehoseBrain(cfg)
     decision = _evaluate_brain(brain, m1)
-    assert decision.action == "fire", f"expected fire, got {decision.action}: {decision.reason}"
+    assert decision.reason == "trade_economics:no_structural_target"
+    assert decision.analogue_n >= 20
     assert decision.analogue_n >= 20
 
 

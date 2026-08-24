@@ -661,6 +661,79 @@ def test_negative_state_ev_cannot_return_through_exploration(tmp_path, monkeypat
     assert after == before, "negative-EV candidate must not be registered"
 
 
+def test_undercovered_state_reaches_exploration_without_legacy_geometry(tmp_path, monkeypatch):
+    """A missing legacy S/R level cannot prevent a guarded micro-candidate check."""
+    from aegis.intel import firehose_brain as fb
+    from aegis.intel.firehose_brain import DemoDecision, IntelligentFirehoseBrain
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1", "records": []}), encoding="utf-8")
+    brain = IntelligentFirehoseBrain(
+        {
+            "analogue_index_path": str(index),
+            "intelligent_gate_validated_states": True,
+            "validated_states_path": str(tmp_path / "empty_states.json"),
+            "intelligent_firehose_bootstrap": True,
+            "intelligent_exploration_enabled": True,
+            "intelligent_min_analogues": 20,
+            "intelligent_min_similarity": 0.5,
+            "intelligent_risk_budget_usd": 100.0,
+            "order_quantity": 0.01,
+            "max_positions": 40,
+        }
+    )
+    monkeypatch.setattr(
+        fb,
+        "build_runtime_state",
+        lambda **kwargs: {
+            "structure": {"M15": {"kind": "none", "support": None, "resistance": None}},
+            "session": "asia",
+            "regime": {"label": "range"},
+            "multi_timeframe": {"H1": {"direction": "up"}, "M5": {"direction": "down"}},
+            "volatility": {"phase": "stable"},
+        },
+    )
+    monkeypatch.setattr(
+        fb,
+        "runtime_signature",
+        lambda state, side, setup: {
+            "symbol": "EURUSD",
+            "side": side,
+            "setup": setup,
+            "regime": "range",
+            "structure": "none",
+            "volatility": "stable",
+            "session": "asia",
+            "h1_direction": "up",
+            "m5_direction": "down",
+        },
+    )
+    invoked = []
+
+    def explore(**kwargs):
+        invoked.append(kwargs)
+        return DemoDecision("fire", "exploration_test", side="buy", sl=1.0, tp=1.1, quantity=0.01), None
+
+    monkeypatch.setattr(brain, "_maybe_explore", explore)
+    frame = _exploration_frame()
+    row = frame.iloc[-1].copy()
+    row["time"] = frame["time"].iloc[-1]
+    decision = brain.evaluate(
+        symbol="EURUSD",
+        row=row,
+        completed_m1=frame.iloc[:-1],
+        positions=[],
+        equity=100.0,
+        pip=0.0001,
+        core_side="buy",
+        spread_price=0.0001,
+        entry_price=float(row["close"]),
+    )
+
+    assert invoked
+    assert decision.action == "fire"
+
+
 def test_book_logic_non_empty_via_real_explore_path(tmp_path, monkeypatch):
     """Audited defect 4: at $0.15 risk, economics correctly reject wide-stop
     candidates (proving check_entry_economics IS wired). Book logic retrieval

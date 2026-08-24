@@ -15,6 +15,8 @@ from aegis.research.dataplane import TF_MINUTES, session_label
 from aegis.research.mtf import mtf_state, require_htf
 from aegis.research.regime import classify_regime
 from aegis.research.structure import structure_event
+from aegis.state_semantics import direction as _direction
+from aegis.state_semantics import volatility as _volatility
 
 
 @dataclass(frozen=True)
@@ -37,39 +39,6 @@ class MarketState:
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
-
-
-def _direction(frame: pd.DataFrame) -> str:
-    if frame.empty:
-        return "unavailable"
-    last = frame.iloc[-1]
-    if float(last["close"]) > float(last["open"]):
-        return "up"
-    if float(last["close"]) < float(last["open"]):
-        return "down"
-    return "flat"
-
-
-def _volatility(m1: pd.DataFrame) -> dict[str, Any]:
-    ranges = (m1["high"].astype(float) - m1["low"].astype(float)).abs()
-    recent = ranges.tail(20)
-    prior = ranges.iloc[max(0, len(ranges) - 40) : max(0, len(ranges) - 20)]
-    recent_mean = float(recent.mean()) if len(recent) else None
-    prior_mean = float(prior.mean()) if len(prior) else None
-    if recent_mean is None or prior_mean is None or prior_mean <= 0:
-        phase = "unavailable"
-    elif recent_mean > prior_mean:
-        phase = "expanding"
-    elif recent_mean < prior_mean:
-        phase = "compressing"
-    else:
-        phase = "stable"
-    return {
-        "range_mean_20": recent_mean,
-        "range_mean_prior_20": prior_mean,
-        "phase": phase,
-        "source": "completed_m1_ranges",
-    }
 
 
 def build_market_state(

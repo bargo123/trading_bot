@@ -608,7 +608,7 @@ class IntelligentFirehoseBrain:
         setup: str,
         signature: Mapping[str, Any],
         entry: float,
-        invalidation: float,
+        invalidation: float | None,
         target: float | None,
         pip: float,
         info_id: str,
@@ -693,9 +693,6 @@ class IntelligentFirehoseBrain:
         if failed is not None:
             return None, f"known_failed_hypothesis:{failed.get('hypothesis_id', '')[:16]}"
 
-        sl_dist = abs(float(entry) - float(invalidation))
-        if sl_dist <= 0:
-            return None, "exploration_no_invalidation"
         # NEGATIVE_STATE_EV: measured analogue evidence against this state is
         # a HARD rejection - economics never returns through exploration.
         ev_obj = evidence
@@ -1272,10 +1269,6 @@ class IntelligentFirehoseBrain:
             symbol,
         )
         invalidation, target = _geometry(side, m15, pip)
-        if invalidation is None and held.clips <= 0:
-            self._note_skip("no_structural_invalidation")
-            self.counts["skip"] += 1
-            return DemoDecision("skip", "no_structural_invalidation", side=side, journal={"brain": "intelligent_firehose"})
         signature = runtime_signature(state, side=side, setup=setup)
         self.regime_by_symbol[str(symbol).upper()] = str(
             signature.get("regime") or ""
@@ -1509,7 +1502,6 @@ class IntelligentFirehoseBrain:
         if (
             exploration_classified
             and held.clips <= 0
-            and invalidation is not None
             and bool(self.cfg.get("intelligent_exploration_enabled", True))
         ):
             book_family = str((books[0] or {}).get("strategy_family") or "") if books else ""
@@ -1519,7 +1511,7 @@ class IntelligentFirehoseBrain:
                 setup=setup,
                 signature=signature,
                 entry=float(entry_price if entry_price is not None else close),
-                invalidation=float(invalidation),
+                invalidation=invalidation,
                 target=target,
                 pip=pip,
                 info_id=info_id,

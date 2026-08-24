@@ -7,20 +7,12 @@ from typing import Any, Iterable
 
 import pandas as pd
 
+from aegis.completed_bars import TF_MINUTES, resample_completed as _resample_completed
 from aegis.research.capabilities import capabilities_snapshot
 from aegis.research.fingerprint import dataset_fingerprint
+from aegis.state_semantics import session_label
 
 SCHEMA_VERSION = "dataplane.v1"
-
-TF_MINUTES = {
-    "M1": 1,
-    "M5": 5,
-    "M15": 15,
-    "M30": 30,
-    "H1": 60,
-    "H4": 240,
-    "D1": 1440,
-}
 
 TICK_COLUMNS = (
     "symbol",
@@ -33,15 +25,6 @@ TICK_COLUMNS = (
     "tick_volume",
     "flags",
 )
-
-
-def session_label(ts: Any) -> str:
-    hour = int(pd.Timestamp(ts).tz_convert("UTC").hour)
-    if 7 <= hour < 13:
-        return "london"
-    if 13 <= hour < 21:
-        return "newyork"
-    return "asia"
 
 
 def ticks_frame(rows: Iterable[dict[str, Any]]) -> pd.DataFrame:
@@ -65,21 +48,7 @@ def annotate_bars(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def resample_completed(m1: pd.DataFrame, tf: str) -> pd.DataFrame:
-    minutes = TF_MINUTES[tf]
-    d = m1.copy()
-    d["time"] = pd.to_datetime(d["time"], utc=True)
-    if minutes == 1:
-        return annotate_bars(d.reset_index(drop=True))
-    last_m1 = d["time"].max()
-    indexed = d.set_index("time").sort_index()
-    ohlc = indexed.resample(f"{minutes}min", label="left", closed="left").agg(
-        {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
-    )
-    ohlc = ohlc.dropna()
-    bar_end = ohlc.index + pd.Timedelta(minutes=minutes)
-    complete = (bar_end - pd.Timedelta(minutes=1)) <= last_m1
-    ohlc = ohlc.loc[complete].reset_index()
-    return annotate_bars(ohlc)
+    return annotate_bars(_resample_completed(m1, tf))
 
 
 def contract_snapshot(
