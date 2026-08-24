@@ -71,3 +71,67 @@ exit values.
 - The checkout contains extensive pre-existing modified and untracked runtime
   artifacts, plus a pre-existing deleted `task-4-report.md`; none were staged,
   changed, or reverted.
+
+## Round 1/5 Fix: Evidence And Walk-Forward Hardening
+
+### Files Changed
+
+- `bot/aegis/research/firehose_basket_replay.py`
+- `bot/tests/test_firehose_basket_replay.py`
+- `task-3-report.md`
+
+### Behavior
+
+- Every feature is now an observed value with an `available_at` timestamp. A
+  missing availability record or one after the row timestamp fails closed; a
+  future feature returns `NO_EVIDENCE` with `future_feature_evidence`.
+- Every row now requires a complete confirmed lifecycle: basket/ticket identity,
+  ordered open/close times, confirmed close, observed MFE/MAE/peak/realized
+  values, capture, age, clips, reasons, EV, costs, regime, session, and
+  turnover. Missing or malformed lifecycle evidence returns `NO_EVIDENCE`.
+- Direct-source packets now require every support and contradiction record to
+  retain Task 1 provenance: filename, 64-character file hash/source ID match,
+  expected evidence label, nonempty verbatim passage, and indexed path and line
+  range. Missing or malformed provenance returns `missing_policy_evidence`.
+- Walk-forward decisions now record the selected policy's observed gross PnL,
+  cost, risk, costed R return, capture, and turnover. The winner is selected
+  from aggregated realized walk-forward outcomes, not the full validation data.
+
+### TDD Evidence
+
+- RED command: `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py -q`
+- RED output: `7 failed, 6 passed in 0.25s`. Failures reproduced future feature
+  acceptance, missing lifecycle acceptance, incomplete support/contradiction
+  provenance acceptance, and full-validation winner selection.
+- GREEN focused command: `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py -q`
+- GREEN focused output: `13 passed in 0.14s`.
+
+### Broader Verification
+
+- `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py tests\test_firehose_basket_evidence.py tests\test_firehose_basket.py tests\test_firehose_harvest_research.py tests\test_firehose_harvest_integration.py -q`
+  completed with `63 passed in 5.55s`.
+- `..\.venv\Scripts\python.exe -m pytest -q` completed with
+  `1074 passed, 1 warning in 80.10s`.
+- The warning is the pre-existing `eventkit` no-current-event-loop deprecation
+  warning in `test_ibkr_order_hygiene.py`.
+
+### Safety And Self-Review
+
+- Missing, malformed, future-dated, or incomplete feature, lifecycle, policy,
+  cost, outcome, or OOS evidence returns `NO_EVIDENCE` without an artifact.
+- The evaluator remains research-only and does not query, synthesize, persist,
+  promote, place orders, start MT5, or enable live trading.
+- Re-read the final evaluator and regression tests. Confirmed that OOS data is
+  not used for selection, provenance is structurally complete, and the result's
+  only policy artifact still carries normalized R/cost/momentum parameters.
+- No runner, config, YAML, Research Factory, AI Council, Book Brain, or
+  runtime-generated artifact was changed.
+
+### Commit
+
+- `863535a fix: harden firehose basket replay evidence`
+
+### Concerns
+
+- The existing unrelated dirty and runtime-generated worktree artifacts remain
+  untouched. The full suite retains the existing single `eventkit` warning.
