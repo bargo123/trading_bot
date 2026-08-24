@@ -4,6 +4,7 @@ from aegis.intel.firehose_turnover import (
     FirehoseReentryGuard, TurnoverMetrics, confirmed_close_cleanup, quote_fingerprint,
 )
 from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
+from scripts.run_broker_paper import reconcile_confirmed_firehose_basket_cleanups
 
 
 def _meta():
@@ -42,6 +43,79 @@ def test_confirmed_close_without_tracked_metadata_does_not_release_slot(tmp_path
     )
     assert result.metadata_removed is False
     assert result.slot_released is False
+
+
+def test_ticket_metadata_save_failure_keeps_close_cleanup_recoverable(tmp_path: Path, monkeypatch):
+    metadata_path = tmp_path / "tickets.json"
+    store = TicketMetadataStore(metadata_path)
+    store.add(_meta())
+    store.begin_pending_cleanup("T1", {
+        "quote_fingerprint": "quote-a", "closed_at": 100.0, "basket_removed": True,
+    })
+    guard_path = tmp_path / "firehose_reentry_guard.json"
+    guard = FirehoseReentryGuard(guard_path)
+
+    monkeypatch.setattr(TicketMetadataStore, "_save", lambda self: False)
+    result = confirmed_close_cleanup(store, guard, "T1", quote_fingerprint="quote-a", closed_at=100.0)
+
+    assert result.metadata_removed is False
+    assert result.slot_released is False
+    assert store.get("T1") is not None
+    assert FirehoseReentryGuard(guard_path).allows("thesis", "quote-a", 101.0) == (False, "stale_reentry")
+
+    monkeypatch.undo()
+    restored_store = TicketMetadataStore(metadata_path)
+    restored_guard = FirehoseReentryGuard(guard_path)
+    assert restored_store.get("T1") is not None
+    assert restored_store.pending_cleanup("T1") is not None
+    retried = reconcile_confirmed_firehose_basket_cleanups(
+        root=tmp_path,
+        metadata_store=restored_store,
+        guard=restored_guard,
+        positions=[],
+        contract_for_symbol=lambda symbol: None,
+        closed_at=101.0,
+    )
+
+    assert retried == [{"ticket_id": "T1", "status": "CLEANED", "basket_removal": {"status": "NO_EVIDENCE"}}]
+    assert TicketMetadataStore(metadata_path).get("T1") is None
+
+
+def test_reentry_guard_save_failure_keeps_metadata_and_slot(tmp_path: Path, monkeypatch):
+    metadata_path = tmp_path / "tickets.json"
+    store = TicketMetadataStore(metadata_path)
+    store.add(_meta())
+    store.begin_pending_cleanup("T1", {
+        "quote_fingerprint": "quote-a", "closed_at": 100.0, "basket_removed": True,
+    })
+    guard_path = tmp_path / "firehose_reentry_guard.json"
+    guard = FirehoseReentryGuard(guard_path)
+
+    monkeypatch.setattr(FirehoseReentryGuard, "_save", lambda self: False)
+    result = confirmed_close_cleanup(store, guard, "T1", quote_fingerprint="quote-a", closed_at=100.0)
+
+    assert result.metadata_removed is False
+    assert result.slot_released is False
+    assert store.get("T1") is not None
+    assert FirehoseReentryGuard(guard_path).allows("thesis", "quote-a", 101.0) == (True, "fresh_quote")
+
+    monkeypatch.undo()
+    restored_store = TicketMetadataStore(metadata_path)
+    restored_guard = FirehoseReentryGuard(guard_path)
+    assert restored_store.get("T1") is not None
+    assert restored_store.pending_cleanup("T1") is not None
+    retried = reconcile_confirmed_firehose_basket_cleanups(
+        root=tmp_path,
+        metadata_store=restored_store,
+        guard=restored_guard,
+        positions=[],
+        contract_for_symbol=lambda symbol: None,
+        closed_at=101.0,
+    )
+
+    assert retried == [{"ticket_id": "T1", "status": "CLEANED", "basket_removal": {"status": "NO_EVIDENCE"}}]
+    assert TicketMetadataStore(metadata_path).get("T1") is None
+    assert FirehoseReentryGuard(guard_path).allows("thesis", "quote-a", 101.0) == (False, "stale_reentry")
 
 
 def test_new_quote_fingerprint_allows_valid_fast_reentry():

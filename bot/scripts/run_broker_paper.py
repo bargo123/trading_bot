@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 import time
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -62,6 +63,7 @@ from aegis.intel.firehose_runtime_evidence import (  # noqa: E402
     attach_runtime_evidence,
     build_runtime_snapshot,
 )
+from aegis.intel.ticket_metadata import firehose_lifecycle_identity  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -231,8 +233,95 @@ def confirmed_position_geometry(position) -> dict[str, float | str]:
     return {"entry_price": entry_price, "stop_loss": stop_loss, "volume": volume}
 
 
+def record_confirmed_firehose_open(
+    *, root: Path, metadata_store, metrics, journal: Path, ticket_id: str,
+    position, basket_metadata: dict, ticket_metadata, opened_at: float,
+    slot_capacity: int, contract: dict | None = None,
+    decision_reasons: list[str] | None = None, expected_net_value: float | None = None,
+) -> dict[str, str | float]:
+    """Persist exact fill ownership before emitting its Firehose lifecycle."""
+    geometry = confirmed_position_geometry(position)
+    if geometry.get("status") == "NO_EVIDENCE":
+        return geometry
+
+    basket_result = {"status": "NO_EVIDENCE"}
+    if str(basket_metadata.get("trigger_id") or "").strip():
+        if not metadata_store.begin_pending_basket_cleanup(
+            ticket_id,
+            str(basket_metadata.get("basket_id") or ""),
+            str(basket_metadata.get("symbol") or ""),
+        ):
+            logger.error("Failed to persist basket cleanup for untracked ticket %s", ticket_id)
+            return {"status": "NO_EVIDENCE", "reason": "pending_basket_cleanup_persistence_failed"}
+        basket_result = persist_confirmed_firehose_basket(
+            root=root,
+            ticket_id=ticket_id,
+            metadata={
+                **basket_metadata,
+                "entry_price": geometry["entry_price"],
+                "stop_loss": geometry["stop_loss"],
+            },
+            contract=contract,
+            volume=float(geometry["volume"]),
+        )
+        if basket_result.get("status") != "PERSISTED":
+            return basket_result
+    persisted = basket_result.get("status") == "PERSISTED"
+    metadata = replace(
+        ticket_metadata,
+        entry_price=float(geometry["entry_price"]),
+        stop_loss=float(geometry["stop_loss"]),
+        basket_id=basket_result.get("basket_id") if persisted else None,
+        trigger_id=str(basket_metadata["trigger_id"]) if persisted else None,
+        clip_sequence=1 if persisted else None,
+        entry_geometry={
+            "entry_price": float(basket_result["entry_price"]),
+            "stop_loss": float(basket_result["stop_loss"]),
+        } if persisted else None,
+        initial_risk=float(basket_result["initial_risk_usd"]) if persisted else None,
+        cost_evidence=dict(basket_metadata["cost_evidence"]) if persisted else None,
+    )
+    if not metadata_store.add(metadata):
+        return {"status": "NO_EVIDENCE", "reason": "ticket_metadata_persistence_failed"}
+    if persisted and not metadata_store.clear_pending_basket_cleanup(ticket_id):
+        logger.error("Failed to clear basket cleanup for tracked ticket %s", ticket_id)
+        return {"status": "NO_EVIDENCE", "reason": "pending_basket_cleanup_persistence_failed"}
+
+    metrics.record_open(ticket_id, opened_at=opened_at, slot_capacity=slot_capacity)
+    append_journal(
+        journal,
+        {
+            "event": "firehose_open",
+            "ticket": ticket_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "symbol": metadata.symbol,
+            "side": metadata.side.upper(),
+            "slot_capacity": slot_capacity,
+            **firehose_lifecycle_identity(metadata),
+        },
+    )
+    from aegis.intel.firehose_turnover import basket_lifecycle_trace
+
+    basket_trace = basket_lifecycle_trace(
+        metadata,
+        event="firehose_basket_open",
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        confirmed=True,
+        observation={
+            "clips": metadata.clip_sequence,
+            "decision_reasons": decision_reasons or [],
+            "ev": expected_net_value,
+            "turnover": 0.0,
+        },
+    )
+    if basket_trace is not None:
+        append_journal(journal, basket_trace)
+    return {"status": "PERSISTED", "ticket_id": ticket_id}
+
+
 def remove_confirmed_firehose_basket(
     *, root: Path, ticket_id: str, symbol: str, contract: dict | None,
+    expected_basket_id: str | None = None,
 ) -> dict[str, str | bool]:
     """Remove exact persisted basket ownership after broker close confirmation."""
     normalized_symbol = str(symbol or "").upper()
@@ -244,12 +333,222 @@ def remove_confirmed_firehose_basket(
             Path(root) / "intel" / "firehose_baskets" / f"{normalized_symbol}.json",
             trusted_contract=trusted_contract,
         )
-        basket_id, basket_closed = store.remove_ticket(str(ticket_id))
+        basket_id, basket_closed = store.remove_ticket(
+            str(ticket_id), expected_basket_id=expected_basket_id,
+        )
     except (OSError, TypeError, ValueError):
         return {"status": "NO_EVIDENCE", "reason": "invalid_broker_contract"}
     if basket_id is None:
         return {"status": "NO_EVIDENCE", "reason": "missing_persisted_ticket"}
     return {"status": "REMOVED", "basket_id": basket_id, "basket_closed": basket_closed}
+
+
+def confirmed_firehose_basket_ownership(
+    *, root: Path, ticket_id: str, symbol: str, basket_id: str, contract: dict | None,
+) -> dict[str, str]:
+    """Verify the exact persisted basket owns the ticket before mutation."""
+    normalized_symbol = str(symbol or "").upper()
+    try:
+        trusted_contract = ContractSpec.from_mapping(normalized_symbol, dict(contract or {}))
+        if not normalized_symbol or trusted_contract.symbol.upper() != normalized_symbol:
+            raise ValueError("symbol")
+        store = BasketMetadataStore(
+            Path(root) / "intel" / "firehose_baskets" / f"{normalized_symbol}.json",
+            trusted_contract=trusted_contract,
+        )
+        basket = store.get_basket(str(basket_id))
+    except (OSError, TypeError, ValueError):
+        return {"status": "NO_EVIDENCE", "reason": "invalid_broker_contract"}
+    if basket is None or str(ticket_id) not in basket.ticket_ids:
+        return {"status": "NO_EVIDENCE", "reason": "missing_persisted_ticket"}
+    return {"status": "PERSISTED"}
+
+
+def remove_confirmed_firehose_basket_then_cleanup(
+    *, root: Path, metadata_store, guard, ticket_id: str,
+    quote_fingerprint: str | None, closed_at: float, contract: dict | None,
+    recover_missing_basket: bool = False,
+) -> dict:
+    """Keep exact basket ownership until its persisted removal succeeds."""
+    metadata = metadata_store.get(ticket_id)
+    if metadata is None:
+        return {"status": "NO_EVIDENCE", "reason": "missing_ticket_metadata"}
+    basket_removal = {"status": "NO_EVIDENCE"}
+    if metadata.basket_id:
+        pending = metadata_store.pending_cleanup(ticket_id)
+        if pending is None:
+            ownership = confirmed_firehose_basket_ownership(
+                root=root,
+                ticket_id=ticket_id,
+                symbol=metadata.symbol,
+                basket_id=metadata.basket_id,
+                contract=contract,
+            )
+            if ownership["status"] != "PERSISTED":
+                return ownership
+            if not metadata_store.begin_pending_cleanup(ticket_id, {
+                "basket_id": metadata.basket_id,
+                "symbol": metadata.symbol,
+                "quote_fingerprint": quote_fingerprint,
+                "closed_at": closed_at,
+                "basket_removed": False,
+            }):
+                return {"status": "NO_EVIDENCE", "reason": "ticket_metadata_persistence_failed"}
+            pending = metadata_store.pending_cleanup(ticket_id)
+        if pending.get("basket_id") != metadata.basket_id or pending.get("symbol") != metadata.symbol:
+            return {"status": "NO_EVIDENCE", "reason": "pending_cleanup_mismatch"}
+        if not pending.get("basket_removed"):
+            basket_removal = remove_confirmed_firehose_basket(
+                root=root,
+                ticket_id=ticket_id,
+                symbol=metadata.symbol,
+                contract=contract,
+                expected_basket_id=metadata.basket_id,
+            )
+            if basket_removal["status"] != "REMOVED":
+                if not (
+                    recover_missing_basket
+                    and basket_removal == {"status": "NO_EVIDENCE", "reason": "missing_persisted_ticket"}
+                ):
+                    return basket_removal
+                basket_removal = {
+                    "status": "REMOVED",
+                    "basket_id": metadata.basket_id,
+                    "basket_closed": False,
+                }
+            if basket_removal["basket_id"] != metadata.basket_id:
+                return {"status": "NO_EVIDENCE", "reason": "basket_id_mismatch"}
+            if not metadata_store.mark_pending_basket_removed(
+                ticket_id, basket_closed=bool(basket_removal["basket_closed"]),
+            ):
+                return {"status": "NO_EVIDENCE", "reason": "ticket_metadata_persistence_failed"}
+        else:
+            basket_removal = {
+                "status": "REMOVED",
+                "basket_id": metadata.basket_id,
+                "basket_closed": bool(pending.get("basket_closed")),
+            }
+    from aegis.intel.firehose_turnover import confirmed_close_cleanup
+
+    cleanup = confirmed_close_cleanup(
+        metadata_store, guard, ticket_id,
+        quote_fingerprint=quote_fingerprint, closed_at=closed_at,
+    )
+    if not cleanup.metadata_removed:
+        return {"status": "NO_EVIDENCE", "reason": cleanup.reason or "local_cleanup_failed"}
+    return {
+        "status": "CLEANED",
+        "basket_removal": basket_removal,
+        "close_cleanup": cleanup,
+    }
+
+
+def reconcile_confirmed_firehose_basket_cleanups(
+    *, root: Path, metadata_store, guard, positions, contract_for_symbol, closed_at: float,
+) -> list[dict]:
+    """Retry persisted cleanup only after a fresh broker snapshot confirms absence."""
+    results = []
+    for ticket_id, pending in metadata_store.pending_basket_cleanups().items():
+        if any(str(getattr(position, "ticket", "")) == str(ticket_id) for position in positions):
+            continue
+        metadata = metadata_store.get(ticket_id)
+        try:
+            contract = contract_for_symbol(pending["symbol"])
+        except (AttributeError, OSError, TypeError, ValueError):
+            contract = None
+        if (
+            metadata is not None
+            and str(metadata.basket_id) == pending["basket_id"]
+            and str(metadata.symbol).upper() == pending["symbol"]
+        ):
+            cleanup_result = remove_confirmed_firehose_basket_then_cleanup(
+                root=root,
+                metadata_store=metadata_store,
+                guard=guard,
+                ticket_id=ticket_id,
+                quote_fingerprint=None,
+                closed_at=closed_at,
+                contract=contract,
+                recover_missing_basket=True,
+            )
+            if cleanup_result["status"] != "CLEANED":
+                event = {"ticket_id": ticket_id, "status": cleanup_result["status"]}
+                if "reason" in cleanup_result:
+                    event["reason"] = cleanup_result["reason"]
+                results.append(event)
+                continue
+            if not metadata_store.clear_pending_basket_cleanup(ticket_id):
+                results.append({
+                    "ticket_id": ticket_id,
+                    "status": "NO_EVIDENCE",
+                    "reason": "pending_basket_cleanup_persistence_failed",
+                })
+                continue
+            results.append({
+                "ticket_id": ticket_id,
+                "status": "CLEANED",
+                "basket_removal": cleanup_result["basket_removal"],
+            })
+            continue
+        basket_removal = remove_confirmed_firehose_basket(
+            root=root,
+            ticket_id=ticket_id,
+            symbol=pending["symbol"],
+            contract=contract,
+            expected_basket_id=pending["basket_id"],
+        )
+        if basket_removal == {"status": "NO_EVIDENCE", "reason": "missing_persisted_ticket"}:
+            basket_removal = {
+                "status": "REMOVED",
+                "basket_id": pending["basket_id"],
+                "basket_closed": False,
+            }
+        elif basket_removal["status"] != "REMOVED":
+            event = {"ticket_id": ticket_id, "status": basket_removal["status"]}
+            if "reason" in basket_removal:
+                event["reason"] = basket_removal["reason"]
+            results.append(event)
+            continue
+        if not metadata_store.clear_pending_basket_cleanup(ticket_id):
+            results.append({
+                "ticket_id": ticket_id,
+                "status": "NO_EVIDENCE",
+                "reason": "pending_basket_cleanup_persistence_failed",
+            })
+            continue
+        results.append({
+            "ticket_id": ticket_id,
+            "status": "REMOVED",
+            "basket_removal": basket_removal,
+        })
+    for ticket_id, pending in metadata_store.pending_cleanups().items():
+        if not close_ticket_confirmed(positions, ticket_id):
+            continue
+        metadata = metadata_store.get(ticket_id)
+        if metadata is None:
+            results.append({"ticket_id": ticket_id, "status": "NO_EVIDENCE", "reason": "missing_ticket_metadata"})
+            continue
+        try:
+            contract = contract_for_symbol(metadata.symbol)
+        except (AttributeError, OSError, TypeError, ValueError):
+            contract = None
+        result = remove_confirmed_firehose_basket_then_cleanup(
+            root=root,
+            metadata_store=metadata_store,
+            guard=guard,
+            ticket_id=ticket_id,
+            quote_fingerprint=pending.get("quote_fingerprint"),
+            closed_at=float(pending.get("closed_at", closed_at)),
+            contract=contract,
+            recover_missing_basket=True,
+        )
+        event = {"ticket_id": ticket_id, "status": result["status"]}
+        if "reason" in result:
+            event["reason"] = result["reason"]
+        if "basket_removal" in result:
+            event["basket_removal"] = result["basket_removal"]
+        results.append(event)
+    return results
 
 
 def close_ticket_confirmed(positions, ticket: str) -> bool:
@@ -352,7 +651,7 @@ def main() -> None:
     ticket_metadata_store = TicketMetadataStore(ROOT / "intel" / "ticket_metadata.json")
     from aegis.intel.firehose_turnover import (
         FirehoseReentryGuard, TurnoverMetrics, basket_lifecycle_trace,
-        confirmed_close_cleanup, quote_fingerprint,
+        quote_fingerprint,
     )
     firehose_turnover = TurnoverMetrics()
     firehose_reentry_guard = FirehoseReentryGuard(
@@ -1500,40 +1799,15 @@ def main() -> None:
                         session = str(brain_decision.journal.get("session") or "")
                         information_id = brain_decision.information_id
                         for tk in new_tickets:
-                            basket_result = {"status": "NO_EVIDENCE"}
-                            if information_id:
-                                position = next(
-                                    (item for item in eng.positions(sym) if str(getattr(item, "ticket", "")) == tk),
-                                    None,
-                                )
-                                if position is not None:
-                                    geometry = confirmed_position_geometry(position)
-                                    try:
-                                        if geometry.get("status") == "NO_EVIDENCE":
-                                            raise ValueError("missing_confirmed_geometry")
-                                        basket_result = persist_confirmed_firehose_basket(
-                                            root=ROOT,
-                                            ticket_id=tk,
-                                            metadata={
-                                                "basket_id": f"firehose-{tk}",
-                                                "hypothesis_id": hypothesis_id,
-                                                "family": strategy_family,
-                                                "symbol": sym,
-                                                "side": side,
-                                                "trigger_id": str(information_id),
-                                                "entry_price": geometry["entry_price"],
-                                                "stop_loss": geometry["stop_loss"],
-                                                "risk_budget": float(cfg.get("exploration_max_risk_per_trade_usd", 0.15)),
-                                                "clip_cap": 1,
-                                                "regime": regime,
-                                                "session": session,
-                                                "cost_evidence": {"spread_price": max(0.0, float(q.ask) - float(q.bid))},
-                                            },
-                                            contract=eng.symbol_spec(sym),
-                                            volume=float(geometry["volume"]),
-                                        )
-                                    except (AttributeError, OSError, TypeError, ValueError):
-                                        basket_result = {"status": "NO_EVIDENCE"}
+                            position = next(
+                                (item for item in eng.positions(sym) if str(getattr(item, "ticket", "")) == tk),
+                                None,
+                            )
+                            geometry = confirmed_position_geometry(position) if position is not None else {
+                                "status": "NO_EVIDENCE", "reason": "missing_confirmed_geometry",
+                            }
+                            if geometry.get("status") == "NO_EVIDENCE":
+                                continue
                             meta = create_ticket_metadata(
                                 ticket=tk,
                                 hypothesis_id=hypothesis_id,
@@ -1541,56 +1815,46 @@ def main() -> None:
                                 strategy_family=strategy_family,
                                 expected_mechanism=expected_mechanism,
                                 side=side,
-                                entry_price=entry_price,
-                                stop_loss=stop_loss,
+                                entry_price=float(geometry["entry_price"]),
+                                stop_loss=float(geometry["stop_loss"]),
                                 target_price=target_price,
                                 max_hold_s=max_hold_s,
                                 regime=regime,
                                 session=session,
                                 information_id=information_id,
                                 symbol=sym,
-                                basket_id=basket_result.get("basket_id"),
-                                trigger_id=str(information_id) if basket_result.get("status") == "PERSISTED" else None,
-                                clip_sequence=1 if basket_result.get("status") == "PERSISTED" else None,
-                                entry_geometry={
-                                    "entry_price": float(basket_result["entry_price"]),
-                                    "stop_loss": float(basket_result["stop_loss"]),
-                                }
-                                if basket_result.get("status") == "PERSISTED" else None,
-                                initial_risk=float(basket_result["initial_risk_usd"])
-                                if basket_result.get("status") == "PERSISTED" else None,
-                                cost_evidence={"spread_price": max(0.0, float(q.ask) - float(q.bid))}
-                                if basket_result.get("status") == "PERSISTED" else None,
                             )
-                            ticket_metadata_store.add(meta)
-                            firehose_turnover.record_open(
-                                tk, opened_at=now_s, slot_capacity=max_positions,
-                            )
-                            append_journal(
-                                journal,
-                                {
-                                    "event": "firehose_open",
-                                    "ticket": tk,
-                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                            try:
+                                contract = eng.symbol_spec(sym)
+                            except (AttributeError, OSError, TypeError, ValueError):
+                                contract = None
+                            record_confirmed_firehose_open(
+                                root=ROOT,
+                                metadata_store=ticket_metadata_store,
+                                metrics=firehose_turnover,
+                                journal=journal,
+                                ticket_id=tk,
+                                position=position,
+                                basket_metadata={
+                                    "basket_id": f"firehose-{tk}",
+                                    "hypothesis_id": hypothesis_id,
+                                    "family": strategy_family,
                                     "symbol": sym,
-                                    "side": side.upper(),
-                                    "slot_capacity": max_positions,
+                                    "side": side,
+                                    "trigger_id": str(information_id),
+                                    "risk_budget": float(cfg.get("exploration_max_risk_per_trade_usd", 0.15)),
+                                    "clip_cap": 1,
+                                    "regime": regime,
+                                    "session": session,
+                                    "cost_evidence": {"spread_price": max(0.0, float(q.ask) - float(q.bid))},
                                 },
+                                ticket_metadata=meta,
+                                opened_at=now_s,
+                                slot_capacity=max_positions,
+                                contract=contract,
+                                decision_reasons=[sig.reason],
+                                expected_net_value=brain_decision.expected_net_value,
                             )
-                            basket_trace = basket_lifecycle_trace(
-                                meta,
-                                event="firehose_basket_open",
-                                timestamp=datetime.now(timezone.utc).isoformat(),
-                                confirmed=True,
-                                observation={
-                                    "clips": meta.clip_sequence,
-                                    "decision_reasons": [sig.reason],
-                                    "ev": brain_decision.expected_net_value,
-                                    "turnover": 0.0,
-                                },
-                            )
-                            if basket_trace is not None:
-                                append_journal(journal, basket_trace)
                     intelligent_brain.memory.apply(
                         sym,
                         brain_decision.action,
@@ -1688,6 +1952,14 @@ def main() -> None:
                 acct = eng.account()
                 equity = acct.equity
                 all_pos = eng.positions()
+                reconcile_confirmed_firehose_basket_cleanups(
+                    root=ROOT,
+                    metadata_store=ticket_metadata_store,
+                    guard=firehose_reentry_guard,
+                    positions=all_pos,
+                    contract_for_symbol=lambda symbol: eng.symbol_spec(symbol),
+                    closed_at=time.time(),
+                )
                 # Continuously sample quotes for ALL watched symbols (not just on new M1 bar)
                 now_ts = time.time()
                 for sym in symbols:
@@ -2184,6 +2456,7 @@ def main() -> None:
                                             "realized_net_usd": None,
                                             "gross_pnl_usd": None,
                                             "cost_usd": None,
+                                            **firehose_lifecycle_identity(_ticket_meta),
                                         },
                                     )
                                     _marks_close = live_marks.get(
@@ -2197,21 +2470,25 @@ def main() -> None:
                                         )
                                     else:
                                         _fingerprint = None
-                                    close_cleanup = confirmed_close_cleanup(
-                                        ticket_metadata_store, firehose_reentry_guard, tk,
-                                        quote_fingerprint=_fingerprint, closed_at=closed_at,
-                                    )
-                                    basket_removal = {"status": "NO_EVIDENCE"}
+                                    basket_contract = None
                                     if _ticket_meta is not None and _ticket_meta.basket_id:
                                         try:
-                                            basket_removal = remove_confirmed_firehose_basket(
-                                                root=ROOT,
-                                                ticket_id=tk,
-                                                symbol=_ticket_meta.symbol,
-                                                contract=eng.symbol_spec(_ticket_meta.symbol),
-                                            )
+                                            basket_contract = eng.symbol_spec(_ticket_meta.symbol)
                                         except (AttributeError, OSError, TypeError, ValueError):
-                                            basket_removal = {"status": "NO_EVIDENCE"}
+                                            pass
+                                    cleanup_result = remove_confirmed_firehose_basket_then_cleanup(
+                                        root=ROOT,
+                                        metadata_store=ticket_metadata_store,
+                                        guard=firehose_reentry_guard,
+                                        ticket_id=tk,
+                                        quote_fingerprint=_fingerprint,
+                                        closed_at=closed_at,
+                                        contract=basket_contract,
+                                    )
+                                    basket_removal = cleanup_result.get(
+                                        "basket_removal", cleanup_result,
+                                    )
+                                    close_cleanup = cleanup_result.get("close_cleanup")
                                     peak = (summary or {}).get("mfe_before_close")
                                     basket_trace = basket_lifecycle_trace(
                                         _ticket_meta,
@@ -2235,8 +2512,8 @@ def main() -> None:
                                             "turnover": 1.0,
                                             "basket_removal_status": basket_removal.get("status"),
                                         },
-                                        slot_released=close_cleanup.slot_released,
-                                        basket_closed=close_cleanup.basket_closed,
+                                        slot_released=bool(close_cleanup and close_cleanup.slot_released),
+                                        basket_closed=bool(close_cleanup and close_cleanup.basket_closed),
                                     )
                                     if basket_trace is not None:
                                         append_journal(journal, basket_trace)

@@ -233,6 +233,106 @@ class TestFastExitProductionHelper:
         # Should be SCRATCH due to time_exit (180s from ticket metadata)
         assert verdict["action"] == "SCRATCH"
 
+    def test_exact_ticket_metadata_drives_state_machine_geometry(self):
+        """Confirmed ticket geometry overrides stale position context at FastExit's boundary."""
+        meta = create_ticket_metadata(
+            ticket="T_CONFIRMED_GEOMETRY",
+            hypothesis_id="hyp_123",
+            thesis_key="key_123",
+            strategy_family="micro_momentum_burst",
+            expected_mechanism="compression->impulse",
+            side="buy",
+            entry_price=1.20000,
+            stop_loss=1.19850,
+            target_price=None,
+            max_hold_s=120,
+            regime="trend",
+            session="london",
+            symbol="EURUSD",
+        )
+        meta.opened_ts = 1000.0
+        ctx = self.create_context(
+            ticket="T_CONFIRMED_GEOMETRY",
+            ticket_meta=meta,
+            entry_price=1.10000,
+            avg_price=1.10050,
+            stop_loss=1.09900,
+            current_bid=1.20100,
+            current_ask=1.20102,
+        )
+        captured = {}
+
+        def capture_evaluate(_self, **kwargs):
+            captured.update(kwargs)
+            return {"action": "HOLD", "reason": "test", "why": "test", "policy": "test"}
+
+        with patch.object(FastExitStateMachine, "evaluate", capture_evaluate):
+            evaluate_fast_exit(ctx)
+
+        assert captured["current_mark"] == pytest.approx(1.20100)
+        assert captured["entry_price"] == pytest.approx(1.20000)
+        assert captured["stop_loss"] == pytest.approx(1.19850)
+        assert captured["pnl_pips"] == pytest.approx(10.0)
+        assert captured["stop_pips"] == pytest.approx(15.0)
+        assert captured["target"] == pytest.approx(1.20100)
+
+    def test_metadata_without_target_uses_confirmed_fallback_target(self):
+        """Metadata tickets derive their own fallback target instead of using legacy experiments."""
+        meta = create_ticket_metadata(
+            ticket="T_METADATA_FALLBACK",
+            hypothesis_id="hyp_123",
+            thesis_key="key_123",
+            strategy_family="micro_momentum_burst",
+            expected_mechanism="compression->impulse",
+            side="buy",
+            entry_price=1.20000,
+            stop_loss=1.19850,
+            target_price=None,
+            max_hold_s=120,
+            regime="trend",
+            session="london",
+            symbol="EURUSD",
+        )
+        meta.opened_ts = 1000.0
+        ctx = self.create_context(
+            ticket="T_METADATA_FALLBACK",
+            ticket_meta=meta,
+            entry_price=1.10000,
+            avg_price=1.10050,
+            stop_loss=1.09900,
+            current_bid=1.20100,
+            current_ask=1.20102,
+        )
+        ctx.legacy_hypothesis_id = "legacy_fallback"
+        ctx.intelligent_brain.experiments.data = {
+            "experiments": {
+                "legacy": {
+                    "hypothesis_id": "legacy_fallback",
+                    "target_price": 1.30000,
+                    "max_hold_s": 60,
+                },
+            },
+        }
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["action"] == "TAKE"
+        assert verdict["reason"] == "target_reached"
+
+    def test_missing_metadata_preserves_context_entry_at_state_machine_boundary(self):
+        """Legacy tickets retain ctx.entry_price for the state-machine entry input."""
+        ctx = self.create_context(entry_price=1.10000, avg_price=1.10050)
+        captured = {}
+
+        def capture_evaluate(_self, **kwargs):
+            captured.update(kwargs)
+            return {"action": "HOLD", "reason": "test", "why": "test", "policy": "test"}
+
+        with patch.object(FastExitStateMachine, "evaluate", capture_evaluate):
+            evaluate_fast_exit(ctx)
+
+        assert captured["entry_price"] == pytest.approx(1.10000)
+
     def test_different_max_hold_values(self):
         """Test different max_hold_s values from ticket metadata."""
         for max_hold in [120, 180, 300]:
@@ -362,6 +462,36 @@ class TestFirehoseHarvestAdapter:
         assert {"pnl_r", "mfe_r", "profit_floor_r", "return_5s_r", "remaining_ev", "reason"} <= trace.keys()
         assert trace["return_5s_r"] is None
         assert trace["profit_floor_r"] is None
+
+    def test_trace_identity_comes_only_from_exact_ticket_metadata(self):
+        meta = create_ticket_metadata(
+            ticket="T_HARVEST", hypothesis_id="hyp", thesis_key="thesis",
+            strategy_family="micro", expected_mechanism="test", side="buy",
+            entry_price=1.10000, stop_loss=1.09900, target_price=1.10200,
+            max_hold_s=120, regime="trend", session="london", symbol="EURUSD",
+            basket_id="B1", trigger_id="Q1", clip_sequence=1,
+        )
+        ctx = self._context(ticket_meta=meta, quote_buffer=QuoteBuffer())
+
+        trace = firehose_exit_trace(ctx, {"action": "HOLD", "reason": "test"})
+
+        assert {field: trace[field] for field in ("basket_id", "trigger_id", "clip_sequence")} == {
+            "basket_id": "B1", "trigger_id": "Q1", "clip_sequence": 1,
+        }
+
+    def test_trace_omits_identity_without_complete_exact_ticket_metadata(self):
+        meta = create_ticket_metadata(
+            ticket="T_HARVEST", hypothesis_id="hyp", thesis_key="thesis",
+            strategy_family="micro", expected_mechanism="test", side="buy",
+            entry_price=1.10000, stop_loss=1.09900, target_price=1.10200,
+            max_hold_s=120, regime="trend", session="london", symbol="EURUSD",
+            basket_id="B1", trigger_id="", clip_sequence=1,
+        )
+        ctx = self._context(ticket_meta=meta, quote_buffer=QuoteBuffer())
+
+        trace = firehose_exit_trace(ctx, {"action": "HOLD", "reason": "test"})
+
+        assert not {"basket_id", "trigger_id", "clip_sequence"} & trace.keys()
 
 
 class TestFastExitRunnerIntegration:

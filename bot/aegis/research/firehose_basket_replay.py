@@ -36,23 +36,22 @@ def normalize_firehose_lifecycle_rows(rows: Sequence[Mapping[str, Any]]) -> dict
         by_ticket.setdefault(ticket, []).append(row)
     normalized: list[dict[str, Any]] = []
     for ticket, events in by_ticket.items():
-        opened = next((event for event in events if event.get("event") == "firehose_open"), None)
+        opened = [event for event in events if event.get("event") == "firehose_open"]
         traced = [event for event in events if event.get("event") == "firehose_exit_trace"]
-        closed = next(
-            (
-                event for event in events
-                if event.get("event") == "firehose_close" and event.get("confirmed") is True
-            ),
-            None,
-        )
-        if closed is None:
+        closed = [
+            event for event in events
+            if event.get("event") == "firehose_close" and event.get("confirmed") is True
+        ]
+        if not closed:
             return _no_evidence("missing_confirmed_close")
-        if opened is None or not traced:
+        if len(opened) != 1 or len(closed) != 1 or not traced:
             return _no_evidence("missing_lifecycle_evidence")
-        identity = tuple(opened.get(field) for field in ("basket_id", "trigger_id", "clip_sequence"))
+        opened = opened[0]
+        closed = closed[0]
+        identity = _lifecycle_identity(opened)
         if (
-            not all(value not in (None, "") for value in identity)
-            or any(tuple(event.get(field) for field in ("basket_id", "trigger_id", "clip_sequence")) != identity for event in traced + [closed])
+            identity is None
+            or any(_lifecycle_identity(event) != identity for event in traced + [closed])
         ):
             return _no_evidence("missing_lifecycle_evidence")
         try:
@@ -60,6 +59,8 @@ def normalize_firehose_lifecycle_rows(rows: Sequence[Mapping[str, Any]]) -> dict
             trace_times = [datetime.fromisoformat(str(event["timestamp"])) for event in traced]
             closed_at = datetime.fromisoformat(str(closed["timestamp"]))
         except (KeyError, TypeError, ValueError):
+            return _no_evidence("non_chronological_lifecycle")
+        if len({timestamp.tzinfo is None for timestamp in [opened_at, *trace_times, closed_at]}) != 1:
             return _no_evidence("non_chronological_lifecycle")
         if not all(opened_at < observed_at < closed_at for observed_at in trace_times):
             return _no_evidence("non_chronological_lifecycle")
@@ -480,6 +481,15 @@ def _finite_number(value: Any) -> bool:
 
 def _positive_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _lifecycle_identity(event: Mapping[str, Any]) -> tuple[str, str, int] | None:
+    basket_id = event.get("basket_id")
+    trigger_id = event.get("trigger_id")
+    clip_sequence = event.get("clip_sequence")
+    if not _text(basket_id) or not _text(trigger_id) or not _positive_int(clip_sequence):
+        return None
+    return basket_id, trigger_id, clip_sequence
 
 
 def _text(value: Any) -> bool:

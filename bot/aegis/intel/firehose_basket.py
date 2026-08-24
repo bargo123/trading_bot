@@ -552,12 +552,16 @@ class BasketMetadataStore:
                 raise
             return ticket
 
-    def remove_ticket(self, ticket_id: str) -> tuple[str | None, bool]:
+    def remove_ticket(
+        self, ticket_id: str, *, expected_basket_id: str | None = None,
+    ) -> tuple[str | None, bool]:
         """Remove an exact closed ticket and its basket when no clips remain."""
         with self._admission_lock():
             self._load()
             ticket_id = str(ticket_id)
             for basket_id, basket in tuple(self._store.items()):
+                if expected_basket_id is not None and basket_id != str(expected_basket_id):
+                    continue
                 remaining = tuple(ticket for ticket in basket.tickets if ticket.ticket_id != ticket_id)
                 if len(remaining) == len(basket.tickets):
                     continue

@@ -13,7 +13,7 @@ from aegis.intel.broker_math import BrokerSymbolSpec, mfe_mae_from_usd
 from aegis.intel.fast_firehose import FastExitConfig, FastExitStateMachine
 from aegis.intel.profit_harvester import HarvestInput, HarvestPolicy
 from aegis.intel.quote_buffer import QuoteBuffer
-from aegis.intel.ticket_metadata import TicketMetadata
+from aegis.intel.ticket_metadata import TicketMetadata, firehose_lifecycle_identity
 
 
 @dataclass
@@ -103,8 +103,10 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
         if _mark is None:
             raise MissingLiquidationMarkError("sell", pos_symbol)
 
-    # Entry price from position
-    _entry_px = float(ctx.avg_price or 0)
+    # Exact ticket metadata is authoritative for fresh tickets.
+    _ticket_meta = ctx.ticket_meta
+    _entry_px = float(_ticket_meta.entry_price if _ticket_meta else ctx.avg_price or 0)
+    _state_entry_px = _ticket_meta.entry_price if _ticket_meta else ctx.entry_price
 
     # PnL in pips using liquidation mark
     _pnl_pips = ((_mark - _entry_px) / max(_pip_sz, 1e-10)) * (1 if pos_side == "buy" else -1)
@@ -128,14 +130,12 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
         _spec_fast, _lot_sz, _pip_sz
     )
 
-    # Exact ticket metadata is authoritative for fresh tickets.
-    _ticket_meta = ctx.ticket_meta
     _stop_loss = _ticket_meta.stop_loss if _ticket_meta else ctx.stop_loss
     _opened_ts = _ticket_meta.opened_ts if _ticket_meta else ctx.opened_ts
 
     # Stop distance in pips
     _stop_dist_pips = abs(
-        float(ctx.avg_price or 0) - float(_stop_loss or 0)
+        _entry_px - float(_stop_loss or 0)
     ) / max(_pip_sz, 1e-10) if _stop_loss else 10.0
 
     # Use exact ticket metadata for target and max_hold_s (first priority)
@@ -143,7 +143,7 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     _max_hold_s = int(_ticket_meta.max_hold_s) if _ticket_meta else 120
 
     # Fallback to experiment scan for legacy tickets ONLY when exact metadata absent
-    if _tgt_px is None and ctx.intelligent_brain is not None:
+    if _ticket_meta is None and _tgt_px is None and ctx.intelligent_brain is not None:
         # Use explicit legacy_hypothesis_id for lookup, NOT track_target (which is a price)
         _legacy_hyp_id = ctx.legacy_hypothesis_id
         if _legacy_hyp_id:
@@ -166,7 +166,7 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     _harvest_active = bool(ctx.harvest_policy is not None and ctx.harvest_policy.is_available)
     fast_verdict = fast_exit_sm.evaluate(
         side=pos_side,
-        entry_price=ctx.entry_price,
+        entry_price=_state_entry_px,
         current_mark=_mark,
         stop_loss=float(_stop_loss or 0),
         target=_tgt_px or _entry_px + _pip_sz * 10 * (1 if pos_side == "buy" else -1),
@@ -274,6 +274,7 @@ def firehose_exit_trace(ctx: FastExitContext, verdict: Mapping[str, Any]) -> dic
         "target_price": (meta.target_price if meta else None),
         "action": verdict.get("action"),
         "reason": verdict.get("reason"),
+        **firehose_lifecycle_identity(meta),
     }
 
 

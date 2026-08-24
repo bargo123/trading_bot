@@ -15,6 +15,7 @@ class CloseCleanup:
     metadata_removed: bool
     slot_released: bool
     basket_closed: bool = False
+    reason: str | None = None
 
 
 class TurnoverMetrics:
@@ -144,24 +145,34 @@ class FirehoseReentryGuard:
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             return
 
-    def _save(self) -> None:
+    def _save(self) -> bool:
         if self.persist_path is None:
-            return
+            return True
         temporary = self.persist_path.with_suffix(self.persist_path.suffix + ".tmp")
         try:
             self.persist_path.parent.mkdir(parents=True, exist_ok=True)
             temporary.write_text(json.dumps(self._last_closed, sort_keys=True), encoding="utf-8")
             temporary.replace(self.persist_path)
+            return True
         except OSError:
             try:
                 temporary.unlink(missing_ok=True)
             except OSError:
                 pass
+            return False
 
-    def record_close(self, ticket: str, thesis_key: str, quote_fingerprint: str, closed_at: float) -> None:
+    def record_close(self, ticket: str, thesis_key: str, quote_fingerprint: str, closed_at: float) -> bool:
         if thesis_key and quote_fingerprint:
+            previous = self._last_closed.get(thesis_key)
             self._last_closed[thesis_key] = (str(ticket), quote_fingerprint, float(closed_at))
-            self._save()
+            if self._save():
+                return True
+            if previous is None:
+                self._last_closed.pop(thesis_key, None)
+            else:
+                self._last_closed[thesis_key] = previous
+            return False
+        return True
 
     def allows(self, thesis_key: str, quote_fingerprint: str, now: float) -> tuple[bool, str]:
         del now  # The guard is fingerprint-based, not a time cooldown.
@@ -191,9 +202,10 @@ def confirmed_close_cleanup(
                 item.get("basket_id") == meta.basket_id
                 for item in metadata_store.snapshot().values()
             ) == 1
-        metadata_store.remove(ticket)
-        if quote_fingerprint:
-            guard.record_close(ticket, meta.thesis_key, quote_fingerprint, closed_at)
+        if quote_fingerprint and not guard.record_close(ticket, meta.thesis_key, quote_fingerprint, closed_at):
+            return CloseCleanup(False, False, basket_closed, "reentry_guard_persistence_failed")
+        if not metadata_store.remove(ticket, clear_pending=True):
+            return CloseCleanup(False, False, basket_closed, "ticket_metadata_persistence_failed")
     removed = meta is not None
     released = removed and (not meta.basket_id or basket_closed)
     return CloseCleanup(
