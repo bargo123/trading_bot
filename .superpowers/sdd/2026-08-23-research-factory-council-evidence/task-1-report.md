@@ -82,3 +82,16 @@ cleanup helper, and a timeout blocked by inherited pipes.
 ..\\.venv\\Scripts\\python.exe -m pytest -q
 971 passed, 1 warning in 84.44s
 ```
+
+## Review Fix Round 2
+
+Pipes now run in binary mode. Drain threads read fixed 4096-byte chunks, own
+their stream close, incrementally decode and frame prefixed sink output, and
+cap unterminated sink records with `[LINE TRUNCATED]`. Control threads never
+close a live pipe and return after bounded joins. New controlled tests cover a
+blocking close/reader and a generated huge unterminated byte stream.
+
+```text
+tests\test_council_cycle.py: 26 passed in 3.07s
+full suite: 973 passed, 1 warning in 94.29s
+```

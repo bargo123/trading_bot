@@ -8,6 +8,7 @@ auto-paid and never blocks the cycle.
 from __future__ import annotations
 
 import json
+import codecs
 import os
 import re
 import signal
@@ -40,8 +41,11 @@ MAX_STDOUT_CHARS = 20_000
 MAX_STDERR_CHARS = 2_000
 STDOUT_TAIL_CHARS = 2_000
 STDERR_TAIL_CHARS = 500
-PIPE_JOIN_TIMEOUT_S = 1
+PIPE_JOIN_TIMEOUT_S = 0.05
 PROCESS_CLEANUP_TIMEOUT_S = 5
+PIPE_READ_CHUNK_SIZE = 4096
+MAX_SINK_CHARS = 4096
+SINK_TRUNCATION_MARKER = "[LINE TRUNCATED]"
 
 _MODEL_RES = (
     re.compile(r"\b(gemini-[0-9.]+(?:-[a-z0-9]+)*)\b", re.I),
@@ -380,21 +384,40 @@ def _run_ask(
     err_buffer = _BoundedBuffer(MAX_STDERR_CHARS)
 
     def drain(stream: Any, buffer: _BoundedBuffer) -> None:
-        for line in stream:
-            buffer.append(line)
+        decoder = codecs.getincrementaldecoder("utf-8")("replace")
+        pending = ""
+
+        def emit(line: str) -> None:
             if line_sink is not None:
                 try:
                     line_sink(f"[{name.upper()}] {line.rstrip(chr(10)).rstrip(chr(13))}")
                 except Exception:
                     pass
 
+        try:
+            while chunk := stream.read(PIPE_READ_CHUNK_SIZE):
+                text = decoder.decode(chunk)
+                buffer.append(text)
+                pending += text
+                while "\n" in pending:
+                    line, pending = pending.split("\n", 1)
+                    while len(line) > MAX_SINK_CHARS:
+                        emit(line[:MAX_SINK_CHARS] + SINK_TRUNCATION_MARKER)
+                        line = line[MAX_SINK_CHARS:]
+                    emit(line)
+                while len(pending) > MAX_SINK_CHARS:
+                    emit(pending[:MAX_SINK_CHARS] + SINK_TRUNCATION_MARKER)
+                    pending = pending[MAX_SINK_CHARS:]
+            pending += decoder.decode(b"", final=True)
+            if pending:
+                emit(pending)
+        finally:
+            _close_pipe(stream)
+
     try:
         popen_kwargs: dict[str, Any] = {
             "stdout": subprocess.PIPE,
             "stderr": subprocess.PIPE,
-            "text": True,
-            "encoding": "utf-8",
-            "errors": "replace",
             "cwd": str(cwd or REPO_ROOT),
         }
         if os.name == "nt":
@@ -424,8 +447,6 @@ def _run_ask(
                 proc.wait(timeout=PROCESS_CLEANUP_TIMEOUT_S)
             except subprocess.TimeoutExpired:
                 pass
-        _close_pipe(proc.stdout)
-        _close_pipe(proc.stderr)
         out_thread.join(PIPE_JOIN_TIMEOUT_S)
         err_thread.join(PIPE_JOIN_TIMEOUT_S)
         base.update({"status": "TIMEOUT",
@@ -436,8 +457,6 @@ def _run_ask(
     out_thread.join(PIPE_JOIN_TIMEOUT_S)
     err_thread.join(PIPE_JOIN_TIMEOUT_S)
     if out_thread.is_alive() or err_thread.is_alive():
-        _close_pipe(proc.stdout)
-        _close_pipe(proc.stderr)
         out_thread.join(PIPE_JOIN_TIMEOUT_S)
         err_thread.join(PIPE_JOIN_TIMEOUT_S)
         if out_thread.is_alive() or err_thread.is_alive():

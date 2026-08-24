@@ -18,8 +18,8 @@ class FakePopen:
     """Controlled process double: no test can invoke an external CLI."""
 
     def __init__(self, stdout_lines=(), stderr_lines=(), *, timeout=False, kill_required=False):
-        self.stdout = iter(stdout_lines)
-        self.stderr = iter(stderr_lines)
+        self.stdout = FakeBinaryStream(stdout_lines)
+        self.stderr = FakeBinaryStream(stderr_lines)
         self.returncode = 0
         self.timeout = timeout
         self.kill_required = kill_required
@@ -46,6 +46,21 @@ class FakePopen:
 
     def send_signal(self, signal):
         self.signals.append(signal)
+
+
+class FakeBinaryStream:
+    def __init__(self, chunks=()):
+        self.data = b"".join(chunk.encode() if isinstance(chunk, str) else chunk for chunk in chunks)
+        self.offset = 0
+        self.closed = False
+
+    def read(self, size):
+        chunk = self.data[self.offset:self.offset + size]
+        self.offset += len(chunk)
+        return chunk
+
+    def close(self):
+        self.closed = True
 
 
 def _fake_agent_popen(monkeypatch, name, process):
@@ -147,7 +162,10 @@ def test_ask_agent_rejects_stdout_larger_than_retained_buffer(monkeypatch):
 
     result = agent_cli.ask_agent("claude", "hi", line_sink=seen.append)
 
-    assert seen == [f"[CLAUDE] {oversized.rstrip()}"]
+    assert len(seen) > 1
+    assert all(len(line) <= len("[CLAUDE] ") + agent_cli.MAX_SINK_CHARS + len(agent_cli.SINK_TRUNCATION_MARKER)
+               for line in seen)
+    assert any(agent_cli.SINK_TRUNCATION_MARKER in line for line in seen)
     assert result["ok"] is False
     assert result["status"] == "ERROR"
     assert result["error"] == "OUTPUT_TOO_LARGE"
@@ -172,12 +190,45 @@ class BlockingInheritedPipe:
     def __init__(self):
         self.closed = threading.Event()
 
-    def __iter__(self):
-        yield "child output\n"
+    def read(self, size):
+        if not hasattr(self, "sent"):
+            self.sent = True
+            return b"child output\n"
         self.closed.wait()
+        return b""
 
     def close(self):
         self.closed.set()
+
+
+class BlockingCloseBinaryPipe:
+    """A TextIOWrapper-like close that must never run on the timeout thread."""
+
+    def __init__(self):
+        self.release = threading.Event()
+
+    def read(self, size):
+        self.release.wait()
+        return b""
+
+    def close(self):
+        self.release.wait()
+
+
+class HugeUnterminatedBinaryPipe:
+    """Produces many fixed-size chunks without materializing one giant record."""
+
+    def __init__(self, chunks):
+        self.remaining = chunks
+
+    def read(self, size):
+        if not self.remaining:
+            return b""
+        self.remaining -= 1
+        return b"x" * size
+
+    def close(self):
+        pass
 
 
 def test_ask_agent_timeout_returns_when_descendant_keeps_pipe_open(monkeypatch):
@@ -199,6 +250,37 @@ def test_ask_agent_timeout_returns_when_descendant_keeps_pipe_open(monkeypatch):
 
     assert finished.is_set()
     assert result["status"] == "TIMEOUT"
+
+
+def test_ask_agent_timeout_does_not_call_blocking_pipe_close(monkeypatch):
+    """A blocking TextIOWrapper close must not hold the timeout control thread."""
+    process = FakePopen(timeout=True)
+    process.stdout = BlockingCloseBinaryPipe()
+    process.stderr = BlockingCloseBinaryPipe()
+    _fake_agent_popen(monkeypatch, "claude", process)
+    finished = threading.Event()
+
+    worker = threading.Thread(
+        target=lambda: (agent_cli.ask_agent("claude", "hi", timeout_s=1), finished.set()), daemon=True
+    )
+    worker.start()
+    worker.join(0.25)
+
+    assert finished.is_set()
+
+
+def test_ask_agent_caps_huge_unterminated_binary_record(monkeypatch):
+    """A no-newline binary record must not allocate or retain beyond the output cap."""
+    process = FakePopen()
+    process.stdout = HugeUnterminatedBinaryPipe(6)
+    process.stderr = FakeBinaryStream()
+    _fake_agent_popen(monkeypatch, "claude", process)
+
+    result = agent_cli.ask_agent("claude", "hi")
+
+    assert result["status"] == "ERROR"
+    assert result["error"] == "OUTPUT_TOO_LARGE"
+    assert len(result["stdout_tail"]) <= agent_cli.STDOUT_TAIL_CHARS
 
 
 def test_ask_agent_stream_timeout_terminates_popen_without_fabricating_output(monkeypatch):
