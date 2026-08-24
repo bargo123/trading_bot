@@ -62,3 +62,16 @@
   verification completed with `21 passed`.
 - Full Round 2 verification: `pytest -q` completed with `1056 passed` in
   81.68s, with the same existing `eventkit` deprecation warning.
+
+## Round 3 Hardening
+
+- Reload rejects the entire persisted store unless every root key exactly
+  matches its embedded `basket_id`.
+- Every persisted ticket's risk is recomputed from its immutable entry/stop
+  geometry, volume, and its basket's broker tick value and tick size. A
+  non-finite or mismatched stored risk fails closed rather than creating risk
+  capacity.
+- Added regressions for an aliased root key and a reduced finite stored risk.
+  Focused verification completed with `23 passed`.
+- Full Round 3 verification: `pytest -q` completed with `1058 passed` in
+  83.96s, with the same existing `eventkit` deprecation warning.

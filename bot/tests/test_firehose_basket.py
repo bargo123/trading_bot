@@ -323,3 +323,38 @@ def test_reload_fails_closed_when_persisted_root_is_not_a_basket_mapping(tmp_pat
     path.write_text("[]", encoding="utf-8")
 
     assert BasketMetadataStore(path).get_basket("basket-1") is None
+
+
+def test_reload_rejects_root_key_that_does_not_match_embedded_basket_id(tmp_path):
+    path = tmp_path / "baskets.json"
+    store = BasketMetadataStore(path)
+    _store_basket(store)
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    persisted["alias-basket"] = persisted.pop("basket-1")
+    path.write_text(json.dumps(persisted), encoding="utf-8")
+
+    reloaded = BasketMetadataStore(path)
+
+    assert reloaded.get_basket("basket-1") is None
+    assert reloaded.get_basket("alias-basket") is None
+
+
+def test_reload_rejects_reduced_finite_ticket_risk_before_another_clip_can_admit(tmp_path):
+    path = tmp_path / "baskets.json"
+    store = BasketMetadataStore(path)
+    _store_basket(store)
+    _record_initial_clip(store)
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    persisted["basket-1"]["tickets"][0]["initial_risk"] = 1.0
+    path.write_text(json.dumps(persisted), encoding="utf-8")
+
+    reloaded = BasketMetadataStore(path)
+
+    assert reloaded.get_basket("basket-1") is None
+    with pytest.raises(KeyError):
+        reloaded.record_ticket(
+            "basket-1", ticket_id="ticket-2", trigger_id="trigger-2", clip_sequence=2,
+            entry_price=1.1000, stop_loss=1.0980, volume=0.38,
+            cost_evidence={"spread_ticks": 1.0}, regime="trend", session="london",
+            continuation=_continuation(),
+        )

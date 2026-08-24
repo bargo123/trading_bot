@@ -174,8 +174,12 @@ class BasketMetadata:
             or not isinstance(data.get("tickets", []), list)
         ):
             raise ValueError("basket")
+        risk_budget = _positive_float(data["risk_budget"], "risk_budget")
+        clip_cap = _positive_int(data["clip_cap"], "clip_cap")
+        tick_value = _positive_float(data["tick_value"], "tick_value")
+        tick_size = _positive_float(data["tick_size"], "tick_size")
         tickets = tuple(BasketTicket.from_dict(ticket) for ticket in data.get("tickets", []))
-        if len(tickets) > _positive_int(data["clip_cap"], "clip_cap"):
+        if len(tickets) > clip_cap:
             raise ValueError("clip_cap")
         if tuple(ticket.clip_sequence for ticket in tickets) != tuple(range(1, len(tickets) + 1)):
             raise ValueError("clip_sequence")
@@ -184,16 +188,29 @@ class BasketMetadata:
         pnl = _finite_float(data.get("unrealized_pnl", 0.0))
         if pnl is None:
             raise ValueError("unrealized_pnl")
+        for ticket in tickets:
+            try:
+                recomputed_risk = _broker_native_risk(
+                    ticket.entry_geometry["entry_price"],
+                    ticket.entry_geometry["stop_loss"],
+                    ticket.volume,
+                    tick_value,
+                    tick_size,
+                )
+            except KeyError:
+                raise ValueError("entry_geometry") from None
+            if ticket.initial_risk != recomputed_risk:
+                raise ValueError("initial_risk")
         return cls(
             basket_id=basket_id,
             hypothesis_id=hypothesis_id,
             family=family,
             symbol=symbol,
             side=side,
-            risk_budget=_positive_float(data["risk_budget"], "risk_budget"),
-            clip_cap=_positive_int(data["clip_cap"], "clip_cap"),
-            tick_value=_positive_float(data["tick_value"], "tick_value"),
-            tick_size=_positive_float(data["tick_size"], "tick_size"),
+            risk_budget=risk_budget,
+            clip_cap=clip_cap,
+            tick_value=tick_value,
+            tick_size=tick_size,
             regime=regime,
             session=session,
             _entry_geometry=_geometry_items(geometry),
@@ -322,10 +339,13 @@ class BasketMetadataStore:
                 not isinstance(basket, Mapping) for basket in data.values()
             ):
                 raise ValueError("persisted_basket_store")
-            self._store = {
-                str(basket_id): BasketMetadata.from_dict(basket)
-                for basket_id, basket in data.items()
-            }
+            loaded: dict[str, BasketMetadata] = {}
+            for basket_id, basket in data.items():
+                restored = BasketMetadata.from_dict(basket)
+                if basket_id != restored.basket_id:
+                    raise ValueError("basket_id")
+                loaded[basket_id] = restored
+            self._store = loaded
         except (OSError, json.JSONDecodeError, TypeError, ValueError, KeyError):
             self._store = {}
 
