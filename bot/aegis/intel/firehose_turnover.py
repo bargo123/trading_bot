@@ -5,15 +5,16 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import median
-from typing import Optional
+from typing import Any, Mapping, Optional
 
-from aegis.intel.ticket_metadata import TicketMetadataStore
+from aegis.intel.ticket_metadata import TicketMetadata, TicketMetadataStore
 
 
 @dataclass(frozen=True)
 class CloseCleanup:
     metadata_removed: bool
     slot_released: bool
+    basket_closed: bool = False
 
 
 class TurnoverMetrics:
@@ -160,14 +161,82 @@ def confirmed_close_cleanup(
 ) -> CloseCleanup:
     """Release local ticket state only after the broker confirms its close."""
     if not confirmed:
-        return CloseCleanup(metadata_removed=False, slot_released=False)
+        return CloseCleanup(metadata_removed=False, slot_released=False, basket_closed=False)
     meta = metadata_store.get(ticket)
+    basket_closed = False
     if meta is not None:
+        if meta.basket_id:
+            basket_closed = sum(
+                item.get("basket_id") == meta.basket_id
+                for item in metadata_store.snapshot().values()
+            ) == 1
         metadata_store.remove(ticket)
         if quote_fingerprint:
             guard.record_close(ticket, meta.thesis_key, quote_fingerprint, closed_at)
     released = meta is not None
-    return CloseCleanup(metadata_removed=released, slot_released=released)
+    return CloseCleanup(
+        metadata_removed=released,
+        slot_released=released,
+        basket_closed=basket_closed,
+    )
+
+
+def basket_lifecycle_trace(
+    metadata: TicketMetadata | None,
+    *,
+    event: str,
+    timestamp: str,
+    confirmed: bool,
+    observation: Mapping[str, Any] | None = None,
+    slot_released: bool = False,
+    basket_closed: bool = False,
+) -> dict[str, Any] | None:
+    """Format a basket observation only for confirmed, exactly-owned tickets."""
+    if (
+        not confirmed
+        or metadata is None
+        or not all((
+            metadata.basket_id,
+            metadata.trigger_id,
+            metadata.clip_sequence,
+            metadata.entry_geometry,
+            metadata.initial_risk,
+            metadata.cost_evidence,
+        ))
+    ):
+        return None
+    values = dict(observation or {})
+    return {
+        "event": event,
+        "timestamp": timestamp,
+        "confirmed": True,
+        "basket_id": metadata.basket_id,
+        "ticket_id": metadata.ticket,
+        "hypothesis_id": metadata.hypothesis_id,
+        "family": metadata.strategy_family,
+        "symbol": metadata.symbol,
+        "side": metadata.side,
+        "trigger_id": metadata.trigger_id,
+        "clip_sequence": metadata.clip_sequence,
+        "entry_geometry": dict(metadata.entry_geometry),
+        "initial_risk_usd": metadata.initial_risk,
+        "cost_evidence": dict(metadata.cost_evidence),
+        "mfe_usd": values.get("mfe_usd"),
+        "mae_usd": values.get("mae_usd"),
+        "peak_net_profit_usd": values.get("peak_net_profit_usd"),
+        "realized_net_usd": values.get("realized_net_usd"),
+        "capture_ratio": values.get("capture_ratio"),
+        "age_seconds": values.get("age_seconds"),
+        "clips": values.get("clips", metadata.clip_sequence),
+        "decision_reasons": values.get("decision_reasons", []),
+        "ev": values.get("ev"),
+        "cost_usd": values.get("cost_usd"),
+        "turnover": values.get("turnover"),
+        "regime": metadata.regime,
+        "session": metadata.session,
+        "slot_released": bool(slot_released),
+        "basket_closed": bool(basket_closed),
+    }
 
 
 def quote_fingerprint(symbol: str, side: str, bid: float, ask: float) -> str:

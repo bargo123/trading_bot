@@ -244,7 +244,8 @@ def main() -> None:
     from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
     ticket_metadata_store = TicketMetadataStore(ROOT / "intel" / "ticket_metadata.json")
     from aegis.intel.firehose_turnover import (
-        FirehoseReentryGuard, TurnoverMetrics, confirmed_close_cleanup, quote_fingerprint,
+        FirehoseReentryGuard, TurnoverMetrics, basket_lifecycle_trace,
+        confirmed_close_cleanup, quote_fingerprint,
     )
     firehose_turnover = TurnoverMetrics()
     firehose_reentry_guard = FirehoseReentryGuard(
@@ -1423,6 +1424,20 @@ def main() -> None:
                                     "slot_capacity": max_positions,
                                 },
                             )
+                            basket_trace = basket_lifecycle_trace(
+                                meta,
+                                event="firehose_basket_open",
+                                timestamp=datetime.now(timezone.utc).isoformat(),
+                                confirmed=True,
+                                observation={
+                                    "clips": meta.clip_sequence,
+                                    "decision_reasons": [sig.reason],
+                                    "ev": brain_decision.expected_net_value,
+                                    "turnover": 0.0,
+                                },
+                            )
+                            if basket_trace is not None:
+                                append_journal(journal, basket_trace)
                     intelligent_brain.memory.apply(
                         sym,
                         brain_decision.action,
@@ -2005,10 +2020,46 @@ def main() -> None:
                                         )
                                     else:
                                         _fingerprint = None
-                                    confirmed_close_cleanup(
+                                    close_cleanup = confirmed_close_cleanup(
                                         ticket_metadata_store, firehose_reentry_guard, tk,
                                         quote_fingerprint=_fingerprint, closed_at=closed_at,
                                     )
+                                    basket_cost = None
+                                    if _ticket_meta is not None and _ticket_meta.cost_evidence:
+                                        basket_cost = _ticket_meta.cost_evidence.get("cost_usd")
+                                    realized = (summary or {}).get("realized_pnl")
+                                    peak = (summary or {}).get("mfe_before_close")
+                                    capture = (
+                                        float(realized) / float(peak)
+                                        if peak is not None and float(peak) > 0 and realized is not None
+                                        else None
+                                    )
+                                    basket_trace = basket_lifecycle_trace(
+                                        _ticket_meta,
+                                        event="firehose_basket_close",
+                                        timestamp=datetime.now(timezone.utc).isoformat(),
+                                        confirmed=True,
+                                        observation={
+                                            "mfe_usd": peak,
+                                            "mae_usd": (summary or {}).get("mae_before_close"),
+                                            "peak_net_profit_usd": peak,
+                                            "realized_net_usd": realized,
+                                            "capture_ratio": capture,
+                                            "age_seconds": (summary or {}).get("duration_s"),
+                                            "clips": (
+                                                _ticket_meta.clip_sequence
+                                                if _ticket_meta is not None else None
+                                            ),
+                                            "decision_reasons": [str(verdict.get("reason") or "unknown")],
+                                            "ev": _rem_ev,
+                                            "cost_usd": basket_cost,
+                                            "turnover": 1.0,
+                                        },
+                                        slot_released=close_cleanup.slot_released,
+                                        basket_closed=close_cleanup.basket_closed,
+                                    )
+                                    if basket_trace is not None:
+                                        append_journal(journal, basket_trace)
                                 elif res_close.ok:
                                     append_journal(
                                         journal,
