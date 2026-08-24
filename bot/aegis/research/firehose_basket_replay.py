@@ -24,6 +24,35 @@ _PARTITION_ORDER = {"TRAIN": 0, "VALIDATION": 1, "OOS": 2, "SEALED": 2}
 _PARAMETER_KEYS = frozenset({"r_multiple", "cost_r", "momentum_threshold"})
 
 
+def normalize_firehose_lifecycle_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Accept replay rows only from exact tickets with confirmed lifecycle evidence."""
+    by_ticket: dict[str, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            return _no_evidence("invalid_lifecycle_row")
+        ticket = str(row.get("ticket") or "").strip()
+        if not ticket:
+            return _no_evidence("missing_ticket_identity")
+        by_ticket.setdefault(ticket, []).append(row)
+    normalized: list[dict[str, Any]] = []
+    for ticket, events in by_ticket.items():
+        opened = next((event for event in events if event.get("event") == "firehose_open"), None)
+        traced = [event for event in events if event.get("event") == "firehose_exit_trace"]
+        closed = next(
+            (
+                event for event in events
+                if event.get("event") == "firehose_close" and event.get("confirmed") is True
+            ),
+            None,
+        )
+        if closed is None:
+            return _no_evidence("missing_confirmed_close")
+        if opened is None or not traced:
+            return _no_evidence("missing_lifecycle_evidence")
+        normalized.append({"ticket": ticket, "open": dict(opened), "traces": [dict(event) for event in traced], "close": dict(closed)})
+    return {"status": "OBSERVED", "rows": normalized}
+
+
 def evaluate_basket_policies(rows: Sequence[Mapping[str, Any]], policy_packets: Mapping[str, Any]) -> dict[str, Any]:
     """Evaluate evidenced policies without allowing OOS outcomes to select a winner."""
     packets = _validated_packets(policy_packets)
