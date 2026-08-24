@@ -162,6 +162,7 @@ def walk_forward_evaluate(
             class FailedReplay:
                 status = "FAILED"
                 metrics = None
+                trades = ()
                 reason = f"walk-forward fold failed: {exc}"
             replay = FailedReplay()
         folds.append(_fold({"train": train, "validation": validation}, replay))

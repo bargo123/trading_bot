@@ -215,3 +215,21 @@ def test_factory_persists_compiler_exception_as_failed_without_metrics(monkeypat
     row = factory.experiment_registry.all_rows()[0]
     assert row["status"] == "failed"
     assert row["metrics"] == {}
+
+
+def test_walk_forward_retains_failed_fold_without_fabricated_metrics():
+    class BrokenPipeline:
+        def train(self, train):
+            raise RuntimeError("pipeline exploded")
+
+    result = walk_forward_evaluate(
+        _frame(), pipeline_factory=BrokenPipeline, compiled=_compiled(), costs=_costs(0),
+        min_train_timestamps=2, validation_timestamps=2, step_timestamps=2,
+    )
+
+    assert result.status == "FAILED"
+    assert result.reason == "walk-forward fold failed: pipeline exploded"
+    assert result.metrics is None
+    assert result.folds[0].status == "FAILED"
+    assert result.folds[0].trade_count is None
+    assert result.folds[0].net_pnls_usd == ()
