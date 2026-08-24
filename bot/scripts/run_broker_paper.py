@@ -231,6 +231,27 @@ def confirmed_position_geometry(position) -> dict[str, float | str]:
     return {"entry_price": entry_price, "stop_loss": stop_loss, "volume": volume}
 
 
+def remove_confirmed_firehose_basket(
+    *, root: Path, ticket_id: str, symbol: str, contract: dict | None,
+) -> dict[str, str | bool]:
+    """Remove exact persisted basket ownership after broker close confirmation."""
+    normalized_symbol = str(symbol or "").upper()
+    try:
+        trusted_contract = ContractSpec.from_mapping(normalized_symbol, dict(contract or {}))
+        if not normalized_symbol or trusted_contract.symbol.upper() != normalized_symbol:
+            raise ValueError("symbol")
+        store = BasketMetadataStore(
+            Path(root) / "intel" / "firehose_baskets" / f"{normalized_symbol}.json",
+            trusted_contract=trusted_contract,
+        )
+        basket_id, basket_closed = store.remove_ticket(str(ticket_id))
+    except (OSError, TypeError, ValueError):
+        return {"status": "NO_EVIDENCE", "reason": "invalid_broker_contract"}
+    if basket_id is None:
+        return {"status": "NO_EVIDENCE", "reason": "missing_persisted_ticket"}
+    return {"status": "REMOVED", "basket_id": basket_id, "basket_closed": basket_closed}
+
+
 def close_ticket_confirmed(positions, ticket: str) -> bool:
     """Confirm a close only when the exact ticket has no remaining volume."""
     ticket_s = str(ticket)
@@ -2180,6 +2201,17 @@ def main() -> None:
                                         ticket_metadata_store, firehose_reentry_guard, tk,
                                         quote_fingerprint=_fingerprint, closed_at=closed_at,
                                     )
+                                    basket_removal = {"status": "NO_EVIDENCE"}
+                                    if _ticket_meta is not None and _ticket_meta.basket_id:
+                                        try:
+                                            basket_removal = remove_confirmed_firehose_basket(
+                                                root=ROOT,
+                                                ticket_id=tk,
+                                                symbol=_ticket_meta.symbol,
+                                                contract=eng.symbol_spec(_ticket_meta.symbol),
+                                            )
+                                        except (AttributeError, OSError, TypeError, ValueError):
+                                            basket_removal = {"status": "NO_EVIDENCE"}
                                     peak = (summary or {}).get("mfe_before_close")
                                     basket_trace = basket_lifecycle_trace(
                                         _ticket_meta,
@@ -2201,6 +2233,7 @@ def main() -> None:
                                             "ev": _rem_ev,
                                             "cost_usd": None,
                                             "turnover": 1.0,
+                                            "basket_removal_status": basket_removal.get("status"),
                                         },
                                         slot_released=close_cleanup.slot_released,
                                         basket_closed=close_cleanup.basket_closed,

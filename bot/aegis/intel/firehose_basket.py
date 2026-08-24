@@ -551,3 +551,27 @@ class BasketMetadataStore:
                 self._store[basket.basket_id] = basket
                 raise
             return ticket
+
+    def remove_ticket(self, ticket_id: str) -> tuple[str | None, bool]:
+        """Remove an exact closed ticket and its basket when no clips remain."""
+        with self._admission_lock():
+            self._load()
+            ticket_id = str(ticket_id)
+            for basket_id, basket in tuple(self._store.items()):
+                remaining = tuple(ticket for ticket in basket.tickets if ticket.ticket_id != ticket_id)
+                if len(remaining) == len(basket.tickets):
+                    continue
+                basket_closed = not remaining
+                if basket_closed:
+                    self._store.pop(basket_id)
+                else:
+                    self._store[basket_id] = BasketMetadata(
+                        **{**basket.__dict__, "tickets": remaining}
+                    )
+                try:
+                    self._save()
+                except Exception:
+                    self._store[basket_id] = basket
+                    raise
+                return basket_id, basket_closed
+        return None, False

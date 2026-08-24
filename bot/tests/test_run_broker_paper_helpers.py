@@ -6,6 +6,7 @@ from scripts.run_broker_paper import (
     close_ticket_confirmed,
     normalize_protective_stops,
     persist_confirmed_firehose_basket,
+    remove_confirmed_firehose_basket,
 )
 
 
@@ -148,3 +149,15 @@ def test_confirmed_position_geometry_rejects_missing_broker_stop():
     )
 
     assert geometry == {"status": "NO_EVIDENCE", "reason": "missing_confirmed_geometry"}
+
+
+def test_confirmed_close_removes_persisted_symbol_basket(tmp_path):
+    persist_confirmed_firehose_basket(
+        root=tmp_path, ticket_id="T1", metadata=_basket_metadata(), contract=_contract("EURUSD"), volume=0.01,
+    )
+
+    result = remove_confirmed_firehose_basket(
+        root=tmp_path, ticket_id="T1", symbol="EURUSD", contract=_contract("EURUSD"),
+    )
+
+    assert result == {"status": "REMOVED", "basket_id": "basket-1001", "basket_closed": True}

@@ -72,6 +72,18 @@ def _record_initial_clip(store):
     )
 
 
+def test_removing_final_confirmed_ticket_removes_persisted_basket(tmp_path):
+    store = _metadata_store(tmp_path / "baskets.json")
+    _store_basket(store)
+    _record_initial_clip(store)
+
+    result = store.remove_ticket("ticket-1")
+
+    assert result == ("basket-1", True)
+    assert store.get_basket("basket-1") is None
+    assert store.get_ticket("ticket-1") is None
+
+
 def _record_competing_clip(path, ready, proceed, outcomes):
     store = _metadata_store(Path(path))
     ready.set()
