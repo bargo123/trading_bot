@@ -24,14 +24,18 @@ class VideoStyleConfig:
     slippage_cost: float = 0.0
     commission_cost: float = 0.0
     max_hold_bars: int = 0
+    max_hold_s: int = 45
 
     def __post_init__(self) -> None:
         if self.starting_equity <= 0 or self.risk_per_trade <= 0:
             raise ValueError("starting_equity and risk_per_trade must be positive")
         if self.stop_r <= 0 or self.reward_to_risk <= 0 or self.scale_after_r <= 0:
             raise ValueError("R parameters must be positive")
-        if self.max_layers < 1 or self.max_hold_bars < 0:
-            raise ValueError("max_layers must be positive and max_hold_bars non-negative")
+        if self.max_layers < 1 or self.max_hold_bars < 0 or self.max_hold_s <= 0:
+            raise ValueError(
+                "max_layers must be positive, max_hold_bars non-negative, "
+                "and max_hold_s positive"
+            )
         if min(self.spread_cost, self.slippage_cost, self.commission_cost) < 0:
             raise ValueError("costs must be non-negative")
 

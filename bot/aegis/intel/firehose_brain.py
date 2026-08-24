@@ -285,7 +285,7 @@ def video_style_micro_candidate(
         entry_price=entry,
         invalidation=stop,
         target=target,
-        max_hold_s=120,
+        max_hold_s=int(cfg.max_hold_s),
         required_regime="",
         required_session="",
         spread_pips=float(spread_pips),

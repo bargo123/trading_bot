@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from aegis.intel.firehose_brain import video_style_micro_candidate
 from aegis.research.video_style_paper import (
@@ -60,6 +61,12 @@ def test_video_style_geometry_is_shared_by_simulator_and_firehose_candidate():
     assert candidate.target == target
     assert candidate.family == "video_style_breakout"
     assert candidate.symbol == "EURUSD"
+    assert candidate.max_hold_s == cfg.max_hold_s
+
+
+def test_video_style_config_rejects_non_positive_seconds_horizon():
+    with pytest.raises(ValueError, match="max_hold_s"):
+        VideoStyleConfig(max_hold_s=0)
 
 
 def test_video_style_scale_requires_profit_favorable_move_and_capacity():
