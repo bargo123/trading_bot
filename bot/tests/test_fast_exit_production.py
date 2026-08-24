@@ -11,7 +11,7 @@ from typing import Any, Mapping, Optional
 
 from aegis.intel.fast_firehose import ExitAction, FastExitConfig, FastExitStateMachine
 from aegis.intel.fast_exit_runner import (
-    FastExitContext, build_harvest_input, evaluate_fast_exit,
+    FastExitContext, build_harvest_input, combine_existing_exit_with_policy, evaluate_fast_exit,
     firehose_exit_trace, pip_size_for, spread_r_from_geometry,
 )
 from aegis.intel.quote_buffer import QuoteBuffer
@@ -456,6 +456,19 @@ class TestFastExitRunnerIntegration:
         # Both should execute without error
         assert buy_verdict["action"] != "ERROR"
         assert sell_verdict["action"] != "ERROR"
+
+def test_missing_runtime_policy_does_not_replace_existing_hold():
+    result = combine_existing_exit_with_policy(
+        {"action": "HOLD", "reason": "structural_hold"},
+        {"action": "NO_EVIDENCE", "reason": "missing_validated_policy_artifact"},
+    )
+
+    assert result == {
+        "action": "HOLD",
+        "reason": "structural_hold",
+        "policy_action": "NO_EVIDENCE",
+        "policy_reason": "missing_validated_policy_artifact",
+    }
 
 
 if __name__ == "__main__":

@@ -63,6 +63,16 @@ class MissingLiquidationMarkError(Exception):
         super().__init__(f"Missing liquidation mark for {side.upper()} on {symbol}: required {'BID' if side == 'buy' else 'ASK'} unavailable")
 
 
+def combine_existing_exit_with_policy(
+    existing: Mapping[str, Any], policy: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Expose policy evidence without allowing it to replace an existing exit decision."""
+    result = dict(existing)
+    result["policy_action"] = policy.get("action")
+    result["policy_reason"] = policy.get("reason")
+    return result
+
+
 def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     """Evaluate FastExit for a single ticket using production logic.
 
