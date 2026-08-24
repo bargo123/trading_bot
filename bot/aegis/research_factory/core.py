@@ -1442,17 +1442,19 @@ def _is_hypothesis_tested(self, hypothesis_id: str) -> bool:
     ) -> Dict[str, Any]:
         """Compile and evaluate only non-sealed rows with explicit costs."""
         self._log_event("HYPOTHESIS", f"Testing {hypothesis.hypothesis_id} via historical replay")
-        frame = pd.concat([train_data, val_data, test_data], ignore_index=True)
-        compiled = compile_hypothesis(hypothesis, frame.columns)
-        result = walk_forward_evaluate(
-            frame,
-            pipeline_factory=MLPipeline,
-            compiled=compiled,
-            costs=costs,
-            min_train_timestamps=min_train_timestamps,
-            validation_timestamps=validation_timestamps,
-            step_timestamps=step_timestamps,
-        )
+        try:
+            # test_data is sealed and deliberately never inspected by this path.
+            frame = pd.concat([train_data, val_data], ignore_index=True)
+            compiled = compile_hypothesis(hypothesis, frame.columns)
+            result = walk_forward_evaluate(
+                frame, pipeline_factory=MLPipeline, compiled=compiled, costs=costs,
+                min_train_timestamps=min_train_timestamps,
+                validation_timestamps=validation_timestamps, step_timestamps=step_timestamps,
+                label_horizon=getattr(self, "label_horizon", 0),
+            )
+        except Exception as exc:
+            self._record_generation_outcome("FAILED", f"walk-forward evaluation failed: {exc}", hypothesis=hypothesis)
+            return {"metrics": {}, "decision": "FAILED", "reason": f"walk-forward evaluation failed: {exc}", "folds": ()}
         self._record_generation_outcome(
             result.status, result.reason, hypothesis=hypothesis, metrics=result.metrics
         )

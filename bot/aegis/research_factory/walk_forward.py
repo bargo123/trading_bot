@@ -24,6 +24,7 @@ class WalkForwardFold:
     net_pnl_usd: Optional[float]
     expectancy_usd: Optional[float]
     max_drawdown_usd: Optional[float]
+    net_pnls_usd: tuple[float, ...]
     status: str
     reason: str
 
@@ -70,6 +71,7 @@ def _fold(frame: pd.DataFrame, replay: Any) -> WalkForwardFold:
         net_pnl_usd=metrics.get("net_pnl_usd"),
         expectancy_usd=metrics.get("expectancy_usd"),
         max_drawdown_usd=metrics.get("max_drawdown_usd"),
+        net_pnls_usd=tuple(trade.net_pnl_usd for trade in replay.trades),
         status=replay.status,
         reason=replay.reason,
     )
@@ -79,15 +81,25 @@ def _aggregate(folds: tuple[WalkForwardFold, ...]) -> Optional[Mapping[str, floa
     observed = [fold for fold in folds if fold.net_pnl_usd is not None]
     if not observed:
         return None
-    trade_count = sum(fold.trade_count or 0 for fold in observed)
-    net_pnl = sum(fold.net_pnl_usd or 0.0 for fold in observed)
+    pnls = [pnl for fold in observed for pnl in fold.net_pnls_usd]
+    trade_count = len(pnls)
+    if not trade_count:
+        return None
+    net_pnl = sum(pnls)
+    equity = peak = drawdown = 0.0
+    for pnl in pnls:
+        equity += pnl
+        peak = max(peak, equity)
+        drawdown = max(drawdown, peak - equity)
     return {
         "trade_count": float(trade_count),
         "gross_pnl_usd": sum(fold.gross_pnl_usd or 0.0 for fold in observed),
         "cost_usd": sum(fold.cost_usd or 0.0 for fold in observed),
         "net_pnl_usd": net_pnl,
         "expectancy_usd": net_pnl / trade_count if trade_count else 0.0,
-        "max_drawdown_usd": max(fold.max_drawdown_usd or 0.0 for fold in observed),
+        "max_drawdown_usd": drawdown,
+        "profit_factor": sum(pnl for pnl in pnls if pnl > 0) / abs(sum(pnl for pnl in pnls if pnl < 0)) if any(pnl < 0 for pnl in pnls) else float("inf"),
+        "tail_loss_usd": min(pnls),
     }
 
 
@@ -100,6 +112,7 @@ def walk_forward_evaluate(
     min_train_timestamps: int,
     validation_timestamps: int,
     step_timestamps: int,
+    label_horizon: int = 0,
 ) -> WalkForwardResult:
     """Retrain on each expanding prefix and replay only its next time slice."""
     if costs is None:
@@ -110,8 +123,8 @@ def walk_forward_evaluate(
         return _result("NO_DATA", "walk-forward frame is empty")
     if "time" not in frame.columns:
         return _result("NO_DATA", "walk-forward frame requires timestamps")
-    if min(min_train_timestamps, validation_timestamps, step_timestamps) <= 0:
-        return _result("FAILED", "walk-forward timestamp sizes must be positive")
+    if min(min_train_timestamps, validation_timestamps, step_timestamps) <= 0 or label_horizon < 0 or step_timestamps < validation_timestamps:
+        return _result("NOT_EXECUTABLE", "walk-forward sizing or embargo is invalid")
 
     working = frame.copy()
     working["time"] = pd.to_datetime(working["time"], utc=True, errors="coerce")
@@ -121,10 +134,12 @@ def walk_forward_evaluate(
     timestamps = pd.Index(working["time"].drop_duplicates().sort_values())
     if len(timestamps) < min_train_timestamps + validation_timestamps:
         return _result("NO_DATA", "insufficient timestamps for a walk-forward fold")
+    if min_train_timestamps <= label_horizon:
+        return _result("NOT_EXECUTABLE", "label horizon leaves no training timestamps")
 
     folds = []
     for start in range(min_train_timestamps, len(timestamps) - validation_timestamps + 1, step_timestamps):
-        train_times = timestamps[:start]
+        train_times = timestamps[: max(0, start - label_horizon)]
         validation_times = timestamps[start : start + validation_timestamps]
         train = working.loc[working["time"].isin(train_times)].copy()
         validation = working.loc[working["time"].isin(validation_times)].copy()
@@ -158,8 +173,12 @@ def walk_forward_evaluate(
         if status in statuses:
             reason = next(fold.reason for fold in observed_folds if fold.status == status)
             return WalkForwardResult(status, reason, observed_folds, metrics)
-    if metrics is None or metrics["trade_count"] == 0:
-        return WalkForwardResult("REJECTED", "no observed replay trades", observed_folds, metrics)
-    if metrics["net_pnl_usd"] <= 0:
-        return WalkForwardResult("REJECTED", "observed net replay PnL is not positive", observed_folds, metrics)
-    return WalkForwardResult("CHALLENGER", "observed net replay PnL is positive", observed_folds, metrics)
+    if metrics is None:
+        return WalkForwardResult("NO_DATA", "no observed replay trades", observed_folds, None)
+    if metrics["expectancy_usd"] <= 0:
+        return WalkForwardResult("REJECTED", "observed expectancy is not positive", observed_folds, metrics)
+    if metrics["profit_factor"] is None or metrics["profit_factor"] <= 1:
+        return WalkForwardResult("REJECTED", "observed profit factor is not above one", observed_folds, metrics)
+    if metrics["tail_loss_usd"] <= -3:
+        return WalkForwardResult("REJECTED", "observed tail loss fails the quality threshold", observed_folds, metrics)
+    return WalkForwardResult("CHALLENGER", "observed aggregate qualification gates passed", observed_folds, metrics)

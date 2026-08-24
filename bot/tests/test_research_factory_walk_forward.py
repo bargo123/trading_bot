@@ -130,3 +130,88 @@ def test_factory_records_no_evidence_when_walk_forward_costs_are_missing(tmp_pat
     row = factory.experiment_registry.all_rows()[0]
     assert row["status"] == "failed"
     assert row["rejection_reason"] == result["reason"]
+
+
+def test_factory_never_accesses_sealed_test_data(tmp_path):
+    class SealedFrame:
+        def __getattr__(self, name):
+            raise AssertionError(f"sealed data was accessed: {name}")
+
+    factory = object.__new__(ResearchFactory)
+    factory.state = ResearchState(generation=2, dataset_fingerprint="nonsealed")
+    factory.experiment_registry = ExperimentRegistry(tmp_path / "experiments.sqlite")
+    factory._log_event = lambda *args, **kwargs: None
+
+    result = factory._test_hypothesis(
+        _hypothesis(), _frame().iloc[:2], _frame().iloc[2:4], SealedFrame()
+    )
+
+    assert result["decision"] == "NO_EVIDENCE"
+
+
+def test_walk_forward_rejects_overlapping_validation_windows():
+    result = walk_forward_evaluate(
+        _frame(), pipeline_factory=lambda: _PipelineSpy([]), compiled=_compiled(),
+        costs=_costs(0), min_train_timestamps=2, validation_timestamps=3,
+        step_timestamps=2,
+    )
+    assert result.status == "NOT_EXECUTABLE"
+
+
+def test_walk_forward_purges_label_horizon_from_training_prefix():
+    trained = []
+    result = walk_forward_evaluate(
+        _frame(), pipeline_factory=lambda: _PipelineSpy(trained), compiled=_compiled(),
+        costs=_costs(0), min_train_timestamps=3, validation_timestamps=2,
+        step_timestamps=2, label_horizon=1,
+    )
+    assert result.folds[0].train_end < result.folds[0].validation_start
+    assert trained[0].max() == _frame().iloc[1]["time"]
+
+
+def test_aggregate_drawdown_uses_ordered_trades_across_folds(monkeypatch):
+    from aegis.research_factory.replay import ReplayResult, ReplayTrade
+    import aegis.research_factory.walk_forward as walk_forward
+
+    trades = iter(
+        [
+            (10.0, 0.0),
+            (-15.0, 0.0),
+            (10.0, 0.0),
+        ]
+    )
+
+    def replay(*args, **kwargs):
+        pnl, per_fold_drawdown = next(trades)
+        trade = ReplayTrade("buy", 0, 1, 1, 1, "fixture", pnl, 0, pnl)
+        return ReplayResult("COMPLETED", (trade,), {
+            "trade_count": 1.0, "gross_pnl_usd": pnl, "cost_usd": 0.0,
+            "net_pnl_usd": pnl, "expectancy_usd": pnl,
+            "max_drawdown_usd": per_fold_drawdown,
+        }, "")
+
+    monkeypatch.setattr(walk_forward, "replay_hypothesis", replay)
+    result = walk_forward_evaluate(
+        _frame(), pipeline_factory=lambda: _PipelineSpy([]), compiled=_compiled(),
+        costs=_costs(0), min_train_timestamps=2, validation_timestamps=2,
+        step_timestamps=2,
+    )
+    assert result.metrics["max_drawdown_usd"] == 15.0
+
+
+def test_factory_persists_compiler_exception_as_failed_without_metrics(monkeypatch, tmp_path):
+    import aegis.research_factory.core as core
+
+    factory = object.__new__(ResearchFactory)
+    factory.state = ResearchState(generation=3, dataset_fingerprint="nonsealed")
+    factory.experiment_registry = ExperimentRegistry(tmp_path / "experiments.sqlite")
+    factory._log_event = lambda *args, **kwargs: None
+    monkeypatch.setattr(core, "compile_hypothesis", lambda *args: (_ for _ in ()).throw(RuntimeError("compiler exploded")))
+
+    result = factory._test_hypothesis(_hypothesis(), _frame().iloc[:2], _frame().iloc[2:4], object())
+
+    assert result["decision"] == "FAILED"
+    assert result["reason"] == "walk-forward evaluation failed: compiler exploded"
+    row = factory.experiment_registry.all_rows()[0]
+    assert row["status"] == "failed"
+    assert row["metrics"] == {}
