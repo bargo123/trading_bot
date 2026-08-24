@@ -38,12 +38,12 @@ def _observed_state(**overrides: object) -> HarvestInput:
     values: dict[str, object] = {
         "ticket": "T1",
         "side": "buy",
-        "net_pnl_r": 0.70,
-        "mfe_r": 0.80,
+        "gross_pnl_r": 0.74,
+        "gross_mfe_r": 0.84,
         "age_s": 10.0,
-        "return_5s_r": 0.01,
-        "return_15s_r": 0.03,
-        "return_30s_r": 0.05,
+        "gross_return_5s_r": 0.05,
+        "gross_return_15s_r": 0.07,
+        "gross_return_30s_r": 0.09,
         "remaining_ev": 0.04,
         "remaining_ev_status": "ESTIMATED",
         "spread_normal": True,
@@ -66,11 +66,11 @@ def test_cost_adjusted_profitable_stall_quick_takes():
 def test_accelerating_winner_gets_bounded_momentum_hold():
     """A favorable accelerating winner must retain its bounded extension."""
     decision = ProfitHarvester(_policy()).evaluate(_observed_state(
-        net_pnl_r=0.80,
-        mfe_r=0.80,
-        return_5s_r=0.09,
-        return_15s_r=0.07,
-        return_30s_r=0.05,
+        gross_pnl_r=0.84,
+        gross_mfe_r=0.84,
+        gross_return_5s_r=0.13,
+        gross_return_15s_r=0.11,
+        gross_return_30s_r=0.09,
     ))
 
     assert decision.action == "MOMENTUM_HOLD"
@@ -79,8 +79,8 @@ def test_accelerating_winner_gets_bounded_momentum_hold():
 def test_floor_breach_takes_before_normal_loss():
     """An armed R-based floor must prevent a winner degrading into a loss."""
     decision = ProfitHarvester(_policy()).evaluate(_observed_state(
-        mfe_r=1.0,
-        net_pnl_r=0.45,
+        gross_mfe_r=1.04,
+        gross_pnl_r=0.49,
     ))
 
     assert decision.action == "QUICK_TAKE"
@@ -97,20 +97,48 @@ def test_negative_remaining_ev_aborts():
 def test_no_progress_loser_scratches_before_protective_stop():
     """An early adverse no-progress trade must scratch before a full stop."""
     assert ProfitHarvester(_policy()).evaluate(_observed_state(
-        net_pnl_r=-0.30,
-        mfe_r=0.05,
+        gross_pnl_r=-0.26,
+        gross_mfe_r=0.09,
         age_s=10.0,
-        return_5s_r=-0.04,
-        return_15s_r=-0.03,
-        return_30s_r=-0.02,
+        gross_return_5s_r=0.00,
+        gross_return_15s_r=0.01,
+        gross_return_30s_r=0.02,
     )).action == "SCRATCH"
 
 
 def test_missing_cost_or_momentum_evidence_is_unavailable():
     """Missing observations must not invent a harvest decision."""
     assert ProfitHarvester(_policy()).evaluate(_observed_state(
-        return_5s_r=None,
+        gross_return_5s_r=None,
     )).action == "UNAVAILABLE"
+
+
+def test_observed_costs_can_remove_gross_winner_take_eligibility():
+    """Dropping cost subtraction must not let gross PnL qualify as net profit."""
+    harvester = ProfitHarvester(_policy())
+    gross_winner = _observed_state(gross_pnl_r=0.54, gross_mfe_r=0.70)
+    higher_cost = _observed_state(
+        gross_pnl_r=0.54,
+        gross_mfe_r=0.70,
+        observed_commission_r=0.05,
+    )
+
+    assert gross_winner.net_pnl_r == 0.50
+    assert harvester.evaluate(gross_winner).action == "QUICK_TAKE"
+    assert harvester.evaluate(higher_cost).action == "UNAVAILABLE"
+
+
+def test_near_peak_net_pnl_uses_normalized_no_giveback_tolerance():
+    """Replacing tolerance with exact equality must not deny a valid extension."""
+    decision = ProfitHarvester(_policy()).evaluate(_observed_state(
+        gross_pnl_r=0.8399995,
+        gross_mfe_r=0.84,
+        gross_return_5s_r=0.13,
+        gross_return_15s_r=0.11,
+        gross_return_30s_r=0.09,
+    ))
+
+    assert decision.action == "MOMENTUM_HOLD"
 
 
 def test_absent_or_incomplete_policy_artifact_is_unavailable():

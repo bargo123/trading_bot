@@ -23,7 +23,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
-from aegis.intel.profit_harvester import HarvestDecision
+from aegis.intel.profit_harvester import (
+    HarvestDecision,
+    HarvestInput,
+    HarvestPolicy,
+    ProfitHarvester,
+)
 
 
 class ExitAction(str, Enum):
@@ -467,6 +472,8 @@ class FastExitStateMachine:
         regime_at_entry: str = "",
         remaining_ev: float | None = None,
         remaining_ev_status: str = "UNKNOWN",
+        harvest_policy: HarvestPolicy | None = None,
+        harvest_input: HarvestInput | None = None,
         harvest_decision: HarvestDecision | None = None,
     ) -> dict[str, Any]:
         R = max(stop_pips, 0.1)
@@ -508,7 +515,10 @@ class FastExitStateMachine:
 
         # A policy may only replace the legacy default HOLD after all
         # structural, regime, time, giveback, and EV protections above.
-        if harvest_decision is not None:
+        # Direct decisions are ignored. Only the pure harvester may produce an
+        # executable action after validating its policy artifact and evidence.
+        if harvest_policy is not None and harvest_input is not None:
+            harvest_decision = ProfitHarvester(harvest_policy).evaluate(harvest_input)
             harvest_actions = {
                 "QUICK_TAKE": ExitAction.QUICK_TAKE,
                 "PROFIT_LOCK": ExitAction.LOCK,

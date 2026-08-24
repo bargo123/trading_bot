@@ -68,18 +68,49 @@ class HarvestPolicy:
 class HarvestInput:
     ticket: str
     side: str
-    net_pnl_r: float | None
-    mfe_r: float | None
+    gross_pnl_r: float | None
+    gross_mfe_r: float | None
     age_s: float | None
-    return_5s_r: float | None
-    return_15s_r: float | None
-    return_30s_r: float | None
+    gross_return_5s_r: float | None
+    gross_return_15s_r: float | None
+    gross_return_30s_r: float | None
     remaining_ev: float | None
     remaining_ev_status: str
     spread_normal: bool | None
     observed_spread_r: float | None
     observed_slippage_r: float | None
     observed_commission_r: float | None
+
+    @property
+    def observed_cost_r(self) -> float | None:
+        costs = (
+            self.observed_spread_r,
+            self.observed_slippage_r,
+            self.observed_commission_r,
+        )
+        if not all(_is_finite(value) for value in costs):
+            return None
+        return sum(costs)
+
+    @property
+    def net_pnl_r(self) -> float | None:
+        return _after_cost(self.gross_pnl_r, self.observed_cost_r)
+
+    @property
+    def mfe_r(self) -> float | None:
+        return _after_cost(self.gross_mfe_r, self.observed_cost_r)
+
+    @property
+    def return_5s_r(self) -> float | None:
+        return _after_cost(self.gross_return_5s_r, self.observed_cost_r)
+
+    @property
+    def return_15s_r(self) -> float | None:
+        return _after_cost(self.gross_return_15s_r, self.observed_cost_r)
+
+    @property
+    def return_30s_r(self) -> float | None:
+        return _after_cost(self.gross_return_30s_r, self.observed_cost_r)
 
     @property
     def has_required_evidence(self) -> bool:
@@ -89,16 +120,14 @@ class HarvestInput:
             and self.remaining_ev_status == "ESTIMATED"
             and self.spread_normal is not None
             and all(_is_finite(value) for value in (
-                self.net_pnl_r,
-                self.mfe_r,
+                self.gross_pnl_r,
+                self.gross_mfe_r,
                 self.age_s,
-                self.return_5s_r,
-                self.return_15s_r,
-                self.return_30s_r,
+                self.gross_return_5s_r,
+                self.gross_return_15s_r,
+                self.gross_return_30s_r,
                 self.remaining_ev,
-                self.observed_spread_r,
-                self.observed_slippage_r,
-                self.observed_commission_r,
+                self.observed_cost_r,
             ))
         )
 
@@ -160,7 +189,7 @@ class ProfitHarvester:
         return (
             input.age_s <= self.policy.max_extension_s
             and input.spread_normal is True
-            and input.net_pnl_r == input.mfe_r
+            and abs(input.net_pnl_r - input.mfe_r) <= 1e-6
             and input.return_5s_r >= self.policy.accelerating_return_r
             and input.return_5s_r > input.return_15s_r > input.return_30s_r > 0
         )
@@ -168,3 +197,9 @@ class ProfitHarvester:
 
 def _is_finite(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _after_cost(gross_r: float | None, observed_cost_r: float | None) -> float | None:
+    if not _is_finite(gross_r) or not _is_finite(observed_cost_r):
+        return None
+    return gross_r - observed_cost_r
