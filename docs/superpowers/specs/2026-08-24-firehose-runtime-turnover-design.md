@@ -94,6 +94,11 @@ Adds remain unavailable without a valid artifact. When available, every add is
 same-side, fresh-triggered, positive-continuation-only, non-losing, within the
 shared broker-native basket risk budget and clip cap, and rejects self hedges.
 
+`BasketMetadataStore` is single-contract by design. The multi-symbol runner
+therefore uses one persisted store per normalized symbol, constructed from that
+symbol's fresh broker `ContractSpec`; it never combines symbols behind one
+untrusted shared store.
+
 ### 3. Runtime Observation Snapshot
 
 For every exact owned ticket/basket, the monitor builds a point-in-time

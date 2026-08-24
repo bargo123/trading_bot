@@ -16,6 +16,7 @@
 - Do not launch MT5, place orders, enable live trading, merge, or push.
 - Do not modify Research Factory, AI Council, Book Brain, ML/replay governance, entry gates, stale-signal protection, spread/economics gates, margin controls, self-hedge protection, or per-trade risk.
 - Runtime changes must use exact ticket metadata and broker-confirmed fill/close state; no symbol/side ownership inference.
+- Persist basket ownership in one `BasketMetadataStore` per normalized symbol, each initialized with that symbol's fresh broker `ContractSpec`.
 - Missing book, lifecycle, cost, feature, policy, or OOS evidence returns `NO_EVIDENCE` or `NOT_IMPLEMENTED`; never fabricate a metric or decision.
 - New quick harvest, extension, profit floor, scratch, abort, and clip-add actions remain inactive unless a trusted governed artifact exists.
 
@@ -174,6 +175,11 @@ def persist_confirmed_firehose_fill(*, ticket_id, metadata, basket_store, contra
 Pass broker-native contract evidence, immutable entry/stop geometry, exact
 trigger/freshness ID, cost evidence, regime, and session. Preserve the existing
 order request and fill decision path unchanged.
+
+Store the basket at `intel/firehose_baskets/<NORMALIZED_SYMBOL>.json`. Construct
+that store only from `ContractSpec.from_mapping(symbol, eng.symbol_spec(symbol))`.
+If contract evidence is missing or invalid, persist no basket ownership and
+record `NO_EVIDENCE`; do not fall back to another symbol's contract.
 
 - [ ] **Step 4: Run focused ownership, restart, and safety tests**
 
