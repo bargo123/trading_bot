@@ -197,3 +197,72 @@ exit values.
   creation is intentionally unavailable to Task 3 and fails closed. Unrelated
   worktree artifacts and the existing single `eventkit` warning remain
   untouched.
+
+## Round 3/5 Fix: Trusted Indexed-Corpus Provenance
+
+### Files Changed
+
+- `bot/aegis/research/firehose_basket_replay.py`
+- `bot/tests/test_firehose_basket_replay.py`
+- `task-3-report.md`
+
+### Behavior
+
+- The fixed public interface remains
+  `evaluate_basket_policies(rows, policy_packets) -> dict`.
+- Direct-source validation now loads the trusted Task 1 `BookIndex` corpus once
+  per evaluation. It accepts a record only when its normalized path and hash
+  select an indexed row, its filename equals that row's basename, the indexed
+  normalized body re-hashes to the stored digest, and the cited line range
+  exactly equals the packet's passage.
+- A self-consistent readable attacker file is no longer sufficient: because it
+  has no independently indexed path/hash/body record, it returns
+  `NO_EVIDENCE` with no artifact.
+- Index access or row-integrity failures fail closed. No source file is trusted
+  solely because a caller names it.
+
+### TDD Evidence
+
+- RED command: `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py -q`
+- RED output: `8 failed, 7 passed in 1.47s`. The initial trusted-index fixture
+  also exposed that the prior raw-byte verifier disagreed with Task 1's
+  normalized UTF-8 hash on Windows line endings, preventing genuine Task 1
+  packets from reaching the intended provenance gate.
+- The fixture was made LF-byte-stable to use the same normalized text that Task
+  1 indexes. The attacker regression then exercises a real Task 1 `BookIndex`
+  and replaces only one support record with a self-consistent, unindexed file.
+- GREEN focused command: `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py -q`
+- GREEN focused output: `15 passed in 1.13s`.
+
+### Broader Verification
+
+- `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py tests\test_firehose_basket_evidence.py tests\test_firehose_basket.py -q`
+  completed with `48 passed in 3.58s`.
+- `..\.venv\Scripts\python.exe -m pytest -q` completed with
+  `1076 passed, 1 warning in 80.50s`.
+- The warning is the pre-existing `eventkit` no-current-event-loop deprecation
+  warning in `test_ibkr_order_hygiene.py`.
+
+### Safety And Self-Review
+
+- The regression uses a real indexed Task 1 corpus and an attacker-created
+  source whose filename, path, digest, source ID, line range, and passage are
+  internally consistent. The evaluator rejects it because it is absent from the
+  trusted index.
+- The evaluator reads only the local trusted BookIndex; it creates no evidence,
+  metric, policy, artifact, runtime behavior, order, MT5 session, or live
+  trading action. Missing, corrupt, or untrusted index evidence fails closed.
+- Re-read the final source and test diff. Provenance is compared to the index's
+  stored normalized body and digest rather than caller-provided filesystem
+  content, while all changes remain confined to Task 3 and this report.
+
+### Commits
+
+- `7f4cd09 fix: trust indexed firehose evidence`
+- `1345e4b test: stabilize firehose index fixture`
+
+### Concerns
+
+- The evaluator intentionally returns `NO_EVIDENCE` when the trusted BookIndex
+  is missing, unreadable, corrupt, or lacks a cited record. Unrelated worktree
+  artifacts and the existing single `eventkit` warning remain untouched.
