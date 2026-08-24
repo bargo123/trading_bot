@@ -135,3 +135,65 @@ exit values.
 
 - The existing unrelated dirty and runtime-generated worktree artifacts remain
   untouched. The full suite retains the existing single `eventkit` warning.
+
+## Round 2/5 Fix: Source-Content Provenance Verification
+
+### Files Changed
+
+- `bot/aegis/research/firehose_basket_replay.py`
+- `bot/tests/test_firehose_basket_replay.py`
+- `task-3-report.md`
+
+### Behavior
+
+- The fixed public API remains `evaluate_basket_policies(rows, policy_packets)`.
+- Direct evidence records now fail closed unless the declared source path is a
+  readable UTF-8 file, its basename equals `filename`, SHA-256 bytes equal the
+  recorded `file_hash`/`source_id`, and the cited inclusive line range exactly
+  equals the recorded verbatim `passage`.
+- This validates the actual source content available in Task 1 packet
+  provenance without adding an index or runtime dependency to Task 3. Any
+  missing source, unreadable source, digest mismatch, invalid range, or passage
+  mismatch returns `NO_EVIDENCE` and no artifact.
+
+### TDD Evidence
+
+- RED command: `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py -q`
+- RED output: `1 failed, 13 passed in 0.35s`. The forged 64-character digest
+  and matching `source_id` for an otherwise valid declared source incorrectly
+  returned `VALIDATED` before the correction.
+- GREEN focused command: `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py -q`
+- GREEN focused output: `14 passed in 0.29s`.
+
+### Broader Verification
+
+- `..\.venv\Scripts\python.exe -m pytest tests\test_firehose_basket_replay.py tests\test_firehose_basket_evidence.py tests\test_firehose_basket.py -q`
+  completed with `47 passed in 3.12s`.
+- `..\.venv\Scripts\python.exe -m pytest -q` completed with
+  `1075 passed, 1 warning in 78.93s`.
+- The warning is the pre-existing `eventkit` no-current-event-loop deprecation
+  warning in `test_ibkr_order_hygiene.py`.
+
+### Safety And Self-Review
+
+- The regression uses a real declared source then forges only its digest and
+  source ID; the evaluator now rejects it rather than trusting self-asserted
+  provenance.
+- File reads are limited to caller-declared research evidence paths. No source,
+  metric, policy, or artifact is fabricated or persisted, and every source-read
+  error fails closed to `NO_EVIDENCE`.
+- Re-read the final source and test diff. The implementation is limited to Task
+  3, preserves the public interface, and does not change runtime, MT5, orders,
+  live trading, configuration, YAML, Research Factory, AI Council, or Book
+  Brain code.
+
+### Commit
+
+- `46df116 fix: verify firehose evidence source content`
+
+### Concerns
+
+- Evidence whose indexed source file is unavailable or changed after packet
+  creation is intentionally unavailable to Task 3 and fails closed. Unrelated
+  worktree artifacts and the existing single `eventkit` warning remain
+  untouched.
