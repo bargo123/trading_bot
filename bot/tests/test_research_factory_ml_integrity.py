@@ -395,3 +395,40 @@ def test_real_models_fit_predict_and_repeated_training_resets_state() -> None:
         probabilities = model.predict_proba(frame.iloc[60:])
         assert len(probabilities) == 20
         assert np.isfinite(probabilities).all()
+
+
+def test_calibrated_ensemble_exposes_agreement_uncertainty_and_abstention() -> None:
+    frame = labeled_frame(80)
+    configs = [
+        small_logistic_config(calibrate=True),
+        ModelConfig(
+            name="logistic_2",
+            model_type="logistic",
+            params={"C": 0.5, "max_iter": 100},
+            feature_selector=False,
+            calibrate=True,
+        ),
+    ]
+    pipeline_obj = MLPipeline(configs=configs)
+    pipeline_obj.train(frame.iloc[:60], frame.iloc[60:])
+
+    result = pipeline_obj.get_calibrated_ensemble_prediction(frame.iloc[60:])
+
+    assert result["model_count"] == 2
+    assert len(result["probability"]) == 20
+    assert len(result["model_agreement"]) == 20
+    assert len(result["uncertainty"]) == 20
+    assert result["weights"]
+    assert sum(result["weights"].values()) == pytest.approx(1.0)
+    assert result["calibration_status"] == "calibrated"
+
+
+def test_calibrated_ensemble_abstains_when_calibration_or_model_count_is_missing() -> None:
+    frame = labeled_frame(80)
+    pipeline = MLPipeline(configs=[small_logistic_config(calibrate=False)])
+    pipeline.train(frame.iloc[:60], frame.iloc[60:])
+
+    result = pipeline.get_calibrated_ensemble_prediction(frame.iloc[60:])
+
+    assert result["calibration_status"] == "not_calibrated"
+    assert result["abstain"].all()

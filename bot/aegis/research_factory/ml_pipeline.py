@@ -460,3 +460,91 @@ class MLPipeline:
             return np.average(list(preds.values()), axis=0, weights=weights)
         else:
             return np.mean(list(preds.values()), axis=0)
+
+    def get_calibrated_ensemble_prediction(
+        self,
+        df: pd.DataFrame,
+        *,
+        threshold: float = 0.5,
+        min_models: int = 2,
+        min_model_agreement: float = 0.6,
+        max_uncertainty: float = 0.2,
+    ) -> Dict[str, Any]:
+        """Return a validation-weighted ensemble with a fail-closed gate.
+
+        Only models calibrated against a supplied validation frame may pass the
+        gate.  Validation Brier scores determine weights; disagreement and
+        probability dispersion abstain rather than manufacturing confidence.
+        This is research inference only and does not submit orders.
+        """
+        if not 0 < float(threshold) < 1:
+            raise ValueError("threshold must be between 0 and 1")
+        if int(min_models) < 1:
+            raise ValueError("min_models must be positive")
+        if not 0 <= float(min_model_agreement) <= 1:
+            raise ValueError("min_model_agreement must be between 0 and 1")
+        if float(max_uncertainty) < 0:
+            raise ValueError("max_uncertainty must be non-negative")
+
+        model_names = [model.name for model in self.models]
+        probabilities = [model.predict_proba(df) for model in self.models]
+        n_rows = len(df)
+        if probabilities:
+            matrix = np.vstack(probabilities)
+            dispersion = np.std(matrix, axis=0)
+            agreement = np.maximum(
+                np.mean(matrix >= float(threshold), axis=0),
+                np.mean(matrix < float(threshold), axis=0),
+            )
+        else:
+            matrix = np.empty((0, n_rows), dtype=float)
+            dispersion = np.full(n_rows, np.inf, dtype=float)
+            agreement = np.zeros(n_rows, dtype=float)
+
+        calibrated = bool(self.models) and all(
+            str(model.metrics.get("calibration_status", "")).startswith("calibrated")
+            for model in self.models
+        )
+        weights: Dict[str, float] = {}
+        if calibrated and len(self.models) >= int(min_models):
+            raw_weights = []
+            for model in self.models:
+                brier = model.metrics.get("brier")
+                try:
+                    score = float(brier)
+                except (TypeError, ValueError):
+                    score = float("nan")
+                raw_weights.append(1.0 / max(score, 1e-6) if np.isfinite(score) else 1.0)
+            normalizer = float(np.sum(raw_weights)) or 1.0
+            weights = {
+                name: float(weight / normalizer)
+                for name, weight in zip(model_names, raw_weights)
+            }
+            probability = np.average(matrix, axis=0, weights=raw_weights)
+            abstain = (agreement < float(min_model_agreement)) | (
+                dispersion > float(max_uncertainty)
+            )
+            reason = np.where(abstain, "ensemble_uncertain", "ensemble_eligible")
+            calibration_status = "calibrated"
+        else:
+            probability = (
+                np.mean(matrix, axis=0)
+                if len(self.models)
+                else np.zeros(n_rows, dtype=float)
+            )
+            abstain = np.ones(n_rows, dtype=bool)
+            reason_value = "not_calibrated" if not calibrated else "insufficient_models"
+            reason = np.full(n_rows, reason_value, dtype=object)
+            calibration_status = "not_calibrated" if not calibrated else "insufficient_models"
+
+        return {
+            "probability": np.asarray(probability, dtype=float),
+            "decision": (np.asarray(probability) >= float(threshold)) & ~abstain,
+            "abstain": np.asarray(abstain, dtype=bool),
+            "abstain_reason": np.asarray(reason, dtype=object),
+            "model_agreement": np.asarray(agreement, dtype=float),
+            "uncertainty": np.asarray(dispersion, dtype=float),
+            "weights": weights,
+            "model_count": len(self.models),
+            "calibration_status": calibration_status,
+        }
