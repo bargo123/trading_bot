@@ -57,6 +57,7 @@ from aegis.paper_control import (  # noqa: E402
 from aegis.risk import RiskEngine  # noqa: E402
 from aegis.sizing import ContractSpec, size_lots_for_risk  # noqa: E402
 from aegis.strategy import prepare, signal_from_row  # noqa: E402
+from aegis.intel.firehose_basket import BasketMetadataStore  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +144,72 @@ def normalize_protective_stops(
         if tp_out is not None:
             tp_out = min(tp_out, float(entry) - min_distance)
     return sl_out, tp_out
+
+
+def persist_confirmed_firehose_basket(
+    *,
+    root: Path,
+    ticket_id: str | None,
+    metadata: dict,
+    contract: dict | None,
+    volume: float,
+) -> dict[str, str | float]:
+    """Persist an initial exact basket only after an already-confirmed fill."""
+    if not ticket_id:
+        return {"status": "NO_EVIDENCE", "reason": "unconfirmed_fill"}
+    symbol = str(metadata.get("symbol") or "").upper()
+    try:
+        trusted_contract = ContractSpec.from_mapping(symbol, dict(contract or {}))
+        if not symbol or trusted_contract.symbol.upper() != symbol:
+            raise ValueError("symbol")
+        basket_id = str(metadata["basket_id"])
+        store = BasketMetadataStore(
+            Path(root) / "intel" / "firehose_baskets" / f"{symbol}.json",
+            trusted_contract=trusted_contract,
+        )
+        basket = store.get_basket(basket_id)
+        if basket is None:
+            basket = store.create_basket(
+                basket_id=basket_id,
+                hypothesis_id=str(metadata["hypothesis_id"]),
+                family=str(metadata["family"]),
+                symbol=symbol,
+                side=str(metadata["side"]),
+                risk_budget=float(metadata["risk_budget"]),
+                clip_cap=int(metadata["clip_cap"]),
+                tick_value=trusted_contract.tick_value,
+                tick_size=trusted_contract.tick_size,
+                regime=str(metadata["regime"]),
+                session=str(metadata["session"]),
+                entry_geometry={
+                    "entry_price": float(metadata["entry_price"]),
+                    "stop_loss": float(metadata["stop_loss"]),
+                },
+            )
+        if store.get_ticket(str(ticket_id)) is None:
+            store.record_ticket(
+                basket.basket_id,
+                ticket_id=str(ticket_id),
+                trigger_id=str(metadata["trigger_id"]),
+                clip_sequence=1,
+                entry_price=float(metadata["entry_price"]),
+                stop_loss=float(metadata["stop_loss"]),
+                volume=float(volume),
+                cost_evidence=dict(metadata["cost_evidence"]),
+                regime=str(metadata["regime"]),
+                session=str(metadata["session"]),
+            )
+    except (KeyError, TypeError, ValueError, OSError):
+        return {"status": "NO_EVIDENCE", "reason": "invalid_broker_contract"}
+    recorded = store.get_ticket(str(ticket_id))
+    if recorded is None:
+        return {"status": "NO_EVIDENCE", "reason": "missing_persisted_ticket"}
+    return {
+        "status": "PERSISTED",
+        "basket_id": basket_id,
+        "ticket_id": str(ticket_id),
+        "initial_risk_usd": recorded.initial_risk,
+    }
 
 
 def close_ticket_confirmed(positions, ticket: str) -> bool:
@@ -1393,6 +1460,37 @@ def main() -> None:
                         session = str(brain_decision.journal.get("session") or "")
                         information_id = brain_decision.information_id
                         for tk in new_tickets:
+                            basket_result = {"status": "NO_EVIDENCE"}
+                            if information_id:
+                                position = next(
+                                    (item for item in eng.positions(sym) if str(getattr(item, "ticket", "")) == tk),
+                                    None,
+                                )
+                                if position is not None:
+                                    try:
+                                        basket_result = persist_confirmed_firehose_basket(
+                                            root=ROOT,
+                                            ticket_id=tk,
+                                            metadata={
+                                                "basket_id": f"firehose-{tk}",
+                                                "hypothesis_id": hypothesis_id,
+                                                "family": strategy_family,
+                                                "symbol": sym,
+                                                "side": side,
+                                                "trigger_id": str(information_id),
+                                                "entry_price": entry_price,
+                                                "stop_loss": stop_loss,
+                                                "risk_budget": float(cfg.get("exploration_max_risk_per_trade_usd", 0.15)),
+                                                "clip_cap": 1,
+                                                "regime": regime,
+                                                "session": session,
+                                                "cost_evidence": {"spread_price": max(0.0, float(q.ask) - float(q.bid))},
+                                            },
+                                            contract=eng.symbol_spec(sym),
+                                            volume=float(getattr(position, "quantity", 0.0)),
+                                        )
+                                    except (AttributeError, OSError, TypeError, ValueError):
+                                        basket_result = {"status": "NO_EVIDENCE"}
                             meta = create_ticket_metadata(
                                 ticket=tk,
                                 hypothesis_id=hypothesis_id,
@@ -1408,6 +1506,15 @@ def main() -> None:
                                 session=session,
                                 information_id=information_id,
                                 symbol=sym,
+                                basket_id=basket_result.get("basket_id"),
+                                trigger_id=str(information_id) if basket_result.get("status") == "PERSISTED" else None,
+                                clip_sequence=1 if basket_result.get("status") == "PERSISTED" else None,
+                                entry_geometry={"entry_price": entry_price, "stop_loss": stop_loss}
+                                if basket_result.get("status") == "PERSISTED" else None,
+                                initial_risk=float(basket_result["initial_risk_usd"])
+                                if basket_result.get("status") == "PERSISTED" else None,
+                                cost_evidence={"spread_price": max(0.0, float(q.ask) - float(q.bid))}
+                                if basket_result.get("status") == "PERSISTED" else None,
                             )
                             ticket_metadata_store.add(meta)
                             firehose_turnover.record_open(
