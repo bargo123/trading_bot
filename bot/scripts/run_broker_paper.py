@@ -587,10 +587,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Aegis broker-engine paper runner")
     parser.add_argument("--config", default=str(ROOT / "config_ib_paper_eurusd.yaml"))
     parser.add_argument("--once", action="store_true")
+    parser.add_argument(
+        "--video-style",
+        action="store_true",
+        help="enable the shared universal video-style Firehose candidate policy",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     cfg = load_config(args.config)
+    video_style_mode = bool(args.video_style)
     engine_name = str(cfg.get("engine", "")).lower()
     if engine_name == "mt5":
         from aegis.paper_control import paper_execution_enabled
@@ -725,6 +731,8 @@ def main() -> None:
             qty,
             ",".join(symbols),
         )
+        if video_style_mode:
+            logger.info("[VIDEO-STYLE FIREHOSE] ACTIVE across %d eligible symbols", len(symbols))
         append_journal(
             journal,
             {
@@ -1137,6 +1145,7 @@ def main() -> None:
                     actual_ask=float(q.ask),
                     quote_buffer=quote_buffer,
                     now_ts=now_ts,
+                    video_style=video_style_mode,
                 )
                 brain_decision = decision
                 _book_logic = decision.journal.get("book_logic") or {}

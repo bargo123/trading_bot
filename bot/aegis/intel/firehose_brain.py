@@ -38,6 +38,12 @@ from aegis.intel.trade_economics import (
     TradeEconomics,
     evaluate_trade_economics,
 )
+from aegis.research.video_style_paper import (
+    VideoStyleConfig,
+    VideoStyleSignal,
+    video_style_geometry,
+    video_style_signal,
+)
 
 
 @dataclass
@@ -248,6 +254,48 @@ def _geometry(side: str, structure: Mapping[str, Any], pip: float) -> tuple[floa
             return None, None
         return float(resistance) + pip, None if support is None else float(support)
     return None, None
+
+
+def video_style_micro_candidate(
+    signal: VideoStyleSignal,
+    *,
+    entry_price: float,
+    pip: float,
+    spread_pips: float,
+    cfg: VideoStyleConfig,
+):
+    """Adapt the shared video intent into the existing Firehose gate contract."""
+    from aegis.intel.fast_firehose import FirehoseLane, MicroCandidate, firehose_hypothesis_id
+
+    entry = float(entry_price)
+    stop, target = video_style_geometry(signal, entry_price=entry, cfg=cfg)
+    stop_pips = abs(entry - stop) / max(float(pip), 1e-12)
+    target_pips = abs(target - entry) / max(float(pip), 1e-12)
+    return MicroCandidate(
+        hypothesis_id=firehose_hypothesis_id(
+            family="video_style_breakout",
+            symbol=signal.symbol,
+            side=signal.side,
+            regime="",
+            session="",
+        ),
+        family="video_style_breakout",
+        symbol=signal.symbol,
+        side=signal.side,
+        entry_price=entry,
+        invalidation=stop,
+        target=target,
+        max_hold_s=120,
+        required_regime="",
+        required_session="",
+        spread_pips=float(spread_pips),
+        stop_pips=stop_pips,
+        target_pips=target_pips,
+        risk_usd_min_lot=0.0,
+        lane=FirehoseLane.BROKER_MICRO,
+        mechanism="completed-bar breakout with tight stop and larger target",
+        falsification="negative net expectancy after measured costs",
+    )
 
 
 def _load_strategy(cfg: Mapping[str, Any]) -> ValidatedStrategyModel | None:
@@ -676,6 +724,7 @@ class IntelligentFirehoseBrain:
         market_ctx: Any = None,
         quote_buffer: Any = None,
         now_ts: float | None = None,
+        video_candidate: Any = None,
     ) -> tuple[DemoDecision | None, str | None]:
         """Exploration Firehose gate chain. Returns (fire_decision, skip_reason).
 
@@ -916,6 +965,10 @@ class IntelligentFirehoseBrain:
         if market_ctx is not None:
             ctx = market_ctx
         micro_cands, micro_diagnostics = diagnose_micro_candidates(ctx)
+        if video_candidate is not None:
+            micro_cands.append(video_candidate)
+            micro_diagnostics = dict(micro_diagnostics)
+            micro_diagnostics["video_style_candidate"] = True
         self._last_exploration_micro_diagnostics = {
             "micro_candidate_count": len(micro_cands),
             "micro_diagnostics": micro_diagnostics,
@@ -1334,6 +1387,7 @@ class IntelligentFirehoseBrain:
         actual_ask: float | None = None,
         quote_buffer: Any = None,
         now_ts: float | None = None,
+        video_style: bool = False,
     ) -> DemoDecision:
         clip_qty = float(self.cfg.get("order_quantity", 0.01))
         clip_risk = max(self._risk_budget * float(self.cfg.get("intelligent_risk_fraction", 0.08)) / 5.0, 0.01)
@@ -1341,9 +1395,12 @@ class IntelligentFirehoseBrain:
         self.memory.sync_from_positions(symbol, positions, clip_risk)
         state = build_runtime_state(symbol=symbol, m1=completed_m1)
         m15 = (state.get("structure") or {}).get("M15") or {}
-        setup = str(m15.get("kind") or "scan")
-        side = str(core_side or "").lower()
-        if side not in {"buy", "sell"}:
+        video_signal = None
+        if video_style:
+            video_signal = video_style_signal(completed_m1, symbol=symbol)
+        setup = "video_style_breakout" if video_signal is not None else str(m15.get("kind") or "scan")
+        side = video_signal.side if video_signal is not None else str(core_side or "").lower()
+        if video_signal is None and side not in {"buy", "sell"}:
             close = float(row["close"])
             ema = row.get("ema_20")
             if ema is not None and not pd.isna(ema):
@@ -1358,6 +1415,30 @@ class IntelligentFirehoseBrain:
             symbol,
         )
         invalidation, target = _geometry(side, m15, pip)
+        video_candidate = None
+        if video_signal is not None:
+            video_entry = entry_price
+            if video_entry is None:
+                video_entry = actual_ask if video_signal.side == "buy" else actual_bid
+            if video_entry is None:
+                video_entry = float(row["close"])
+            video_cfg = VideoStyleConfig(
+                risk_per_trade=max(self._exploration_limits.max_risk_per_trade_usd, 0.01),
+                max_hold_bars=0,
+            )
+            invalidation, target = video_style_geometry(
+                video_signal, entry_price=float(video_entry), cfg=video_cfg
+            )
+            video_candidate = video_style_micro_candidate(
+                video_signal,
+                entry_price=float(video_entry),
+                pip=float(pip),
+                spread_pips=(
+                    abs(float(spread_price)) / max(float(pip), 1e-12)
+                    if spread_price is not None else 0.0
+                ),
+                cfg=video_cfg,
+            )
         signature = runtime_signature(state, side=side, setup=setup)
         measured_spread = self._measured_spread_limit(
             symbol, str(signature.get("session") or "")
@@ -1651,6 +1732,7 @@ class IntelligentFirehoseBrain:
                 actual_ask=actual_ask,
                 quote_buffer=quote_buffer,
                 now_ts=now_ts,
+                video_candidate=video_candidate,
             )
             if exp_decision is not None:
                 # Explicit exploration classification (audited fix, defect 6).

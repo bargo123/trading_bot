@@ -13,6 +13,7 @@ tests/test_execution_audit.py.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Mapping, Sequence
 
 #: MT5 retcodes that mean the order was PLACED but NOT filled (pending order).
@@ -176,6 +177,12 @@ class FireLatency:
     request_ts: float = 0.0
     response_ts: float = 0.0
     confirmed_ts: float = 0.0
+
+    def __post_init__(self) -> None:
+        # Broker Quote.time is a timezone-aware datetime; latency arithmetic
+        # and serialization use epoch seconds throughout this module.
+        if isinstance(self.quote_ts, datetime):
+            self.quote_ts = float(self.quote_ts.timestamp())
 
     def decision_to_request_ms(self) -> float | None:
         if self.decision_ts and self.request_ts:

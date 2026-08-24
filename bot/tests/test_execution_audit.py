@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -192,3 +193,11 @@ def test_fire_latency_chain():
     assert d["latency_decision_to_confirmed_ms"] == 4000.0
     empty = FireLatency()
     assert empty.decision_to_request_ms() is None
+
+
+def test_fire_latency_normalizes_broker_datetime_quote_timestamp():
+    quote_time = datetime(2026, 8, 25, 1, 44, tzinfo=timezone.utc)
+    latency = FireLatency(decision_ts=1000.0, quote_ts=quote_time)
+
+    assert latency.quote_ts == quote_time.timestamp()
+    assert latency.as_dict()["quote_ts"] == round(quote_time.timestamp(), 3)

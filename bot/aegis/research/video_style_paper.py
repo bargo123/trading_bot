@@ -37,6 +37,91 @@ class VideoStyleConfig:
 
 
 @dataclass(frozen=True)
+class VideoStyleSignal:
+    """Completed-bar breakout intent shared by research and runtime Firehose."""
+
+    symbol: str
+    side: str
+    signal_time: Any
+    breakout_price: float
+    risk_distance: float
+
+
+def video_style_signal(
+    bars: pd.DataFrame,
+    *,
+    symbol: str,
+) -> VideoStyleSignal | None:
+    """Return a next-bar breakout signal without looking into the entry bar."""
+    symbol = str(symbol or "").strip().upper()
+    if not symbol:
+        raise ValueError("symbol must not be empty")
+    frame = _normalise_bars(symbol, bars)
+    if len(frame) < 2:
+        return None
+    prior = frame.iloc[-2]
+    latest = frame.iloc[-1]
+    latest_close = float(latest["close"])
+    prior_high = float(prior["high"])
+    prior_low = float(prior["low"])
+    if latest_close > prior_high:
+        side = "buy"
+    elif latest_close < prior_low:
+        side = "sell"
+    else:
+        return None
+    risk_distance = float(latest["high"]) - float(latest["low"])
+    if risk_distance <= 0:
+        return None
+    return VideoStyleSignal(
+        symbol=symbol,
+        side=side,
+        signal_time=latest["time"],
+        breakout_price=latest_close,
+        risk_distance=risk_distance,
+    )
+
+
+def video_style_geometry(
+    signal: VideoStyleSignal,
+    *,
+    entry_price: float,
+    cfg: VideoStyleConfig,
+) -> tuple[float, float]:
+    """Build the tight stop / larger target geometry used by both paths."""
+    entry = float(entry_price)
+    stop_distance = float(cfg.stop_r) * float(signal.risk_distance)
+    direction = 1.0 if signal.side == "buy" else -1.0
+    stop = entry - direction * stop_distance
+    target = entry + direction * float(cfg.reward_to_risk) * stop_distance
+    return stop, target
+
+
+def video_style_scale_allowed(
+    *,
+    side: str,
+    last_entry_price: float,
+    current_price: float,
+    stop_distance: float,
+    unrealized_pnl: float,
+    current_layers: int,
+    max_layers: int,
+    scale_after_r: float,
+) -> bool:
+    """Allow a same-thesis clip only after profitable favorable movement."""
+    if current_layers < 1 or current_layers >= int(max_layers):
+        return False
+    if float(unrealized_pnl) < 0 or float(stop_distance) <= 0:
+        return False
+    move = float(current_price) - float(last_entry_price)
+    if str(side).lower() == "sell":
+        move = -move
+    elif str(side).lower() != "buy":
+        return False
+    return move >= float(scale_after_r) * float(stop_distance)
+
+
+@dataclass(frozen=True)
 class PaperTrade:
     symbol: str
     side: str
@@ -157,18 +242,11 @@ def _symbol_result(
 
     for i in range(2, len(bars)):
         row = bars.iloc[i]
-        prev = bars.iloc[i - 1]
-        prior = bars.iloc[i - 2]
 
         if not layers and pending_entry is None:
-            signal_side: str | None = None
-            if float(prev["close"]) > float(prior["high"]):
-                signal_side = "buy"
-            elif float(prev["close"]) < float(prior["low"]):
-                signal_side = "sell"
-            if signal_side is not None:
-                risk_distance = max(float(prev["high"]) - float(prev["low"]), 1e-12)
-                pending_entry = (signal_side, risk_distance, prev["time"])
+            signal = video_style_signal(bars.iloc[:i], symbol=symbol)
+            if signal is not None:
+                pending_entry = (signal.side, signal.risk_distance, signal.signal_time)
 
         if pending_entry is not None and not layers:
             side, risk_distance, signal_time = pending_entry
@@ -196,13 +274,17 @@ def _symbol_result(
 
         if layers:
             first = layers[0]
-            stop_distance = cfg.stop_r * first.risk_distance
-            stop = first.entry_price - stop_distance if first.side == "buy" else first.entry_price + stop_distance
-            target = (
-                first.entry_price + cfg.reward_to_risk * stop_distance
-                if first.side == "buy"
-                else first.entry_price - cfg.reward_to_risk * stop_distance
+            position_signal = VideoStyleSignal(
+                symbol=symbol,
+                side=first.side,
+                signal_time=first.entry_time,
+                breakout_price=first.entry_price,
+                risk_distance=first.risk_distance,
             )
+            stop, target = video_style_geometry(
+                position_signal, entry_price=first.entry_price, cfg=cfg
+            )
+            stop_distance = abs(first.entry_price - stop)
             low, high = float(row["low"]), float(row["high"])
             exit_price: float | None = None
             reason: str | None = None
@@ -242,12 +324,19 @@ def _symbol_result(
                 for layer in layers
             )
             last_entry = layers[-1].entry_price
-            favorable = (
-                float(row["close"]) >= last_entry + cfg.scale_after_r * stop_distance
-                if first.side == "buy"
-                else float(row["close"]) <= last_entry - cfg.scale_after_r * stop_distance
-            )
-            if len(layers) < cfg.max_layers and unrealized >= 0.0 and favorable and i < len(bars) - 1:
+            if (
+                i < len(bars) - 1
+                and video_style_scale_allowed(
+                    side=first.side,
+                    last_entry_price=last_entry,
+                    current_price=float(row["close"]),
+                    stop_distance=stop_distance,
+                    unrealized_pnl=unrealized,
+                    current_layers=len(layers),
+                    max_layers=cfg.max_layers,
+                    scale_after_r=cfg.scale_after_r,
+                )
+            ):
                 pending_add = True
             continue
 
