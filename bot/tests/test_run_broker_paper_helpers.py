@@ -52,11 +52,11 @@ def test_risk_halt_records_one_terminal_funnel_row_without_order_intent():
 
 def test_merge_firehose_funnel_counts_preserves_observed_halted_scans():
     merged = merge_firehose_funnel_counts(
-        {"SCANS": 0, "RISK_REJECT": 0, "FIRES": 2},
+        {"SCANS": 0, "scans": 7, "RISK_REJECT": 0, "FIRES": 2},
         {"SCANS": 3, "RISK_REJECT": 3},
     )
 
-    assert merged == {"SCANS": 3, "RISK_REJECT": 3, "FIRES": 2}
+    assert merged == {"SCANS": 7, "RISK_REJECT": 3, "FIRES": 2}
 
 
 def test_order_margin_for_send_uses_broker_native_calculator_for_cross_currency_pair():

@@ -258,6 +258,15 @@ def merge_firehose_funnel_counts(
     observed: dict[str, object] | None,
 ) -> dict[str, int]:
     """Merge cumulative runner observations without decreasing brain counts."""
+    stage_aliases = {
+        stage.lower(): stage
+        for stage in (
+            "SCANS", "MICRO_CANDIDATES", "BOOK_SUPPORTED", "VALIDATED_MATCH",
+            "EXPLORATION_ELIGIBLE", "SPREAD_REJECT", "ECONOMICS_REJECT",
+            "GEOMETRY_REJECT", "RISK_REJECT", "STALE_REJECT", "OTHER_REJECT",
+            "FIRES", "FILLS",
+        )
+    }
     merged: dict[str, int] = {}
     for source in (base or {}, observed or {}):
         for stage, value in source.items():
@@ -265,7 +274,8 @@ def merge_firehose_funnel_counts(
                 count = max(0, int(value or 0))
             except (TypeError, ValueError):
                 continue
-            merged[str(stage)] = max(merged.get(str(stage), 0), count)
+            key = stage_aliases.get(str(stage).lower(), str(stage))
+            merged[key] = max(merged.get(key, 0), count)
     return merged
 
 

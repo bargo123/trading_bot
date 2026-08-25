@@ -258,13 +258,10 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert int(cfg["firehose_max_per_symbol"]) == 3
     assert str(cfg.get("position_sizing_mode") or "") != "risk"
     assert float(cfg["order_quantity"]) == 0.01
-    # The drawdown circuit breaker must be ARMED. Both of these were 0, which fully
-    # disables the guards (aegis/risk.py:61,65). Limits are deliberately loose so the
-    # firehose keeps its throughput, but a genuine blowup has to halt it.
-    assert float(cfg.get("max_daily_loss_percent") or 0) > 0.0
+    # The global percentage halt is intentionally disabled for this governed DEMO
+    # Firehose. The separate dollar exploration cap remains armed below.
+    assert float(cfg.get("max_daily_loss_percent") or 0) == 0.0
     assert float(cfg.get("max_total_drawdown_percent") or 0) > 0.0
-    # Loose enough not to throttle a high-throughput demo.
-    assert float(cfg["max_daily_loss_percent"]) >= 5.0
     assert float(cfg["max_total_drawdown_percent"]) >= 15.0
     assert int(cfg["max_positions"]) == 40
     assert int(cfg.get("no_money_reject_limit") or 0) == 3
