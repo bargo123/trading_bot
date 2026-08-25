@@ -258,9 +258,9 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert int(cfg["firehose_max_per_symbol"]) == 3
     assert str(cfg.get("position_sizing_mode") or "") != "risk"
     assert float(cfg["order_quantity"]) == 0.01
-    # The global percentage halt is intentionally disabled for this governed DEMO
-    # Firehose. The separate dollar exploration cap remains armed below.
-    assert float(cfg.get("max_daily_loss_percent") or 0) == 3.0
+    # Both global and exploration daily halts are intentionally disabled for
+    # this operator-approved MT5 DEMO environment; per-trade controls remain.
+    assert float(cfg.get("max_daily_loss_percent") or 0) == 0.0
     assert float(cfg.get("max_total_drawdown_percent") or 0) > 0.0
     assert float(cfg["max_total_drawdown_percent"]) >= 15.0
     assert int(cfg["max_positions"]) == 40
@@ -279,7 +279,7 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert cfg.get("intelligent_exploration_enabled") is True
     assert int(cfg["exploration_max_positions"]) == 2
     assert int(cfg["exploration_max_positions_per_symbol"]) == 1
-    assert float(cfg["exploration_max_daily_loss_usd"]) == 1.0
+    assert float(cfg["exploration_max_daily_loss_usd"]) == 0.0
     assert float(cfg["exploration_max_risk_per_trade_usd"]) == 0.15
     assert int(cfg["exploration_max_trades_per_hypothesis"]) == 5
     assert int(cfg["exploration_cooldown_after_failure_s"]) == 1800
