@@ -18,7 +18,7 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 import pandas as pd
 
-from aegis.research.short_horizon import DEFAULT_HORIZONS_S
+from aegis.research.short_horizon import DEFAULT_HORIZONS_S, symbol_features
 from aegis.research.registry import DuplicateExperimentError, ExperimentRegistry
 from aegis.research_factory.evaluation import record_outcome
 from aegis.research_factory.ml_pipeline import MLPipeline, ModelConfig
@@ -184,6 +184,8 @@ def _feature_frame(quotes: pd.DataFrame, symbol: str) -> pd.DataFrame:
         "hour_utc": frame["time"].dt.hour.to_numpy(dtype=float),
         "dow_utc": frame["time"].dt.dayofweek.to_numpy(dtype=float),
     }
+    for name, value in symbol_features(symbol).items():
+        values[name] = np.full(len(frame), value, dtype=float)
     spread_series = pd.Series(spread)
     values["spread_percentile"] = (
         spread_series.rolling(60, min_periods=2).rank(pct=True).fillna(1.0).to_numpy(dtype=float)

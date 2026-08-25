@@ -13,6 +13,7 @@ from aegis.research.short_horizon_artifact import (
     chronological_slices,
     record_artifact_outcome,
 )
+from aegis.research.short_horizon import point_in_time_features, symbol_features
 
 
 def _positive_metrics(mean: float) -> dict[str, float | int]:
@@ -133,6 +134,16 @@ def test_short_horizon_features_do_not_read_future_quotes():
     left = first[first["time"] < pd.Timestamp("2026-01-01T00:02:00Z")][columns].reset_index(drop=True)
     right = second[second["time"] < pd.Timestamp("2026-01-01T00:02:00Z")][columns].reset_index(drop=True)
     pd.testing.assert_frame_equal(left, right)
+
+
+def test_training_and_runtime_share_symbol_encoding():
+    quotes = _quotes()
+    training = _feature_frame(quotes, "EURUSD").iloc[-1]
+    runtime = point_in_time_features(quotes, at=quotes["time"].iloc[-1], symbol="EURUSD")
+
+    for key, value in symbol_features("EURUSD").items():
+        assert training[key] == value
+        assert runtime[key] == value
 
 
 def test_training_frame_has_matured_both_side_horizon_rows():

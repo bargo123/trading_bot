@@ -9,6 +9,7 @@ from aegis.research.short_horizon import (
     build_short_horizon_labels,
     evaluate_short_horizon_predictions,
     point_in_time_features,
+    symbol_features,
 )
 
 
@@ -61,6 +62,24 @@ def test_features_are_point_in_time_and_include_microstructure():
     changed = quotes.copy()
     changed.loc[5:, ["bid", "ask"]] += 100.0
     assert point_in_time_features(changed, at=at, symbol="EURUSD") == features
+
+
+def test_symbol_features_are_stable_and_distinguish_symbols():
+    eurusd = symbol_features("eurusd")
+    eurusd_again = symbol_features("EURUSD")
+    xauusd = symbol_features("XAUUSD")
+
+    assert eurusd == eurusd_again
+    assert sum(eurusd.values()) == 1.0
+    assert sum(xauusd.values()) == 1.0
+    assert eurusd != xauusd
+
+
+def test_runtime_features_include_shared_symbol_encoding():
+    features = point_in_time_features(_quotes(), at=_quotes().loc[4, "time"], symbol="EURUSD")
+
+    encoded = {key: value for key, value in features.items() if key.startswith("symbol_bucket_")}
+    assert encoded == symbol_features("EURUSD")
 
 
 def test_features_reject_invalid_or_future_only_context():

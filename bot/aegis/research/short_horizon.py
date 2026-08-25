@@ -8,6 +8,7 @@ the requested timestamp.
 from __future__ import annotations
 
 from collections.abc import Sequence
+import hashlib
 from typing import Any
 
 import numpy as np
@@ -17,6 +18,7 @@ from aegis.research.dataset import assert_no_lookahead
 
 
 DEFAULT_HORIZONS_S = (3, 5, 8, 10, 15, 20, 30, 45)
+SYMBOL_FEATURE_BUCKETS = 32
 SHORT_HORIZON_LABEL_COLUMNS = (
     "entry_time",
     "side",
@@ -31,6 +33,22 @@ SHORT_HORIZON_LABEL_COLUMNS = (
     "time_to_profit_s",
     "time_to_failure_s",
 )
+
+
+def symbol_features(symbol: str | None) -> dict[str, float]:
+    """Return a stable one-hot identity encoding for a market symbol.
+
+    The digest avoids Python's process-randomized ``hash()`` so research and
+    runtime rows use the same representation across processes.  Empty symbols
+    remain all-zero and therefore cannot create synthetic identity evidence.
+    """
+    features = {f"symbol_bucket_{index:02d}": 0.0 for index in range(SYMBOL_FEATURE_BUCKETS)}
+    normalized = str(symbol or "").strip().upper()
+    if not normalized:
+        return features
+    bucket = int.from_bytes(hashlib.sha256(normalized.encode("utf-8")).digest()[:4], "big")
+    features[f"symbol_bucket_{bucket % SYMBOL_FEATURE_BUCKETS:02d}"] = 1.0
+    return features
 
 
 def _normalise_quotes(quotes: pd.DataFrame) -> pd.DataFrame:
@@ -324,6 +342,7 @@ def point_in_time_features(
         "dow_utc": float(target.dayofweek),
         "session": _session_name(target.hour),
     }
+    features.update(symbol_features(symbol_value))
     assert_no_lookahead(features)
     return features
 
