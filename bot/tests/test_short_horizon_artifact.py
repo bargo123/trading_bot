@@ -6,10 +6,21 @@ import pandas as pd
 from aegis.research.registry import ExperimentRegistry
 from aegis.research.short_horizon_artifact import (
     _feature_frame,
+    _threshold_candidates,
     build_quote_training_frame,
     chronological_slices,
     record_artifact_outcome,
 )
+
+
+def test_threshold_candidates_are_derived_from_validation_probabilities():
+    probabilities = np.array([0.01, 0.02, 0.08, 0.12, 0.18, 0.27, 0.41])
+
+    candidates = _threshold_candidates(probabilities)
+
+    assert 0.12 in candidates
+    assert max(candidates) == 0.41
+    assert any(candidate < 0.5 for candidate in candidates)
 
 
 def _quotes(n: int = 240) -> pd.DataFrame:

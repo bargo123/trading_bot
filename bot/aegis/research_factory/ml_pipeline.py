@@ -469,6 +469,7 @@ class MLPipeline:
         min_models: int = 2,
         min_model_agreement: float = 0.6,
         max_uncertainty: float = 0.2,
+        include_model_probabilities: bool = False,
     ) -> Dict[str, Any]:
         """Return a validation-weighted ensemble with a fail-closed gate.
 
@@ -537,7 +538,7 @@ class MLPipeline:
             reason = np.full(n_rows, reason_value, dtype=object)
             calibration_status = "not_calibrated" if not calibrated else "insufficient_models"
 
-        return {
+        result = {
             "probability": np.asarray(probability, dtype=float),
             "decision": (np.asarray(probability) >= float(threshold)) & ~abstain,
             "abstain": np.asarray(abstain, dtype=bool),
@@ -548,3 +549,6 @@ class MLPipeline:
             "model_count": len(self.models),
             "calibration_status": calibration_status,
         }
+        if include_model_probabilities:
+            result["model_probabilities"] = np.asarray(matrix, dtype=float)
+        return result

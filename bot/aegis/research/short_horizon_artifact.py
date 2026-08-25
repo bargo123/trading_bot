@@ -326,6 +326,51 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
     }
 
 
+def _threshold_candidates(probabilities: np.ndarray) -> np.ndarray:
+    """Return validation-derived calibrated thresholds, not arbitrary priors."""
+    values = np.asarray(probabilities, dtype=float)
+    values = np.unique(values[np.isfinite(values)])
+    values = values[(values > 0.0) & (values < 1.0)]
+    if not len(values):
+        return np.asarray([0.5], dtype=float)
+    # Exact validation probabilities are affordable for normal slices.  For
+    # unusually large slices, quantiles retain the selection-rate frontier
+    # without evaluating a threshold for every row.
+    if len(values) > 256:
+        values = np.unique(np.quantile(values, np.linspace(0.0, 1.0, 257)))
+    return values.astype(float, copy=False)
+
+
+def _threshold_prediction(
+    base_prediction: Mapping[str, Any],
+    *,
+    threshold: float,
+    min_model_agreement: float,
+    max_uncertainty: float,
+) -> dict[str, Any]:
+    """Apply a new threshold to cached model probabilities without refitting."""
+    matrix = np.asarray(base_prediction["model_probabilities"], dtype=float)
+    agreement = np.maximum(
+        np.mean(matrix >= float(threshold), axis=0),
+        np.mean(matrix < float(threshold), axis=0),
+    )
+    uncertainty = np.asarray(base_prediction["uncertainty"], dtype=float)
+    abstain = (agreement < float(min_model_agreement)) | (
+        uncertainty > float(max_uncertainty)
+    )
+    result = dict(base_prediction)
+    result.update(
+        {
+            "decision": (np.asarray(base_prediction["probability"]) >= float(threshold))
+            & ~abstain,
+            "abstain": abstain,
+            "abstain_reason": np.where(abstain, "ensemble_uncertain", "ensemble_eligible"),
+            "model_agreement": agreement,
+        }
+    )
+    return result
+
+
 def train_and_publish(
     frame: pd.DataFrame,
     output_path: Path,
@@ -365,10 +410,24 @@ def train_and_publish(
 
     # Select the threshold only from chronological validation rows.  The
     # objective is positive terminal economics, with precision as tie-breaker.
+    validation_prediction = pipeline.get_calibrated_ensemble_prediction(
+        _model_frame(slices.validation), threshold=0.5, min_models=2,
+        min_model_agreement=0.6, max_uncertainty=1.0,
+        include_model_probabilities=True,
+    )
     candidates: list[tuple[float, dict[str, Any]]] = []
-    for threshold in np.arange(0.50, 0.951, 0.025):
-        metrics = evaluate(slices.validation, threshold=float(threshold), max_uncertainty=1.0)
-        if int(metrics["selected"] or 0) >= max(10, int(len(slices.validation) * 0.01)):
+    min_selected = max(10, int(len(slices.validation) * 0.01))
+    for threshold in _threshold_candidates(validation_prediction["probability"]):
+        metrics = _metrics(
+            _threshold_prediction(
+                validation_prediction,
+                threshold=float(threshold),
+                min_model_agreement=0.6,
+                max_uncertainty=1.0,
+            ),
+            slices.validation,
+        )
+        if int(metrics["selected"] or 0) >= min_selected:
             candidates.append((float(threshold), metrics))
     if candidates:
         threshold, validation_metrics = max(
