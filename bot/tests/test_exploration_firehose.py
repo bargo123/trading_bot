@@ -734,6 +734,76 @@ def test_undercovered_state_reaches_exploration_without_legacy_geometry(tmp_path
     assert decision.action == "fire"
 
 
+def test_short_horizon_abstention_still_reaches_bounded_exploration(tmp_path, monkeypatch):
+    """Uncertainty may classify exploration, but must not bypass its gates."""
+    from aegis.intel import firehose_brain as fb
+    from aegis.intel.firehose_brain import DemoDecision, IntelligentFirehoseBrain
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(
+        json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1", "records": []}),
+        encoding="utf-8",
+    )
+    brain = IntelligentFirehoseBrain({
+        "analogue_index_path": str(index),
+        "intelligent_gate_validated_states": True,
+        "validated_states_path": str(tmp_path / "empty_states.json"),
+        "intelligent_firehose_bootstrap": True,
+        "intelligent_exploration_enabled": True,
+        "intelligent_min_analogues": 20,
+        "intelligent_min_similarity": 0.5,
+        "intelligent_risk_budget_usd": 100.0,
+        "order_quantity": 0.01,
+        "max_positions": 40,
+        "exploration_max_positions": 2,
+        "exploration_max_positions_per_symbol": 1,
+        "exploration_max_risk_per_trade_usd": 0.15,
+    })
+    monkeypatch.setattr(
+        fb,
+        "build_runtime_state",
+        lambda **kwargs: {
+            "structure": {"M15": {"kind": "none", "support": None, "resistance": None}},
+            "session": "asia",
+            "regime": {"label": "range"},
+            "multi_timeframe": {"H1": {"direction": "up"}, "M5": {"direction": "down"}},
+            "volatility": {"phase": "stable"},
+        },
+    )
+    monkeypatch.setattr(
+        fb,
+        "runtime_signature",
+        lambda state, side, setup: {
+            "symbol": "EURUSD", "side": side, "setup": setup,
+            "regime": "range", "structure": "none", "session": "asia",
+        },
+    )
+    invoked = []
+
+    def explore(**kwargs):
+        invoked.append(kwargs)
+        return DemoDecision("fire", "bounded_exploration", side="buy", sl=1.0, tp=1.1, quantity=0.01), None
+
+    monkeypatch.setattr(brain, "_maybe_explore", explore)
+    frame = _exploration_frame()
+    row = frame.iloc[-1].copy()
+    row["time"] = frame["time"].iloc[-1]
+    decision = brain.evaluate(
+        symbol="EURUSD", row=row, completed_m1=frame.iloc[:-1], positions=[], equity=100.0,
+        pip=0.0001, core_side="buy", spread_price=0.0001,
+        entry_price=float(row["close"]), actual_bid=float(row["close"]) - 0.00005,
+        actual_ask=float(row["close"]) + 0.00005,
+        short_horizon_prediction={
+            "calibration_status": "calibrated", "abstain": True,
+            "abstain_reason": "uncertainty_high", "uncertainty": 0.45,
+            "model_agreement": 2 / 3,
+        },
+    )
+
+    assert invoked, "short-horizon abstention must classify the candidate for exploration"
+    assert decision.action == "fire"
+
+
 def test_exploration_journal_records_micro_rejection_reason(tmp_path, monkeypatch):
     from aegis.intel import firehose_brain as fb
     from aegis.intel.firehose_brain import IntelligentFirehoseBrain

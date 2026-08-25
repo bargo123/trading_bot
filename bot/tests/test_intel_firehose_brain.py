@@ -241,7 +241,7 @@ def test_video_candidate_is_recorded_when_short_horizon_abstains(tmp_path):
     index.write_text(json.dumps({"schema": "analogue_index.v1", "records": []}), encoding="utf-8")
     brain = IntelligentFirehoseBrain({
         "analogue_index_path": str(index),
-        "intelligent_exploration_enabled": True,
+        "intelligent_exploration_enabled": False,
         "intelligent_min_analogues": 20,
         "order_quantity": 0.01,
     })

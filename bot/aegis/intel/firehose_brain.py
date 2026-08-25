@@ -1820,6 +1820,7 @@ class IntelligentFirehoseBrain:
             "no_validated_strategy_model",      # INSUFFICIENT_EVIDENCE
             "state_not_in_validated_set",       # UNDERCOVERED_STATE
             "unacceptable_uncertainty",         # UNCERTAIN_PLAUSIBLE_MECHANISM
+            "short_horizon_abstain",            # UNCERTAIN_PLAUSIBLE_MECHANISM
             "insufficient_analogue_evidence",   # INSUFFICIENT_EVIDENCE
             "shadow:not_trading_stage",         # research-stage demand
         )
@@ -1880,6 +1881,7 @@ class IntelligentFirehoseBrain:
                     "insufficient_analogue_evidence": "INSUFFICIENT_EVIDENCE",
                     "state_not_in_validated_set": "UNDERCOVERED_STATE",
                     "unacceptable_uncertainty": "UNCERTAIN_PLAUSIBLE_MECHANISM",
+                    "short_horizon_abstain": "UNCERTAIN_PLAUSIBLE_MECHANISM",
                 }
                 _base = str(fire.reason or "").split(":", 1)[0]
                 _trigger = _trigger_map.get(
