@@ -388,6 +388,83 @@ def shadow_model_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return result.replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
 
+def fast_winner_feature_discovery(
+    frame: pd.DataFrame,
+    *,
+    horizons: Sequence[int] = (1, 2, 3, 5, 8, 10),
+    top_n: int = 20,
+) -> dict[str, Any]:
+    """Describe point-in-time feature differences on sealed OOS outcomes.
+
+    This is an evidence report only: future outcome columns define the groups
+    after the replay, while the returned features come exclusively from the
+    pre-entry model frame and are never fed back into training or execution.
+    """
+    if frame.empty:
+        raise ValueError("fast-winner discovery requires observations")
+    observations = frame.reset_index(drop=True)
+    features = shadow_model_frame(observations).drop(columns=["target"]).reset_index(drop=True)
+    captured = pd.to_numeric(observations.get("captured_exit_net_pnl"), errors="coerce").fillna(0.0)
+    groups: dict[str, np.ndarray] = {}
+    for horizon in horizons:
+        green_column = f"green_within_{int(horizon)}s"
+        green = observations.get(green_column, pd.Series(False, index=observations.index)).fillna(False).astype(bool)
+        groups[f"fast_clean_winner_{int(horizon)}s"] = (green & (captured > 0.0)).to_numpy()
+    first_green = observations.get("first_green", pd.Series(False, index=observations.index)).fillna(False).astype(bool)
+    default_fast = next(iter(groups.values()), np.zeros(len(observations), dtype=bool))
+    groups["fast_clean_winner"] = groups.get("fast_clean_winner_5s", default_fast)
+    groups["slow_or_losing"] = ~groups["fast_clean_winner"]
+    groups["never_green"] = (~first_green).to_numpy()
+    groups["tail_loss"] = observations.get("tail_loss", pd.Series(False, index=observations.index)).fillna(False).astype(bool).to_numpy()
+    groups["immediate_adverse_move"] = observations.get(
+        "immediate_adverse_move", pd.Series(False, index=observations.index)
+    ).fillna(False).astype(bool).to_numpy()
+    groups["winner_giveback"] = observations.get(
+        "winner_giveback", pd.Series(False, index=observations.index)
+    ).fillna(False).astype(bool).to_numpy()
+
+    feature_arrays = {
+        str(column): pd.to_numeric(features[column], errors="coerce").to_numpy(dtype=float)
+        for column in features.columns
+    }
+    horizons_report: dict[str, Any] = {}
+    for horizon in horizons:
+        fast = groups[f"fast_clean_winner_{int(horizon)}s"]
+        comparison = groups["slow_or_losing"]
+        rows: list[dict[str, Any]] = []
+        for feature, values in feature_arrays.items():
+            fast_values = values[fast & np.isfinite(values)]
+            comparison_values = values[comparison & np.isfinite(values)]
+            if not len(fast_values) or not len(comparison_values):
+                continue
+            fast_std = float(np.std(fast_values))
+            comparison_std = float(np.std(comparison_values))
+            pooled_std = float(np.sqrt((fast_std**2 + comparison_std**2) / 2.0))
+            difference = float(np.mean(fast_values) - np.mean(comparison_values))
+            rows.append(
+                {
+                    "feature": feature,
+                    "comparison": "slow_or_losing",
+                    "fast_mean": float(np.mean(fast_values)),
+                    "comparison_mean": float(np.mean(comparison_values)),
+                    "standardized_difference": difference / pooled_std if pooled_std > 0.0 else difference,
+                }
+            )
+        rows.sort(key=lambda row: abs(row["standardized_difference"]), reverse=True)
+        horizons_report[str(int(horizon))] = {
+            "fast_clean_n": int(fast.sum()),
+            "slow_or_losing_n": int(comparison.sum()),
+            "top_feature_differences": rows[: max(1, int(top_n))],
+        }
+    return {
+        "analysis_scope": "descriptive_sealed_oos",
+        "groups": sorted(groups),
+        "horizons": horizons_report,
+        "features": list(feature_arrays),
+        "note": "Outcome labels are used only to describe sealed OOS groups; no discovered feature authorizes execution.",
+    }
+
+
 def chronological_shadow_slices(frame: pd.DataFrame) -> ShadowSlices:
     if frame.empty or "time" not in frame:
         raise ValueError("shadow frame requires time")

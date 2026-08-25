@@ -21,6 +21,7 @@ from aegis.research.fast_edge_shadow import (  # noqa: E402
     build_shadow_dataset,
     chronological_shadow_slices,
     evaluate_exit_policies,
+    fast_winner_feature_discovery,
     fit_shadow_model_space,
 )
 from aegis.research.registry import ExperimentRegistry  # noqa: E402
@@ -74,6 +75,7 @@ def main() -> None:
         )
     model_report = fit_shadow_model_space(frame, min_samples=20)
     sealed_frame = chronological_shadow_slices(frame).sealed
+    fast_winner_discovery = fast_winner_feature_discovery(sealed_frame)
     exit_policy_comparison = evaluate_exit_policies(sealed_frame, min_samples=20)
     sealed_predictions = model_report.pop("sealed_predictions", None)
     book_queries = (
@@ -187,6 +189,7 @@ def main() -> None:
         },
         "model_space": model_report,
         "multi_outcome_models": model_report["multi_outcome_models"],
+        "fast_winner_feature_discovery": fast_winner_discovery,
         "book_evidence": book_evidence,
         "exit_policy_comparison": exit_policy_comparison[:50],
         "leaderboard_top_50": published_candidates,

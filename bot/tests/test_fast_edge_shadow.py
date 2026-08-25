@@ -10,6 +10,7 @@ from aegis.research.fast_edge_shadow import (
     build_shadow_dataset,
     chronological_shadow_slices,
     evaluate_shadow_leaderboard,
+    fast_winner_feature_discovery,
     replay_executable_path,
     shadow_model_frame,
     fit_shadow_model_space,
@@ -182,6 +183,23 @@ def test_probability_calibration_uses_only_prior_calibration_observations():
     assert method == "isotonic_validation"
     assert np.all((calibrated >= 0.0) & (calibrated <= 1.0))
     assert calibrated[0] < calibrated[1]
+
+
+def test_fast_winner_feature_discovery_compares_oos_groups_without_outcome_features():
+    frame = build_shadow_dataset({"EURUSD": _quotes(320)}, horizons=(1, 5), sample_every_s=2)
+    report = fast_winner_feature_discovery(
+        chronological_shadow_slices(frame).sealed,
+        horizons=(1, 5),
+        top_n=5,
+    )
+    assert report["analysis_scope"] == "descriptive_sealed_oos"
+    assert {"fast_clean_winner", "slow_or_losing", "tail_loss"}.issubset(report["groups"])
+    assert "1" in report["horizons"]
+    assert report["horizons"]["1"]["fast_clean_n"] >= 0
+    assert all(
+        "captured_exit" not in row["feature"] and "green_within" not in row["feature"]
+        for row in report["horizons"]["1"]["top_feature_differences"]
+    )
 
 
 def test_exit_policy_comparison_is_segmented_and_cost_aware():

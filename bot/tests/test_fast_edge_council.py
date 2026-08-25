@@ -19,11 +19,17 @@ def test_council_evidence_stays_bounded_and_valid_json():
         "exit_policy_comparison": [{"symbol": "EURUSD", "noise": "x" * 10000} for _ in range(50)],
         "book_evidence": [{"query": "scalping", "sources": ["x"] * 10000}],
         "multi_outcome_models": {"probability": {"P_GREEN_1S": {"oos_n": 100}}},
+        "fast_winner_feature_discovery": {
+            "analysis_scope": "descriptive_sealed_oos",
+            "horizons": {"1": {"fast_clean_n": 12, "slow_or_losing_n": 88, "top_feature_differences": []}},
+        },
         "model_space": {"promotion_candidates": [{"noise": "x" * 10000}]},
     }
     evidence = _bounded_evidence(report)
     assert len(evidence) <= 6000
-    assert json.loads(evidence)["status"] == "SHADOW_ONLY_NO_POSITIVE_OOS"
+    bounded = json.loads(evidence)
+    assert bounded["status"] == "SHADOW_ONLY_NO_POSITIVE_OOS"
+    assert bounded["fast_winner_feature_discovery"]["analysis_scope"] == "descriptive_sealed_oos"
     assert len(_prompt(report, role="ML CRITIC")) < 8000
 
 

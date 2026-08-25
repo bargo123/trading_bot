@@ -86,6 +86,19 @@ def _bounded_evidence(report: dict, *, candidate_limit: int = 6) -> str:
                     )
                     if key in value
                 }
+    discovery = report.get("fast_winner_feature_discovery") or {}
+    discovery_summary = {
+        "analysis_scope": discovery.get("analysis_scope"),
+        "horizons": {
+            str(horizon): {
+                "fast_clean_n": values.get("fast_clean_n"),
+                "slow_or_losing_n": values.get("slow_or_losing_n"),
+                "top_feature_differences": (values.get("top_feature_differences") or [])[:3],
+            }
+            for horizon, values in (discovery.get("horizons") or {}).items()
+            if isinstance(values, dict)
+        },
+    }
     payload = {
         "status": report.get("EXECUTION_STATUS"),
         "rows": report.get("candidate_rows"),
@@ -107,6 +120,7 @@ def _bounded_evidence(report: dict, *, candidate_limit: int = 6) -> str:
         "top_candidates": candidates,
         "exit_policy_comparison": exit_rows,
         "multi_outcome": outcome_summary,
+        "fast_winner_feature_discovery": discovery_summary,
         "book_evidence": book_rows,
         "promotion_candidates": (model_space.get("promotion_candidates") or [])[:4],
     }
@@ -123,6 +137,7 @@ def _bounded_evidence(report: dict, *, candidate_limit: int = 6) -> str:
             "progress": payload["progress"],
             "top_candidates": candidates[:1],
             "exit_policy_comparison": exit_rows[:1],
+            "fast_winner_feature_discovery": discovery_summary,
         },
         separators=(",", ":"),
         default=str,
