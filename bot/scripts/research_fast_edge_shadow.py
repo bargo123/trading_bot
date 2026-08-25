@@ -142,7 +142,6 @@ def main() -> None:
         "VALIDATION_HASH": model_report["validation_hash"],
         "DECISION_HORIZON": "multi_horizon_shadow_only",
         "candidate_source": "all_quote_entries",
-        "target_definition": "captured_exit_replay",
         "horizons_s": list(SHADOW_HORIZONS_S),
         "symbols": sorted(frame["symbol"].astype(str).str.upper().unique().tolist()),
         "candidate_rows": int(len(frame)),
@@ -180,7 +179,6 @@ def main() -> None:
             default=None,
         ),
         "candidate_sides": sorted(frame["side"].unique().tolist()),
-        "dataset_hash": model_report["dataset_hash"],
         "time_range": [str(frame["time"].min()), str(frame["time"].max())],
         "outcome_counts": {
             str(key): int(value)

@@ -12,7 +12,6 @@
   "VALIDATION_HASH": "fb887e1bc877724f3df173acc4978d2462e31bb5faee9c8602ac0f283cdbfeea",
   "DECISION_HORIZON": "multi_horizon_shadow_only",
   "candidate_source": "all_quote_entries",
-  "target_definition": "captured_exit_replay",
   "horizons_s": [
     1,
     2,
@@ -201,7 +200,6 @@
     "buy",
     "sell"
   ],
-  "dataset_hash": "55b38182c6c4c7ebcd12bb94845a7aa6c4859a593af2f2d165997f620271adc8",
   "time_range": [
     "2026-08-25 15:10:25+00:00",
     "2026-08-25 16:09:41+00:00"

@@ -1,7 +1,7 @@
 {
   "schema": "fast_edge_council_review.v1",
-  "generated_at": "2026-08-25T16:36:57.665905+00:00",
-  "source_report": "bot\\reports\\research\\fast_edge_leaderboard.json",
+  "generated_at": "2026-08-25T16:43:55.699307+00:00",
+  "source_report": "reports\\research\\fast_edge_leaderboard.json",
   "execution_authority": "NONE",
   "hermes_models_configured": [
     "x-preview-f-free",
