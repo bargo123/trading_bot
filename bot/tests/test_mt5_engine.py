@@ -110,8 +110,10 @@ class FakeMT5:
         return SimpleNamespace(trade_allowed=True, connected=True)
 
     def symbol_info(self, name):
-        if str(name).upper() == "EURUSD":
-            return self.symbol
+        if str(name).upper() in {"EURUSD", "USDJPY"}:
+            attrs = vars(self.symbol).copy()
+            attrs["name"] = str(name)
+            return SimpleNamespace(**attrs)
         return None
 
     def symbols_get(self):
@@ -198,6 +200,9 @@ class FakeMT5:
             )
             return FakeResult(retcode=10009, order=ticket, comment="done", price=request.get("price", 0), deal=ticket)
         return FakeResult(retcode=10004, order=0, comment="unsupported", price=0, deal=0)
+
+    def order_calc_margin(self, order_type, symbol, volume, price):
+        return 30.0
 
 
 def _engine(api: FakeMT5, **cfg) -> MT5Engine:
@@ -390,6 +395,14 @@ def test_history_deals_and_orders_readonly():
     assert deals[0]["time_msc"] == 1_699_996_400_000
     assert orders[0]["ticket"] == "8"
     assert api.shutdown_calls == 0
+
+
+def test_order_margin_uses_broker_native_account_currency_calculation():
+    api = FakeMT5()
+    eng = _engine(api)
+    eng.connect()
+
+    assert eng.order_margin("USDJPY", "buy", 0.03, 159.38) == 30.0
 
 
 def test_connect_readonly_live_does_not_shutdown():

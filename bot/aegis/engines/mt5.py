@@ -299,6 +299,28 @@ class MT5Engine(BrokerEngine):
             },
         )
 
+    def order_margin(self, symbol: str, side: str, quantity: float, price: float) -> float:
+        """Use MT5's account-currency margin calculator without submitting an order."""
+        mt5 = self._require()
+        calculator = getattr(mt5, "order_calc_margin", None)
+        if not callable(calculator):
+            raise RuntimeError("MT5 order_calc_margin is unavailable")
+        order_type = int(getattr(mt5, "ORDER_TYPE_BUY", 0)) if side == "buy" else int(
+            getattr(mt5, "ORDER_TYPE_SELL", 1)
+        )
+        value = calculator(
+            order_type,
+            self._resolve_symbol(symbol),
+            float(quantity),
+            float(price),
+        )
+        if value is None:
+            raise RuntimeError(f"MT5 order_calc_margin failed ({self._last_error()})")
+        margin = float(value)
+        if not math.isfinite(margin) or margin < 0.0:
+            raise RuntimeError(f"MT5 order_calc_margin returned invalid value {value!r}")
+        return margin
+
     def _resolve_symbol(self, symbol: str) -> str:
         key = symbol.upper().replace("=X", "").replace("/", "")
         if key in self._resolved:

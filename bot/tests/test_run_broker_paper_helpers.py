@@ -13,6 +13,7 @@ from scripts.run_broker_paper import (
     exploration_order_risk_check,
     firehose_lifecycle_identity,
     normalize_protective_stops,
+    order_margin_for_send,
     persist_confirmed_firehose_basket,
     record_confirmed_firehose_open,
     reconcile_confirmed_firehose_basket_cleanups,
@@ -20,6 +21,21 @@ from scripts.run_broker_paper import (
     remove_confirmed_firehose_basket_then_cleanup,
     video_style_signal_for_scan,
 )
+
+
+def test_order_margin_for_send_uses_broker_native_calculator_for_cross_currency_pair():
+    class _Engine:
+        def order_margin(self, symbol, side, quantity, price):
+            assert (symbol, side, quantity, price) == ("USDJPY", "buy", 0.03, 159.38)
+            return 30.0
+
+    margin, source = order_margin_for_send(
+        _Engine(), symbol="USDJPY", side="buy", quantity=0.03, price=159.38,
+        contract_size=100000.0, leverage=100.0,
+    )
+
+    assert margin == 30.0
+    assert source == "broker_native"
 
 
 def test_exploration_order_risk_check_rejects_stale_quote_size_breach():

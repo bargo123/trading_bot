@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import logging
+import math
 import os
 import sys
 import time
@@ -136,6 +137,36 @@ def exploration_order_risk_check(
             "max_lots": round(max_lots, 8),
         }
     return {"allowed": True, "reason": "ok", "max_lots": round(max_lots, 8)}
+
+
+def order_margin_for_send(
+    eng,
+    *,
+    symbol: str,
+    side: str,
+    quantity: float,
+    price: float,
+    contract_size: float,
+    leverage: float,
+) -> tuple[float, str]:
+    """Return required margin in account currency, preferring MT5's calculator."""
+    native = getattr(eng, "order_margin", None)
+    if callable(native):
+        try:
+            value = float(native(symbol, side, float(quantity), float(price)))
+            if math.isfinite(value) and value >= 0.0:
+                return value, "broker_native"
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+            pass
+    from aegis.intel.send_guard import estimate_margin
+
+    return (
+        estimate_margin(
+            price=float(price), lots=float(quantity),
+            contract_size=float(contract_size), leverage=float(leverage),
+        ),
+        "conservative_formula",
+    )
 
 
 def bars_to_frame(bars) -> pd.DataFrame:
@@ -1767,24 +1798,12 @@ def main() -> None:
                         },
                     )
                     return
-                # Reservation happens HERE (post-guard) so the guard doesn't
-                # see its own decision as a conflict.
-                _thesis_key = str(brain_decision.journal.get("thesis_key") or "")
-                if _thesis_key:
-                    intelligent_brain.memory.exploration_pending.setdefault(
-                        _thesis_key, []).append(time.time())
-                    _mem = intelligent_brain.memory.theses.get(_thesis_key)
-                    if _mem is not None:
-                        _mem.symbol = sym.upper()
-                        _mem.side = brain_decision.side
-                        _mem.setup_family = str(brain_decision.journal.get("setup_family") or "")
             # --- Pre-send refresh (P8): the decision was priced on quote q,
             # fetched before the brain ran. If that quote is now stale, fetch
             # ONE fresh tick and re-validate; never send on stale pricing and
             # never disable stale protection to force trades through.
             from aegis.intel.send_guard import (
                 margin_precheck_ok,
-                estimate_margin,
                 min_lot_ok,
                 needs_quote_refresh,
                 refresh_verdict,
@@ -1892,10 +1911,20 @@ def main() -> None:
                 leverage = 100.0
             if funds is not None:
                 contract = float((spec_pre or {}).get("trade_contract_size", 100000.0) or 100000.0)
-                ref_price = float(getattr(q, "ask", 0.0) or getattr(q, "bid", 0.0) or 0.0)
-                est_margin = estimate_margin(
-                    price=ref_price, lots=float(order_qty),
-                    contract_size=contract, leverage=leverage,
+                ref_price = float(
+                    (q.ask if sig.side == "buy" else q.bid)
+                    or getattr(q, "ask", 0.0)
+                    or getattr(q, "bid", 0.0)
+                    or 0.0
+                )
+                est_margin, margin_source = order_margin_for_send(
+                    eng,
+                    symbol=sym,
+                    side="buy" if sig.side == "buy" else "sell",
+                    quantity=float(order_qty),
+                    price=ref_price,
+                    contract_size=contract,
+                    leverage=leverage,
                 )
                 if not margin_precheck_ok(funds, est_margin):
                     quote_refresh_counts["margin_precheck_skip"] += 1
@@ -1907,10 +1936,23 @@ def main() -> None:
                             "est_margin": round(est_margin, 2),
                             "funds": round(funds, 2),
                             "qty": order_qty,
+                            "source": margin_source,
                             "bar": str(bar_time),
                         },
                     )
                     return
+            # Reserve only after every pre-send guard passes. A rejected
+            # candidate must not consume an exploration slot for 180 seconds.
+            if brain_decision is not None and brain_decision.journal.get("exploration"):
+                _thesis_key = str(brain_decision.journal.get("thesis_key") or "")
+                if _thesis_key:
+                    intelligent_brain.memory.exploration_pending.setdefault(
+                        _thesis_key, []).append(time.time())
+                    _mem = intelligent_brain.memory.theses.get(_thesis_key)
+                    if _mem is not None:
+                        _mem.symbol = sym.upper()
+                        _mem.side = brain_decision.side
+                        _mem.setup_family = str(brain_decision.journal.get("setup_family") or "")
             if brain_decision is not None:
                 append_journal(
                     journal,
