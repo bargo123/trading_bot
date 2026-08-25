@@ -13,7 +13,7 @@ from aegis.research.short_horizon_artifact import (
     chronological_slices,
     record_artifact_outcome,
 )
-from aegis.research.short_horizon import point_in_time_features, symbol_features
+from aegis.research.short_horizon import point_in_time_features, session_features, symbol_features
 
 
 def _positive_metrics(mean: float) -> dict[str, float | int]:
@@ -142,6 +142,9 @@ def test_training_and_runtime_share_symbol_encoding():
     runtime = point_in_time_features(quotes, at=quotes["time"].iloc[-1], symbol="EURUSD")
 
     for key, value in symbol_features("EURUSD").items():
+        assert training[key] == value
+        assert runtime[key] == value
+    for key, value in session_features(0).items():
         assert training[key] == value
         assert runtime[key] == value
 

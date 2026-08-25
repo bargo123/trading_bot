@@ -51,6 +51,17 @@ def symbol_features(symbol: str | None) -> dict[str, float]:
     return features
 
 
+def session_features(hour_utc: int | float) -> dict[str, float]:
+    """Return a numeric one-hot encoding of the point-in-time UTC session."""
+    session = _session_name(int(float(hour_utc)) % 24)
+    return {
+        "session_asia_or_off": 1.0 if session == "asia_or_off" else 0.0,
+        "session_london": 1.0 if session == "london" else 0.0,
+        "session_new_york": 1.0 if session == "new_york" else 0.0,
+        "session_overlap": 1.0 if session == "overlap" else 0.0,
+    }
+
+
 def _normalise_quotes(quotes: pd.DataFrame) -> pd.DataFrame:
     if quotes is None or quotes.empty:
         raise ValueError("quotes must not be empty")
@@ -343,6 +354,7 @@ def point_in_time_features(
         "session": _session_name(target.hour),
     }
     features.update(symbol_features(symbol_value))
+    features.update(session_features(target.hour))
     assert_no_lookahead(features)
     return features
 
