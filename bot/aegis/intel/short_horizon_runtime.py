@@ -72,19 +72,21 @@ def _abstain_reason(
     """Explain an ensemble abstention without relaxing the decision gate."""
     if not bool(prediction.get("abstain", True)):
         return "ensemble_eligible", False
+
+    def scalar(value: Any, default: float) -> float:
+        try:
+            if not isinstance(value, (str, bytes)) and hasattr(value, "__len__"):
+                if len(value) == 1:
+                    value = value[0]
+            return float(value)
+        except (IndexError, TypeError, ValueError):
+            return float(default)
+
     reasons: list[str] = []
-    try:
-        disagreement = float(prediction.get("model_agreement", 0.0)) < float(
-            min_model_agreement
-        )
-    except (TypeError, ValueError):
-        disagreement = True
-    try:
-        uncertain = float(prediction.get("uncertainty", 1.0)) > float(
-            max_uncertainty
-        )
-    except (TypeError, ValueError):
-        uncertain = True
+    disagreement = scalar(prediction.get("model_agreement"), 0.0) < float(
+        min_model_agreement
+    )
+    uncertain = scalar(prediction.get("uncertainty"), 1.0) > float(max_uncertainty)
     if disagreement:
         reasons.append("model_disagreement")
     if uncertain:

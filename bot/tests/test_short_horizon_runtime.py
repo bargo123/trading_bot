@@ -194,3 +194,42 @@ def test_runtime_exposes_precise_abstention_diagnostics(tmp_path: Path):
     assert result is not None
     assert result["abstain_reason"] == "model_disagreement+uncertainty_high"
     assert result["model_disagreement"] is True
+
+
+def test_runtime_diagnostics_handle_vector_model_outputs(tmp_path: Path):
+    class Pipeline:
+        models = [object(), object()]
+
+        def get_calibrated_ensemble_prediction(self, row, **kwargs):
+            return {
+                "probability": [0.8],
+                "decision": [False],
+                "abstain": [True],
+                "model_agreement": [2.0 / 3.0],
+                "uncertainty": [0.8],
+            }
+
+    class Buffer:
+        points = [
+            SimpleNamespace(timestamp=1787659200.0, bid=1.1, ask=1.1002),
+            SimpleNamespace(timestamp=1787659201.0, bid=1.1001, ask=1.1003),
+        ]
+
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+    predictor.pipeline = Pipeline()
+    predictor.status = "shadow_only"
+    predictor.metadata = {
+        "horizons_s": [10],
+        "decision_horizon_s": 10,
+        "min_model_agreement": 0.6,
+        "max_uncertainty": 0.2,
+    }
+    result = predictor.predict(
+        symbol="EURUSD",
+        quote_buffer=SimpleNamespace(buffers={"EURUSD": Buffer()}),
+        now_ts=1787659201.0,
+    )
+
+    assert result is not None
+    assert result["abstain_reason"] == "uncertainty_high"
+    assert result["model_disagreement"] is False
