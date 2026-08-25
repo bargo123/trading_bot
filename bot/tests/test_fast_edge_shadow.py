@@ -17,6 +17,7 @@ from aegis.research.fast_edge_shadow import (
     shadow_model_frame,
     fit_shadow_model_space,
     evaluate_exit_policies,
+    evaluate_spread_vol_gates,
     fit_multi_outcome_models,
     fit_segmented_logistic_models,
 )
@@ -217,6 +218,17 @@ def test_fast_winner_feature_discovery_compares_oos_groups_without_outcome_featu
         "captured_exit" not in row["feature"] and "green_within" not in row["feature"]
         for row in report["horizons"]["1"]["top_feature_differences"]
     )
+
+
+def test_spread_vol_gate_sweep_is_chronological_and_reports_both_oos_slices():
+    frame = build_shadow_dataset({"EURUSD": _quotes(320)}, horizons=(1, 5), sample_every_s=2)
+    rows = evaluate_spread_vol_gates(frame, thresholds=((0.20, 1.50),))
+    assert len(rows) == 1
+    assert rows[0]["execution_authority"] == "NONE"
+    assert rows[0]["test"]["n"] > 0
+    assert rows[0]["sealed"]["n"] > 0
+    assert rows[0]["test"]["selected"] <= rows[0]["test"]["n"]
+    assert "executable_captured_exit_expectancy" in rows[0]["sealed"]
 
 
 def test_exit_policy_comparison_is_segmented_and_cost_aware():

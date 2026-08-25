@@ -27,6 +27,11 @@ from aegis.research.short_horizon_artifact import _feature_frame
 
 SHADOW_HORIZONS_S = (1, 2, 3, 5, 8, 10, 15, 20, 30, 45)
 SHADOW_THRESHOLDS = (0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.925, 0.95, 0.975, 0.99)
+SPREAD_VOL_GATE_THRESHOLDS = tuple(
+    (spread_to_realized, spread_to_micro)
+    for spread_to_realized in (0.05, 0.10, 0.15, 0.20)
+    for spread_to_micro in (0.5, 1.0, 1.5, 2.0)
+)
 SHADOW_EXIT_POLICIES = (
     "captured_exit_replay", "first_meaningful_green", "mfe_protection", "no_progress_3s",
 )
@@ -614,6 +619,43 @@ def _metrics(
         "calibration_ece": _calibration_ece(probability, actual),
         "abstain_rate": float((~selected).mean()) if len(selected) else None,
     }
+
+
+def evaluate_spread_vol_gates(
+    frame: pd.DataFrame,
+    *,
+    thresholds: Sequence[tuple[float, float]] = SPREAD_VOL_GATE_THRESHOLDS,
+) -> list[dict[str, Any]]:
+    """Evaluate ex-ante spread/volatility filters on chronological OOS slices."""
+    required = {"spread_to_realized_vol", "spread_to_micro_vol"}
+    missing = sorted(required.difference(frame.columns))
+    if missing:
+        raise ValueError(f"spread-vol gate requires features: {', '.join(missing)}")
+    slices = chronological_shadow_slices(frame)
+    rows: list[dict[str, Any]] = []
+    for realized_limit, micro_limit in thresholds:
+        def score(part: pd.DataFrame) -> dict[str, Any]:
+            realized = pd.to_numeric(part["spread_to_realized_vol"], errors="coerce")
+            micro = pd.to_numeric(part["spread_to_micro_vol"], errors="coerce")
+            selected = (realized <= float(realized_limit)) & (micro <= float(micro_limit))
+            return _metrics(
+                part,
+                selected.fillna(False).to_numpy(dtype=float),
+                0.5,
+                duration_frame=part,
+            )
+
+        rows.append(
+            {
+                "experiment": "spread_vol_gate_sweep",
+                "spread_to_realized_vol_max": float(realized_limit),
+                "spread_to_micro_vol_max": float(micro_limit),
+                "execution_authority": "NONE",
+                "test": score(slices.test),
+                "sealed": score(slices.sealed),
+            }
+        )
+    return rows
 
 
 def fit_multi_outcome_models(frame: pd.DataFrame) -> dict[str, Any]:

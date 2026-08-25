@@ -99,6 +99,22 @@ def _bounded_evidence(report: dict, *, candidate_limit: int = 6) -> str:
             if isinstance(values, dict)
         },
     }
+    gate_rows = []
+    for item in (report.get("spread_vol_gate_sweep") or [])[:8]:
+        gate_rows.append(
+            {
+                "spread_to_realized_vol_max": item.get("spread_to_realized_vol_max"),
+                "spread_to_micro_vol_max": item.get("spread_to_micro_vol_max"),
+                "test": {
+                    key: (item.get("test") or {}).get(key)
+                    for key in ("selected", "executable_captured_exit_expectancy", "executable_captured_exit_pf")
+                },
+                "sealed": {
+                    key: (item.get("sealed") or {}).get(key)
+                    for key in ("selected", "executable_captured_exit_expectancy", "executable_captured_exit_pf")
+                },
+            }
+        )
     payload = {
         "status": report.get("EXECUTION_STATUS"),
         "rows": report.get("candidate_rows"),
@@ -121,6 +137,7 @@ def _bounded_evidence(report: dict, *, candidate_limit: int = 6) -> str:
         "exit_policy_comparison": exit_rows,
         "multi_outcome": outcome_summary,
         "fast_winner_feature_discovery": discovery_summary,
+        "spread_vol_gate_sweep": gate_rows,
         "book_evidence": book_rows,
         "promotion_candidates": (model_space.get("promotion_candidates") or [])[:4],
     }
@@ -138,6 +155,7 @@ def _bounded_evidence(report: dict, *, candidate_limit: int = 6) -> str:
             "top_candidates": candidates[:1],
             "exit_policy_comparison": exit_rows[:1],
             "fast_winner_feature_discovery": discovery_summary,
+            "spread_vol_gate_sweep": gate_rows[:2],
         },
         separators=(",", ":"),
         default=str,
