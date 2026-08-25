@@ -393,6 +393,34 @@ def _threshold_prediction(
     return result
 
 
+def _execution_status(
+    *,
+    target_definition: str,
+    decision_horizon_s: int,
+    test_metrics: Mapping[str, Any],
+    sealed_metrics: Mapping[str, Any],
+    sealed_by_horizon: Mapping[str, Mapping[str, Any]],
+) -> tuple[str, str]:
+    """Authorize execution only for the label and horizon runtime consumes."""
+    if str(target_definition).strip().lower() != "terminal_profit":
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", "execution_requires_terminal_profit_labels"
+
+    def positive(metrics: Mapping[str, Any] | None) -> bool:
+        if not isinstance(metrics, Mapping):
+            return False
+        try:
+            return float(metrics.get("mean_terminal_return")) > 0.0
+        except (TypeError, ValueError):
+            return False
+
+    if not positive(test_metrics) or not positive(sealed_metrics):
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", "test_or_sealed_oos_not_positive"
+    horizon_metrics = sealed_by_horizon.get(str(int(decision_horizon_s)))
+    if not positive(horizon_metrics):
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", "decision_horizon_oos_not_positive"
+    return "EXECUTION_CANDIDATE", "positive_test_sealed_decision_horizon_oos"
+
+
 def train_and_publish(
     frame: pd.DataFrame,
     output_path: Path,
@@ -483,10 +511,13 @@ def train_and_publish(
             sealed_by_horizon[str(horizon)] = evaluate(
                 subset, threshold=threshold, max_uncertainty=uncertainty_limit
             )
-    execution_status = "EXECUTION_CANDIDATE" if all(
-        metrics["mean_terminal_return"] is not None and metrics["mean_terminal_return"] > 0.0
-        for metrics in (test_metrics, sealed_metrics)
-    ) else "SHADOW_ONLY_NO_POSITIVE_OOS"
+    execution_status, execution_status_reason = _execution_status(
+        target_definition=target_definition,
+        decision_horizon_s=decision_horizon_s,
+        test_metrics=test_metrics,
+        sealed_metrics=sealed_metrics,
+        sealed_by_horizon=sealed_by_horizon,
+    )
 
     output_path = Path(output_path)
     pipeline.save(output_path)
@@ -496,6 +527,7 @@ def train_and_publish(
         {
             "schema": ARTIFACT_SCHEMA,
             "execution_status": execution_status,
+            "execution_status_reason": execution_status_reason,
             "dataset_hash": _hash_frame(frame),
             "validation_hash": _hash_frame(slices.validation),
             "horizons_s": [int(value) for value in horizons],

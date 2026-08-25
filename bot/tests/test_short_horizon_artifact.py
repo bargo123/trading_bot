@@ -6,11 +6,55 @@ import pandas as pd
 from aegis.research.registry import ExperimentRegistry
 from aegis.research.short_horizon_artifact import (
     _feature_frame,
+    _execution_status,
     _threshold_candidates,
     build_quote_training_frame,
     chronological_slices,
     record_artifact_outcome,
 )
+
+
+def _positive_metrics(mean: float) -> dict[str, float | int]:
+    return {"mean_terminal_return": mean, "selected": 20}
+
+
+def test_execution_candidate_requires_positive_oos_at_configured_decision_horizon():
+    status, reason = _execution_status(
+        target_definition="terminal_profit",
+        decision_horizon_s=10,
+        test_metrics=_positive_metrics(0.001),
+        sealed_metrics=_positive_metrics(0.001),
+        sealed_by_horizon={"10": _positive_metrics(-0.001)},
+    )
+
+    assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
+    assert reason == "decision_horizon_oos_not_positive"
+
+
+def test_execution_candidate_requires_terminal_profit_labels():
+    status, reason = _execution_status(
+        target_definition="mfe_first",
+        decision_horizon_s=10,
+        test_metrics=_positive_metrics(0.001),
+        sealed_metrics=_positive_metrics(0.001),
+        sealed_by_horizon={"10": _positive_metrics(0.001)},
+    )
+
+    assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
+    assert reason == "execution_requires_terminal_profit_labels"
+
+
+def test_execution_candidate_requires_positive_test_sealed_and_horizon_metrics():
+    status, reason = _execution_status(
+        target_definition="terminal_profit",
+        decision_horizon_s=10,
+        test_metrics=_positive_metrics(0.001),
+        sealed_metrics=_positive_metrics(0.001),
+        sealed_by_horizon={"10": _positive_metrics(0.001)},
+    )
+
+    assert status == "EXECUTION_CANDIDATE"
+    assert reason == "positive_test_sealed_decision_horizon_oos"
 
 
 def test_threshold_candidates_are_derived_from_validation_probabilities():
