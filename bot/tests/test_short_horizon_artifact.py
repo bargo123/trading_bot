@@ -16,7 +16,11 @@ from aegis.research.short_horizon_artifact import (
 
 
 def _positive_metrics(mean: float) -> dict[str, float | int]:
-    return {"mean_terminal_return": mean, "selected": 20}
+    return {
+        "mean_terminal_return": mean,
+        "expectancy_lcb95_return": mean,
+        "selected": 20,
+    }
 
 
 def test_execution_candidate_requires_positive_oos_at_configured_decision_horizon():
@@ -30,6 +34,21 @@ def test_execution_candidate_requires_positive_oos_at_configured_decision_horizo
 
     assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
     assert reason == "decision_horizon_oos_not_positive"
+
+
+def test_execution_candidate_requires_positive_lower_confidence_bound():
+    metrics = _positive_metrics(0.001)
+    metrics["expectancy_lcb95_return"] = -0.001
+    status, reason = _execution_status(
+        target_definition="terminal_profit",
+        decision_horizon_s=10,
+        test_metrics=metrics,
+        sealed_metrics=_positive_metrics(0.001),
+        sealed_by_horizon={"10": _positive_metrics(0.001)},
+    )
+
+    assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
+    assert reason == "oos_lcb95_not_positive"
 
 
 def test_execution_candidate_requires_terminal_profit_labels():
@@ -81,6 +100,8 @@ def test_oos_metrics_include_calibration_curve_ece_and_confusion_counts():
     assert 0.0 <= metrics["calibration_ece"] <= 1.0
     assert len(metrics["calibration_bins"]) > 0
     assert metrics["confusion_matrix"] == {"tp": 2, "fp": 0, "tn": 2, "fn": 0}
+    assert metrics["expectancy_lcb95_return"] <= metrics["mean_terminal_return"]
+    assert "50-60%" in metrics["confidence_bands"]
 
 
 def test_threshold_candidates_are_derived_from_validation_probabilities():

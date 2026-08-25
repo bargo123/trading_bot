@@ -217,13 +217,19 @@ class ShortHorizonPredictor:
             oos_by_horizon = ((self.metadata.get("oos") or {}).get("sealed_by_horizon") or {})
             selected_oos = oos_by_horizon.get(selected_horizon) or {}
             expected_return = selected_oos.get("mean_terminal_return")
+            expected_lcb_return = selected_oos.get("expectancy_lcb95_return")
             expected_net = None
+            expected_net_lcb95 = None
             if notional_usd is not None:
                 # No selected sealed-OOS rows are an explicit zero-evidence
                 # veto, never an omitted field that could bypass the gate.
                 expected_net = (
                     float(expected_return) * float(features["mid"]) * float(notional_usd)
                     if expected_return is not None else 0.0
+                )
+                expected_net_lcb95 = (
+                    float(expected_lcb_return) * float(features["mid"]) * float(notional_usd)
+                    if expected_lcb_return is not None else 0.0
                 )
             return {
                 "probability": selected["probability"],
@@ -239,6 +245,7 @@ class ShortHorizonPredictor:
                 "threshold": float(self.metadata.get("threshold", 0.5) or 0.5),
                 "by_horizon": by_horizon,
                 "expected_net_pnl": expected_net,
+                "expected_net_pnl_lcb95": expected_net_lcb95,
                 "tail_loss_probability": selected_oos.get("tail_loss_rate"),
                 "expected_mfe": selected_oos.get("expected_mfe"),
                 "expected_mae": selected_oos.get("expected_mae"),

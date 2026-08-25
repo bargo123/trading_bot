@@ -377,6 +377,29 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
         "tn": int((~decision & (actual == 0)).sum()),
         "fn": int((~decision & (actual == 1)).sum()),
     }
+    expectancy_lcb95 = None
+    if len(selected) >= 2:
+        expectancy_lcb95 = float(
+            selected.mean() - 1.96 * selected.std(ddof=1) / np.sqrt(len(selected))
+        )
+    confidence_bands: dict[str, dict[str, Any]] = {}
+    for lower, upper in (
+        (0.50, 0.60), (0.60, 0.70), (0.70, 0.80), (0.80, 0.90),
+        (0.90, 0.95), (0.95, 0.975), (0.975, 0.99), (0.99, 1.000001),
+    ):
+        mask = (probability >= lower) & (probability < upper)
+        band_terminal = terminal[mask]
+        band_actual = actual[mask]
+        band_losses = band_terminal[band_terminal < 0.0]
+        confidence_bands[
+            f"{int(round(lower * 100))}-{min(100, int(round(upper * 100)))}%"
+        ] = {
+            "n": int(mask.sum()),
+            "actual_rate": float(band_actual.mean()) if len(band_actual) else None,
+            "mean_terminal_return": float(band_terminal.mean()) if len(band_terminal) else None,
+            "avg_loss": float(band_losses.mean()) if len(band_losses) else None,
+            "tail_loss_rate": float(frame.loc[mask, "tail_loss"].mean()) if mask.any() else None,
+        }
     def selected_mean(column: str) -> float | None:
         values = pd.to_numeric(selected_frame[column], errors="coerce").dropna()
         return float(values.mean()) if len(values) else None
@@ -393,6 +416,8 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
         "calibration_ece": float(calibration_ece) if len(actual) else None,
         "calibration_bins": calibration_bins,
         "confusion_matrix": confusion,
+        "expectancy_lcb95_return": expectancy_lcb95,
+        "confidence_bands": confidence_bands,
         "precision": float(actual[decision].mean()) if decision.any() else None,
         "mean_terminal_return": float(selected.mean()) if len(selected) else None,
         "net_terminal_return": float(selected.sum()) if len(selected) else None,
@@ -474,11 +499,23 @@ def _execution_status(
         except (TypeError, ValueError):
             return False
 
+    def positive_lcb(metrics: Mapping[str, Any] | None) -> bool:
+        if not isinstance(metrics, Mapping):
+            return False
+        try:
+            return float(metrics.get("expectancy_lcb95_return")) > 0.0
+        except (TypeError, ValueError):
+            return False
+
     if not positive(test_metrics) or not positive(sealed_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", "test_or_sealed_oos_not_positive"
+    if not positive_lcb(test_metrics) or not positive_lcb(sealed_metrics):
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", "oos_lcb95_not_positive"
     horizon_metrics = sealed_by_horizon.get(str(int(decision_horizon_s)))
     if not positive(horizon_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", "decision_horizon_oos_not_positive"
+    if not positive_lcb(horizon_metrics):
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", "oos_lcb95_not_positive"
     return "EXECUTION_CANDIDATE", "positive_test_sealed_decision_horizon_oos"
 
 
