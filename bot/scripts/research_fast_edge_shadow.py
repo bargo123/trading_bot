@@ -45,6 +45,42 @@ def select_research_symbols(configured: Sequence[str], overrides: Sequence[str] 
     return selected
 
 
+def primary_oos_metrics(model_report: dict) -> dict[str, object]:
+    """Expose primary test and sealed economics without collapsing the splits."""
+    primary_model = model_report.get("primary_model")
+    metrics = (model_report.get("oos_metrics") or {}).get(primary_model, {}) if primary_model else {}
+    result: dict[str, object] = {"OOS_PRIMARY_MODEL": primary_model}
+    fields = {
+        "precision": "PRECISION",
+        "captured_exit_expectancy": "CAPTURED_EXPECTANCY",
+        "captured_exit_pf": "CAPTURED_PF",
+        "executable_captured_exit_expectancy": "EXECUTABLE_CAPTURED_EXPECTANCY",
+        "executable_captured_exit_pf": "EXECUTABLE_CAPTURED_PF",
+        "executable_captured_exit_expectancy_lower_95": "EXECUTABLE_CAPTURED_EXPECTANCY_LOWER_95",
+        "p95_loss": "P95_LOSS",
+        "p99_loss": "P99_LOSS",
+        "calibration_ece": "CALIBRATION_ECE",
+        "abstain_rate": "ABSTAIN_RATE",
+    }
+    for split in ("test", "sealed"):
+        values = metrics.get(split) or {}
+        prefix = "OOS_TEST" if split == "test" else "OOS_SEALED"
+        for field, label in fields.items():
+            result[f"{prefix}_{label}"] = values.get(field)
+    result.update(
+        {
+            "OOS_PRECISION": result.get("OOS_SEALED_PRECISION"),
+            "OOS_CAPTURED_EXPECTANCY": result.get("OOS_SEALED_CAPTURED_EXPECTANCY"),
+            "OOS_CAPTURED_PF": result.get("OOS_SEALED_CAPTURED_PF"),
+            "P95_LOSS": result.get("OOS_SEALED_P95_LOSS"),
+            "P99_LOSS": result.get("OOS_SEALED_P99_LOSS"),
+            "CALIBRATION_ECE": result.get("OOS_SEALED_CALIBRATION_ECE"),
+            "ABSTAIN_RATE": result.get("OOS_SEALED_ABSTAIN_RATE"),
+        }
+    )
+    return result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=BOT_ROOT / "config_mt5_demo_firehose_hw.yaml")
@@ -133,10 +169,7 @@ def main() -> None:
             previous_report = json.loads(previous_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             previous_report = None
-    primary_metrics = (
-        model_report["oos_metrics"].get(model_report["primary_model"], {}).get("sealed", {})
-        if model_report.get("primary_model") else {}
-    )
+    primary_oos = primary_oos_metrics(model_report)
     args.out_dir.mkdir(parents=True, exist_ok=True)
     if not args.no_rows:
         frame.to_json(
@@ -217,20 +250,13 @@ def main() -> None:
         "scored_oos_path": str(scored_path) if sealed_predictions is not None else None,
         "OOS_TEST_N": model_report["oos"]["test_n"],
         "OOS_SEALED_N": model_report["oos"]["sealed_n"],
-        "OOS_PRIMARY_MODEL": model_report["primary_model"],
         "PROMOTION_CANDIDATE_COUNT": len(model_report["promotion_candidates"]),
         "DISTANCE_FROM_EXECUTION_CANDIDATE": (
             "requires positive test+sealed OOS, calibration, sample, and tail review"
             if not model_report["promotion_candidates"]
             else "requires governed challenger review and artifact promotion gates"
         ),
-        "OOS_PRECISION": primary_metrics.get("precision"),
-        "OOS_CAPTURED_EXPECTANCY": primary_metrics.get("captured_exit_expectancy"),
-        "OOS_CAPTURED_PF": primary_metrics.get("captured_exit_pf"),
-        "P95_LOSS": primary_metrics.get("p95_loss"),
-        "P99_LOSS": primary_metrics.get("p99_loss"),
-        "CALIBRATION_ECE": primary_metrics.get("calibration_ece"),
-        "ABSTAIN_RATE": primary_metrics.get("abstain_rate"),
+        **primary_oos,
         "note": "Evidence only. No model or leaderboard row authorizes broker execution.",
     }
     factory_handoff_path = args.out_dir / "fast_edge_factory_handoff.json"

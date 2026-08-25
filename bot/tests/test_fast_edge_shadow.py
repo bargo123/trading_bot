@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-from research_fast_edge_shadow import select_research_symbols
+from research_fast_edge_shadow import primary_oos_metrics, select_research_symbols
 
 from aegis.research.fast_edge_shadow import (
     SHADOW_HORIZONS_S,
@@ -290,6 +290,36 @@ def test_multi_outcome_models_report_sealed_probabilities_and_expectations():
     assert report["regression"]["EXPECTED_NET_PNL"]["test"]["status"] == "TEST_OOS"
     assert report["regression"]["EXPECTED_NET_PNL"]["sealed"]["status"] == "SEALED_OOS"
     assert all(value["status"] in {"SEALED_OOS", "missing_target", "single_class_train"} for value in report["probability"].values())
+
+
+def test_primary_oos_metrics_keep_test_and_sealed_economics_distinct():
+    report = primary_oos_metrics(
+        {
+            "primary_model": "random_forest",
+            "oos_metrics": {
+                "random_forest": {
+                    "test": {
+                        "precision": 0.4,
+                        "captured_exit_expectancy": -1e-6,
+                        "captured_exit_pf": 0.8,
+                        "executable_captured_exit_expectancy": -2e-6,
+                        "executable_captured_exit_pf": 0.5,
+                    },
+                    "sealed": {
+                        "precision": 0.8,
+                        "captured_exit_expectancy": 2e-6,
+                        "captured_exit_pf": 1.5,
+                        "executable_captured_exit_expectancy": 3e-6,
+                        "executable_captured_exit_pf": 2.0,
+                    },
+                }
+            },
+        }
+    )
+    assert report["OOS_TEST_CAPTURED_EXPECTANCY"] == pytest.approx(-1e-6)
+    assert report["OOS_SEALED_CAPTURED_EXPECTANCY"] == pytest.approx(2e-6)
+    assert report["OOS_TEST_EXECUTABLE_CAPTURED_PF"] == pytest.approx(0.5)
+    assert report["OOS_SEALED_EXECUTABLE_CAPTURED_PF"] == pytest.approx(2.0)
 
 
 def test_segmented_models_are_chronological_and_dimension_scoped():
