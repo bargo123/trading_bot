@@ -20,6 +20,29 @@ from aegis.research_factory.ml_pipeline import MLPipeline
 SHORT_HORIZON_ARTIFACT_SCHEMA = "short_horizon_ensemble.v1"
 
 
+def resample_runtime_quotes(frame: pd.DataFrame) -> pd.DataFrame:
+    """Match the artifact builder's one-observation-per-second cadence."""
+    if frame is None or frame.empty:
+        return frame
+    required = {"time", "bid", "ask"}
+    if not required.issubset(frame.columns):
+        raise ValueError("runtime quotes require time, bid, and ask")
+    values = frame.loc[:, ["time", "bid", "ask"]].copy()
+    values["time"] = pd.to_datetime(values["time"], utc=True, errors="coerce")
+    values["bid"] = pd.to_numeric(values["bid"], errors="coerce")
+    values["ask"] = pd.to_numeric(values["ask"], errors="coerce")
+    values = values.dropna().sort_values("time", kind="stable")
+    if values.empty:
+        return values
+    return (
+        values.set_index("time")[["bid", "ask"]]
+        .resample("1s")
+        .last()
+        .dropna()
+        .reset_index()
+    )
+
+
 def seed_quote_buffer(quote_buffer: Any, symbol: str, quotes: Any) -> int:
     """Seed local features from valid, read-only broker quote rows."""
     recorder = getattr(quote_buffer, "record", None)
@@ -158,6 +181,9 @@ class ShortHorizonPredictor:
             ]
         )
         try:
+            frame = resample_runtime_quotes(frame)
+            if len(frame) < 2:
+                return self._fail_closed_prediction("quote_history_insufficient")
             features = point_in_time_features(
                 frame,
                 at=frame["time"].iloc[-1],

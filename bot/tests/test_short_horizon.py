@@ -51,7 +51,7 @@ def test_features_are_point_in_time_and_include_microstructure():
     assert features["bid"] == pytest.approx(1.1003)
     assert features["ask"] == pytest.approx(1.1005)
     assert features["spread"] == pytest.approx(0.0002)
-    assert "spread_percentile" in features
+    assert 0.0 < features["spread_percentile"] <= 1.0
     assert "tick_velocity" in features
     assert "return_5s" in features
     assert "realized_vol_60s" in features

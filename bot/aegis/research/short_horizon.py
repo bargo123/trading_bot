@@ -291,13 +291,19 @@ def point_in_time_features(
     symbol_value = symbol
     if symbol_value is None and "symbol" in current.index:
         symbol_value = str(current["symbol"])
+    # Keep the runtime feature on the same 0..1 percentile scale as the
+    # artifact builder's rolling rank.  Returning 0..100 here silently fed a
+    # different distribution to the cached models and could suppress every
+    # live probability without raising a feature-schema error.
+    spread_window = pd.Series(spreads[-60:])
+    spread_percentile = float(spread_window.rank(pct=True).iloc[-1]) if len(spread_window) else 1.0
     features = {
         "symbol": symbol_value,
         "bid": float(current["_bid"]),
         "ask": float(current["_ask"]),
         "mid": float(current["_mid"]),
         "spread": float(current["_spread"]),
-        "spread_percentile": float(np.mean(spreads <= spreads[-1]) * 100.0),
+        "spread_percentile": spread_percentile,
         "spread_change": float(spreads[-1] - spreads[-2]) if len(spreads) >= 2 else None,
         "tick_velocity": velocity,
         "price_acceleration": acceleration,
