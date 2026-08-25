@@ -10,6 +10,7 @@ from aegis.sizing import ContractSpec
 from scripts.run_broker_paper import (
     confirmed_position_geometry,
     close_ticket_confirmed,
+    exploration_order_risk_check,
     firehose_lifecycle_identity,
     normalize_protective_stops,
     persist_confirmed_firehose_basket,
@@ -19,6 +20,28 @@ from scripts.run_broker_paper import (
     remove_confirmed_firehose_basket_then_cleanup,
     video_style_signal_for_scan,
 )
+
+
+def test_exploration_order_risk_check_rejects_stale_quote_size_breach():
+    """A refreshed quote must not let the sent lot size exceed $0.15 risk."""
+    result = exploration_order_risk_check(
+        order_qty=0.03,
+        entry=1.38593,
+        stop=1.38586,
+        pip=0.0001,
+        max_risk_usd=0.15,
+        spec={
+            "trade_contract_size": 100000.0,
+            "trade_tick_value": 0.7215423689679059,
+            "trade_tick_size": 0.00001,
+            "volume_min": 0.01,
+            "volume_step": 0.01,
+        },
+    )
+
+    assert result["allowed"] is False
+    assert result["reason"] == "exploration_risk_exceeds_budget"
+    assert result["max_lots"] == 0.02
 
 
 def test_video_style_prediction_signal_uses_shared_direction_only_when_enabled():

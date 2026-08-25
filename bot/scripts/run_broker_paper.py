@@ -86,6 +86,58 @@ def video_style_signal_for_scan(
         return None
 
 
+def exploration_order_risk_check(
+    *,
+    order_qty: float,
+    entry: float,
+    stop: float | None,
+    pip: float,
+    max_risk_usd: float,
+    spec: dict | None,
+) -> dict[str, object]:
+    """Revalidate exploration risk against the quote used for the order.
+
+    The brain sizes from its decision-time quote. A later fresh quote can make
+    the same stop/lot pair riskier, so the runner must fail closed immediately
+    before ``place_order``.
+    """
+    if stop is None:
+        return {"allowed": False, "reason": "exploration_stop_required", "max_lots": 0.0}
+    broker_spec = dict(spec or {})
+    tick_values = [
+        float(broker_spec.get(name) or 0.0)
+        for name in ("trade_tick_value_profit", "trade_tick_value_loss", "trade_tick_value")
+    ]
+    tick_value = max(tick_values) if any(tick_values) else None
+    from aegis.intel.exploration import risk_lots_for_exploration
+
+    sizing = risk_lots_for_exploration(
+        max_risk_usd=float(max_risk_usd),
+        entry=float(entry),
+        invalidation=float(stop),
+        pip=float(pip),
+        contract_size=float(broker_spec.get("trade_contract_size") or 100000.0),
+        tick_value=tick_value,
+        tick_size=float(broker_spec.get("trade_tick_size") or 0.0) or None,
+        volume_min=float(broker_spec.get("volume_min") or 0.01),
+        volume_step=float(broker_spec.get("volume_step") or 0.01),
+    )
+    max_lots = float(sizing.get("lots") or 0.0)
+    if not bool(sizing.get("allowed")):
+        return {
+            "allowed": False,
+            "reason": str(sizing.get("reason") or "exploration_risk_rejected"),
+            "max_lots": round(max_lots, 8),
+        }
+    if float(order_qty) > max_lots + 1e-12:
+        return {
+            "allowed": False,
+            "reason": "exploration_risk_exceeds_budget",
+            "max_lots": round(max_lots, 8),
+        }
+    return {"allowed": True, "reason": "ok", "max_lots": round(max_lots, 8)}
+
+
 def bars_to_frame(bars) -> pd.DataFrame:
     rows = [
         {
@@ -706,6 +758,7 @@ def main() -> None:
         "order_sent_after_refresh": 0,
         "margin_precheck_skip": 0,
         "min_lot_precheck_skip": 0,
+        "risk_budget_precheck_skip": 0,
     }
     fast_exit_error_count: int = 0
     # Quote buffer for genuine sub-minute features
@@ -1785,6 +1838,36 @@ def main() -> None:
                 spec_pre = eng.symbol_spec(sym)
             except Exception:
                 spec_pre = None
+            if (
+                brain_decision is not None
+                and _terminal == "EXPLORATION_ELIGIBLE"
+                and sl is not None
+            ):
+                risk_check = exploration_order_risk_check(
+                    order_qty=float(order_qty),
+                    entry=float(q.ask if sig.side == "buy" else q.bid),
+                    stop=float(sl),
+                    pip=float(pip),
+                    max_risk_usd=float(cfg.get("exploration_max_risk_per_trade_usd", 0.15) or 0.15),
+                    spec=spec_pre,
+                )
+                if not bool(risk_check["allowed"]):
+                    quote_refresh_counts["risk_budget_precheck_skip"] += 1
+                    append_journal(
+                        journal,
+                        {
+                            "event": "sizing_skip",
+                            "reason": str(risk_check["reason"]),
+                            "symbol": sym,
+                            "qty": float(order_qty),
+                            "max_lots": risk_check.get("max_lots"),
+                            "risk_budget_usd": float(
+                                cfg.get("exploration_max_risk_per_trade_usd", 0.15) or 0.15
+                            ),
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
             vmin = float((spec_pre or {}).get("volume_min", 0.0) or 0.0)
             if not min_lot_ok(float(order_qty), vmin):
                 quote_refresh_counts["min_lot_precheck_skip"] += 1
