@@ -44,6 +44,23 @@ def ingest_rows(rows: list[Any], *, symbol: str) -> dict[str, Any]:
     return {"status": "OK", "symbol": sym, "rows": normalized, "count": len(normalized)}
 
 
+def _persist_symbol_cursor(cursor: dict[str, Any], symbol: str, result: Mapping[str, Any]) -> bool:
+    """Advance only the raw bound while retaining the label bound."""
+    last = result.get("last_bar")
+    if not last or result.get("error"):
+        return False
+    sym = str(symbol).upper()
+    symbols = cursor.setdefault("symbols", {})
+    existing = symbols.get(sym)
+    if isinstance(existing, Mapping):
+        entry = dict(existing)
+        entry["raw_cursor"] = str(last)
+    else:
+        entry = {"raw_cursor": str(last), "label_cursor": str(last)}
+    symbols[sym] = entry
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Incremental analogue ingestion")
     parser.add_argument("--config", type=Path, default=BOT / "config_mt5_demo_firehose_hw.yaml")
@@ -121,9 +138,7 @@ def main() -> int:
                 }
             res.setdefault("status", "OK")
             results.append(res)
-            last = res.get("last_bar")
-            if last and not res.get("error"):
-                cursor.setdefault("symbols", {})[str(symbol).upper()] = last
+            if _persist_symbol_cursor(cursor, symbol, res):
                 save_cursor(cursor, args.cursor)  # persist per symbol
             # keep existing keys fresh so cross-symbol dupes are caught
             existing = index_record_keys(args.index)

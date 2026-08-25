@@ -220,6 +220,24 @@ def test_cursor_v2_normalizes_legacy_string_symbol_values_at_ingest_boundary():
     ) == ("t2", "t2")
 
 
+def test_incremental_wrapper_preserves_label_cursor_when_advancing_raw_cursor():
+    from scripts.research_incremental_ingest import _persist_symbol_cursor
+
+    cursor = {
+        "schema": "ingest_cursor.v2",
+        "symbols": {
+            "EURUSD": {"raw_cursor": "t1", "label_cursor": "label-t0"},
+        },
+    }
+
+    assert _persist_symbol_cursor(
+        cursor, "EURUSD", {"last_bar": "t2", "error": None}
+    ) is True
+    assert cursor["symbols"]["EURUSD"] == {
+        "raw_cursor": "t2", "label_cursor": "label-t0"
+    }
+
+
 # ---------------------------------------------------------------------------
 # Defect 6: LEVEL A OOS must test the SAME family trained on
 # ---------------------------------------------------------------------------

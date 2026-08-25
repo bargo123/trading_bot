@@ -273,7 +273,12 @@ def run_council_cycle(question: str, *, agents: list[str] | None = None,
         raise ValueError("question is required")
     mode = "DRY_RUN" if dry_run else "REAL"
     config = agent_cli.load_agents_config()
-    names = agents or list(config.keys())
+    default_names = ("hermes", "opencode", "gemini", "codex", "cursor")
+    names = (
+        list(agents)
+        if agents is not None
+        else [name for name in default_names if name in config]
+    )
     started = datetime.now(timezone.utc).isoformat()
     t_start = time.time()
 
