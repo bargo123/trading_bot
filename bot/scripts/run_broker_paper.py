@@ -253,6 +253,22 @@ def firehose_funnel_risk_row(
     }
 
 
+def merge_firehose_funnel_counts(
+    base: dict[str, object] | None,
+    observed: dict[str, object] | None,
+) -> dict[str, int]:
+    """Merge cumulative runner observations without decreasing brain counts."""
+    merged: dict[str, int] = {}
+    for source in (base or {}, observed or {}):
+        for stage, value in source.items():
+            try:
+                count = max(0, int(value or 0))
+            except (TypeError, ValueError):
+                continue
+            merged[str(stage)] = max(merged.get(str(stage), 0), count)
+    return merged
+
+
 def write_runner_heartbeat(
     path: Path,
     *,
@@ -819,6 +835,7 @@ def main() -> None:
         "min_lot_precheck_skip": 0,
         "risk_budget_precheck_skip": 0,
     }
+    observed_funnel_counts: dict[str, int] = {"SCANS": 0, "RISK_REJECT": 0}
     fast_exit_error_count: int = 0
     # Quote buffer for genuine sub-minute features
     from aegis.intel.quote_buffer import QuoteBuffer
@@ -1203,6 +1220,8 @@ def main() -> None:
             if not ok:
                 logger.warning("Risk halt: %s (continuing watch)", reason)
                 risk.save_json(risk_path)
+                observed_funnel_counts["SCANS"] += 1
+                observed_funnel_counts["RISK_REJECT"] += 1
                 append_journal(
                     journal,
                     firehose_funnel_risk_row(
@@ -2381,6 +2400,9 @@ def main() -> None:
                     extra_hb["intelligent_firehose"] = True
                 else:
                     extra_hb["intelligent_firehose"] = bool(cfg.get("intelligent_firehose", False))
+                extra_hb["funnel"] = merge_firehose_funnel_counts(
+                    extra_hb.get("funnel"), observed_funnel_counts
+                )
                 if hasattr(eng, "history_deals"):
                     try:
                         for event in ingest_deals(eng.history_deals(1), deal_cursor):

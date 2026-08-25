@@ -13,6 +13,7 @@ from scripts.run_broker_paper import (
     exploration_order_risk_check,
     firehose_lifecycle_identity,
     firehose_funnel_risk_row,
+    merge_firehose_funnel_counts,
     normalize_protective_stops,
     order_margin_for_send,
     persist_confirmed_firehose_basket,
@@ -47,6 +48,15 @@ def test_risk_halt_records_one_terminal_funnel_row_without_order_intent():
         "filled": False,
         "reason": "daily_loss 10.11%",
     }
+
+
+def test_merge_firehose_funnel_counts_preserves_observed_halted_scans():
+    merged = merge_firehose_funnel_counts(
+        {"SCANS": 0, "RISK_REJECT": 0, "FIRES": 2},
+        {"SCANS": 3, "RISK_REJECT": 3},
+    )
+
+    assert merged == {"SCANS": 3, "RISK_REJECT": 3, "FIRES": 2}
 
 
 def test_order_margin_for_send_uses_broker_native_calculator_for_cross_currency_pair():
