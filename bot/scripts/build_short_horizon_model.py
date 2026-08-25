@@ -7,10 +7,14 @@ artifact builder's positive cost-aware OOS gate passes.  It has no order path.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import pandas as pd
 import yaml
+
+if __package__ in {None, ""}:  # support `python scripts/build_short_horizon_model.py`
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from aegis.engines.mt5 import MT5Engine
 from aegis.intel.paths import BOT_ROOT
