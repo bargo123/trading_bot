@@ -201,7 +201,9 @@ intelligent_bootstrap_canary: true
 intelligent_exploration_enabled: true
 exploration_max_positions: 2
 exploration_max_positions_per_symbol: 1
-exploration_max_daily_loss_usd: 1.0
+# Operator-approved MT5 DEMO exception: exploration daily halt disabled.
+# Per-trade risk remains bounded by exploration_max_risk_per_trade_usd.
+exploration_max_daily_loss_usd: 0
 exploration_max_risk_per_trade_usd: 0.15
 exploration_max_trades_per_hypothesis: 5
 exploration_cooldown_after_failure_s: 1800

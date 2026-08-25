@@ -157,6 +157,24 @@ def test_daily_loss_limit_halts_exploration(store):
     assert not ok and reason.startswith("exploration_max_daily_loss_usd")
 
 
+@pytest.mark.parametrize("configured_limit", [0, -1])
+def test_non_positive_daily_loss_limit_disables_exploration_halt(store, configured_limit):
+    limits = ExplorationLimits.from_cfg({
+        "exploration_max_daily_loss_usd": configured_limit,
+    })
+    rec, _ = store.register(_candidate(side="sell"), reason="r", mechanism="m")
+    store.record_close(hypothesis_id=rec["hypothesis_id"], pnl=-10.0)
+
+    ok, reason = check_exploration_limits(
+        limits, store, hypothesis_id="new-hypothesis",
+        open_positions_total=0, open_positions_symbol=0,
+        exploration_open_total=0, exploration_open_symbol=0,
+    )
+
+    assert limits.max_daily_loss_usd == configured_limit
+    assert ok and reason == "ok"
+
+
 def test_per_hypothesis_trade_cap_and_failure_cooldown(store):
     limits = ExplorationLimits(max_trades_per_hypothesis=5, cooldown_after_failure_s=1800)
     rec, _ = store.register(_candidate(), reason="r", mechanism="m")

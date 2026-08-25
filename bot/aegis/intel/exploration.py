@@ -70,10 +70,13 @@ class ExplorationLimits:
 
     @classmethod
     def from_cfg(cls, cfg: Mapping[str, Any]) -> "ExplorationLimits":
+        daily_loss_limit = cfg.get("exploration_max_daily_loss_usd", 1.0)
+        if daily_loss_limit is None:
+            daily_loss_limit = 1.0
         return cls(
             max_positions=int(cfg.get("exploration_max_positions", 2) or 2),
             max_positions_per_symbol=int(cfg.get("exploration_max_positions_per_symbol", 1) or 1),
-            max_daily_loss_usd=float(cfg.get("exploration_max_daily_loss_usd", 1.0) or 1.0),
+            max_daily_loss_usd=float(daily_loss_limit),
             max_risk_per_trade_usd=float(cfg.get("exploration_max_risk_per_trade_usd", 0.15) or 0.15),
             max_trades_per_hypothesis=int(cfg.get("exploration_max_trades_per_hypothesis", 5) or 5),
             cooldown_after_failure_s=int(cfg.get("exploration_cooldown_after_failure_s", 1800) or 1800),
@@ -413,7 +416,7 @@ def check_exploration_limits(
         return False, f"exploration_max_positions:{exploration_open_total}"
     if exploration_open_symbol >= limits.max_positions_per_symbol:
         return False, "exploration_max_positions_per_symbol"
-    if store.daily_pnl() <= -abs(limits.max_daily_loss_usd):
+    if limits.max_daily_loss_usd > 0 and store.daily_pnl() <= -limits.max_daily_loss_usd:
         return False, f"exploration_max_daily_loss_usd:{store.daily_pnl():.2f}"
     if store.hypothesis_trade_count(hypothesis_id) >= limits.max_trades_per_hypothesis:
         return False, "exploration_max_trades_per_hypothesis"
