@@ -53,6 +53,9 @@ class PositionSnapshot:
     stop_loss: float = 0.0
     take_profit: float = 0.0
     comment: str = ""
+    # Broker-reported epoch seconds when available. Restart/adoption logic
+    # must not replace the real position age with process-start time.
+    opened_ts: float | None = None
 
 
 @dataclass(frozen=True)

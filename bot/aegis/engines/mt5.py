@@ -483,6 +483,12 @@ class MT5Engine(BrokerEngine):
             if abs(qty) < 1e-12:
                 continue
             side = "buy" if int(getattr(pos, "type", 0) or 0) == 0 else "sell"
+            opened_msc = float(getattr(pos, "time_msc", 0) or 0)
+            opened_ts = (
+                opened_msc / 1000.0
+                if opened_msc > 0
+                else float(getattr(pos, "time", 0) or 0) or None
+            )
             out.append(
                 PositionSnapshot(
                     symbol=str(getattr(pos, "symbol", name or "")),
@@ -494,6 +500,7 @@ class MT5Engine(BrokerEngine):
                     stop_loss=float(getattr(pos, "sl", 0) or 0),
                     take_profit=float(getattr(pos, "tp", 0) or 0),
                     comment=str(getattr(pos, "comment", "") or ""),
+                    opened_ts=opened_ts,
                 )
             )
         return out

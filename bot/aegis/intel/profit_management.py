@@ -227,6 +227,15 @@ class ProfitManager:
                 meta = meta_by_ticket.get(ticket, {})
                 broker_sl = float(getattr(pos, "stop_loss", 0) or 0) or None
                 broker_tp = float(getattr(pos, "take_profit", 0) or 0) or None
+                broker_opened_ts = getattr(pos, "opened_ts", None)
+                try:
+                    broker_opened_ts = (
+                        float(broker_opened_ts)
+                        if broker_opened_ts is not None and float(broker_opened_ts) > 0
+                        else None
+                    )
+                except (TypeError, ValueError):
+                    broker_opened_ts = None
                 track = TicketTrack(
                     ticket=ticket,
                     thesis_key=str(meta.get("thesis_key") or ""),
@@ -235,7 +244,7 @@ class ProfitManager:
                     symbol=str(getattr(pos, "symbol", "")),
                     side=str(getattr(pos, "side", "")),
                     family=str(meta.get("family") or ""),
-                    opened_ts=now,
+                    opened_ts=broker_opened_ts if broker_opened_ts is not None else now,
                     entry_price=float(getattr(pos, "avg_price", 0) or 0),
                     target=meta.get("target", broker_tp),
                     invalidation=meta.get("invalidation"),

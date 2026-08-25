@@ -413,6 +413,7 @@ def test_positions_include_ticket_sl_tp():
             profit=0.01,
             sl=1.09,
             tp=1.11,
+            time_msc=1_700_000_123_456,
         )
     ]
     eng = _engine(api)
@@ -421,6 +422,7 @@ def test_positions_include_ticket_sl_tp():
     assert pos[0].ticket == "42"
     assert pos[0].stop_loss == 1.09
     assert pos[0].take_profit == 1.11
+    assert pos[0].opened_ts == 1_700_000_123.456
     assert api.shutdown_calls == 0
 
 

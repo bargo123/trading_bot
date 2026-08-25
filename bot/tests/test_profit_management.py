@@ -15,7 +15,7 @@ from aegis.intel.profit_management import ProfitManager  # noqa: E402
 
 class _Pos:
     def __init__(self, ticket, symbol, side, pnl, qty=0.01, price=1.10,
-                 sl=0.0, comment=""):
+                 sl=0.0, comment="", opened_ts=None):
         self.ticket = ticket
         self.symbol = symbol
         self.side = side
@@ -24,11 +24,20 @@ class _Pos:
         self.avg_price = price
         self.stop_loss = sl
         self.comment = comment
+        self.opened_ts = opened_ts
 
 
 def _manager(**cfg):
     return ProfitManager({"pm_mfe_arm_usd": 0.30, "pm_giveback_frac": 0.50,
                           "pm_time_decay_s": 5400, **cfg})
+
+
+def test_sync_uses_broker_open_timestamp_for_new_ticket():
+    """Restart adoption must preserve the broker's real age for fast exits."""
+    pm = _manager()
+    pm.sync([_Pos("broker-age", "EURUSD", "buy", -0.01, opened_ts=100.0)], now=500.0)
+
+    assert pm.tracks["broker-age"].opened_ts == 100.0
 
 
 def test_per_ticket_mfe_is_independent():
