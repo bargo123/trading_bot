@@ -284,9 +284,11 @@ def ingest_symbol(
 ) -> dict[str, Any]:
     """Ingest one symbol: fetch -> raw append -> label matured -> merge -> cursors."""
     sym = str(symbol).upper()
-    entry = (cursor.get("symbols") or {}).get(sym) or {}
-    raw_cursor = entry.get("raw_cursor")
-    label_cursor = entry.get("label_cursor")
+    raw_cursor, label_cursor = cursor_timestamps(cursor, sym)
+    entry: dict[str, str | None] = {
+        "raw_cursor": raw_cursor,
+        "label_cursor": label_cursor,
+    }
     frame = fetch_completed_bars(
         eng, symbol, since_utc=None, max_bars=max_bars, lookback_days=lookback_days
     )
@@ -319,3 +321,13 @@ def ingest_symbol(
     out["label_cursor"] = entry.get("label_cursor")
     out["last_bar"] = newest_raw
     return out
+
+
+def cursor_timestamps(cursor: Mapping[str, Any], symbol: str) -> tuple[str | None, str | None]:
+    """Read v2 cursor bounds while tolerating legacy string-valued entries."""
+    entry = (cursor.get("symbols") or {}).get(str(symbol).upper())
+    if isinstance(entry, Mapping):
+        return entry.get("raw_cursor"), entry.get("label_cursor")
+    if isinstance(entry, str):
+        return entry, entry
+    return None, None

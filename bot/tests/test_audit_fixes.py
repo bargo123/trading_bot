@@ -211,6 +211,15 @@ def test_cursor_v2_round_trip_and_migration(tmp_path):
     assert migrated["symbols"]["GBPUSD"] == {"raw_cursor": "t9", "label_cursor": "t9"}
 
 
+def test_cursor_v2_normalizes_legacy_string_symbol_values_at_ingest_boundary():
+    from aegis.research.incremental_ingest import cursor_timestamps
+
+    assert cursor_timestamps(
+        {"schema": "ingest_cursor.v2", "symbols": {"EURUSD": "t2"}},
+        "EURUSD",
+    ) == ("t2", "t2")
+
+
 # ---------------------------------------------------------------------------
 # Defect 6: LEVEL A OOS must test the SAME family trained on
 # ---------------------------------------------------------------------------
