@@ -227,6 +227,7 @@ class ShortHorizonPredictor:
                 )
             return {
                 "probability": selected["probability"],
+                "net_profit_probability": selected["probability"],
                 "decision": selected["decision"],
                 "abstain": selected["abstain"],
                 "calibration_status": "calibrated",
@@ -244,6 +245,7 @@ class ShortHorizonPredictor:
                 "expected_time_to_green_s": selected_oos.get("median_time_to_green_s"),
                 "expected_time_to_failure_s": selected_oos.get("median_time_to_failure_s"),
                 "winner_giveback_rate": selected_oos.get("winner_giveback_rate"),
+                "calibration_ece": selected_oos.get("calibration_ece"),
             }
         except Exception:
             return self._fail_closed_prediction("prediction_error")

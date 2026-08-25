@@ -350,6 +350,33 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
     terminal = frame["terminal_return"].to_numpy(dtype=float)
     selected = terminal[decision]
     selected_frame = frame.loc[decision]
+    calibration_bins: list[dict[str, Any]] = []
+    calibration_ece = 0.0
+    for lower in np.linspace(0.0, 1.0, 11)[:-1]:
+        upper = float(lower + 0.1)
+        mask = (probability >= float(lower)) & (
+            probability <= upper if upper >= 1.0 else probability < upper
+        )
+        if not mask.any():
+            continue
+        predicted_mean = float(probability[mask].mean())
+        actual_mean = float(actual[mask].mean())
+        calibration_ece += float(mask.mean()) * abs(predicted_mean - actual_mean)
+        calibration_bins.append(
+            {
+                "lower": float(lower),
+                "upper": min(1.0, upper),
+                "n": int(mask.sum()),
+                "predicted_mean": predicted_mean,
+                "actual_rate": actual_mean,
+            }
+        )
+    confusion = {
+        "tp": int((decision & (actual == 1)).sum()),
+        "fp": int((decision & (actual == 0)).sum()),
+        "tn": int((~decision & (actual == 0)).sum()),
+        "fn": int((~decision & (actual == 1)).sum()),
+    }
     def selected_mean(column: str) -> float | None:
         values = pd.to_numeric(selected_frame[column], errors="coerce").dropna()
         return float(values.mean()) if len(values) else None
@@ -363,6 +390,9 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
         "selected": int(decision.sum()),
         "positive_rate": float(actual.mean()) if len(actual) else None,
         "brier": float(np.mean(np.square(probability - actual))) if len(actual) else None,
+        "calibration_ece": float(calibration_ece) if len(actual) else None,
+        "calibration_bins": calibration_bins,
+        "confusion_matrix": confusion,
         "precision": float(actual[decision].mean()) if decision.any() else None,
         "mean_terminal_return": float(selected.mean()) if len(selected) else None,
         "net_terminal_return": float(selected.sum()) if len(selected) else None,

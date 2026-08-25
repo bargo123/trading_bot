@@ -7,6 +7,7 @@ from aegis.research.registry import ExperimentRegistry
 from aegis.research.short_horizon_artifact import (
     _feature_frame,
     _execution_status,
+    _metrics,
     _threshold_candidates,
     build_quote_training_frame,
     chronological_slices,
@@ -55,6 +56,31 @@ def test_execution_candidate_requires_positive_test_sealed_and_horizon_metrics()
 
     assert status == "EXECUTION_CANDIDATE"
     assert reason == "positive_test_sealed_decision_horizon_oos"
+
+
+def test_oos_metrics_include_calibration_curve_ece_and_confusion_counts():
+    frame = pd.DataFrame(
+        {
+            "target": [0, 1, 0, 1],
+            "terminal_return": [-0.1, 0.2, -0.2, 0.3],
+            "tail_loss": [0, 0, 1, 0],
+            "mfe": [0.1, 0.2, 0.1, 0.3],
+            "mae": [-0.1, -0.1, -0.2, -0.1],
+            "time_to_profit_s": [None, 2.0, None, 1.0],
+            "time_to_failure_s": [1.0, None, 1.0, None],
+        }
+    )
+    prediction = {
+        "probability": np.array([0.1, 0.8, 0.6, 0.7]),
+        "decision": np.array([False, True, False, True]),
+        "abstain": np.zeros(4, dtype=bool),
+    }
+
+    metrics = _metrics(prediction, frame)
+
+    assert 0.0 <= metrics["calibration_ece"] <= 1.0
+    assert len(metrics["calibration_bins"]) > 0
+    assert metrics["confusion_matrix"] == {"tp": 2, "fp": 0, "tn": 2, "fn": 0}
 
 
 def test_threshold_candidates_are_derived_from_validation_probabilities():
