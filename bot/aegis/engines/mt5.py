@@ -501,7 +501,12 @@ class MT5Engine(BrokerEngine):
     def history_deals(self, lookback_days: int = 14) -> list[dict[str, Any]]:
         """Read-only deal history. Does not place orders. Caller must not shutdown()."""
         mt5 = self._require()
-        end = datetime.now(timezone.utc).replace(tzinfo=None)
+        # MetaQuotes demo timestamps and history query bounds use the broker's
+        # server clock, while the rest of AEGIS uses UTC.  Query through the
+        # server-time window and normalize returned deal times back to UTC so
+        # reconciliation sees closes that happened after the last watermark.
+        server_offset = self._server_utc_offset()
+        end = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=server_offset)
         start = end - timedelta(days=max(1, int(lookback_days)))
         raw = mt5.history_deals_get(start, end)
         if raw is None:
@@ -524,7 +529,11 @@ class MT5Engine(BrokerEngine):
                     "position_id": str(int(getattr(row, "position_id", 0) or 0) or ""),
                     "magic": int(getattr(row, "magic", 0) or 0),
                     "comment": str(getattr(row, "comment", "") or ""),
-                    "time": datetime.fromtimestamp(ts, tz=timezone.utc).isoformat() if ts else "",
+                    "time": (
+                        datetime.fromtimestamp(ts - server_offset, tz=timezone.utc).isoformat()
+                        if ts else ""
+                    ),
+                    "time_msc": int(getattr(row, "time_msc", 0) or 0) or None,
                 }
             )
         return out

@@ -680,6 +680,8 @@ def main() -> None:
     t2t = TickToTrade()
     fire_retry_guard = PendingRetryGuard()
     execution_status_counts: dict[str, int] = {}
+    submitted_count = 0
+    fill_count = 0
     quote_refresh_counts: dict[str, int] = {
         "stale_observed_at_send": 0,
         "fresh_quote_recovered": 0,
@@ -692,6 +694,8 @@ def main() -> None:
     # Quote buffer for genuine sub-minute features
     from aegis.intel.quote_buffer import QuoteBuffer
     quote_buffer = QuoteBuffer(max_points_per_symbol=3600)
+    from aegis.intel.short_horizon_runtime import ShortHorizonPredictor
+    short_horizon_predictor = ShortHorizonPredictor.from_config(cfg)
     # Exact ticket->hypothesis metadata persistence
     from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
     ticket_metadata_store = TicketMetadataStore(ROOT / "intel" / "ticket_metadata.json")
@@ -978,6 +982,7 @@ def main() -> None:
         def maybe_enter(sym: str, equity: float, open_count: int) -> None:
             nonlocal day_trades, day_stamp, last_halt_journal, close_block_until
             nonlocal margin_block_until
+            nonlocal submitted_count, fill_count
             brain_decision = None
             if open_attempt_blocked(time.time(), close_block_until):
                 return
@@ -1164,6 +1169,11 @@ def main() -> None:
                     quote_buffer=quote_buffer,
                     now_ts=now_ts,
                     video_style=video_style_mode,
+                    short_horizon_prediction=short_horizon_predictor.predict(
+                        symbol=sym,
+                        quote_buffer=quote_buffer,
+                        now_ts=now_ts,
+                    ),
                 )
                 brain_decision = decision
                 _book_logic = decision.journal.get("book_logic") or {}
@@ -1789,6 +1799,7 @@ def main() -> None:
                     },
                 )
             latency.request_ts = time.time()
+            submitted_count += 1
             res = eng.place_order(req)
             latency.response_ts = time.time()
             audit = classify_execution(
@@ -1819,6 +1830,7 @@ def main() -> None:
                 )
             execution_status_counts[status] = int(execution_status_counts.get(status, 0)) + 1
             if status in {"POSITION_CONFIRMED", "DEAL_EXECUTED"}:
+                fill_count += 1
                 latency.confirmed_ts = time.time()
             # Only uncertain outcomes arm the dedup guard. Definitive rejections
             # (e.g. 10016 invalid stops from a stale quote) are safe to retry.
@@ -2114,6 +2126,7 @@ def main() -> None:
                     extra_hb["execution_status"] = dict(execution_status_counts)
                 extra_hb["quote_refresh"] = dict(quote_refresh_counts)
                 extra_hb["fast_exit_errors"] = fast_exit_error_count
+                extra_hb["short_horizon_model"] = short_horizon_predictor.snapshot()
                 if intelligent_brain is not None:
                     extra_hb.update(intelligent_brain.snapshot())
                     # Profit-management reporting (spec O) + exposure metrics
@@ -2180,6 +2193,10 @@ def main() -> None:
                                             str(rec["hypothesis_id"]),
                                         )
                             if event.get("is_exit"):
+                                firehose_turnover.record_realized(
+                                    str(event.get("position") or event.get("ticket") or ""),
+                                    net_pnl_usd=float(event.get("pnl") or 0.0),
+                                )
                                 from aegis.intel.outcome_log import append_outcome
 
                                 append_outcome(
@@ -2222,6 +2239,40 @@ def main() -> None:
                     extra_hb["close_block_until_iso"] = datetime.fromtimestamp(
                         close_block_until, timezone.utc
                     ).isoformat()
+                _turnover = firehose_turnover.snapshot(time.time())
+                _brain_counts = extra_hb.get("counts") or {}
+                _funnel = extra_hb.get("funnel") or {}
+                extra_hb["firehose_telemetry"] = {
+                    "SCANS": int(_funnel.get("SCANS", _brain_counts.get("scans", 0)) or 0),
+                    "RAW_SIGNALS": int(_brain_counts.get("raw_signals", 0) or 0),
+                    "ML_ELIGIBLE": int(_brain_counts.get("ml_eligible", 0) or 0),
+                    "HIGH_CONFIDENCE": int(_brain_counts.get("high_confidence", 0) or 0),
+                    "COST_REJECT": int(
+                        (_funnel.get("SPREAD_REJECT", 0) or 0)
+                        + (_funnel.get("ECONOMICS_REJECT", 0) or 0)
+                    ),
+                    "UNCERTAINTY_REJECT": int(_brain_counts.get("uncertainty_reject", 0) or 0),
+                    "MODEL_DISAGREEMENT": int(_brain_counts.get("model_disagreement", 0) or 0),
+                    "TAIL_REJECT": int(_brain_counts.get("tail_reject", 0) or 0),
+                    "STALE_REJECT": int(_funnel.get("STALE_REJECT", 0) or 0),
+                    "RISK_REJECT": int(_funnel.get("RISK_REJECT", 0) or 0),
+                    "FIRES": int(_brain_counts.get("fire", 0) or 0),
+                    "SUBMITTED": int(submitted_count),
+                    "FILLS": int(fill_count),
+                    "GREEN_WITHIN_3S": int(_turnover.get("green_within_3s", 0) or 0),
+                    "GREEN_WITHIN_5S": int(_turnover.get("green_within_5s", 0) or 0),
+                    "GREEN_WITHIN_10S": int(_turnover.get("green_within_10s", 0) or 0),
+                    "SCRATCHES": int(_turnover.get("scratches", 0) or 0),
+                    "WIN_EXITS": int(_turnover.get("win_exits", 0) or 0),
+                    "LOSS_EXITS": int(_turnover.get("loss_exits", 0) or 0),
+                    "COMPLETED_TRADES": int(_turnover.get("completed_trades", 0) or 0),
+                    "MEDIAN_HOLD_S": _turnover.get("median_hold_seconds"),
+                    "WR": _turnover.get("win_rate"),
+                    "EXPECTANCY": _turnover.get("expectancy"),
+                    "PF": _turnover.get("profit_factor"),
+                    "DAILY_NET": _turnover.get("daily_net"),
+                    "OUTCOME_EVIDENCE": _turnover.get("outcome_evidence", "NO_EVIDENCE"),
+                }
                 write_heartbeat(extra_hb)
                 try:
                     risk.save_json(risk_path)
@@ -2517,7 +2568,10 @@ def main() -> None:
                                         evidence = {"status": "NO_EVIDENCE", "reason": "missing_exact_basket_ownership"}
                                     trace = attach_runtime_evidence(trace, evidence)
                                     firehose_turnover.record_exit_trace(
-                                        tk, observed_at=fast_exit_ctx.now_ts, mfe_usd=trace["mfe_usd"],
+                                        tk,
+                                        observed_at=fast_exit_ctx.now_ts,
+                                        mfe_usd=trace["mfe_usd"],
+                                        pnl_usd=trace.get("pnl_usd"),
                                     )
                                     append_journal(journal, trace)
                                     if fast_verdict["action"] in {"TAKE", "QUICK_TAKE", "SCRATCH", "ABORT", "TIME_EXIT"}:
@@ -2569,6 +2623,7 @@ def main() -> None:
                                     firehose_turnover.record_close(
                                         tk, closed_at=closed_at, gross_pnl_usd=None,
                                         net_pnl_usd=None, cost_usd=None, confirmed=True,
+                                        exit_reason=str(verdict.get("reason") or "unknown"),
                                     )
                                     append_journal(
                                         journal,

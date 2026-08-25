@@ -167,3 +167,28 @@ def test_confirmed_turnover_reports_average_loss_erasure_geometry():
     assert snapshot["average_loser_usd"] == -1.0
     assert snapshot["wins_erased_by_avg_loss"] == 2.0
     assert snapshot["p95_loss_usd"] == -1.0
+
+
+def test_turnover_telemetry_tracks_green_time_and_reconciled_outcome():
+    metrics = TurnoverMetrics()
+    metrics.record_open("T1", opened_at=0.0, slot_capacity=2)
+    metrics.record_exit_trace("T1", observed_at=1.0, mfe_usd=0.0, pnl_usd=-0.01)
+    metrics.record_exit_trace("T1", observed_at=4.0, mfe_usd=0.04, pnl_usd=0.04)
+    metrics.record_exit_trace("T1", observed_at=6.0, mfe_usd=0.04, pnl_usd=0.02)
+    metrics.record_close(
+        "T1", closed_at=7.0, gross_pnl_usd=None, net_pnl_usd=None,
+        cost_usd=None, confirmed=True, exit_reason="fast_take",
+    )
+
+    before_reconcile = metrics.snapshot(now=8.0)
+    assert before_reconcile["completed_trades"] == 1
+    assert before_reconcile["green_within_5s"] == 1
+    assert before_reconcile["resolved_outcomes"] == 0
+    assert before_reconcile["win_rate"] is None
+
+    assert metrics.record_realized("T1", net_pnl_usd=0.02) is True
+    after_reconcile = metrics.snapshot(now=8.0)
+    assert after_reconcile["resolved_outcomes"] == 1
+    assert after_reconcile["win_rate"] == 1.0
+    assert after_reconcile["profit_factor"] is None
+    assert after_reconcile["daily_net"] == 0.02

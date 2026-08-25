@@ -615,6 +615,12 @@ class IntelligentFirehoseBrain:
             "fire": 0, "scale": 0, "hold": 0, "reduce": 0, "exit": 0, "skip": 0,
             "skip_reasons": {},
             "shadow_fires": 0,
+            "raw_signals": 0,
+            "ml_eligible": 0,
+            "high_confidence": 0,
+            "uncertainty_reject": 0,
+            "model_disagreement": 0,
+            "tail_reject": 0,
         }
 
     def _note_skip(self, reason: str) -> None:
@@ -1431,6 +1437,8 @@ class IntelligentFirehoseBrain:
         video_signal = None
         if video_style:
             video_signal = video_style_signal(completed_m1, symbol=symbol)
+            if video_signal is not None:
+                self.counts["raw_signals"] = int(self.counts.get("raw_signals", 0)) + 1
         setup = "video_style_breakout" if video_signal is not None else str(m15.get("kind") or "scan")
         side = video_signal.side if video_signal is not None else str(core_side or "").lower()
         if video_signal is None and side not in {"buy", "sell"}:
@@ -1599,6 +1607,11 @@ class IntelligentFirehoseBrain:
             fire = ThesisFireDecision("skip", "state_not_in_validated_set", None)
         short_horizon_journal: dict[str, Any] = {}
         if short_horizon_prediction is not None:
+            calibration_status = str(short_horizon_prediction.get("calibration_status") or "")
+            if calibration_status == "calibrated":
+                self.counts["ml_eligible"] = int(self.counts.get("ml_eligible", 0)) + 1
+            if bool(short_horizon_prediction.get("model_disagreement", False)):
+                self.counts["model_disagreement"] = int(self.counts.get("model_disagreement", 0)) + 1
             prediction_ok, prediction_reason = short_horizon_gate(
                 short_horizon_prediction,
                 min_probability=float(
@@ -1619,7 +1632,15 @@ class IntelligentFirehoseBrain:
                 "short_horizon_gate": prediction_reason,
             }
             if not prediction_ok:
+                if any(token in prediction_reason for token in ("uncertainty", "abstain", "not_calibrated")):
+                    self.counts["uncertainty_reject"] = int(
+                        self.counts.get("uncertainty_reject", 0)
+                    ) + 1
+                if "tail" in prediction_reason:
+                    self.counts["tail_reject"] = int(self.counts.get("tail_reject", 0)) + 1
                 fire = ThesisFireDecision("skip", prediction_reason, fire.expected_net_value)
+            elif calibration_status == "calibrated":
+                self.counts["high_confidence"] = int(self.counts.get("high_confidence", 0)) + 1
         info_id = _information_id(
             symbol=symbol,
             side=side,

@@ -381,9 +381,11 @@ def test_history_deals_and_orders_readonly():
     ]
     eng = _engine(api)
     eng.connect_readonly()
+    eng._server_utc_offset_s = 3600
     deals = eng.history_deals(7)
     orders = eng.history_orders(7)
     assert deals[0]["profit"] == 0.12
+    assert deals[0]["time"] == "2023-11-14T21:13:20+00:00"
     assert orders[0]["ticket"] == "8"
     assert api.shutdown_calls == 0
 

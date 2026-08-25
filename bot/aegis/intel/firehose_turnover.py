@@ -25,6 +25,10 @@ class TurnoverMetrics:
         self._opens: dict[str, tuple[float, int | None]] = {}
         self._peaks: dict[str, float] = {}
         self._closes: list[tuple[float, float, float | None, float | None, float | None, float | None, int | None]] = []
+        self._close_details: list[dict[str, Any]] = []
+        self._green_at: dict[str, float] = {}
+        self._red_seconds: dict[str, float] = {}
+        self._last_sample: dict[str, tuple[float, float]] = {}
 
     @property
     def active_tickets(self) -> set[str]:
@@ -33,14 +37,33 @@ class TurnoverMetrics:
     def record_open(self, ticket: str, *, opened_at: float, slot_capacity: int | None) -> None:
         if ticket and ticket not in self._opens:
             self._opens[ticket] = (float(opened_at), slot_capacity if slot_capacity and slot_capacity > 0 else None)
+            self._green_at.pop(ticket, None)
+            self._red_seconds.pop(ticket, None)
+            self._last_sample.pop(ticket, None)
 
-    def record_exit_trace(self, ticket: str, *, observed_at: float, mfe_usd: float | None) -> None:
-        del observed_at
+    def record_exit_trace(
+        self,
+        ticket: str,
+        *,
+        observed_at: float,
+        mfe_usd: float | None,
+        pnl_usd: float | None = None,
+    ) -> None:
         if ticket not in self._opens or mfe_usd is None:
             return
         peak = float(mfe_usd)
         if peak > 0:
             self._peaks[ticket] = max(self._peaks.get(ticket, peak), peak)
+        if pnl_usd is None:
+            return
+        now = float(observed_at)
+        pnl = float(pnl_usd)
+        prior = self._last_sample.get(ticket)
+        if prior is not None and prior[1] < 0.0 and now >= prior[0]:
+            self._red_seconds[ticket] = self._red_seconds.get(ticket, 0.0) + (now - prior[0])
+        self._last_sample[ticket] = (now, pnl)
+        if pnl > 0.0 and ticket not in self._green_at:
+            self._green_at[ticket] = now
 
     def record_close(
         self,
@@ -51,6 +74,7 @@ class TurnoverMetrics:
         net_pnl_usd: float | None,
         cost_usd: float | None,
         confirmed: bool,
+        exit_reason: str | None = None,
     ) -> None:
         if not confirmed or ticket not in self._opens:
             return
@@ -59,9 +83,74 @@ class TurnoverMetrics:
             opened_at, float(closed_at), gross_pnl_usd, net_pnl_usd, cost_usd,
             self._peaks.pop(ticket, None), slot_capacity,
         ))
+        self._close_details.append({
+            "ticket": ticket,
+            "opened_at": opened_at,
+            "closed_at": float(closed_at),
+            "exit_reason": str(exit_reason or "unknown"),
+            "first_green_s": (
+                max(0.0, self._green_at[ticket] - opened_at)
+                if ticket in self._green_at else None
+            ),
+            "seconds_in_red": round(self._red_seconds.get(ticket, 0.0), 6),
+        })
+        self._green_at.pop(ticket, None)
+        self._red_seconds.pop(ticket, None)
+        self._last_sample.pop(ticket, None)
 
-    def snapshot(self, now: float) -> dict[str, float | None]:
+    def record_realized(
+        self,
+        ticket: str,
+        *,
+        net_pnl_usd: float,
+        cost_usd: float | None = None,
+    ) -> bool:
+        """Attach broker-reconciled P&L to an already confirmed close."""
+        for index in range(len(self._close_details) - 1, -1, -1):
+            detail = self._close_details[index]
+            if detail.get("ticket") != str(ticket) or detail.get("net_pnl_usd") is not None:
+                continue
+            detail["net_pnl_usd"] = float(net_pnl_usd)
+            if cost_usd is not None:
+                detail["cost_usd"] = float(cost_usd)
+            opened, closed, gross, _net, cost, peak, capacity = self._closes[index]
+            self._closes[index] = (
+                opened, closed, gross if gross is not None else float(net_pnl_usd),
+                float(net_pnl_usd), cost if cost is not None else cost_usd,
+                peak, capacity,
+            )
+            return True
+        return False
+
+    def snapshot(self, now: float) -> dict[str, Any]:
         completed = self._closes
+        details = self._close_details
+        resolved = [detail for detail in details if detail.get("net_pnl_usd") is not None]
+        resolved_net = [float(detail["net_pnl_usd"]) for detail in resolved]
+        winners_resolved = [value for value in resolved_net if value > 0]
+        losers_resolved = [value for value in resolved_net if value < 0]
+        exit_reasons = [str(detail.get("exit_reason") or "") for detail in details]
+        green_times = [
+            float(detail["first_green_s"])
+            for detail in details
+            if detail.get("first_green_s") is not None
+        ]
+        red_seconds = [float(detail.get("seconds_in_red") or 0.0) for detail in details]
+        telemetry: dict[str, Any] = {
+            "completed_trades": len(details),
+            "scratches": sum("scratch" in reason or "abort" in reason for reason in exit_reasons),
+            "win_exits": len(winners_resolved),
+            "loss_exits": len(losers_resolved),
+            "green_within_3s": sum(value <= 3.0 for value in green_times),
+            "green_within_5s": sum(value <= 5.0 for value in green_times),
+            "green_within_10s": sum(value <= 10.0 for value in green_times),
+            "green_within_20s": sum(value <= 20.0 for value in green_times),
+            "green_within_30s": sum(value <= 30.0 for value in green_times),
+            "median_time_to_green_s": median(green_times) if green_times else None,
+            "median_seconds_in_red": median(red_seconds) if red_seconds else None,
+            "resolved_outcomes": len(resolved_net),
+            "outcome_evidence": "broker_reconciled_deals" if resolved_net else "NO_EVIDENCE",
+        }
         if not completed:
             return {
                 "median_hold_seconds": None, "p90_hold_seconds": None,
@@ -72,6 +161,9 @@ class TurnoverMetrics:
                 "average_winner_usd": None, "average_loser_usd": None,
                 "p95_loss_usd": None, "p99_loss_usd": None,
                 "max_loss_usd": None, "wins_erased_by_avg_loss": None,
+                **telemetry,
+                "win_rate": None, "expectancy": None, "profit_factor": None,
+                "daily_net": None,
             }
         holds = sorted(closed - opened for opened, closed, _, _, _, _, _ in completed)
         p90_index = (len(holds) - 1) * 0.9
@@ -118,6 +210,18 @@ class TurnoverMetrics:
                 if average_loser is not None and average_winner is not None and average_winner > 0
                 else None
             ),
+            **telemetry,
+            "win_rate": (
+                len(winners_resolved) / len(resolved_net) if resolved_net else None
+            ),
+            "expectancy": (
+                sum(resolved_net) / len(resolved_net) if resolved_net else None
+            ),
+            "profit_factor": (
+                sum(winners_resolved) / abs(sum(losers_resolved))
+                if losers_resolved and winners_resolved else None
+            ),
+            "daily_net": sum(resolved_net) if resolved_net else None,
         }
 
 
