@@ -26,6 +26,9 @@ def test_council_evidence_stays_bounded_and_valid_json():
         "spread_vol_gate_sweep": [
             {"spread_to_realized_vol_max": 0.2, "spread_to_micro_vol_max": 1.5, "sealed": {"selected": 12}},
         ],
+        "spread_vol_soft_gate_sweep": [
+            {"soft_gate_score_threshold": 0.8, "sealed": {"selected": 9}},
+        ],
         "model_space": {"promotion_candidates": [{"noise": "x" * 10000}]},
     }
     evidence = _bounded_evidence(report)
@@ -34,6 +37,7 @@ def test_council_evidence_stays_bounded_and_valid_json():
     assert bounded["status"] == "SHADOW_ONLY_NO_POSITIVE_OOS"
     assert bounded["fast_winner_feature_discovery"]["analysis_scope"] == "descriptive_sealed_oos"
     assert bounded["spread_vol_gate_sweep"][0]["sealed"]["selected"] == 12
+    assert bounded["spread_vol_soft_gate_sweep"][0]["sealed"]["selected"] == 9
     assert len(_prompt(report, role="ML CRITIC")) < 8000
 
 

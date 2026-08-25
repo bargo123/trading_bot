@@ -18,6 +18,7 @@ from aegis.research.fast_edge_shadow import (
     fit_shadow_model_space,
     evaluate_exit_policies,
     evaluate_spread_vol_gates,
+    evaluate_soft_spread_vol_gates,
     fit_multi_outcome_models,
     fit_segmented_logistic_models,
 )
@@ -229,6 +230,28 @@ def test_spread_vol_gate_sweep_is_chronological_and_reports_both_oos_slices():
     assert rows[0]["sealed"]["n"] > 0
     assert rows[0]["test"]["selected"] <= rows[0]["test"]["n"]
     assert "executable_captured_exit_expectancy" in rows[0]["sealed"]
+
+
+def test_soft_spread_vol_gate_sweep_is_continuous_and_research_only():
+    times = pd.date_range("2026-01-01T00:00:00Z", periods=40, freq="1s")
+    frame = pd.DataFrame(
+        {
+            "time": times,
+            "spread_to_realized_vol": np.linspace(0.01, 0.40, 40),
+            "spread_to_micro_vol": np.linspace(0.10, 4.00, 40),
+            "captured_exit_return": np.where(np.arange(40) < 20, 0.001, -0.001),
+            "target": np.where(np.arange(40) < 20, 1, 0),
+            "horizon_s": np.ones(40),
+            "time_to_green_s": np.ones(40),
+        }
+    )
+    rows = evaluate_soft_spread_vol_gates(frame, thresholds=(0.70, 0.80))
+    assert len(rows) == 2
+    assert all(row["experiment"] == "spread_vol_soft_gate_sweep" for row in rows)
+    assert all(row["execution_authority"] == "NONE" for row in rows)
+    assert [row["soft_gate_score_threshold"] for row in rows] == [0.70, 0.80]
+    assert rows[0]["test"]["selected"] < rows[0]["test"]["n"]
+    assert rows[1]["test"]["selected"] <= rows[0]["test"]["selected"]
 
 
 def test_exit_policy_comparison_is_segmented_and_cost_aware():

@@ -23,6 +23,7 @@ from aegis.research.fast_edge_shadow import (  # noqa: E402
     chronological_shadow_slices,
     evaluate_exit_policies,
     evaluate_spread_vol_gates,
+    evaluate_soft_spread_vol_gates,
     fast_winner_feature_discovery,
     fit_shadow_model_space,
 )
@@ -90,6 +91,7 @@ def main() -> None:
         )
     model_report = fit_shadow_model_space(frame, min_samples=20)
     spread_vol_gate_sweep = evaluate_spread_vol_gates(frame)
+    spread_vol_soft_gate_sweep = evaluate_soft_spread_vol_gates(frame)
     sealed_frame = chronological_shadow_slices(frame).sealed
     fast_winner_discovery = fast_winner_feature_discovery(sealed_frame)
     exit_policy_comparison = evaluate_exit_policies(sealed_frame, min_samples=20)
@@ -207,6 +209,7 @@ def main() -> None:
         "multi_outcome_models": model_report["multi_outcome_models"],
         "fast_winner_feature_discovery": fast_winner_discovery,
         "spread_vol_gate_sweep": spread_vol_gate_sweep,
+        "spread_vol_soft_gate_sweep": spread_vol_soft_gate_sweep,
         "book_evidence": book_evidence,
         "exit_policy_comparison": exit_policy_comparison[:50],
         "leaderboard_top_50": published_candidates,

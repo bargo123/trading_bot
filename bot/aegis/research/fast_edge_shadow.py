@@ -32,6 +32,7 @@ SPREAD_VOL_GATE_THRESHOLDS = tuple(
     for spread_to_realized in (0.05, 0.10, 0.15, 0.20)
     for spread_to_micro in (0.5, 1.0, 1.5, 2.0)
 )
+SOFT_SPREAD_VOL_GATE_SCORE_THRESHOLDS = (0.50, 0.60, 0.70, 0.80, 0.90)
 SHADOW_EXIT_POLICIES = (
     "captured_exit_replay", "first_meaningful_green", "mfe_protection", "no_progress_3s",
 )
@@ -650,6 +651,56 @@ def evaluate_spread_vol_gates(
                 "experiment": "spread_vol_gate_sweep",
                 "spread_to_realized_vol_max": float(realized_limit),
                 "spread_to_micro_vol_max": float(micro_limit),
+                "execution_authority": "NONE",
+                "test": score(slices.test),
+                "sealed": score(slices.sealed),
+            }
+        )
+    return rows
+
+
+def evaluate_soft_spread_vol_gates(
+    frame: pd.DataFrame,
+    *,
+    thresholds: Sequence[float] = SOFT_SPREAD_VOL_GATE_SCORE_THRESHOLDS,
+) -> list[dict[str, Any]]:
+    """Evaluate a continuous spread/volatility score on chronological OOS slices.
+
+    This is a research-only challenger to the hard ratio gates.  The score is
+    monotone in both executable spread-to-volatility ratios and is never an
+    execution authority or runtime filter.
+    """
+    required = {"spread_to_realized_vol", "spread_to_micro_vol"}
+    missing = sorted(required.difference(frame.columns))
+    if missing:
+        raise ValueError(f"soft spread-vol gate requires features: {', '.join(missing)}")
+    slices = chronological_shadow_slices(frame)
+    rows: list[dict[str, Any]] = []
+    for threshold in thresholds:
+        threshold_value = float(threshold)
+        if not 0.0 <= threshold_value <= 1.0:
+            raise ValueError("soft spread-vol score thresholds must be between 0 and 1")
+
+        def score(part: pd.DataFrame) -> dict[str, Any]:
+            realized = pd.to_numeric(part["spread_to_realized_vol"], errors="coerce")
+            micro = pd.to_numeric(part["spread_to_micro_vol"], errors="coerce")
+            soft_score = np.sqrt(
+                (1.0 / (1.0 + realized.clip(lower=0.0)))
+                * (1.0 / (1.0 + micro.clip(lower=0.0)))
+            )
+            selected = soft_score.ge(threshold_value) & soft_score.notna()
+            return _metrics(
+                part,
+                selected.to_numpy(dtype=float),
+                0.5,
+                duration_frame=part,
+            )
+
+        rows.append(
+            {
+                "experiment": "spread_vol_soft_gate_sweep",
+                "soft_gate_score_definition": "sqrt(1/(1+spread_to_realized_vol) * 1/(1+spread_to_micro_vol))",
+                "soft_gate_score_threshold": threshold_value,
                 "execution_authority": "NONE",
                 "test": score(slices.test),
                 "sealed": score(slices.sealed),
