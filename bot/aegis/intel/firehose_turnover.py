@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import median
@@ -104,8 +105,10 @@ class TurnoverMetrics:
         *,
         net_pnl_usd: float,
         cost_usd: float | None = None,
+        closed_at: float | None = None,
+        exit_reason: str | None = None,
     ) -> bool:
-        """Attach broker-reconciled P&L to an already confirmed close."""
+        """Attach broker P&L, including exits triggered outside the runner."""
         for index in range(len(self._close_details) - 1, -1, -1):
             detail = self._close_details[index]
             if detail.get("ticket") != str(ticket) or detail.get("net_pnl_usd") is not None:
@@ -119,6 +122,23 @@ class TurnoverMetrics:
                 float(net_pnl_usd), cost if cost is not None else cost_usd,
                 peak, capacity,
             )
+            return True
+        if ticket in self._opens:
+            # SL/TP or a terminal-side close can arrive before the runner's
+            # local close-confirmation path. Materialize that broker truth as
+            # a completed lifecycle instead of dropping its P&L.
+            self.record_close(
+                ticket,
+                closed_at=float(closed_at if closed_at is not None else time.time()),
+                gross_pnl_usd=float(net_pnl_usd),
+                net_pnl_usd=float(net_pnl_usd),
+                cost_usd=cost_usd,
+                confirmed=True,
+                exit_reason=exit_reason or "broker_reconciled",
+            )
+            self._close_details[-1]["net_pnl_usd"] = float(net_pnl_usd)
+            if cost_usd is not None:
+                self._close_details[-1]["cost_usd"] = float(cost_usd)
             return True
         return False
 

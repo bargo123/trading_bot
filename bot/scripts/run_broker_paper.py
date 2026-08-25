@@ -2244,6 +2244,11 @@ def main() -> None:
                                 firehose_turnover.record_realized(
                                     str(event.get("position") or event.get("ticket") or ""),
                                     net_pnl_usd=float(event.get("pnl") or 0.0),
+                                    closed_at=(
+                                        float(event["time_msc"]) / 1000.0
+                                        if event.get("time_msc") else None
+                                    ),
+                                    exit_reason=str(event.get("close_reason") or "broker_reconciled"),
                                 )
                                 from aegis.intel.outcome_log import append_outcome
 

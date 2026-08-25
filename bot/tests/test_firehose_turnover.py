@@ -192,3 +192,21 @@ def test_turnover_telemetry_tracks_green_time_and_reconciled_outcome():
     assert after_reconcile["win_rate"] == 1.0
     assert after_reconcile["profit_factor"] is None
     assert after_reconcile["daily_net"] == 0.02
+
+
+def test_broker_exit_reconciles_active_ticket_without_local_close():
+    """Broker SL/TP exits must not disappear from turnover metrics."""
+    metrics = TurnoverMetrics()
+    metrics.record_open("SL1", opened_at=100.0, slot_capacity=2)
+    metrics.record_exit_trace("SL1", observed_at=101.0, mfe_usd=0.0, pnl_usd=-0.01)
+
+    assert metrics.record_realized(
+        "SL1", net_pnl_usd=-0.08, closed_at=105.0, exit_reason="sl"
+    ) is True
+
+    snapshot = metrics.snapshot(now=106.0)
+    assert snapshot["completed_trades"] == 1
+    assert snapshot["resolved_outcomes"] == 1
+    assert snapshot["loss_exits"] == 1
+    assert snapshot["daily_net"] == -0.08
+    assert snapshot["median_hold_seconds"] == 5.0
