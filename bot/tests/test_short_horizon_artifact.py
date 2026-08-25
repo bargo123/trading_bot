@@ -51,6 +51,28 @@ def test_training_frame_has_matured_both_side_horizon_rows():
     assert {0, 1}.issuperset(set(frame["target"]))
 
 
+def test_terminal_profit_target_does_not_label_temporary_mfe_as_a_win():
+    times = pd.date_range("2026-01-01T00:00:00Z", periods=70, freq="1s")
+    mid = np.full(70, 1.1)
+    mid[1] = 1.1004
+    mid[2:11] = np.linspace(1.1003, 1.0995, 9)
+    quotes = pd.DataFrame({"time": times, "bid": mid - 0.00001, "ask": mid + 0.00001})
+
+    mfe = build_quote_training_frame(
+        {"EURUSD": quotes}, horizons=(10,), sample_every_s=1, target_mode="mfe_first"
+    )
+    terminal = build_quote_training_frame(
+        {"EURUSD": quotes}, horizons=(10,), sample_every_s=1, target_mode="terminal_profit"
+    )
+    mfe_row = mfe[(mfe["time"] == times[0]) & (mfe["side"] == "buy")].iloc[0]
+    terminal_row = terminal[(terminal["time"] == times[0]) & (terminal["side"] == "buy")].iloc[0]
+
+    assert mfe_row["mfe"] > 0
+    assert mfe_row["terminal_net_pnl"] < 0
+    assert mfe_row["target"] == 1
+    assert terminal_row["target"] == 0
+
+
 def test_chronological_slices_are_disjoint_and_ordered():
     frame = build_quote_training_frame(
         {"EURUSD": _quotes(300)}, horizons=(5,), sample_every_s=5

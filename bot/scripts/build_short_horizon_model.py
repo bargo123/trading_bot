@@ -32,6 +32,12 @@ def main() -> None:
     parser.add_argument("--config", type=Path, default=BOT_ROOT / "config_mt5_demo_firehose_hw.yaml")
     parser.add_argument("--lookback-seconds", type=int, default=14_400)
     parser.add_argument("--sample-every-seconds", type=int, default=5)
+    parser.add_argument(
+        "--target-mode",
+        choices=("mfe_first", "terminal_profit"),
+        default="mfe_first",
+        help="Research label: temporary green or terminal profit at the horizon",
+    )
     parser.add_argument("--output", type=Path, default=BOT_ROOT / "intel" / "short_horizon_model")
     args = parser.parse_args()
     cfg = yaml.safe_load(args.config.read_text(encoding="utf-8")) or {}
@@ -61,6 +67,7 @@ def main() -> None:
         quotes_by_symbol,
         horizons=DEFAULT_HORIZONS_S,
         sample_every_s=max(1, int(args.sample_every_seconds)),
+        target_mode=args.target_mode,
     )
     print(f"TRAINING_ROWS {len(frame)} SYMBOLS {frame['symbol'].nunique()} TIMES {frame['time'].min()}..{frame['time'].max()}")
     metadata = train_and_publish(
@@ -68,6 +75,7 @@ def main() -> None:
         args.output,
         horizons=DEFAULT_HORIZONS_S,
         decision_horizon_s=10,
+        target_definition=args.target_mode,
     )
     experiment_id = record_artifact_outcome(
         metadata,

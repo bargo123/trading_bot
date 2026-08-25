@@ -207,13 +207,24 @@ def build_quote_training_frame(
     *,
     horizons: Sequence[int] = DEFAULT_HORIZONS_S,
     sample_every_s: int = 5,
+    target_mode: str = "mfe_first",
 ) -> pd.DataFrame:
-    """Create point-in-time feature/label rows from completed quotes."""
+    """Create point-in-time feature/label rows from completed quotes.
+
+    ``mfe_first`` predicts whether the executable path becomes green at any
+    point in the horizon.  ``terminal_profit`` predicts whether the
+    executable terminal mark is still green at the horizon endpoint.  Both
+    labels are point-in-time and cost-aware; the latter is a research
+    challenger for the runtime's terminal-EV gate.
+    """
     horizon_values = tuple(sorted({int(value) for value in horizons if int(value) > 0}))
     if not horizon_values:
         raise ValueError("at least one positive horizon is required")
     if int(sample_every_s) <= 0:
         raise ValueError("sample_every_s must be positive")
+    target_mode = str(target_mode).strip().lower()
+    if target_mode not in {"mfe_first", "terminal_profit"}:
+        raise ValueError("target_mode must be mfe_first or terminal_profit")
     rows: list[dict[str, Any]] = []
     for symbol, quotes in sorted(quotes_by_symbol.items()):
         features = _feature_frame(quotes, symbol)
@@ -252,6 +263,7 @@ def build_quote_training_frame(
                     mae = float(np.min(signed))
                     terminal = float(signed[-1])
                     row = features.iloc[index].to_dict()
+                    target = int(mfe > 0.0) if target_mode == "mfe_first" else int(terminal > 0.0)
                     row.update(
                         {
                             "time": features.iloc[index]["time"],
@@ -261,7 +273,7 @@ def build_quote_training_frame(
                             "horizon_s": float(horizon),
                             # Profit means the executable path became green
                             # within the stated horizon, after spread.
-                            "target": int(mfe > 0.0),
+                            "target": target,
                             "terminal_net_pnl": terminal,
                             "terminal_return": terminal / float(mid[index]) if mid[index] > 0 else np.nan,
                             "mfe": mfe,
@@ -377,6 +389,7 @@ def train_and_publish(
     *,
     horizons: Sequence[int] = DEFAULT_HORIZONS_S,
     decision_horizon_s: int = 10,
+    target_definition: str = "mfe_first",
 ) -> dict[str, Any]:
     """Train, evaluate, and publish only a calibrated positive-OOS artifact."""
     slices = chronological_slices(frame)
@@ -477,6 +490,7 @@ def train_and_publish(
             "validation_hash": _hash_frame(slices.validation),
             "horizons_s": [int(value) for value in horizons],
             "decision_horizon_s": int(decision_horizon_s),
+            "target_definition": str(target_definition),
             "threshold": float(threshold),
             "min_model_agreement": 0.6,
             "max_uncertainty": uncertainty_limit,
