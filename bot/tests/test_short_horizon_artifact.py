@@ -8,6 +8,7 @@ from aegis.research.short_horizon_artifact import (
     _feature_frame,
     _execution_status,
     _metrics,
+    _select_decision_horizon,
     _threshold_candidates,
     build_quote_training_frame,
     chronological_slices,
@@ -20,6 +21,14 @@ def _positive_metrics(mean: float) -> dict[str, float | int]:
     return {
         "mean_terminal_return": mean,
         "expectancy_lcb95_return": mean,
+        "selected": 20,
+    }
+
+
+def _positive_mfe_metrics(mean: float) -> dict[str, float | int]:
+    return {
+        "mean_harvest_return": mean,
+        "harvest_lcb95_return": mean,
         "selected": 20,
     }
 
@@ -52,9 +61,9 @@ def test_execution_candidate_requires_positive_lower_confidence_bound():
     assert reason == "oos_lcb95_not_positive"
 
 
-def test_execution_candidate_requires_terminal_profit_labels():
+def test_execution_candidate_requires_supported_harvest_labels():
     status, reason = _execution_status(
-        target_definition="mfe_first",
+        target_definition="unknown_target",
         decision_horizon_s=10,
         test_metrics=_positive_metrics(0.001),
         sealed_metrics=_positive_metrics(0.001),
@@ -62,7 +71,35 @@ def test_execution_candidate_requires_terminal_profit_labels():
     )
 
     assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
-    assert reason == "execution_requires_terminal_profit_labels"
+    assert reason == "execution_requires_supported_harvest_labels"
+
+
+def test_mfe_first_execution_candidate_requires_positive_harvest_oos():
+    status, reason = _execution_status(
+        target_definition="mfe_first",
+        decision_horizon_s=10,
+        test_metrics=_positive_mfe_metrics(0.001),
+        sealed_metrics=_positive_mfe_metrics(0.001),
+        sealed_by_horizon={"10": _positive_mfe_metrics(0.001)},
+    )
+
+    assert status == "EXECUTION_CANDIDATE"
+    assert reason == "positive_test_sealed_decision_horizon_harvest_oos"
+
+
+def test_mfe_first_execution_candidate_rejects_negative_harvest_lcb():
+    metrics = _positive_mfe_metrics(0.001)
+    metrics["harvest_lcb95_return"] = -0.001
+    status, reason = _execution_status(
+        target_definition="mfe_first",
+        decision_horizon_s=10,
+        test_metrics=metrics,
+        sealed_metrics=_positive_mfe_metrics(0.001),
+        sealed_by_horizon={"10": _positive_mfe_metrics(0.001)},
+    )
+
+    assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
+    assert reason == "harvest_oos_lcb95_not_positive"
 
 
 def test_execution_candidate_requires_positive_test_sealed_and_horizon_metrics():
@@ -78,6 +115,22 @@ def test_execution_candidate_requires_positive_test_sealed_and_horizon_metrics()
     assert reason == "positive_test_sealed_decision_horizon_oos"
 
 
+def test_decision_horizon_uses_fastest_validation_supported_horizon():
+    selected, reason = _select_decision_horizon(
+        {
+            "10": {"mean_harvest_return": 0.001, "harvest_lcb95_return": 0.001, "selected": 5},
+            "20": {"mean_harvest_return": 0.001, "harvest_lcb95_return": 0.001, "selected": 12},
+            "30": {"mean_harvest_return": 0.001, "harvest_lcb95_return": 0.001, "selected": 25},
+        },
+        requested_horizon_s=10,
+        target_definition="mfe_first",
+        min_selected=20,
+    )
+
+    assert selected == 30
+    assert reason == "fastest_validation_supported_horizon"
+
+
 def test_oos_metrics_include_calibration_curve_ece_and_confusion_counts():
     frame = pd.DataFrame(
         {
@@ -86,6 +139,7 @@ def test_oos_metrics_include_calibration_curve_ece_and_confusion_counts():
             "tail_loss": [0, 0, 1, 0],
             "mfe": [0.1, 0.2, 0.1, 0.3],
             "mae": [-0.1, -0.1, -0.2, -0.1],
+            "mid": [1.0, 1.0, 1.0, 1.0],
             "time_to_profit_s": [None, 2.0, None, 1.0],
             "time_to_failure_s": [1.0, None, 1.0, None],
         }
@@ -102,6 +156,10 @@ def test_oos_metrics_include_calibration_curve_ece_and_confusion_counts():
     assert len(metrics["calibration_bins"]) > 0
     assert metrics["confusion_matrix"] == {"tp": 2, "fp": 0, "tn": 2, "fn": 0}
     assert metrics["expectancy_lcb95_return"] <= metrics["mean_terminal_return"]
+    assert "mfe_lcb95_return" in metrics
+    assert "mean_mfe_return" in metrics
+    assert "harvest_lcb95_return" in metrics
+    assert "mean_harvest_return" in metrics
     assert "50-60%" in metrics["confidence_bands"]
 
 
@@ -157,7 +215,7 @@ def test_training_frame_has_matured_both_side_horizon_rows():
     assert set(frame["horizon_s"]) == {3.0, 10.0, 45.0}
     assert frame["time"].max() <= pd.Timestamp("2026-01-01T00:03:15Z")
     assert {0, 1}.issuperset(set(frame["target"]))
-    assert {"time_to_profit_s", "time_to_failure_s"}.issubset(frame.columns)
+    assert {"time_to_profit_s", "time_to_failure_s", "harvest_return"}.issubset(frame.columns)
 
 
 def test_terminal_profit_target_does_not_label_temporary_mfe_as_a_win():
@@ -178,6 +236,7 @@ def test_terminal_profit_target_does_not_label_temporary_mfe_as_a_win():
 
     assert mfe_row["mfe"] > 0
     assert mfe_row["terminal_net_pnl"] < 0
+    assert mfe_row["harvest_return"] > 0
     assert mfe_row["target"] == 1
     assert terminal_row["target"] == 0
 

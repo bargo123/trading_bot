@@ -4,7 +4,7 @@ This module consumes completed MT5 quote history and never imports an engine or
 places orders.  Features are calculated from observations at or before the
 entry timestamp.  Labels use only observations strictly after entry.  An
 artifact is publishable only when its chronological OOS slice has positive
-cost-aware terminal expectancy.
+cost-aware terminal or first-green harvest expectancy.
 """
 from __future__ import annotations
 
@@ -74,8 +74,11 @@ def record_artifact_outcome(
         if str(metadata.get("execution_status") or "") == "EXECUTION_CANDIDATE"
         else "NO_EVIDENCE"
     )
+    harvest_mode = str(metadata.get("target_definition") or "terminal_profit").strip().lower() == "mfe_first"
     reason = (
-        "positive chronological test and sealed-OOS terminal returns support a challenger"
+        "positive chronological test and sealed-OOS first-green harvest returns support a challenger"
+        if status == "CHALLENGER" and harvest_mode
+        else "positive chronological test and sealed-OOS terminal returns support a challenger"
         if status == "CHALLENGER"
         else "no positive sealed-OOS execution selection; retain shadow-only"
     )
@@ -84,14 +87,19 @@ def record_artifact_outcome(
         "test_selected": test.get("selected"),
         "test_positive_rate": test.get("positive_rate"),
         "test_mean_terminal_return": test.get("mean_terminal_return"),
+        "test_mean_harvest_return": test.get("mean_harvest_return"),
+        "test_harvest_lcb95_return": test.get("harvest_lcb95_return"),
         "test_brier": test.get("brier"),
         "sealed_n": sealed.get("n"),
         "sealed_selected": sealed.get("selected"),
         "sealed_positive_rate": sealed.get("positive_rate"),
         "sealed_mean_terminal_return": sealed.get("mean_terminal_return"),
+        "sealed_mean_harvest_return": sealed.get("mean_harvest_return"),
+        "sealed_harvest_lcb95_return": sealed.get("harvest_lcb95_return"),
         "sealed_brier": sealed.get("brier"),
         "horizons_s": list(metadata.get("horizons_s") or []),
         "decision_horizon_s": metadata.get("decision_horizon_s"),
+        "target_definition": metadata.get("target_definition"),
         "threshold": metadata.get("threshold"),
     }
     hypothesis = {
@@ -291,6 +299,7 @@ def build_quote_training_frame(
                         float((future_times.iloc[int(failures[0])] - features.iloc[index]["time"]).total_seconds())
                         if len(failures) else None
                     )
+                    harvest = float(signed[int(profitable[0])]) if len(profitable) else terminal
                     row = features.iloc[index].to_dict()
                     target = int(mfe > 0.0) if target_mode == "mfe_first" else int(terminal > 0.0)
                     row.update(
@@ -305,6 +314,11 @@ def build_quote_training_frame(
                             "target": target,
                             "terminal_net_pnl": terminal,
                             "terminal_return": terminal / float(mid[index]) if mid[index] > 0 else np.nan,
+                            # The first-green harvest proxy is executable-side
+                            # and cost-aware: take the first positive mark, or
+                            # retain the terminal outcome when no green mark
+                            # occurred within the horizon.
+                            "harvest_return": harvest / float(mid[index]) if mid[index] > 0 else np.nan,
                             "mfe": mfe,
                             "mae": mae,
                             "tail_loss": int(mae <= -tail_threshold),
@@ -343,7 +357,7 @@ def _model_frame(frame: pd.DataFrame) -> pd.DataFrame:
     excluded = {
         "time", "symbol", "side", "target", "terminal_net_pnl",
         "terminal_return", "mfe", "mae", "tail_loss",
-        "time_to_profit_s", "time_to_failure_s",
+        "harvest_return", "time_to_profit_s", "time_to_failure_s",
     }
     columns = [column for column in frame.columns if column not in excluded]
     result = frame.loc[:, columns].copy()
@@ -358,6 +372,23 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
     terminal = frame["terminal_return"].to_numpy(dtype=float)
     selected = terminal[decision]
     selected_frame = frame.loc[decision]
+    harvest = pd.to_numeric(
+        frame.get("harvest_return", frame["terminal_return"]), errors="coerce"
+    ).to_numpy(dtype=float)
+    selected_harvest = harvest[decision]
+    mfe_values = pd.to_numeric(
+        frame.get("mfe", pd.Series(np.nan, index=frame.index)), errors="coerce"
+    ).to_numpy(dtype=float)
+    mid_values = pd.to_numeric(
+        frame.get("mid", pd.Series(1.0, index=frame.index)), errors="coerce"
+    ).to_numpy(dtype=float)
+    mfe_return = np.divide(
+        mfe_values,
+        mid_values,
+        out=np.full(len(frame), np.nan, dtype=float),
+        where=np.isfinite(mid_values) & (np.abs(mid_values) > 1e-12),
+    )
+    selected_mfe_return = mfe_return[decision]
     calibration_bins: list[dict[str, Any]] = []
     calibration_ece = 0.0
     for lower in np.linspace(0.0, 1.0, 11)[:-1]:
@@ -389,6 +420,20 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
     if len(selected) >= 2:
         expectancy_lcb95 = float(
             selected.mean() - 1.96 * selected.std(ddof=1) / np.sqrt(len(selected))
+        )
+    mfe_lcb95 = None
+    finite_selected_mfe = selected_mfe_return[np.isfinite(selected_mfe_return)]
+    if len(finite_selected_mfe) >= 2:
+        mfe_lcb95 = float(
+            finite_selected_mfe.mean()
+            - 1.96 * finite_selected_mfe.std(ddof=1) / np.sqrt(len(finite_selected_mfe))
+        )
+    harvest_lcb95 = None
+    finite_selected_harvest = selected_harvest[np.isfinite(selected_harvest)]
+    if len(finite_selected_harvest) >= 2:
+        harvest_lcb95 = float(
+            finite_selected_harvest.mean()
+            - 1.96 * finite_selected_harvest.std(ddof=1) / np.sqrt(len(finite_selected_harvest))
         )
     confidence_bands: dict[str, dict[str, Any]] = {}
     for lower, upper in (
@@ -425,10 +470,19 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
         "calibration_bins": calibration_bins,
         "confusion_matrix": confusion,
         "expectancy_lcb95_return": expectancy_lcb95,
+        "mfe_lcb95_return": mfe_lcb95,
+        "harvest_lcb95_return": harvest_lcb95,
         "confidence_bands": confidence_bands,
         "precision": float(actual[decision].mean()) if decision.any() else None,
         "mean_terminal_return": float(selected.mean()) if len(selected) else None,
         "net_terminal_return": float(selected.sum()) if len(selected) else None,
+        "mean_mfe_return": (
+            float(finite_selected_mfe.mean()) if len(finite_selected_mfe) else None
+        ),
+        "mean_harvest_return": (
+            float(finite_selected_harvest.mean())
+            if len(finite_selected_harvest) else None
+        ),
         "expected_mfe": selected_mean("mfe"),
         "expected_mae": selected_mean("mae"),
         "median_time_to_green_s": selected_median("time_to_profit_s"),
@@ -495,15 +549,19 @@ def _execution_status(
     sealed_metrics: Mapping[str, Any],
     sealed_by_horizon: Mapping[str, Mapping[str, Any]],
 ) -> tuple[str, str]:
-    """Authorize execution only for the label and horizon runtime consumes."""
-    if str(target_definition).strip().lower() != "terminal_profit":
-        return "SHADOW_ONLY_NO_POSITIVE_OOS", "execution_requires_terminal_profit_labels"
+    """Authorize execution only for a costed label the exit can realize."""
+    target = str(target_definition).strip().lower()
+    if target not in {"terminal_profit", "mfe_first"}:
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", "execution_requires_supported_harvest_labels"
+    harvest_mode = target == "mfe_first"
+    mean_key = "mean_harvest_return" if harvest_mode else "mean_terminal_return"
+    lcb_key = "harvest_lcb95_return" if harvest_mode else "expectancy_lcb95_return"
 
     def positive(metrics: Mapping[str, Any] | None) -> bool:
         if not isinstance(metrics, Mapping):
             return False
         try:
-            return float(metrics.get("mean_terminal_return")) > 0.0
+            return float(metrics.get(mean_key)) > 0.0
         except (TypeError, ValueError):
             return False
 
@@ -511,20 +569,69 @@ def _execution_status(
         if not isinstance(metrics, Mapping):
             return False
         try:
-            return float(metrics.get("expectancy_lcb95_return")) > 0.0
+            return float(metrics.get(lcb_key)) > 0.0
         except (TypeError, ValueError):
             return False
 
     if not positive(test_metrics) or not positive(sealed_metrics):
-        return "SHADOW_ONLY_NO_POSITIVE_OOS", "test_or_sealed_oos_not_positive"
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", (
+            "test_or_sealed_harvest_oos_not_positive" if harvest_mode
+            else "test_or_sealed_oos_not_positive"
+        )
     if not positive_lcb(test_metrics) or not positive_lcb(sealed_metrics):
-        return "SHADOW_ONLY_NO_POSITIVE_OOS", "oos_lcb95_not_positive"
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", (
+            "harvest_oos_lcb95_not_positive" if harvest_mode else "oos_lcb95_not_positive"
+        )
     horizon_metrics = sealed_by_horizon.get(str(int(decision_horizon_s)))
     if not positive(horizon_metrics):
-        return "SHADOW_ONLY_NO_POSITIVE_OOS", "decision_horizon_oos_not_positive"
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", (
+            "decision_horizon_harvest_oos_not_positive" if harvest_mode
+            else "decision_horizon_oos_not_positive"
+        )
     if not positive_lcb(horizon_metrics):
-        return "SHADOW_ONLY_NO_POSITIVE_OOS", "oos_lcb95_not_positive"
-    return "EXECUTION_CANDIDATE", "positive_test_sealed_decision_horizon_oos"
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", (
+            "harvest_oos_lcb95_not_positive" if harvest_mode else "oos_lcb95_not_positive"
+        )
+    return "EXECUTION_CANDIDATE", (
+        "positive_test_sealed_decision_horizon_harvest_oos" if harvest_mode
+        else "positive_test_sealed_decision_horizon_oos"
+    )
+
+
+def _select_decision_horizon(
+    validation_by_horizon: Mapping[str, Mapping[str, Any]],
+    *,
+    requested_horizon_s: int,
+    target_definition: str,
+    min_selected: int = 20,
+) -> tuple[int, str]:
+    """Choose the fastest horizon with positive validation LCB evidence."""
+    target = str(target_definition).strip().lower()
+    mean_key = "mean_harvest_return" if target == "mfe_first" else "mean_terminal_return"
+    lcb_key = "harvest_lcb95_return" if target == "mfe_first" else "expectancy_lcb95_return"
+
+    def supported(metrics: Mapping[str, Any] | None) -> bool:
+        if not isinstance(metrics, Mapping):
+            return False
+        try:
+            return (
+                int(metrics.get("selected") or 0) >= int(min_selected)
+                and float(metrics.get(mean_key)) > 0.0
+                and float(metrics.get(lcb_key)) > 0.0
+            )
+        except (TypeError, ValueError):
+            return False
+
+    supported_horizons = sorted(
+        int(horizon) for horizon, metrics in validation_by_horizon.items()
+        if supported(metrics)
+    )
+    if supported_horizons:
+        requested = int(requested_horizon_s)
+        if requested in supported_horizons:
+            return requested, "requested_validation_supported_horizon"
+        return supported_horizons[0], "fastest_validation_supported_horizon"
+    return int(requested_horizon_s), "requested_horizon_no_positive_validation_support"
 
 
 def train_and_publish(
@@ -565,8 +672,10 @@ def train_and_publish(
         )
         return metrics
 
-    # Select the threshold only from chronological validation rows.  The
-    # objective is positive terminal economics, with precision as tie-breaker.
+    # Select the threshold only from chronological validation rows.  A
+    # first-green artifact optimizes its realizable harvest proxy; terminal
+    # artifacts optimize terminal economics.
+    selection_metric = "mean_harvest_return" if str(target_definition).strip().lower() == "mfe_first" else "mean_terminal_return"
     validation_prediction = pipeline.get_calibrated_ensemble_prediction(
         _model_frame(slices.validation), threshold=0.5, min_models=2,
         min_model_agreement=0.6, max_uncertainty=1.0,
@@ -590,8 +699,8 @@ def train_and_publish(
         threshold, validation_metrics = max(
             candidates,
             key=lambda item: (
-                float(item[1]["mean_terminal_return"])
-                if item[1]["mean_terminal_return"] is not None else -float("inf"),
+                float(item[1][selection_metric])
+                if item[1][selection_metric] is not None else -float("inf"),
                 float(item[1]["precision"] or 0.0),
                 -item[0],
             ),
@@ -608,6 +717,18 @@ def train_and_publish(
         0.01,
         min(1.0, float(validation_metrics.get("uncertainty_p90") or 0.2)),
     )
+    validation_by_horizon: dict[str, dict[str, Any]] = {}
+    for horizon in sorted({int(value) for value in horizons}):
+        subset = slices.validation[slices.validation["horizon_s"] == float(horizon)]
+        if not subset.empty:
+            validation_by_horizon[str(horizon)] = evaluate(
+                subset, threshold=threshold, max_uncertainty=uncertainty_limit
+            )
+    selected_decision_horizon, horizon_selection_reason = _select_decision_horizon(
+        validation_by_horizon,
+        requested_horizon_s=decision_horizon_s,
+        target_definition=target_definition,
+    )
     test_metrics = evaluate(slices.test, threshold=threshold, max_uncertainty=uncertainty_limit)
     sealed_metrics = evaluate(slices.sealed, threshold=threshold, max_uncertainty=uncertainty_limit)
     sealed_by_horizon = {}
@@ -619,7 +740,7 @@ def train_and_publish(
             )
     execution_status, execution_status_reason = _execution_status(
         target_definition=target_definition,
-        decision_horizon_s=decision_horizon_s,
+        decision_horizon_s=selected_decision_horizon,
         test_metrics=test_metrics,
         sealed_metrics=sealed_metrics,
         sealed_by_horizon=sealed_by_horizon,
@@ -637,13 +758,15 @@ def train_and_publish(
             "dataset_hash": _hash_frame(frame),
             "validation_hash": _hash_frame(slices.validation),
             "horizons_s": [int(value) for value in horizons],
-            "decision_horizon_s": int(decision_horizon_s),
+            "decision_horizon_s": int(selected_decision_horizon),
+            "decision_horizon_selection": horizon_selection_reason,
             "target_definition": str(target_definition),
             "threshold": float(threshold),
             "min_model_agreement": 0.6,
             "max_uncertainty": uncertainty_limit,
             "oos": {
                 "validation": validation_metrics,
+                "validation_by_horizon": validation_by_horizon,
                 "test": test_metrics,
                 "sealed": sealed_metrics,
                 "sealed_by_horizon": sealed_by_horizon,

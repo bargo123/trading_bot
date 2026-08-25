@@ -216,8 +216,15 @@ class ShortHorizonPredictor:
             selected = by_horizon.get(selected_horizon) or next(iter(by_horizon.values()))
             oos_by_horizon = ((self.metadata.get("oos") or {}).get("sealed_by_horizon") or {})
             selected_oos = oos_by_horizon.get(selected_horizon) or {}
-            expected_return = selected_oos.get("mean_terminal_return")
-            expected_lcb_return = selected_oos.get("expectancy_lcb95_return")
+            harvest_mode = str(self.metadata.get("target_definition") or "terminal_profit").strip().lower() == "mfe_first"
+            expected_return = (
+                selected_oos.get("mean_harvest_return") if harvest_mode
+                else selected_oos.get("mean_terminal_return")
+            )
+            expected_lcb_return = (
+                selected_oos.get("harvest_lcb95_return") if harvest_mode
+                else selected_oos.get("expectancy_lcb95_return")
+            )
             expected_net = None
             expected_net_lcb95 = None
             if notional_usd is not None:
@@ -246,6 +253,9 @@ class ShortHorizonPredictor:
                 "by_horizon": by_horizon,
                 "expected_net_pnl": expected_net,
                 "expected_net_pnl_lcb95": expected_net_lcb95,
+                "harvest_mode": "first_green" if harvest_mode else "terminal_horizon",
+                "expected_harvest_return": expected_return if harvest_mode else None,
+                "expected_harvest_return_lcb95": expected_lcb_return if harvest_mode else None,
                 "tail_loss_probability": selected_oos.get("tail_loss_rate"),
                 "expected_mfe": selected_oos.get("expected_mfe"),
                 "expected_mae": selected_oos.get("expected_mae"),

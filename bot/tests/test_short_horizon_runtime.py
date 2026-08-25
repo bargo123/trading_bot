@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 
@@ -72,3 +73,59 @@ def test_runtime_quotes_use_the_training_one_second_cadence():
     assert len(result) == 2
     assert result.iloc[0]["bid"] == 1.1001
     assert result.iloc[1]["bid"] == 1.1002
+
+
+def test_mfe_artifact_uses_first_green_oos_expectancy_for_runtime_ev(tmp_path: Path):
+    class Pipeline:
+        models = [object(), object()]
+
+        def get_calibrated_ensemble_prediction(self, row, **kwargs):
+            return {
+                "probability": [0.8],
+                "decision": [True],
+                "abstain": [False],
+                "model_agreement": [1.0],
+                "uncertainty": [0.01],
+            }
+
+    class Buffer:
+        points = [
+            SimpleNamespace(timestamp=1787659200.0, bid=1.1, ask=1.1002),
+            SimpleNamespace(timestamp=1787659201.0, bid=1.1001, ask=1.1003),
+        ]
+
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+    predictor.pipeline = Pipeline()
+    predictor.status = "ready"
+    predictor.execution_status = "EXECUTION_CANDIDATE"
+    predictor.metadata = {
+        "horizons_s": [10],
+        "decision_horizon_s": 10,
+        "target_definition": "mfe_first",
+        "threshold": 0.5,
+        "min_model_agreement": 0.6,
+        "max_uncertainty": 0.2,
+        "oos": {
+            "sealed_by_horizon": {
+                "10": {
+                    "mean_harvest_return": 0.001,
+                    "harvest_lcb95_return": 0.0005,
+                }
+            }
+        },
+    }
+    quote_buffer = SimpleNamespace(buffers={"EURUSD": Buffer()})
+
+    result = predictor.predict(
+        symbol="EURUSD",
+        quote_buffer=quote_buffer,
+        now_ts=1787659201.0,
+        side="buy",
+        notional_usd=100.0,
+    )
+
+    assert result is not None
+    assert result["harvest_mode"] == "first_green"
+    assert result["expected_harvest_return"] == 0.001
+    assert result["expected_net_pnl"] > 0.0
+    assert result["expected_net_pnl_lcb95"] > 0.0
