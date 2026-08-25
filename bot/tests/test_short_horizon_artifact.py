@@ -96,6 +96,7 @@ def test_training_frame_has_matured_both_side_horizon_rows():
     assert set(frame["horizon_s"]) == {3.0, 10.0, 45.0}
     assert frame["time"].max() <= pd.Timestamp("2026-01-01T00:03:15Z")
     assert {0, 1}.issuperset(set(frame["target"]))
+    assert {"time_to_profit_s", "time_to_failure_s"}.issubset(frame.columns)
 
 
 def test_terminal_profit_target_does_not_label_temporary_mfe_as_a_win():

@@ -272,6 +272,17 @@ def build_quote_training_frame(
                     mfe = float(np.max(signed))
                     mae = float(np.min(signed))
                     terminal = float(signed[-1])
+                    future_times = features["time"].iloc[index + 1 : end + 1]
+                    profitable = np.flatnonzero(signed > 0.0)
+                    failures = np.flatnonzero(signed <= -tail_threshold)
+                    time_to_profit = (
+                        float((future_times.iloc[int(profitable[0])] - features.iloc[index]["time"]).total_seconds())
+                        if len(profitable) else None
+                    )
+                    time_to_failure = (
+                        float((future_times.iloc[int(failures[0])] - features.iloc[index]["time"]).total_seconds())
+                        if len(failures) else None
+                    )
                     row = features.iloc[index].to_dict()
                     target = int(mfe > 0.0) if target_mode == "mfe_first" else int(terminal > 0.0)
                     row.update(
@@ -289,6 +300,8 @@ def build_quote_training_frame(
                             "mfe": mfe,
                             "mae": mae,
                             "tail_loss": int(mae <= -tail_threshold),
+                            "time_to_profit_s": time_to_profit,
+                            "time_to_failure_s": time_to_failure,
                         }
                     )
                     rows.append(row)
@@ -322,6 +335,7 @@ def _model_frame(frame: pd.DataFrame) -> pd.DataFrame:
     excluded = {
         "time", "symbol", "side", "target", "terminal_net_pnl",
         "terminal_return", "mfe", "mae", "tail_loss",
+        "time_to_profit_s", "time_to_failure_s",
     }
     columns = [column for column in frame.columns if column not in excluded]
     result = frame.loc[:, columns].copy()
@@ -335,6 +349,15 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
     actual = frame["target"].to_numpy(dtype=int)
     terminal = frame["terminal_return"].to_numpy(dtype=float)
     selected = terminal[decision]
+    selected_frame = frame.loc[decision]
+    def selected_mean(column: str) -> float | None:
+        values = pd.to_numeric(selected_frame[column], errors="coerce").dropna()
+        return float(values.mean()) if len(values) else None
+
+    def selected_median(column: str) -> float | None:
+        values = pd.to_numeric(selected_frame[column], errors="coerce").dropna()
+        return float(values.median()) if len(values) else None
+
     return {
         "n": int(len(frame)),
         "selected": int(decision.sum()),
@@ -343,6 +366,14 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
         "precision": float(actual[decision].mean()) if decision.any() else None,
         "mean_terminal_return": float(selected.mean()) if len(selected) else None,
         "net_terminal_return": float(selected.sum()) if len(selected) else None,
+        "expected_mfe": selected_mean("mfe"),
+        "expected_mae": selected_mean("mae"),
+        "median_time_to_green_s": selected_median("time_to_profit_s"),
+        "median_time_to_failure_s": selected_median("time_to_failure_s"),
+        "winner_giveback_rate": (
+            float(((selected_frame["mfe"] > 0.0) & (selected_frame["terminal_return"] <= 0.0)).mean())
+            if len(selected_frame) else None
+        ),
         "tail_loss_rate": float(frame.loc[decision, "tail_loss"].mean()) if decision.any() else None,
         "abstain_rate": float(np.asarray(prediction["abstain"], dtype=bool).mean()) if len(frame) else None,
     }
