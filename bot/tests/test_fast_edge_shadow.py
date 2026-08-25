@@ -12,6 +12,9 @@ from aegis.research.fast_edge_shadow import (
     replay_executable_path,
     shadow_model_frame,
     fit_shadow_model_space,
+    evaluate_exit_policies,
+    fit_multi_outcome_models,
+    fit_segmented_logistic_models,
 )
 
 
@@ -39,8 +42,33 @@ def test_replay_uses_executable_sides_and_stops_sequentially():
     assert outcome["captured_exit_reason"] == "harvest"
     assert outcome["captured_exit_net_pnl"] == pytest.approx(0.00009)
     assert outcome["first_green"] is True
+    assert outcome["first_profitable_executable_close"] is True
     assert outcome["time_to_green_s"] == 1.0
     assert outcome["time_in_red_s"] == 0.0
+
+
+def test_causal_exit_policy_variants_do_not_use_future_max_as_entry_authority():
+    kwargs = {
+        "entry_time": pd.Timestamp("2026-01-01T00:00:00Z"),
+        "entry_bid": 1.09999,
+        "entry_ask": 1.10001,
+        "future_times": pd.date_range("2026-01-01T00:00:01Z", periods=5, freq="1s"),
+        "future_bid": np.array([1.10002, 1.10010, 1.10020, 1.10012, 1.10008]),
+        "future_ask": np.array([1.10004, 1.10012, 1.10022, 1.10014, 1.10010]),
+        "side": "buy",
+        "horizon_s": 5,
+    }
+    meaningful = replay_executable_path(**kwargs, exit_policy="first_meaningful_green")
+    protected = replay_executable_path(**kwargs, exit_policy="mfe_protection")
+    no_progress_kwargs = dict(kwargs)
+    no_progress_kwargs["future_bid"] = np.array([1.09999, 1.09999, 1.09999, 1.09999, 1.09999])
+    no_progress_kwargs["future_ask"] = np.array([1.10001, 1.10001, 1.10001, 1.10001, 1.10001])
+    no_progress = replay_executable_path(**no_progress_kwargs, exit_policy="no_progress_3s")
+    assert meaningful["exit_policy"] == "first_meaningful_green"
+    assert meaningful["captured_exit_reason"] == "harvest"
+    assert protected["captured_exit_reason"] == "giveback"
+    assert protected["captured_exit_net_pnl"] < protected["mfe"]
+    assert no_progress["captured_exit_reason"] == "no_progress"
 
 
 def test_shadow_dataset_is_universal_and_outcome_columns_are_not_features():
@@ -53,9 +81,20 @@ def test_shadow_dataset_is_universal_and_outcome_columns_are_not_features():
     assert set(frame["horizon_s"]) == {1.0, 2.0, 5.0}
     assert set(frame["side"]) == {"buy", "sell"}
     assert set(frame["candidate_authority"]) == {"SHADOW_ONLY"}
+    assert set(frame["family_version"]) == {"quote_microstructure_v1"}
+    assert {"pnl_1s", "pnl_2s", "pnl_5s", "green_within_1s", "captured_win_5s"}.issubset(frame.columns)
+    assert {
+        "exit_capturedexitreplay_return", "exit_mfeprotection_return",
+        "exit_noprogress3s_time_s",
+    }.issubset(frame.columns)
     features = shadow_model_frame(frame)
     assert "captured_exit_net_pnl" not in features.columns
     assert "future_path_observed_n" not in features.columns
+    assert "pnl_1s" not in features.columns
+    assert "green_within_5s" not in features.columns
+    assert {"return_1s", "return_2s", "return_3s", "micro_reversal", "volatility_expansion"}.issubset(
+        features.columns
+    )
     assert "target" in features.columns
 
 
@@ -93,3 +132,40 @@ def test_shadow_model_space_searches_local_models_without_authority():
     )
     assert report["oos"]["sealed_n"] > 0
     assert all(row["model"] in report["model_names"] for row in report["leaderboard"])
+    assert {"model_probability_mean", "model_disagreement", "prediction_vector"}.issubset(
+        report["sealed_predictions"].columns
+    )
+
+
+def test_exit_policy_comparison_is_segmented_and_cost_aware():
+    frame = build_shadow_dataset({"EURUSD": _quotes(260)}, horizons=(1, 5), sample_every_s=2)
+    rows = evaluate_exit_policies(frame, min_samples=2)
+    assert rows
+    assert {"captured_exit_replay", "mfe_protection", "no_progress_3s"}.issubset(
+        {row["exit_policy"] for row in rows}
+    )
+    assert {"win_rate", "captured_exit_pf", "avg_loss", "p95_loss", "median_exit_time_s"}.issubset(rows[0])
+
+
+def test_multi_outcome_models_report_sealed_probabilities_and_expectations():
+    frame = build_shadow_dataset({"EURUSD": _quotes(260)}, horizons=(1, 2, 3, 5, 10, 20), sample_every_s=2)
+    report = fit_multi_outcome_models(frame)
+    assert {"P_GREEN_1S", "P_GREEN_10S", "P_TAIL_LOSS", "P_WINNER_GIVEBACK"}.issubset(
+        report["probability"]
+    )
+    assert {"EXPECTED_NET_PNL", "EXPECTED_MFE", "EXPECTED_TIME_TO_GREEN"}.issubset(
+        report["regression"]
+    )
+    assert all(value["status"] in {"SEALED_OOS", "missing_target", "single_class_train"} for value in report["probability"].values())
+
+
+def test_segmented_models_are_chronological_and_dimension_scoped():
+    frame = build_shadow_dataset(
+        {"EURUSD": _quotes(320), "GBPUSD": _quotes(320)}, horizons=(1, 5), sample_every_s=2
+    )
+    report = fit_segmented_logistic_models(
+        frame, min_train_samples=20, min_validation_samples=5, min_sealed_samples=5
+    )
+    assert {"symbol", "side", "session", "horizon_s"}.issubset(report["dimensions"])
+    assert report["accepted_model_count"] > 0
+    assert all("segment_dimension" in row and "captured_exit_pf" in row for row in report["oos_leaderboard"])

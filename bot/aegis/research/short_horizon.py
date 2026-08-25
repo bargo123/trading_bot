@@ -320,6 +320,26 @@ def point_in_time_features(
     relative_spread = float(current["_spread"]) / max(abs(float(current["_mid"])), 1e-12)
     micro_volatility = float(np.std(recent_returns, ddof=0)) if len(recent_returns) else 0.0
     realized_vol_60s = float(np.sqrt(np.square(realized_returns).sum())) if len(realized_returns) else 0.0
+    time_seconds = (
+        history["_time"] - history["_time"].iloc[0]
+    ).dt.total_seconds().to_numpy(dtype=float)
+    intervals = np.diff(time_seconds, prepend=time_seconds[0])
+    velocity_history = np.divide(
+        np.diff(mids, prepend=mids[0]), intervals,
+        out=np.zeros_like(mids), where=intervals > 0,
+    )
+    prior_velocity = np.roll(velocity_history, 1)
+    prior_velocity[0] = 0.0
+    spread_changes = np.diff(spreads, prepend=spreads[0])
+    returns_series = pd.Series(np.concatenate(([np.nan], returns)))
+    micro_volatility_series = returns_series.rolling(20, min_periods=2).std(ddof=0).fillna(0.0)
+    baseline_volatility = micro_volatility_series.rolling(60, min_periods=2).mean().fillna(0.0)
+    rolling_abs_velocity = pd.Series(velocity_history).abs().rolling(20, min_periods=2).mean().fillna(0.0)
+    current_micro_volatility = float(micro_volatility_series.iloc[-1])
+    current_baseline_volatility = float(baseline_volatility.iloc[-1])
+    current_momentum_persistence = float(
+        np.sign(pd.Series(velocity_history)).rolling(10, min_periods=2).mean().fillna(0.0).iloc[-1]
+    )
     symbol_value = symbol
     if symbol_value is None and "symbol" in current.index:
         symbol_value = str(current["symbol"])
@@ -336,14 +356,21 @@ def point_in_time_features(
         "mid": float(current["_mid"]),
         "spread": float(current["_spread"]),
         "spread_percentile": spread_percentile,
-        "spread_change": float(spreads[-1] - spreads[-2]) if len(spreads) >= 2 else None,
+        "spread_change": float(spread_changes[-1]) if len(spread_changes) else None,
+        "spread_acceleration": float(spread_changes[-1] - spread_changes[-2]) if len(spread_changes) >= 2 else None,
         "tick_velocity": velocity,
         "price_acceleration": acceleration,
-        "return_5s": _return_since(history, target, 5),
-        "return_10s": _return_since(history, target, 10),
-        "return_15s": _return_since(history, target, 15),
-        "return_30s": _return_since(history, target, 30),
-        "return_60s": _return_since(history, target, 60),
+        **{f"return_{window}s": _return_since(history, target, window) for window in (1, 2, 3, 5, 8, 10, 15, 30, 60)},
+        "micro_reversal": float(
+            abs(velocity_history[-1] - prior_velocity[-1])
+            if velocity_history[-1] * prior_velocity[-1] < 0.0 else 0.0
+        ),
+        "momentum_persistence": current_momentum_persistence,
+        "momentum_decay": float(abs(velocity_history[-1]) / max(float(rolling_abs_velocity.iloc[-1]), 1e-12)),
+        "distance_to_micro_high": float(mids[-1] - np.max(mids[-30:])),
+        "distance_to_micro_low": float(mids[-1] - np.min(mids[-30:])),
+        "volatility_expansion": float(current_micro_volatility / max(current_baseline_volatility, 1e-12)),
+        "cost_to_movement": float(spreads[-1] / max(abs(velocity_history[-1]), 1e-12)),
         "micro_volatility": micro_volatility if len(recent_returns) else None,
         "realized_vol_60s": realized_vol_60s,
         "spread_to_micro_vol": relative_spread / max(micro_volatility, 1e-12),

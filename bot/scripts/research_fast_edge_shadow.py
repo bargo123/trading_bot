@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,10 +19,14 @@ from aegis.engines.mt5 import MT5Engine  # noqa: E402
 from aegis.research.fast_edge_shadow import (  # noqa: E402
     SHADOW_HORIZONS_S,
     build_shadow_dataset,
+    chronological_shadow_slices,
+    evaluate_exit_policies,
     fit_shadow_model_space,
 )
 from aegis.research.registry import ExperimentRegistry  # noqa: E402
 from aegis.config import configured_symbols  # noqa: E402
+from aegis.research.books_index import BookIndex  # noqa: E402
+from aegis.research.knowledge import search_full_book_knowledge  # noqa: E402
 
 
 def main() -> None:
@@ -68,6 +73,38 @@ def main() -> None:
             sample_every_s=max(1, int(args.sample_every_seconds)),
         )
     model_report = fit_shadow_model_space(frame, min_samples=20)
+    sealed_frame = chronological_shadow_slices(frame).sealed
+    exit_policy_comparison = evaluate_exit_policies(sealed_frame, min_samples=20)
+    sealed_predictions = model_report.pop("sealed_predictions", None)
+    book_queries = (
+        "scalping tick behavior short momentum",
+        "failed breakouts micro pullbacks momentum continuation",
+        "mean reversion volatility contraction expansion",
+        "adverse selection execution costs profit harvesting optimal stopping",
+    )
+    book_index = BookIndex()
+    book_evidence = []
+    for query in book_queries:
+        sources = search_full_book_knowledge(book_index, query, limit=8)
+        book_evidence.append(
+            {
+                "query": query,
+                "sources": [asdict(source) for source in sources],
+                "mechanism_to_test": "point-in-time quote microstructure must improve captured executable economics after spread",
+                "hypothesis": "selective velocity/acceleration, spread, reversal, and cost-to-movement segments may separate fast clean winners from immediate adverse moves",
+                "shadow_experiment": "fast_edge_shadow captured_exit_replay with chronological and sealed OOS comparison",
+            }
+        )
+    top_candidates = list(model_report["leaderboard"])
+    top_candidates.extend(model_report["segmented_model_space"]["oos_leaderboard"])
+    for candidate in top_candidates:
+        candidate.setdefault("exit_policy", "captured_exit_replay")
+    top_candidates.sort(
+        key=lambda row: (
+            row.get("captured_exit_expectancy") is None,
+            -(row.get("captured_exit_expectancy") or -float("inf")),
+        )
+    )
     primary_metrics = (
         model_report["oos_metrics"].get(model_report["primary_model"], {}).get("sealed", {})
         if model_report.get("primary_model") else {}
@@ -76,6 +113,12 @@ def main() -> None:
     if not args.no_rows:
         frame.to_json(
             args.out_dir / "fast_edge_shadow_rows.jsonl",
+            orient="records", lines=True, date_format="iso", double_precision=15,
+        )
+    scored_path = args.out_dir / "fast_edge_shadow_scored_oos.jsonl"
+    if sealed_predictions is not None:
+        sealed_predictions.to_json(
+            scored_path,
             orient="records", lines=True, date_format="iso", double_precision=15,
         )
     report = {
@@ -104,9 +147,21 @@ def main() -> None:
             for key, value in frame["captured_exit_reason"].value_counts().to_dict().items()
         },
         "model_space": model_report,
+        "multi_outcome_models": model_report["multi_outcome_models"],
+        "book_evidence": book_evidence,
+        "exit_policy_comparison": exit_policy_comparison[:50],
+        "leaderboard_top_50": top_candidates[:50],
+        "scored_oos_rows": int(len(sealed_predictions)) if sealed_predictions is not None else 0,
+        "scored_oos_path": str(scored_path) if sealed_predictions is not None else None,
         "OOS_TEST_N": model_report["oos"]["test_n"],
         "OOS_SEALED_N": model_report["oos"]["sealed_n"],
         "OOS_PRIMARY_MODEL": model_report["primary_model"],
+        "PROMOTION_CANDIDATE_COUNT": len(model_report["promotion_candidates"]),
+        "DISTANCE_FROM_EXECUTION_CANDIDATE": (
+            "requires positive test+sealed OOS, calibration, sample, and tail review"
+            if not model_report["promotion_candidates"]
+            else "requires governed challenger review and artifact promotion gates"
+        ),
         "OOS_PRECISION": primary_metrics.get("precision"),
         "OOS_CAPTURED_EXPECTANCY": primary_metrics.get("captured_exit_expectancy"),
         "OOS_CAPTURED_PF": primary_metrics.get("captured_exit_pf"),
@@ -116,6 +171,35 @@ def main() -> None:
         "ABSTAIN_RATE": primary_metrics.get("abstain_rate"),
         "note": "Evidence only. No model or leaderboard row authorizes broker execution.",
     }
+    factory_handoff_path = args.out_dir / "fast_edge_factory_handoff.json"
+    factory_handoff_path.write_text(
+        json.dumps(
+            {
+                "schema": "fast_edge_factory_handoff.v1",
+                "source_report": str(args.out_dir / "fast_edge_leaderboard.json"),
+                "dataset_hash": model_report["dataset_hash"],
+                "target_definition": "captured_exit_replay",
+                "candidate_rows": len(frame),
+                "oos_test_n": model_report["oos"]["test_n"],
+                "oos_sealed_n": model_report["oos"]["sealed_n"],
+                "model_space": model_report["model_names"],
+                "segmented_scopes": model_report["segmented_model_space"]["dimensions"],
+                "exit_policies": [
+                    row["exit_policy"] for row in exit_policy_comparison[:20]
+                ],
+                "next_research_tasks": [
+                    "replay promotion candidates across a longer independent window",
+                    "calibrate probability vectors before any authority review",
+                    "autopsy tail losses and validate MFE-protection exits",
+                ],
+                "execution_authority": "NONE",
+            },
+            indent=2,
+            default=str,
+        ),
+        encoding="utf-8",
+    )
+    report["factory_handoff_path"] = str(factory_handoff_path)
     report_path = args.out_dir / "fast_edge_leaderboard.json"
     report_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     registry = ExperimentRegistry()

@@ -289,6 +289,13 @@ def test_training_and_runtime_share_symbol_encoding():
     for key, value in session_features(0).items():
         assert training[key] == value
         assert runtime[key] == value
+    for key in (
+        "return_1s", "return_2s", "return_3s", "return_8s", "spread_acceleration",
+        "micro_reversal", "momentum_persistence", "momentum_decay",
+        "distance_to_micro_high", "distance_to_micro_low", "volatility_expansion",
+        "cost_to_movement",
+    ):
+        assert np.isclose(float(training[key]), float(runtime[key]), equal_nan=True)
 
 
 def test_training_frame_has_matured_both_side_horizon_rows():

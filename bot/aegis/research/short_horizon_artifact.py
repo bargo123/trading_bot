@@ -228,12 +228,43 @@ def _feature_frame(quotes: pd.DataFrame, symbol: str) -> pd.DataFrame:
     values["spread_to_realized_vol"] = np.divide(
         relative_spread, np.maximum(values["realized_vol_60s"], 1e-12)
     )
-    for window in (5, 10, 15, 30, 60):
+    for window in (1, 2, 3, 5, 8, 10, 15, 30, 60):
         starts = _asof_index(times, window)
         valid = starts >= 0
         result = np.full(len(mid), np.nan, dtype=float)
         result[valid] = mid[valid] / mid[starts[valid]] - 1.0
         values[f"return_{window}s"] = result
+    velocity_series = pd.Series(velocity)
+    spread_change = values["spread_change"]
+    values["spread_acceleration"] = np.concatenate(([0.0], np.diff(spread_change)))
+    prior_velocity = velocity_series.shift(1).fillna(0.0).to_numpy(dtype=float)
+    values["micro_reversal"] = np.where(
+        (velocity * prior_velocity) < 0.0,
+        np.abs(velocity - prior_velocity),
+        0.0,
+    )
+    values["momentum_persistence"] = (
+        np.sign(velocity_series).rolling(10, min_periods=2).mean().fillna(0.0).to_numpy(dtype=float)
+    )
+    rolling_abs_velocity = (
+        velocity_series.abs().rolling(20, min_periods=2).mean().fillna(0.0).to_numpy(dtype=float)
+    )
+    values["momentum_decay"] = np.divide(
+        np.abs(velocity), np.maximum(rolling_abs_velocity, 1e-12)
+    )
+    mid_series = pd.Series(mid)
+    values["distance_to_micro_high"] = mid - mid_series.rolling(30, min_periods=2).max().to_numpy(dtype=float)
+    values["distance_to_micro_low"] = mid - mid_series.rolling(30, min_periods=2).min().to_numpy(dtype=float)
+    volatility_series = pd.Series(values["micro_volatility"])
+    baseline_volatility = (
+        volatility_series.rolling(60, min_periods=2).mean().fillna(0.0).to_numpy(dtype=float)
+    )
+    values["volatility_expansion"] = np.divide(
+        values["micro_volatility"], np.maximum(baseline_volatility, 1e-12)
+    )
+    values["cost_to_movement"] = np.divide(
+        spread, np.maximum(np.abs(velocity), 1e-12)
+    )
     return pd.DataFrame(values)
 
 

@@ -1,0 +1,35 @@
+{
+  "schema": "fast_edge_council_review.v1",
+  "generated_at": "2026-08-25T16:01:42.721310+00:00",
+  "source_report": "bot\\reports\\research\\fast_edge_leaderboard.json",
+  "execution_authority": "NONE",
+  "hermes_models_configured": [
+    "x-preview-f-free",
+    "hy3-free",
+    "laguna-s-2.1-free",
+    "nemotron-3-ultra-free",
+    "nemotron-3.5-lightning-free",
+    "muse-spark-1.2-contributor-free"
+  ],
+  "hermes": {
+    "agent": "hermes",
+    "adapter": "ai_council.hermes",
+    "ok": false,
+    "status": "UNAVAILABLE_CLI",
+    "duration_s": 0.03,
+    "streaming": false,
+    "structured_output": "json-in-text",
+    "model": "x-preview-f-free",
+    "cli": "C:\\Users\\Zaid barghouthi\\AppData\\Local\\hermes\\bin\\hermes.exe",
+    "error": "[WinError 206] The filename or extension is too long"
+  },
+  "claude": {
+    "agent": "claude",
+    "ok": false,
+    "started_utc": "2026-08-25T16:01:42.854311+00:00",
+    "status": "UNAVAILABLE_CLI",
+    "error": "[WinError 206] The filename or extension is too long",
+    "finished_utc": "2026-08-25T16:01:42.880911+00:00",
+    "duration_s": 0.03
+  }
+}

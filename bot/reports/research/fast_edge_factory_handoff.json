@@ -1,0 +1,37 @@
+{
+  "schema": "fast_edge_factory_handoff.v1",
+  "source_report": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\reports\\research\\fast_edge_leaderboard.json",
+  "dataset_hash": "957466f3fbe48a3531725b60ad4b6fcfc71f54099547ec49a888d9e417f0a691",
+  "target_definition": "captured_exit_replay",
+  "candidate_rows": 326062,
+  "oos_test_n": 34362,
+  "oos_sealed_n": 32674,
+  "model_space": [
+    "gradient_boosting",
+    "hist_gradient_boosting",
+    "logistic",
+    "random_forest",
+    "regularized_logistic"
+  ],
+  "segmented_scopes": [
+    "symbol",
+    "side",
+    "session",
+    "regime",
+    "structure",
+    "family",
+    "horizon_s"
+  ],
+  "exit_policies": [
+    "captured_exit_replay",
+    "first_meaningful_green",
+    "mfe_protection",
+    "no_progress_3s"
+  ],
+  "next_research_tasks": [
+    "replay promotion candidates across a longer independent window",
+    "calibrate probability vectors before any authority review",
+    "autopsy tail losses and validate MFE-protection exits"
+  ],
+  "execution_authority": "NONE"
+}
