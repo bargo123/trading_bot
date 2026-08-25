@@ -541,6 +541,57 @@ def _threshold_prediction(
     return result
 
 
+def _select_threshold_for_prediction(
+    base_prediction: Mapping[str, Any],
+    frame: pd.DataFrame,
+    *,
+    target_definition: str,
+    min_selected: int = 20,
+    min_model_agreement: float = 0.6,
+    max_uncertainty: float = 1.0,
+) -> tuple[float, dict[str, Any]]:
+    """Select a scope threshold from validation predictions only."""
+    target = str(target_definition).strip().lower()
+    mean_key = "mean_harvest_return" if target == "mfe_first" else "mean_terminal_return"
+    lcb_key = "harvest_lcb95_return" if target == "mfe_first" else "expectancy_lcb95_return"
+    candidates: list[tuple[float, dict[str, Any]]] = []
+    for threshold in _threshold_candidates(base_prediction["probability"]):
+        prediction = _threshold_prediction(
+            base_prediction,
+            threshold=float(threshold),
+            min_model_agreement=min_model_agreement,
+            max_uncertainty=max_uncertainty,
+        )
+        metrics = _metrics(prediction, frame)
+        if int(metrics.get("selected") or 0) >= int(min_selected):
+            candidates.append((float(threshold), metrics))
+    if not candidates:
+        threshold = 0.5
+        return threshold, _metrics(
+            _threshold_prediction(
+                base_prediction,
+                threshold=threshold,
+                min_model_agreement=min_model_agreement,
+                max_uncertainty=max_uncertainty,
+            ),
+            frame,
+        )
+    def score(metrics: Mapping[str, Any], key: str, default: float = -float("inf")) -> float:
+        value = metrics.get(key)
+        return default if value is None else float(value)
+
+    threshold, metrics = max(
+        candidates,
+        key=lambda item: (
+            score(item[1], lcb_key),
+            score(item[1], mean_key),
+            score(item[1], "precision", 0.0),
+            -item[0],
+        ),
+    )
+    return threshold, metrics
+
+
 def _execution_status(
     *,
     target_definition: str,
@@ -632,6 +683,43 @@ def _select_decision_horizon(
             return requested, "requested_validation_supported_horizon"
         return supported_horizons[0], "fastest_validation_supported_horizon"
     return int(requested_horizon_s), "requested_horizon_no_positive_validation_support"
+
+
+def _authorized_symbols(
+    *,
+    test_by_symbol: Mapping[str, Mapping[str, Any]],
+    sealed_by_symbol_horizon: Mapping[str, Mapping[str, Mapping[str, Any]]],
+    decision_horizon_s: int,
+    target_definition: str,
+    min_selected: int = 20,
+) -> list[str]:
+    """Return only symbols with exact test and sealed horizon evidence."""
+    target = str(target_definition).strip().lower()
+    if target not in {"terminal_profit", "mfe_first"}:
+        return []
+    mean_key = "mean_harvest_return" if target == "mfe_first" else "mean_terminal_return"
+    lcb_key = "harvest_lcb95_return" if target == "mfe_first" else "expectancy_lcb95_return"
+
+    def positive(metrics: Mapping[str, Any] | None) -> bool:
+        if not isinstance(metrics, Mapping):
+            return False
+        try:
+            return (
+                int(metrics.get("selected") or 0) >= int(min_selected)
+                and float(metrics.get(mean_key)) > 0.0
+                and float(metrics.get(lcb_key)) > 0.0
+            )
+        except (TypeError, ValueError):
+            return False
+
+    authorized: list[str] = []
+    for symbol, test_metrics in test_by_symbol.items():
+        sealed_metrics = (sealed_by_symbol_horizon.get(str(symbol).upper()) or {}).get(
+            str(int(decision_horizon_s))
+        )
+        if positive(test_metrics) and positive(sealed_metrics):
+            authorized.append(str(symbol).upper())
+    return sorted(set(authorized))
 
 
 def train_and_publish(
@@ -729,8 +817,61 @@ def train_and_publish(
         requested_horizon_s=decision_horizon_s,
         target_definition=target_definition,
     )
+    threshold_by_symbol_horizon: dict[str, dict[str, float]] = {}
+    for symbol in sorted(frame["symbol"].astype(str).str.upper().unique()):
+        symbol_validation = slices.validation[
+            slices.validation["symbol"].astype(str).str.upper() == symbol
+        ]
+        threshold_by_symbol_horizon[symbol] = {}
+        for horizon in sorted({int(value) for value in horizons}):
+            validation_subset = symbol_validation[
+                symbol_validation["horizon_s"] == float(horizon)
+            ]
+            if validation_subset.empty:
+                continue
+            validation_prediction = pipeline.get_calibrated_ensemble_prediction(
+                _model_frame(validation_subset), threshold=0.5, min_models=2,
+                min_model_agreement=0.6, max_uncertainty=uncertainty_limit,
+                include_model_probabilities=True,
+            )
+            scope_threshold, _ = _select_threshold_for_prediction(
+                validation_prediction,
+                validation_subset,
+                target_definition=target_definition,
+                min_selected=20,
+                min_model_agreement=0.6,
+                max_uncertainty=uncertainty_limit,
+            )
+            threshold_by_symbol_horizon[symbol][str(horizon)] = float(scope_threshold)
     test_metrics = evaluate(slices.test, threshold=threshold, max_uncertainty=uncertainty_limit)
     sealed_metrics = evaluate(slices.sealed, threshold=threshold, max_uncertainty=uncertainty_limit)
+    test_by_symbol: dict[str, dict[str, Any]] = {}
+    sealed_by_symbol_horizon: dict[str, dict[str, dict[str, Any]]] = {}
+    for symbol in sorted(frame["symbol"].astype(str).str.upper().unique()):
+        test_subset = slices.test[
+            (slices.test["symbol"].astype(str).str.upper() == symbol)
+            & (slices.test["horizon_s"] == float(selected_decision_horizon))
+        ]
+        if not test_subset.empty:
+            scope_threshold = threshold_by_symbol_horizon.get(symbol, {}).get(
+                str(selected_decision_horizon), threshold
+            )
+            test_by_symbol[symbol] = evaluate(
+                test_subset, threshold=scope_threshold, max_uncertainty=uncertainty_limit
+            )
+        sealed_by_symbol_horizon[symbol] = {}
+        for horizon in sorted({int(value) for value in horizons}):
+            sealed_subset = slices.sealed[
+                (slices.sealed["symbol"].astype(str).str.upper() == symbol)
+                & (slices.sealed["horizon_s"] == float(horizon))
+            ]
+            if not sealed_subset.empty:
+                scope_threshold = threshold_by_symbol_horizon.get(symbol, {}).get(
+                    str(horizon), threshold
+                )
+                sealed_by_symbol_horizon[symbol][str(horizon)] = evaluate(
+                    sealed_subset, threshold=scope_threshold, max_uncertainty=uncertainty_limit
+                )
     sealed_by_horizon = {}
     for horizon in sorted({int(value) for value in horizons}):
         subset = slices.sealed[slices.sealed["horizon_s"] == float(horizon)]
@@ -745,6 +886,18 @@ def train_and_publish(
         sealed_metrics=sealed_metrics,
         sealed_by_horizon=sealed_by_horizon,
     )
+    authorized_symbols = _authorized_symbols(
+        test_by_symbol=test_by_symbol,
+        sealed_by_symbol_horizon=sealed_by_symbol_horizon,
+        decision_horizon_s=selected_decision_horizon,
+        target_definition=target_definition,
+    )
+    if authorized_symbols:
+        execution_status = "EXECUTION_CANDIDATE"
+        execution_status_reason = "positive_exact_symbol_test_sealed_horizon_oos"
+    elif execution_status == "EXECUTION_CANDIDATE":
+        execution_status = "SHADOW_ONLY_NO_POSITIVE_OOS"
+        execution_status_reason = "no_symbol_scope_positive_oos"
 
     output_path = Path(output_path)
     pipeline.save(output_path)
@@ -762,18 +915,22 @@ def train_and_publish(
             "decision_horizon_selection": horizon_selection_reason,
             "target_definition": str(target_definition),
             "threshold": float(threshold),
+            "threshold_by_symbol_horizon": threshold_by_symbol_horizon,
             "min_model_agreement": 0.6,
             "max_uncertainty": uncertainty_limit,
             "oos": {
                 "validation": validation_metrics,
                 "validation_by_horizon": validation_by_horizon,
                 "test": test_metrics,
+                "test_by_symbol": test_by_symbol,
                 "sealed": sealed_metrics,
                 "sealed_by_horizon": sealed_by_horizon,
+                "sealed_by_symbol_horizon": sealed_by_symbol_horizon,
             },
             "trained_at": datetime.now(timezone.utc).isoformat(),
             "cost_evidence": "executable_bid_ask_spread_in_labels; no synthetic slippage",
             "symbols": sorted(frame["symbol"].astype(str).str.upper().unique().tolist()),
+            "authorized_symbols": authorized_symbols,
         }
     )
     metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")

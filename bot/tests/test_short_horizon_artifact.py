@@ -8,7 +8,9 @@ from aegis.research.short_horizon_artifact import (
     _feature_frame,
     _execution_status,
     _metrics,
+    _authorized_symbols,
     _select_decision_horizon,
+    _select_threshold_for_prediction,
     _threshold_candidates,
     build_quote_training_frame,
     chronological_slices,
@@ -129,6 +131,54 @@ def test_decision_horizon_uses_fastest_validation_supported_horizon():
 
     assert selected == 30
     assert reason == "fastest_validation_supported_horizon"
+
+
+def test_symbol_authorization_requires_positive_test_and_sealed_horizon_oos():
+    positive = _positive_metrics(0.001)
+    negative = _positive_metrics(-0.001)
+
+    authorized = _authorized_symbols(
+        test_by_symbol={"EURUSD": positive, "GBPUSD": positive},
+        sealed_by_symbol_horizon={
+            "EURUSD": {"10": positive},
+            "GBPUSD": {"10": negative},
+        },
+        decision_horizon_s=10,
+        target_definition="terminal_profit",
+        min_selected=10,
+    )
+
+    assert authorized == ["EURUSD"]
+
+
+def test_scope_threshold_selection_uses_validation_harvest_lcb():
+    frame = pd.DataFrame(
+        {
+            "target": [1, 1, 0, 0],
+            "terminal_return": [0.1, 0.08, -1.0, -1.0],
+            "harvest_return": [0.1, 0.08, -1.0, -1.0],
+            "mfe": [0.1, 0.08, 0.0, 0.0],
+            "mae": [0.0, 0.0, -1.0, -1.0],
+            "mid": [1.0, 1.0, 1.0, 1.0],
+            "tail_loss": [0, 0, 1, 1],
+            "time_to_profit_s": [1.0, 1.0, None, None],
+            "time_to_failure_s": [None, None, 1.0, 1.0],
+        }
+    )
+    prediction = {
+        "probability": np.array([0.9, 0.8, 0.7, 0.2]),
+        "model_probabilities": np.array([[0.9, 0.8, 0.7, 0.2], [0.9, 0.8, 0.7, 0.2]]),
+        "uncertainty": np.zeros(4),
+        "abstain": np.zeros(4, dtype=bool),
+    }
+
+    threshold, metrics = _select_threshold_for_prediction(
+        prediction, frame, target_definition="mfe_first", min_selected=2
+    )
+
+    assert threshold == 0.8
+    assert metrics["selected"] == 2
+    assert metrics["harvest_lcb95_return"] > 0.0
 
 
 def test_oos_metrics_include_calibration_curve_ece_and_confusion_counts():

@@ -105,13 +105,23 @@ def test_mfe_artifact_uses_first_green_oos_expectancy_for_runtime_ev(tmp_path: P
         "threshold": 0.5,
         "min_model_agreement": 0.6,
         "max_uncertainty": 0.2,
+        "authorized_symbols": ["EURUSD"],
+        "threshold_by_symbol_horizon": {"EURUSD": {"10": 0.7}},
         "oos": {
             "sealed_by_horizon": {
                 "10": {
                     "mean_harvest_return": 0.001,
                     "harvest_lcb95_return": 0.0005,
                 }
-            }
+            },
+            "sealed_by_symbol_horizon": {
+                "EURUSD": {
+                    "10": {
+                        "mean_harvest_return": 0.002,
+                        "harvest_lcb95_return": 0.001,
+                    }
+                }
+            },
         },
     }
     quote_buffer = SimpleNamespace(buffers={"EURUSD": Buffer()})
@@ -126,6 +136,21 @@ def test_mfe_artifact_uses_first_green_oos_expectancy_for_runtime_ev(tmp_path: P
 
     assert result is not None
     assert result["harvest_mode"] == "first_green"
-    assert result["expected_harvest_return"] == 0.001
+    assert result["expected_harvest_return"] == 0.002
     assert result["expected_net_pnl"] > 0.0
     assert result["expected_net_pnl_lcb95"] > 0.0
+    assert result["threshold"] == 0.7
+    assert result["by_horizon"]["10"]["threshold"] == 0.7
+
+
+def test_execution_candidate_rejects_symbol_without_exact_scope_permission(tmp_path: Path):
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+    predictor.execution_status = "EXECUTION_CANDIDATE"
+    predictor.status = "ready"
+    predictor.metadata = {"authorized_symbols": ["GBPUSD"]}
+
+    result = predictor.predict(symbol="EURUSD", quote_buffer=None, now_ts=1.0)
+
+    assert result is not None
+    assert result["abstain"] is True
+    assert result["prediction_reason"] == "symbol_not_authorized"

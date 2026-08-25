@@ -162,9 +162,17 @@ class ShortHorizonPredictor:
         side: str = "buy",
         notional_usd: float | None = None,
     ) -> dict[str, Any] | None:
+        normalized_symbol = str(symbol).upper()
+        if self.execution_status == "EXECUTION_CANDIDATE":
+            authorized = {
+                str(value).upper()
+                for value in (self.metadata.get("authorized_symbols") or ())
+            }
+            if normalized_symbol not in authorized:
+                return self._fail_closed_prediction("symbol_not_authorized")
         if self.pipeline is None or self.status not in {"ready", "shadow_only"}:
             return None
-        buffer = getattr(quote_buffer, "buffers", {}).get(str(symbol).upper())
+        buffer = getattr(quote_buffer, "buffers", {}).get(normalized_symbol)
         if buffer is None:
             return self._fail_closed_prediction("quote_history_missing")
         points = [point for point in getattr(buffer, "points", ()) if point.timestamp <= float(now_ts)]
@@ -191,6 +199,16 @@ class ShortHorizonPredictor:
             )
             by_horizon: dict[str, dict[str, Any]] = {}
             for horizon in self.metadata.get("horizons_s") or ():
+                horizon_key = str(int(horizon))
+                scope_thresholds = (
+                    self.metadata.get("threshold_by_symbol_horizon") or {}
+                ).get(normalized_symbol) or {}
+                horizon_threshold = float(
+                    scope_thresholds.get(
+                        horizon_key,
+                        self.metadata.get("threshold", 0.5) or 0.5,
+                    )
+                )
                 row = pd.DataFrame([{
                     **features,
                     "side_buy": 1.0 if str(side).lower() == "buy" else 0.0,
@@ -198,23 +216,30 @@ class ShortHorizonPredictor:
                 }])
                 result = self.pipeline.get_calibrated_ensemble_prediction(
                     row,
-                    threshold=float(self.metadata.get("threshold", 0.5) or 0.5),
+                    threshold=horizon_threshold,
                     min_models=2,
                     min_model_agreement=float(self.metadata.get("min_model_agreement", 0.6) or 0.6),
                     max_uncertainty=float(self.metadata.get("max_uncertainty", 0.2) or 0.2),
                 )
-                by_horizon[str(int(horizon))] = {
+                by_horizon[horizon_key] = {
                     "probability": float(result["probability"][0]),
                     "decision": bool(result["decision"][0]),
                     "abstain": bool(result["abstain"][0]),
                     "model_agreement": float(result["model_agreement"][0]),
                     "uncertainty": float(result["uncertainty"][0]),
+                    "threshold": horizon_threshold,
                 }
             if not by_horizon:
                 return None
             selected_horizon = str(int(self.metadata.get("decision_horizon_s", 10) or 10))
             selected = by_horizon.get(selected_horizon) or next(iter(by_horizon.values()))
-            oos_by_horizon = ((self.metadata.get("oos") or {}).get("sealed_by_horizon") or {})
+            oos = self.metadata.get("oos") or {}
+            scoped_oos = (
+                (oos.get("sealed_by_symbol_horizon") or {}).get(normalized_symbol) or {}
+                if self.execution_status == "EXECUTION_CANDIDATE"
+                else {}
+            )
+            oos_by_horizon = scoped_oos or (oos.get("sealed_by_horizon") or {})
             selected_oos = oos_by_horizon.get(selected_horizon) or {}
             harvest_mode = str(self.metadata.get("target_definition") or "terminal_profit").strip().lower() == "mfe_first"
             expected_return = (
@@ -249,7 +274,7 @@ class ShortHorizonPredictor:
                 "model_count": len(self.pipeline.models),
                 "horizons_s": self.metadata.get("horizons_s"),
                 "decision_horizon_s": int(selected_horizon),
-                "threshold": float(self.metadata.get("threshold", 0.5) or 0.5),
+                "threshold": float(selected.get("threshold", self.metadata.get("threshold", 0.5)) or 0.5),
                 "by_horizon": by_horizon,
                 "expected_net_pnl": expected_net,
                 "expected_net_pnl_lcb95": expected_net_lcb95,
