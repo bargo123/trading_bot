@@ -19,6 +19,8 @@ import numpy as np
 import pandas as pd
 
 from aegis.research.short_horizon import DEFAULT_HORIZONS_S
+from aegis.research.registry import DuplicateExperimentError, ExperimentRegistry
+from aegis.research_factory.evaluation import record_outcome
 from aegis.research_factory.ml_pipeline import MLPipeline, ModelConfig
 
 
@@ -37,6 +39,89 @@ def _hash_frame(frame: pd.DataFrame) -> str:
     payload = frame.sort_values(["time", "symbol", "side", "horizon_s"], kind="stable")
     raw = payload.to_json(orient="records", date_format="iso", double_precision=15).encode()
     return hashlib.sha256(raw).hexdigest()
+
+
+def record_artifact_outcome(
+    metadata: Mapping[str, Any],
+    *,
+    registry: ExperimentRegistry,
+) -> str:
+    """Record one seconds-artifact result in the append-only Factory registry.
+
+    A shadow artifact is deliberately recorded as ``NO_EVIDENCE``.  Only the
+    builder's explicit positive chronological test and sealed-OOS status is
+    recorded as a challenger; this function never promotes or changes runtime
+    authority.  Re-running the same immutable artifact is idempotent.
+    """
+    if str(metadata.get("schema") or "") != ARTIFACT_SCHEMA:
+        raise ValueError("unsupported short-horizon artifact schema")
+    dataset_hash = str(metadata.get("dataset_hash") or "").strip()
+    validation_hash = str(metadata.get("validation_hash") or "").strip()
+    if not dataset_hash or not validation_hash:
+        raise ValueError("dataset_hash and validation_hash are required")
+
+    experiment_id = f"short_horizon_{dataset_hash[:16]}_{validation_hash[:16]}"
+    if registry.get(experiment_id) is not None:
+        return experiment_id
+
+    oos = metadata.get("oos")
+    if not isinstance(oos, Mapping):
+        raise ValueError("artifact OOS metadata is required")
+    test = oos.get("test") if isinstance(oos.get("test"), Mapping) else {}
+    sealed = oos.get("sealed") if isinstance(oos.get("sealed"), Mapping) else {}
+    status = (
+        "CHALLENGER"
+        if str(metadata.get("execution_status") or "") == "EXECUTION_CANDIDATE"
+        else "NO_EVIDENCE"
+    )
+    reason = (
+        "positive chronological test and sealed-OOS terminal returns support a challenger"
+        if status == "CHALLENGER"
+        else "no positive sealed-OOS execution selection; retain shadow-only"
+    )
+    metrics = {
+        "test_n": test.get("n"),
+        "test_selected": test.get("selected"),
+        "test_positive_rate": test.get("positive_rate"),
+        "test_mean_terminal_return": test.get("mean_terminal_return"),
+        "test_brier": test.get("brier"),
+        "sealed_n": sealed.get("n"),
+        "sealed_selected": sealed.get("selected"),
+        "sealed_positive_rate": sealed.get("positive_rate"),
+        "sealed_mean_terminal_return": sealed.get("mean_terminal_return"),
+        "sealed_brier": sealed.get("brier"),
+        "horizons_s": list(metadata.get("horizons_s") or []),
+        "decision_horizon_s": metadata.get("decision_horizon_s"),
+        "threshold": metadata.get("threshold"),
+    }
+    hypothesis = {
+        "hypothesis_id": experiment_id,
+        "origin": "SHORT_HORIZON_ARTIFACT",
+        "problem": "seconds-horizon net-profitable opportunity prediction",
+        "proposed_mechanism": (
+            "calibrated logistic, random-forest, and gradient-boosting ensemble "
+            "using point-in-time executable bid/ask features"
+        ),
+        "features_required": "point-in-time quote and microstructure features",
+        "entry_rule": "calibrated ensemble selection after measured costs",
+        "exit_rule": "seconds horizon with executable-side labels",
+        "max_hold_s": max([int(value) for value in (metadata.get("horizons_s") or [45])]),
+    }
+    try:
+        return record_outcome(
+            registry,
+            hypothesis,
+            dataset_hash,
+            status,
+            reason,
+            metrics,
+        )
+    except DuplicateExperimentError:
+        # A concurrent research cadence may have recorded the same immutable
+        # artifact between the idempotence check and the insert.
+        if registry.get(experiment_id) is not None:
+            return experiment_id
+        raise
 
 
 def _asof_index(times: np.ndarray, seconds: int) -> np.ndarray:

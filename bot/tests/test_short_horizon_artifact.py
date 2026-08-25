@@ -3,10 +3,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from aegis.research.registry import ExperimentRegistry
 from aegis.research.short_horizon_artifact import (
     _feature_frame,
     build_quote_training_frame,
     chronological_slices,
+    record_artifact_outcome,
 )
 
 
@@ -46,3 +48,53 @@ def test_chronological_slices_are_disjoint_and_ordered():
     assert slices.train["time"].max() < slices.validation["time"].min()
     assert slices.validation["time"].max() < slices.test["time"].min()
     assert slices.test["time"].max() < slices.sealed["time"].min()
+
+
+def test_shadow_artifact_is_recorded_as_no_evidence(tmp_path):
+    registry = ExperimentRegistry(tmp_path / "experiments.sqlite")
+    metadata = {
+        "schema": "short_horizon_ensemble.v1",
+        "dataset_hash": "dataset-123",
+        "validation_hash": "validation-456",
+        "execution_status": "SHADOW_ONLY_NO_POSITIVE_OOS",
+        "threshold": 0.5,
+        "horizons_s": [3, 5, 10, 30, 45],
+        "oos": {
+            "test": {"n": 100, "selected": 0, "positive_rate": 0.05},
+            "sealed": {"n": 100, "selected": 0, "positive_rate": 0.04},
+        },
+    }
+
+    experiment_id = record_artifact_outcome(metadata, registry=registry)
+
+    row = registry.get(experiment_id)
+    assert row is not None
+    assert row["status"] == "failed"
+    assert "positive sealed-OOS" in row["rejection_reason"]
+    assert row["dataset_fingerprint"] == "dataset-123"
+    assert row["metrics"]["test_selected"] == 0
+    assert row["metrics"]["sealed_selected"] == 0
+
+
+def test_execution_candidate_artifact_is_recorded_as_challenger(tmp_path):
+    registry = ExperimentRegistry(tmp_path / "experiments.sqlite")
+    metadata = {
+        "schema": "short_horizon_ensemble.v1",
+        "dataset_hash": "dataset-789",
+        "validation_hash": "validation-000",
+        "execution_status": "EXECUTION_CANDIDATE",
+        "threshold": 0.8,
+        "horizons_s": [3, 5, 10],
+        "oos": {
+            "test": {"n": 100, "selected": 20, "mean_terminal_return": 0.01},
+            "sealed": {"n": 100, "selected": 15, "mean_terminal_return": 0.02},
+        },
+    }
+
+    experiment_id = record_artifact_outcome(metadata, registry=registry)
+
+    row = registry.get(experiment_id)
+    assert row is not None
+    assert row["status"] == "accepted"
+    assert row["metrics"]["test_selected"] == 20
+    assert row["metrics"]["sealed_selected"] == 15

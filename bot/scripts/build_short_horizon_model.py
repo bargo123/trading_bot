@@ -18,8 +18,13 @@ if __package__ in {None, ""}:  # support `python scripts/build_short_horizon_mod
 
 from aegis.engines.mt5 import MT5Engine
 from aegis.intel.paths import BOT_ROOT
+from aegis.research.registry import ExperimentRegistry
 from aegis.research.short_horizon import DEFAULT_HORIZONS_S
-from aegis.research.short_horizon_artifact import build_quote_training_frame, train_and_publish
+from aegis.research.short_horizon_artifact import (
+    build_quote_training_frame,
+    record_artifact_outcome,
+    train_and_publish,
+)
 
 
 def main() -> None:
@@ -64,11 +69,17 @@ def main() -> None:
         horizons=DEFAULT_HORIZONS_S,
         decision_horizon_s=10,
     )
+    experiment_id = record_artifact_outcome(
+        metadata,
+        registry=ExperimentRegistry(),
+    )
     print(
         "PUBLISHED",
         args.output,
         "schema=",
         metadata["schema"],
+        "experiment=",
+        experiment_id,
         "test=",
         metadata["oos"]["test"],
         "sealed=",
