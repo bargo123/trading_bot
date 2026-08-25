@@ -277,6 +277,31 @@ def test_video_candidate_is_recorded_when_short_horizon_abstains(tmp_path):
     assert decision.journal["micro_candidate_count"] == 1
     assert decision.journal["micro_diagnostics"]["video_style_candidate"] == "candidate_matched"
 
+
+def test_video_predictor_unavailable_produces_zero_order_intent(tmp_path):
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "records": []}), encoding="utf-8")
+    brain = IntelligentFirehoseBrain({
+        "analogue_index_path": str(index),
+        "intelligent_exploration_enabled": True,
+        "intelligent_min_analogues": 20,
+        "order_quantity": 0.01,
+        "exploration_max_positions": 2,
+        "exploration_max_positions_per_symbol": 1,
+        "exploration_max_risk_per_trade_usd": 0.15,
+    })
+    frame = _frame([1.1000, 1.1005, 1.1015])
+    decision = brain.evaluate(
+        symbol="EURUSD", row=frame.iloc[-1].copy(), completed_m1=frame,
+        positions=[], equity=100.0, pip=0.0001, core_side="buy",
+        actual_bid=1.1014, actual_ask=1.1015, entry_price=1.1015,
+        video_style=True, short_horizon_prediction=None,
+    )
+
+    assert decision.action == "skip"
+    assert decision.reason == "short_horizon_prediction_missing"
+    assert decision.quantity == 0.0
+
 def test_brain_can_fire_with_bootstrap_analogues(tmp_path):
     m1_for_signature = _m1()
     records = _positive_records(n=40, signature=_signature_for_m1(m1_for_signature.iloc[:-1]))

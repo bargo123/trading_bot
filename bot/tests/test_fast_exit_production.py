@@ -13,6 +13,7 @@ from aegis.intel.fast_firehose import ExitAction, FastExitConfig, FastExitStateM
 from aegis.intel.fast_exit_runner import (
     FastExitContext, build_harvest_input, combine_existing_exit_with_policy, evaluate_fast_exit,
     firehose_exit_trace, pip_size_for, spread_r_from_geometry,
+    REMAINING_EV_EXIT_POLICY_ID,
 )
 from aegis.intel.quote_buffer import QuoteBuffer
 from aegis.intel.broker_math import BrokerSymbolSpec
@@ -440,7 +441,7 @@ class TestFastExitProductionHelper:
 
 
 class TestFirehoseHarvestAdapter:
-    def _context(self, *, side="buy", ticket_meta=None, quote_buffer=None):
+    def _context(self, *, side="buy", ticket_meta=None, quote_buffer=None, config=None):
         helper = TestFastExitProductionHelper()
         meta = ticket_meta or create_ticket_metadata(
             ticket="T_HARVEST", hypothesis_id="hyp", thesis_key="thesis",
@@ -456,6 +457,7 @@ class TestFirehoseHarvestAdapter:
             remaining_ev=0.2, remaining_ev_status="ESTIMATED",
             observed_spread_r=0.01, observed_slippage_r=0.01,
             observed_commission_r=0.01, spread_normal=True,
+            config=config,
         )
 
     def _quotes(self):
@@ -504,10 +506,15 @@ class TestFirehoseHarvestAdapter:
         assert evaluate_fast_exit(ctx)["action"] == "HOLD"
 
     def test_unvalidated_harvester_keeps_legacy_ev_behavior(self):
-        ctx = self._context(quote_buffer=QuoteBuffer())
+        ctx = self._context(
+            quote_buffer=QuoteBuffer(),
+            config={"fast_firehose_remaining_ev_policy": REMAINING_EV_EXIT_POLICY_ID},
+        )
         ctx.mfe_usd = 0.0
         ctx.remaining_ev = -1.0
-        assert evaluate_fast_exit(ctx)["action"] == "HOLD"
+        verdict = evaluate_fast_exit(ctx)
+        assert verdict["action"] == "ABORT"
+        assert verdict["reason"] == "remaining_ev_negative"
 
     def test_trace_contains_observed_values_and_nulls_for_unavailable_evidence(self):
         ctx = self._context(quote_buffer=QuoteBuffer())

@@ -1,0 +1,24 @@
+{
+  "status": "DISCOVERED",
+  "source": "C:/Users/Zaid barghouthi/AppData/Local/hermes/provider_models_cache.json",
+  "provider": "opencode-free",
+  "hermes_cli": "C:/Users/Zaid barghouthi/AppData/Local/hermes/bin/hermes.exe",
+  "models": [
+    "x-preview-f-free",
+    "hy3-free",
+    "laguna-s-2.1-free",
+    "nemotron-3-ultra-free",
+    "nemotron-3.5-lightning-free",
+    "muse-spark-1.2-contributor-free"
+  ],
+  "paid_fallback": false,
+  "research_only": true,
+  "discovered_at": "2026-08-25T00:00:00Z",
+  "real_request": {
+    "status": "AVAILABLE",
+    "verified_model": "x-preview-f-free",
+    "duration_s": 17.31,
+    "output": "RESEARCH_ONLY_OK",
+    "usage_file": "bot/reports/council/hermes_free_capability_usage.json"
+  }
+}

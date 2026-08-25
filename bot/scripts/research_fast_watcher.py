@@ -786,7 +786,7 @@ def _council_agents_for_trigger(trigger: str | None) -> list[str]:
     """
     agents_env = os.environ.get(
         "AEGIS_COUNCIL_AGENTS",
-        "hermes,opencode,gemini,codex,cursor",
+        "hermes,opencode,gemini,cursor",
     )
     agents = [a.strip() for a in agents_env.split(",") if a.strip()]
     if trigger in _SENIOR_REVIEW_TRIGGERS and "claude" not in agents:

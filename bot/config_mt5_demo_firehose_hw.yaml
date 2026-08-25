@@ -122,7 +122,10 @@ hr_max_consecutive_losses: 20
 # guards, and the per-trade EV gate now addresses the cause. Limits are restored
 # deliberately loose - far looser than the 3%/12% defaults - so the firehose keeps
 # its throughput while a genuine blowup still halts it.
-max_daily_loss_percent: 0
+# Measured DEMO guard: 3% is approximately two observed $1.21 tail losses
+# at the recent $84.40 day-start equity; total drawdown remains 25%.
+max_daily_loss_percent: 3
+fast_firehose_remaining_ev_policy: fast_firehose_remaining_ev_v1
 max_total_drawdown_percent: 25
 max_positions: 40
 no_money_reject_limit: 3

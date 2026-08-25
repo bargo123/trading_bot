@@ -86,9 +86,12 @@ DEFAULT_AGENTS = {
         "models": [
             "x-preview-f-free",
             "hy3-free",
+            "laguna-s-2.1-free",
+            "nemotron-3-ultra-free",
             "nemotron-3.5-lightning-free",
+            "muse-spark-1.2-contributor-free",
         ],
-        "available_default": False,
+        "available_default": True,
         "hint": "Research-only Hermes adapter; free models only, never an execution authority.",
     },
     "opencode": {
@@ -129,7 +132,7 @@ DEFAULT_AGENTS = {
         "cli": "codex",
         "ask_cmd": ["exec", "--skip-git-repo-check"],
         "available_default": False,
-        "hint": "Quota limited; rejoin automatically when quota resets.",
+        "hint": "Implementation engineer; manual invocation only, never in recurring Council rounds.",
     },
     "cursor": {
         "label": "Cursor Agent",

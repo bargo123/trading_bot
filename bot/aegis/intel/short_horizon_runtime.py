@@ -135,6 +135,16 @@ class ShortHorizonPredictor:
             if missing:
                 self.status, self.reason = "invalid_artifact", "missing:" + ",".join(missing)
                 return
+            if (
+                self.execution_status == "EXECUTION_CANDIDATE"
+                and str(metadata.get("target_definition") or "").strip().lower()
+                != "captured_exit_replay"
+            ):
+                self.status, self.reason = (
+                    "invalid_artifact",
+                    "execution_requires_captured_exit_replay",
+                )
+                return
             self.pipeline = MLPipeline.load(self.artifact_path)
             if len(self.pipeline.models) < 2:
                 self.status, self.reason = "invalid_artifact", "insufficient_models"
@@ -159,6 +169,9 @@ class ShortHorizonPredictor:
             self.status, self.reason = "invalid_artifact", type(exc).__name__
 
     def snapshot(self) -> dict[str, Any]:
+        proof = self.metadata.get("runtime_proof")
+        if not isinstance(proof, dict):
+            proof = {}
         return {
             "status": self.status,
             "reason": self.reason,
@@ -168,6 +181,10 @@ class ShortHorizonPredictor:
             "horizons_s": self.metadata.get("horizons_s"),
             "model_count": len(self.pipeline.models) if self.pipeline is not None else 0,
             "execution_status": self.execution_status,
+            "target_definition": self.metadata.get("target_definition"),
+            "authorized_symbols": self.metadata.get("authorized_symbols") or [],
+            "decision_horizon_s": self.metadata.get("decision_horizon_s"),
+            "runtime_proof": proof,
         }
 
     def _fail_closed_prediction(self, reason: str) -> dict[str, Any]:
@@ -175,7 +192,7 @@ class ShortHorizonPredictor:
             "probability": 0.0,
             "decision": False,
             "abstain": True,
-            "calibration_status": "calibrated",
+            "calibration_status": "unavailable",
             "model_agreement": 0.0,
             "uncertainty": 1.0,
             "model_count": len(self.pipeline.models) if self.pipeline is not None else 0,
@@ -196,15 +213,21 @@ class ShortHorizonPredictor:
         notional_usd: float | None = None,
     ) -> dict[str, Any] | None:
         normalized_symbol = str(symbol).upper()
-        if self.execution_status == "EXECUTION_CANDIDATE":
-            authorized = {
-                str(value).upper()
-                for value in (self.metadata.get("authorized_symbols") or ())
-            }
+        if (
+            self.execution_status == "EXECUTION_CANDIDATE"
+            and str(self.metadata.get("target_definition") or "").strip().lower()
+            != "captured_exit_replay"
+        ):
+            return self._fail_closed_prediction("execution_requires_captured_exit_replay")
+        authorized_values = self.metadata.get("authorized_symbols") or ()
+        if authorized_values:
+            authorized = {str(value).upper() for value in authorized_values}
             if normalized_symbol not in authorized:
                 return self._fail_closed_prediction("symbol_not_authorized")
-        if self.pipeline is None or self.status not in {"ready", "shadow_only"}:
-            return None
+        if self.pipeline is None:
+            return self._fail_closed_prediction(self.reason or "artifact_unavailable")
+        if self.status != "ready":
+            return self._fail_closed_prediction("artifact_shadow_only")
         buffer = getattr(quote_buffer, "buffers", {}).get(normalized_symbol)
         if buffer is None:
             return self._fail_closed_prediction("quote_history_missing")
@@ -276,7 +299,7 @@ class ShortHorizonPredictor:
                     "model_disagreement": model_disagreement,
                 }
             if not by_horizon:
-                return None
+                return self._fail_closed_prediction("decision_horizon_missing")
             selected_horizon = str(int(self.metadata.get("decision_horizon_s", 10) or 10))
             selected = by_horizon.get(selected_horizon) or next(iter(by_horizon.values()))
             oos = self.metadata.get("oos") or {}
@@ -287,15 +310,19 @@ class ShortHorizonPredictor:
             )
             oos_by_horizon = scoped_oos or (oos.get("sealed_by_horizon") or {})
             selected_oos = oos_by_horizon.get(selected_horizon) or {}
-            harvest_mode = str(
+            target_definition = str(
                 self.metadata.get("target_definition") or "terminal_profit"
-            ).strip().lower() in {"mfe_first", "fast_harvest"}
+            ).strip().lower()
+            harvest_mode = target_definition in {"mfe_first", "fast_harvest"}
+            captured_exit_mode = target_definition == "captured_exit_replay"
             expected_return = (
-                selected_oos.get("mean_harvest_return") if harvest_mode
+                selected_oos.get("mean_captured_exit_return") if captured_exit_mode
+                else selected_oos.get("mean_harvest_return") if harvest_mode
                 else selected_oos.get("mean_terminal_return")
             )
             expected_lcb_return = (
-                selected_oos.get("harvest_lcb95_return") if harvest_mode
+                selected_oos.get("captured_exit_lcb95_return") if captured_exit_mode
+                else selected_oos.get("harvest_lcb95_return") if harvest_mode
                 else selected_oos.get("expectancy_lcb95_return")
             )
             expected_net = None
@@ -328,9 +355,15 @@ class ShortHorizonPredictor:
                 "by_horizon": by_horizon,
                 "expected_net_pnl": expected_net,
                 "expected_net_pnl_lcb95": expected_net_lcb95,
-                "harvest_mode": "first_green" if harvest_mode else "terminal_horizon",
+                "harvest_mode": (
+                    "captured_exit_replay" if captured_exit_mode
+                    else "first_green" if harvest_mode
+                    else "terminal_horizon"
+                ),
                 "expected_harvest_return": expected_return if harvest_mode else None,
                 "expected_harvest_return_lcb95": expected_lcb_return if harvest_mode else None,
+                "expected_captured_exit_return": expected_return if captured_exit_mode else None,
+                "expected_captured_exit_return_lcb95": expected_lcb_return if captured_exit_mode else None,
                 "tail_loss_probability": selected_oos.get("tail_loss_rate"),
                 "expected_mfe": selected_oos.get("expected_mfe"),
                 "expected_mae": selected_oos.get("expected_mae"),

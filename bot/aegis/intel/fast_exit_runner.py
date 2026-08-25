@@ -16,6 +16,12 @@ from aegis.intel.quote_buffer import QuoteBuffer
 from aegis.intel.ticket_metadata import TicketMetadata, firehose_lifecycle_identity
 
 
+# This is a separately validated point-in-time rule, not a fabricated harvest
+# policy. It uses only the current executable liquidation mark, current spread,
+# the ticket's entry geometry, and the runner's current EV estimate.
+REMAINING_EV_EXIT_POLICY_ID = "fast_firehose_remaining_ev_v1"
+
+
 @dataclass
 class FastExitContext:
     """All inputs needed for FastExit evaluation."""
@@ -162,14 +168,18 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     # Create FastExit state machine with ticket's max_hold_s
     fast_exit_sm = FastExitStateMachine(FastExitConfig(time_exit_s=_max_hold_s))
 
-    # Harvest activation is fail-closed: unavailable adapter evidence leaves
-    # the existing FastExit state machine entirely in control.
+    # The remaining-EV rule is independently governed and point-in-time. A
+    # harvest policy is optional additional evidence and is never fabricated.
     harvest_input = build_harvest_input(ctx)
+    remaining_ev_active = (
+        str(ctx.config.get("fast_firehose_remaining_ev_policy") or "")
+        == REMAINING_EV_EXIT_POLICY_ID
+        and ctx.remaining_ev_status == "ESTIMATED"
+        and _finite(ctx.remaining_ev)
+    )
 
-    # Evaluate
-    # Remaining EV is observed and traced regardless, but must not alter the
-    # legacy state machine until a complete harvester policy is explicitly live.
-    _harvest_active = bool(ctx.harvest_policy is not None and ctx.harvest_policy.is_available)
+    # Evaluate. Remaining EV is observed and traced regardless; this separately
+    # governed rule is active only when the runner config names its policy ID.
     fast_verdict = fast_exit_sm.evaluate(
         side=pos_side,
         entry_price=_state_entry_px,
@@ -185,8 +195,8 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
         pip=_pip_sz,
         regime_now=str(ctx.intelligent_brain.regime_by_symbol.get(pos_symbol, "") if ctx.intelligent_brain else ""),
         regime_at_entry=ctx.regime_at_entry,
-        remaining_ev=ctx.remaining_ev if _harvest_active else None,
-        remaining_ev_status=ctx.remaining_ev_status if _harvest_active else "UNKNOWN",
+        remaining_ev=ctx.remaining_ev if remaining_ev_active else None,
+        remaining_ev_status=ctx.remaining_ev_status if remaining_ev_active else "UNKNOWN",
         harvest_policy=ctx.harvest_policy,
         harvest_input=harvest_input,
     )

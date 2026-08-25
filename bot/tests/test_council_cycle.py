@@ -300,13 +300,13 @@ def test_ask_agent_stream_timeout_terminates_popen_without_fabricating_output(mo
 def test_dry_run_cycle_completes_full_round(monkeypatch, tmp_path):
     monkeypatch.setattr(case_store, "CASES_DIR", tmp_path)
     result = run_council_cycle("Should we stack Asia entries?", dry_run=True)
-    assert result["n_proposals"] == 5
-    assert result["n_critiques"] == 20  # 5 agents x 4 others
-    assert result["n_revisions"] == 5
+    assert result["n_proposals"] == 4
+    assert result["n_critiques"] == 12  # 4 recurring agents x 3 others
+    assert result["n_revisions"] == 4
     assert result["decision"] == "defer_validation"
     case = case_store.load_case(result["id"])
     assert case["status"] == "decided"
-    assert case["decision"]["evidence"]["n_proposals"] == 5
+    assert case["decision"]["evidence"]["n_proposals"] == 4
 
 
 def test_dry_run_cycle_does_not_invoke_cli(monkeypatch, tmp_path):

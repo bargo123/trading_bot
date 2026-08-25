@@ -1443,6 +1443,7 @@ class IntelligentFirehoseBrain:
     ) -> DemoDecision:
         clip_qty = float(self.cfg.get("order_quantity", 0.01))
         clip_risk = max(self._risk_budget * float(self.cfg.get("intelligent_risk_fraction", 0.08)) / 5.0, 0.01)
+        predictive_veto = False
         self.counts["scans"] = int(self.counts.get("scans", 0)) + 1
         self.memory.sync_from_positions(symbol, positions, clip_risk)
         state = build_runtime_state(symbol=symbol, m1=completed_m1)
@@ -1631,7 +1632,23 @@ class IntelligentFirehoseBrain:
                     "video_style_candidate": "candidate_matched",
                 },
             })
-        if short_horizon_prediction is not None:
+        if video_style and short_horizon_prediction is None:
+            # Predictive/video-style mode is fail-closed.  A missing predictor
+            # result is an explicit veto, never permission to use legacy
+            # Firehose entry logic.
+            self.counts["short_horizon_missing"] = int(
+                self.counts.get("short_horizon_missing", 0)
+            ) + 1
+            short_horizon_journal = {
+                **short_horizon_journal,
+                "short_horizon_prediction": None,
+                "short_horizon_gate": "short_horizon_prediction_missing",
+            }
+            fire = ThesisFireDecision(
+                "skip", "short_horizon_prediction_missing", fire.expected_net_value
+            )
+            predictive_veto = True
+        elif short_horizon_prediction is not None:
             calibration_status = str(short_horizon_prediction.get("calibration_status") or "")
             if calibration_status == "calibrated":
                 self.counts["ml_eligible"] = int(self.counts.get("ml_eligible", 0)) + 1
@@ -1669,6 +1686,7 @@ class IntelligentFirehoseBrain:
                 "short_horizon_gate": prediction_reason,
             }
             if not prediction_ok:
+                predictive_veto = bool(video_style)
                 diagnostic_reason = str(
                     short_horizon_prediction.get("abstain_reason")
                     or prediction_reason
@@ -1827,6 +1845,7 @@ class IntelligentFirehoseBrain:
         fire_base = str(fire.reason or "").split(":", 1)[0]
         exploration_classified = (
             fire.action == "skip"
+            and not predictive_veto
             and (fire_base in _EXPLORATION_ALLOWED_BASES
                  or str(fire.reason or "").startswith("shadow:"))
         )
@@ -1987,7 +2006,7 @@ class IntelligentFirehoseBrain:
             # actually validated, including a synthesised one when structure gave
             # no usable level.
             tp=econ.target if econ.target is not None else target,
-            quantity=clip_qty,
+            quantity=0.0 if predictive_veto else clip_qty,
             expected_net_value=action.expected_net_value,
             information_id=info_id,
             analogue_n=evidence.analogue_n,

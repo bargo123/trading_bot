@@ -19,7 +19,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FREE_MODELS = (
     "x-preview-f-free",
     "hy3-free",
+    "laguna-s-2.1-free",
+    "nemotron-3-ultra-free",
     "nemotron-3.5-lightning-free",
+    "muse-spark-1.2-contributor-free",
 )
 _QUOTA_MARKERS = ("429", "capacity", "rate limit", "quota", "temporarily unavailable")
 _JSON_BLOCK = re.compile(r"\{[\s\S]*\}")
@@ -213,4 +216,3 @@ def ask(
         if status != "UNAVAILABLE_QUOTA":
             break
     return last or _base_result(status="ERROR", started=started, error="no model attempted")
-

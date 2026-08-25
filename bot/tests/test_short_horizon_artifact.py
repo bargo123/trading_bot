@@ -35,6 +35,14 @@ def _positive_mfe_metrics(mean: float) -> dict[str, float | int]:
     }
 
 
+def _positive_captured_metrics(mean: float) -> dict[str, float | int]:
+    return {
+        "mean_captured_exit_return": mean,
+        "captured_exit_lcb95_return": mean,
+        "selected": 20,
+    }
+
+
 def test_execution_candidate_requires_positive_oos_at_configured_decision_horizon():
     status, reason = _execution_status(
         target_definition="terminal_profit",
@@ -45,7 +53,7 @@ def test_execution_candidate_requires_positive_oos_at_configured_decision_horizo
     )
 
     assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
-    assert reason == "decision_horizon_oos_not_positive"
+    assert reason == "execution_requires_captured_exit_replay"
 
 
 def test_execution_candidate_requires_positive_lower_confidence_bound():
@@ -60,7 +68,7 @@ def test_execution_candidate_requires_positive_lower_confidence_bound():
     )
 
     assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
-    assert reason == "oos_lcb95_not_positive"
+    assert reason == "execution_requires_captured_exit_replay"
 
 
 def test_execution_candidate_requires_supported_harvest_labels():
@@ -76,7 +84,7 @@ def test_execution_candidate_requires_supported_harvest_labels():
     assert reason == "execution_requires_supported_harvest_labels"
 
 
-def test_mfe_first_execution_candidate_requires_positive_harvest_oos():
+def test_mfe_first_is_auxiliary_only_even_with_positive_harvest_oos():
     status, reason = _execution_status(
         target_definition="mfe_first",
         decision_horizon_s=10,
@@ -85,11 +93,11 @@ def test_mfe_first_execution_candidate_requires_positive_harvest_oos():
         sealed_by_horizon={"10": _positive_mfe_metrics(0.001)},
     )
 
-    assert status == "EXECUTION_CANDIDATE"
-    assert reason == "positive_test_sealed_decision_horizon_harvest_oos"
+    assert status == "SHADOW_ONLY_AUXILIARY_TARGET"
+    assert reason == "mfe_first_auxiliary_only"
 
 
-def test_fast_harvest_execution_candidate_uses_harvest_oos_gate():
+def test_fast_harvest_is_auxiliary_only_even_with_positive_harvest_oos():
     status, reason = _execution_status(
         target_definition="fast_harvest",
         decision_horizon_s=10,
@@ -98,8 +106,21 @@ def test_fast_harvest_execution_candidate_uses_harvest_oos_gate():
         sealed_by_horizon={"10": _positive_mfe_metrics(0.001)},
     )
 
+    assert status == "SHADOW_ONLY_AUXILIARY_TARGET"
+    assert reason == "fast_harvest_auxiliary_only"
+
+
+def test_captured_exit_replay_is_the_only_execution_authorizing_target():
+    status, reason = _execution_status(
+        target_definition="captured_exit_replay",
+        decision_horizon_s=10,
+        test_metrics=_positive_captured_metrics(0.001),
+        sealed_metrics=_positive_captured_metrics(0.001),
+        sealed_by_horizon={"10": _positive_captured_metrics(0.001)},
+    )
+
     assert status == "EXECUTION_CANDIDATE"
-    assert reason == "positive_test_sealed_decision_horizon_harvest_oos"
+    assert reason == "positive_test_sealed_decision_horizon_captured_exit_oos"
 
 
 def test_mfe_first_execution_candidate_rejects_negative_harvest_lcb():
@@ -113,21 +134,21 @@ def test_mfe_first_execution_candidate_rejects_negative_harvest_lcb():
         sealed_by_horizon={"10": _positive_mfe_metrics(0.001)},
     )
 
-    assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
-    assert reason == "harvest_oos_lcb95_not_positive"
+    assert status == "SHADOW_ONLY_AUXILIARY_TARGET"
+    assert reason == "mfe_first_auxiliary_only"
 
 
 def test_execution_candidate_requires_positive_test_sealed_and_horizon_metrics():
     status, reason = _execution_status(
-        target_definition="terminal_profit",
+        target_definition="captured_exit_replay",
         decision_horizon_s=10,
-        test_metrics=_positive_metrics(0.001),
-        sealed_metrics=_positive_metrics(0.001),
-        sealed_by_horizon={"10": _positive_metrics(0.001)},
+        test_metrics=_positive_captured_metrics(0.001),
+        sealed_metrics=_positive_captured_metrics(0.001),
+        sealed_by_horizon={"10": _positive_captured_metrics(0.001)},
     )
 
     assert status == "EXECUTION_CANDIDATE"
-    assert reason == "positive_test_sealed_decision_horizon_oos"
+    assert reason == "positive_test_sealed_decision_horizon_captured_exit_oos"
 
 
 def test_decision_horizon_uses_fastest_validation_supported_horizon():
@@ -147,8 +168,8 @@ def test_decision_horizon_uses_fastest_validation_supported_horizon():
 
 
 def test_symbol_authorization_requires_positive_test_and_sealed_horizon_oos():
-    positive = _positive_metrics(0.001)
-    negative = _positive_metrics(-0.001)
+    positive = _positive_captured_metrics(0.001)
+    negative = _positive_captured_metrics(-0.001)
 
     authorized = _authorized_symbols(
         test_by_symbol={"EURUSD": positive, "GBPUSD": positive},
@@ -157,7 +178,7 @@ def test_symbol_authorization_requires_positive_test_and_sealed_horizon_oos():
             "GBPUSD": {"10": negative},
         },
         decision_horizon_s=10,
-        target_definition="terminal_profit",
+        target_definition="captured_exit_replay",
         min_selected=10,
     )
 
@@ -281,6 +302,15 @@ def test_training_frame_has_matured_both_side_horizon_rows():
     assert {"time_to_profit_s", "time_to_failure_s", "harvest_return"}.issubset(frame.columns)
 
 
+def test_captured_exit_replay_records_sequential_executable_outcome():
+    frame = build_quote_training_frame(
+        {"EURUSD": _quotes()}, horizons=(10,), sample_every_s=1,
+        target_mode="captured_exit_replay",
+    )
+    assert {"captured_exit_net_pnl", "captured_exit_return", "captured_exit_reason"}.issubset(frame.columns)
+    assert set(frame["captured_exit_reason"]).issubset({"harvest", "abort", "timeout"})
+
+
 def test_terminal_profit_target_does_not_label_temporary_mfe_as_a_win():
     times = pd.date_range("2026-01-01T00:00:00Z", periods=70, freq="1s")
     mid = np.full(70, 1.1)
@@ -366,11 +396,12 @@ def test_execution_candidate_artifact_is_recorded_as_challenger(tmp_path):
         "dataset_hash": "dataset-789",
         "validation_hash": "validation-000",
         "execution_status": "EXECUTION_CANDIDATE",
+        "target_definition": "captured_exit_replay",
         "threshold": 0.8,
         "horizons_s": [3, 5, 10],
         "oos": {
-            "test": {"n": 100, "selected": 20, "mean_terminal_return": 0.01},
-            "sealed": {"n": 100, "selected": 15, "mean_terminal_return": 0.02},
+            "test": {"n": 100, "selected": 20, "mean_captured_exit_return": 0.01},
+            "sealed": {"n": 100, "selected": 15, "mean_captured_exit_return": 0.02},
         },
     }
 

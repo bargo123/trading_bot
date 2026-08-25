@@ -3,8 +3,9 @@
 This module consumes completed MT5 quote history and never imports an engine or
 places orders.  Features are calculated from observations at or before the
 entry timestamp.  Labels use only observations strictly after entry.  An
-artifact is publishable only when its chronological OOS slice has positive
-cost-aware terminal or first-green harvest expectancy.
+artifact is execution-authorizing only when its chronological OOS slice has
+positive cost-aware captured-exit replay expectancy. Older targets remain
+research-only labels.
 """
 from __future__ import annotations
 
@@ -69,15 +70,21 @@ def record_artifact_outcome(
         raise ValueError("artifact OOS metadata is required")
     test = oos.get("test") if isinstance(oos.get("test"), Mapping) else {}
     sealed = oos.get("sealed") if isinstance(oos.get("sealed"), Mapping) else {}
+    target = str(metadata.get("target_definition") or "terminal_profit").strip().lower()
     status = (
         "CHALLENGER"
-        if str(metadata.get("execution_status") or "") == "EXECUTION_CANDIDATE"
+        if (
+            str(metadata.get("execution_status") or "") == "EXECUTION_CANDIDATE"
+            and target == "captured_exit_replay"
+        )
         else "NO_EVIDENCE"
     )
-    harvest_mode = str(metadata.get("target_definition") or "terminal_profit").strip().lower() in {"mfe_first", "fast_harvest"}
+    harvest_mode = target in {"mfe_first", "fast_harvest"}
     reason = (
         "positive chronological test and sealed-OOS first-green harvest returns support a challenger"
         if status == "CHALLENGER" and harvest_mode
+        else "positive chronological test and sealed-OOS captured-exit replay returns support a challenger"
+        if status == "CHALLENGER" and target == "captured_exit_replay"
         else "positive chronological test and sealed-OOS terminal returns support a challenger"
         if status == "CHALLENGER"
         else "no positive sealed-OOS execution selection; retain shadow-only"
@@ -88,6 +95,7 @@ def record_artifact_outcome(
         "test_positive_rate": test.get("positive_rate"),
         "test_mean_terminal_return": test.get("mean_terminal_return"),
         "test_mean_harvest_return": test.get("mean_harvest_return"),
+        "test_mean_captured_exit_return": test.get("mean_captured_exit_return"),
         "test_harvest_lcb95_return": test.get("harvest_lcb95_return"),
         "test_brier": test.get("brier"),
         "sealed_n": sealed.get("n"),
@@ -95,6 +103,7 @@ def record_artifact_outcome(
         "sealed_positive_rate": sealed.get("positive_rate"),
         "sealed_mean_terminal_return": sealed.get("mean_terminal_return"),
         "sealed_mean_harvest_return": sealed.get("mean_harvest_return"),
+        "sealed_mean_captured_exit_return": sealed.get("mean_captured_exit_return"),
         "sealed_harvest_lcb95_return": sealed.get("harvest_lcb95_return"),
         "sealed_brier": sealed.get("brier"),
         "horizons_s": list(metadata.get("horizons_s") or []),
@@ -233,7 +242,7 @@ def build_quote_training_frame(
     *,
     horizons: Sequence[int] = DEFAULT_HORIZONS_S,
     sample_every_s: int = 5,
-    target_mode: str = "mfe_first",
+    target_mode: str = "captured_exit_replay",
 ) -> pd.DataFrame:
     """Create point-in-time feature/label rows from completed quotes.
 
@@ -241,7 +250,9 @@ def build_quote_training_frame(
     point in the horizon. ``fast_harvest`` requires a realized move of at
     least two observed spreads before treating the path as a harvestable win.
     ``terminal_profit`` predicts whether the executable terminal mark is still
-    green at the horizon endpoint. All labels are point-in-time and cost-aware.
+    green at the horizon endpoint. ``captured_exit_replay`` sequentially
+    applies the capture/abort/timeout policy to future executable BID/ASK
+    quotes. All labels are point-in-time and cost-aware.
     """
     horizon_values = tuple(sorted({int(value) for value in horizons if int(value) > 0}))
     if not horizon_values:
@@ -249,8 +260,10 @@ def build_quote_training_frame(
     if int(sample_every_s) <= 0:
         raise ValueError("sample_every_s must be positive")
     target_mode = str(target_mode).strip().lower()
-    if target_mode not in {"mfe_first", "fast_harvest", "terminal_profit"}:
-        raise ValueError("target_mode must be mfe_first, fast_harvest, or terminal_profit")
+    if target_mode not in {"mfe_first", "fast_harvest", "terminal_profit", "captured_exit_replay"}:
+        raise ValueError(
+            "target_mode must be mfe_first, fast_harvest, terminal_profit, or captured_exit_replay"
+        )
     rows: list[dict[str, Any]] = []
     for symbol, quotes in sorted(quotes_by_symbol.items()):
         features = _feature_frame(quotes, symbol)
@@ -305,13 +318,44 @@ def build_quote_training_frame(
                         float((future_times.iloc[int(failures[0])] - features.iloc[index]["time"]).total_seconds())
                         if len(failures) else None
                     )
+                    captured = terminal
+                    captured_reason = "timeout"
+                    captured_index: int | None = None
+                    if target_mode == "captured_exit_replay":
+                        # Sequential replay: only the current future quote is
+                        # visible when deciding capture, abort, or timeout.
+                        for future_index, value in enumerate(signed):
+                            if value >= harvest_threshold:
+                                captured = float(value)
+                                captured_reason = "harvest"
+                                captured_index = future_index
+                                break
+                            if value <= -tail_threshold:
+                                captured = float(value)
+                                captured_reason = "abort"
+                                captured_index = future_index
+                                break
                     harvest = float(signed[int(harvestable[0])]) if len(harvestable) else terminal
+                    if target_mode == "captured_exit_replay":
+                        harvest = captured
+                        time_to_profit = (
+                            float(
+                                (
+                                    future_times.iloc[captured_index]
+                                    - features.iloc[index]["time"]
+                                ).total_seconds()
+                            )
+                            if captured_reason == "harvest" and captured_index is not None
+                            else None
+                        )
                     row = features.iloc[index].to_dict()
                     target = (
                         int(len(harvestable) > 0)
                         if target_mode == "fast_harvest"
                         else int(mfe > 0.0)
                         if target_mode == "mfe_first"
+                        else int(captured > 0.0)
+                        if target_mode == "captured_exit_replay"
                         else int(terminal > 0.0)
                     )
                     row.update(
@@ -331,6 +375,9 @@ def build_quote_training_frame(
                             # retain the terminal outcome when no green mark
                             # occurred within the horizon.
                             "harvest_return": harvest / float(mid[index]) if mid[index] > 0 else np.nan,
+                            "captured_exit_net_pnl": captured,
+                            "captured_exit_return": captured / float(mid[index]) if mid[index] > 0 else np.nan,
+                            "captured_exit_reason": captured_reason,
                             "mfe": mfe,
                             "mae": mae,
                             "tail_loss": int(mae <= -tail_threshold),
@@ -370,6 +417,7 @@ def _model_frame(frame: pd.DataFrame) -> pd.DataFrame:
         "time", "symbol", "side", "target", "terminal_net_pnl",
         "terminal_return", "mfe", "mae", "tail_loss",
         "harvest_return", "time_to_profit_s", "time_to_failure_s",
+        "captured_exit_net_pnl", "captured_exit_return", "captured_exit_reason",
     }
     columns = [column for column in frame.columns if column not in excluded]
     result = frame.loc[:, columns].copy()
@@ -388,6 +436,10 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
         frame.get("harvest_return", frame["terminal_return"]), errors="coerce"
     ).to_numpy(dtype=float)
     selected_harvest = harvest[decision]
+    captured = pd.to_numeric(
+        frame.get("captured_exit_return", frame["terminal_return"]), errors="coerce"
+    ).to_numpy(dtype=float)
+    selected_captured = captured[decision]
     mfe_values = pd.to_numeric(
         frame.get("mfe", pd.Series(np.nan, index=frame.index)), errors="coerce"
     ).to_numpy(dtype=float)
@@ -447,6 +499,21 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
             finite_selected_harvest.mean()
             - 1.96 * finite_selected_harvest.std(ddof=1) / np.sqrt(len(finite_selected_harvest))
         )
+    captured_lcb95 = None
+    finite_selected_captured = selected_captured[np.isfinite(selected_captured)]
+    if len(finite_selected_captured) >= 2:
+        captured_lcb95 = float(
+            finite_selected_captured.mean()
+            - 1.96 * finite_selected_captured.std(ddof=1) / np.sqrt(len(finite_selected_captured))
+        )
+    captured_wins = finite_selected_captured[finite_selected_captured > 0.0]
+    captured_losses = finite_selected_captured[finite_selected_captured < 0.0]
+    captured_profit_factor = (
+        float(captured_wins.sum() / abs(captured_losses.sum()))
+        if len(captured_losses) and len(captured_wins) else None
+    )
+    p95_loss = float(np.quantile(captured_losses, 0.05)) if len(captured_losses) else None
+    p99_loss = float(np.quantile(captured_losses, 0.01)) if len(captured_losses) else None
     confidence_bands: dict[str, dict[str, Any]] = {}
     for lower, upper in (
         (0.50, 0.60), (0.60, 0.70), (0.70, 0.80), (0.80, 0.90),
@@ -484,6 +551,7 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
         "expectancy_lcb95_return": expectancy_lcb95,
         "mfe_lcb95_return": mfe_lcb95,
         "harvest_lcb95_return": harvest_lcb95,
+        "captured_exit_lcb95_return": captured_lcb95,
         "confidence_bands": confidence_bands,
         "precision": float(actual[decision].mean()) if decision.any() else None,
         "mean_terminal_return": float(selected.mean()) if len(selected) else None,
@@ -495,6 +563,13 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
             float(finite_selected_harvest.mean())
             if len(finite_selected_harvest) else None
         ),
+        "mean_captured_exit_return": (
+            float(finite_selected_captured.mean())
+            if len(finite_selected_captured) else None
+        ),
+        "captured_exit_profit_factor": captured_profit_factor,
+        "p95_loss_return": p95_loss,
+        "p99_loss_return": p99_loss,
         "expected_mfe": selected_mean("mfe"),
         "expected_mae": selected_mean("mae"),
         "median_time_to_green_s": selected_median("time_to_profit_s"),
@@ -564,9 +639,13 @@ def _select_threshold_for_prediction(
 ) -> tuple[float, dict[str, Any]]:
     """Select a scope threshold from validation predictions only."""
     target = str(target_definition).strip().lower()
-    harvest_mode = target in {"mfe_first", "fast_harvest"}
-    mean_key = "mean_harvest_return" if harvest_mode else "mean_terminal_return"
-    lcb_key = "harvest_lcb95_return" if harvest_mode else "expectancy_lcb95_return"
+    if target == "captured_exit_replay":
+        mean_key = "mean_captured_exit_return"
+        lcb_key = "captured_exit_lcb95_return"
+    else:
+        harvest_mode = target in {"mfe_first", "fast_harvest"}
+        mean_key = "mean_harvest_return" if harvest_mode else "mean_terminal_return"
+        lcb_key = "harvest_lcb95_return" if harvest_mode else "expectancy_lcb95_return"
     candidates: list[tuple[float, dict[str, Any]]] = []
     for threshold in _threshold_candidates(base_prediction["probability"]):
         prediction = _threshold_prediction(
@@ -615,11 +694,14 @@ def _execution_status(
 ) -> tuple[str, str]:
     """Authorize execution only for a costed label the exit can realize."""
     target = str(target_definition).strip().lower()
-    if target not in {"terminal_profit", "mfe_first", "fast_harvest"}:
+    if target != "captured_exit_replay":
+        if target in {"mfe_first", "fast_harvest"}:
+            return "SHADOW_ONLY_AUXILIARY_TARGET", f"{target}_auxiliary_only"
+        if target == "terminal_profit":
+            return "SHADOW_ONLY_NO_POSITIVE_OOS", "execution_requires_captured_exit_replay"
         return "SHADOW_ONLY_NO_POSITIVE_OOS", "execution_requires_supported_harvest_labels"
-    harvest_mode = target in {"mfe_first", "fast_harvest"}
-    mean_key = "mean_harvest_return" if harvest_mode else "mean_terminal_return"
-    lcb_key = "harvest_lcb95_return" if harvest_mode else "expectancy_lcb95_return"
+    mean_key = "mean_captured_exit_return"
+    lcb_key = "captured_exit_lcb95_return"
 
     def positive(metrics: Mapping[str, Any] | None) -> bool:
         if not isinstance(metrics, Mapping):
@@ -639,26 +721,23 @@ def _execution_status(
 
     if not positive(test_metrics) or not positive(sealed_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", (
-            "test_or_sealed_harvest_oos_not_positive" if harvest_mode
-            else "test_or_sealed_oos_not_positive"
+            "test_or_sealed_captured_exit_oos_not_positive"
         )
     if not positive_lcb(test_metrics) or not positive_lcb(sealed_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", (
-            "harvest_oos_lcb95_not_positive" if harvest_mode else "oos_lcb95_not_positive"
+            "captured_exit_oos_lcb95_not_positive"
         )
     horizon_metrics = sealed_by_horizon.get(str(int(decision_horizon_s)))
     if not positive(horizon_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", (
-            "decision_horizon_harvest_oos_not_positive" if harvest_mode
-            else "decision_horizon_oos_not_positive"
+            "decision_horizon_captured_exit_oos_not_positive"
         )
     if not positive_lcb(horizon_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", (
-            "harvest_oos_lcb95_not_positive" if harvest_mode else "oos_lcb95_not_positive"
+            "captured_exit_oos_lcb95_not_positive"
         )
     return "EXECUTION_CANDIDATE", (
-        "positive_test_sealed_decision_horizon_harvest_oos" if harvest_mode
-        else "positive_test_sealed_decision_horizon_oos"
+        "positive_test_sealed_decision_horizon_captured_exit_oos"
     )
 
 
@@ -671,9 +750,13 @@ def _select_decision_horizon(
 ) -> tuple[int, str]:
     """Choose the fastest horizon with positive validation LCB evidence."""
     target = str(target_definition).strip().lower()
-    harvest_mode = target in {"mfe_first", "fast_harvest"}
-    mean_key = "mean_harvest_return" if harvest_mode else "mean_terminal_return"
-    lcb_key = "harvest_lcb95_return" if harvest_mode else "expectancy_lcb95_return"
+    if target == "captured_exit_replay":
+        mean_key = "mean_captured_exit_return"
+        lcb_key = "captured_exit_lcb95_return"
+    else:
+        harvest_mode = target in {"mfe_first", "fast_harvest"}
+        mean_key = "mean_harvest_return" if harvest_mode else "mean_terminal_return"
+        lcb_key = "harvest_lcb95_return" if harvest_mode else "expectancy_lcb95_return"
 
     def supported(metrics: Mapping[str, Any] | None) -> bool:
         if not isinstance(metrics, Mapping):
@@ -709,11 +792,12 @@ def _authorized_symbols(
 ) -> list[str]:
     """Return only symbols with exact test and sealed horizon evidence."""
     target = str(target_definition).strip().lower()
-    if target not in {"terminal_profit", "mfe_first", "fast_harvest"}:
+    if target not in {"terminal_profit", "mfe_first", "fast_harvest", "captured_exit_replay"}:
         return []
-    harvest_mode = target in {"mfe_first", "fast_harvest"}
-    mean_key = "mean_harvest_return" if harvest_mode else "mean_terminal_return"
-    lcb_key = "harvest_lcb95_return" if harvest_mode else "expectancy_lcb95_return"
+    if target != "captured_exit_replay":
+        return []
+    mean_key = "mean_captured_exit_return"
+    lcb_key = "captured_exit_lcb95_return"
 
     def positive(metrics: Mapping[str, Any] | None) -> bool:
         if not isinstance(metrics, Mapping):
@@ -743,7 +827,7 @@ def train_and_publish(
     *,
     horizons: Sequence[int] = DEFAULT_HORIZONS_S,
     decision_horizon_s: int = 10,
-    target_definition: str = "mfe_first",
+    target_definition: str = "captured_exit_replay",
 ) -> dict[str, Any]:
     """Train, evaluate, and publish only a calibrated positive-OOS artifact."""
     slices = chronological_slices(frame)
@@ -779,7 +863,9 @@ def train_and_publish(
     # first-green artifact optimizes its realizable harvest proxy; terminal
     # artifacts optimize terminal economics.
     selection_metric = (
-        "mean_harvest_return"
+        "mean_captured_exit_return"
+        if str(target_definition).strip().lower() == "captured_exit_replay"
+        else "mean_harvest_return"
         if str(target_definition).strip().lower() in {"mfe_first", "fast_harvest"}
         else "mean_terminal_return"
     )
@@ -911,7 +997,7 @@ def train_and_publish(
         decision_horizon_s=selected_decision_horizon,
         target_definition=target_definition,
     )
-    if authorized_symbols:
+    if authorized_symbols and execution_status == "EXECUTION_CANDIDATE":
         execution_status = "EXECUTION_CANDIDATE"
         execution_status_reason = "positive_exact_symbol_test_sealed_horizon_oos"
     elif execution_status == "EXECUTION_CANDIDATE":
@@ -950,6 +1036,34 @@ def train_and_publish(
             "cost_evidence": "executable_bid_ask_spread_in_labels; no synthetic slippage",
             "symbols": sorted(frame["symbol"].astype(str).str.upper().unique().tolist()),
             "authorized_symbols": authorized_symbols,
+            "model_count": len(pipeline.models),
+            "exit_policy": {
+                "name": "captured_exit_replay_v1",
+                "entry": "buy=ASK,sell=BID",
+                "capture": "first_executable_move_at_or_above_two_observed_spreads",
+                "abort": "first_executable_move_at_or_below_three_observed_spreads_loss",
+                "timeout": "last_future_quote_at_horizon",
+                "costs": "observed_bid_ask_spread_only; slippage_and_commission_unavailable",
+            },
+            "runtime_proof": {
+                "SHORT_HORIZON_MODEL_STATUS": execution_status,
+                "EXECUTION_STATUS": execution_status,
+                "TARGET_DEFINITION": str(target_definition),
+                "AUTHORIZED_SYMBOLS": authorized_symbols,
+                "MODEL_COUNT": len(pipeline.models),
+                "DATASET_HASH": _hash_frame(frame),
+                "VALIDATION_HASH": _hash_frame(slices.validation),
+                "DECISION_HORIZON": int(selected_decision_horizon),
+                "OOS_TEST_N": test_metrics.get("n"),
+                "OOS_SEALED_N": sealed_metrics.get("n"),
+                "OOS_PRECISION": sealed_metrics.get("precision"),
+                "OOS_CAPTURED_EXPECTANCY": sealed_metrics.get("mean_captured_exit_return"),
+                "OOS_CAPTURED_PF": sealed_metrics.get("captured_exit_profit_factor"),
+                "P95_LOSS": sealed_metrics.get("p95_loss_return"),
+                "P99_LOSS": sealed_metrics.get("p99_loss_return"),
+                "CALIBRATION_ECE": sealed_metrics.get("calibration_ece"),
+                "ABSTAIN_RATE": sealed_metrics.get("abstain_rate"),
+            },
         }
     )
     metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")

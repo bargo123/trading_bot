@@ -273,7 +273,7 @@ def run_council_cycle(question: str, *, agents: list[str] | None = None,
         raise ValueError("question is required")
     mode = "DRY_RUN" if dry_run else "REAL"
     config = agent_cli.load_agents_config()
-    default_names = ("hermes", "opencode", "gemini", "codex", "cursor")
+    default_names = ("hermes", "opencode", "gemini", "cursor")
     if agents is not None:
         names = list(agents)
     elif "hermes" in config:

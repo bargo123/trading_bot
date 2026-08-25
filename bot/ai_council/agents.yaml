@@ -12,8 +12,11 @@ agents:
     models:
       - "x-preview-f-free"
       - "hy3-free"
+      - "laguna-s-2.1-free"
+      - "nemotron-3-ultra-free"
       - "nemotron-3.5-lightning-free"
-    available_default: false
+      - "muse-spark-1.2-contributor-free"
+    available_default: true
     hint: "Research-only Hermes adapter; never an execution authority."
   opencode:
     label: "OpenCode"
@@ -48,7 +51,7 @@ agents:
     cli: "codex"
     ask_cmd: ["exec", "--skip-git-repo-check"]
     available_default: false
-    hint: "Quota limited; rejoin automatically when quota resets."
+    hint: "Implementation engineer; manual invocation only, never in recurring Council rounds."
   cursor:
     label: "Cursor Agent"
     provider: "cursor"

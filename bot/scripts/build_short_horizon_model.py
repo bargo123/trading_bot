@@ -34,9 +34,9 @@ def main() -> None:
     parser.add_argument("--sample-every-seconds", type=int, default=5)
     parser.add_argument(
         "--target-mode",
-        choices=("mfe_first", "fast_harvest", "terminal_profit"),
-        default="mfe_first",
-        help="Research label: green, fast harvest, or terminal profit at the horizon",
+        choices=("captured_exit_replay", "mfe_first", "fast_harvest", "terminal_profit"),
+        default="captured_exit_replay",
+        help="Point-in-time executable target; older labels remain auxiliary research targets",
     )
     parser.add_argument("--output", type=Path, default=BOT_ROOT / "intel" / "short_horizon_model")
     args = parser.parse_args()

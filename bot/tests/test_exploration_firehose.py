@@ -793,6 +793,7 @@ def test_short_horizon_abstention_still_reaches_bounded_exploration(tmp_path, mo
         pip=0.0001, core_side="buy", spread_price=0.0001,
         entry_price=float(row["close"]), actual_bid=float(row["close"]) - 0.00005,
         actual_ask=float(row["close"]) + 0.00005,
+        video_style=True,
         short_horizon_prediction={
             "calibration_status": "calibrated", "abstain": True,
             "abstain_reason": "uncertainty_high", "uncertainty": 0.45,
@@ -800,8 +801,8 @@ def test_short_horizon_abstention_still_reaches_bounded_exploration(tmp_path, mo
         },
     )
 
-    assert invoked, "short-horizon abstention must classify the candidate for exploration"
-    assert decision.action == "fire"
+    assert not invoked, "predictive abstention must not create an exploration order intent"
+    assert decision.action == "skip"
 
 
 def test_exploration_journal_records_micro_rejection_reason(tmp_path, monkeypatch):

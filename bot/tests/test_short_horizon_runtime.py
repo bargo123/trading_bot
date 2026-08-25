@@ -13,7 +13,9 @@ from aegis.intel.short_horizon_runtime import (
 def test_short_horizon_runtime_is_fail_closed_without_artifact(tmp_path: Path):
     predictor = ShortHorizonPredictor(tmp_path / "missing")
 
-    assert predictor.predict(symbol="EURUSD", quote_buffer=None, now_ts=1.0) is None
+    result = predictor.predict(symbol="EURUSD", quote_buffer=None, now_ts=1.0)
+    assert result["abstain"] is True
+    assert result["prediction_reason"] == "artifact_not_found"
     assert predictor.snapshot()["status"] == "missing_artifact"
     assert predictor.snapshot()["reason"] == "artifact_not_found"
 
@@ -25,7 +27,9 @@ def test_short_horizon_runtime_rejects_non_short_horizon_metadata(tmp_path: Path
 
     predictor = ShortHorizonPredictor(path)
 
-    assert predictor.predict(symbol="EURUSD", quote_buffer=None, now_ts=1.0) is None
+    result = predictor.predict(symbol="EURUSD", quote_buffer=None, now_ts=1.0)
+    assert result["abstain"] is True
+    assert result["prediction_reason"] == "schema_mismatch"
     assert predictor.snapshot()["status"] == "invalid_artifact"
     assert predictor.snapshot()["reason"] == "schema_mismatch"
 
@@ -75,7 +79,7 @@ def test_runtime_quotes_use_the_training_one_second_cadence():
     assert result.iloc[1]["bid"] == 1.1002
 
 
-def test_mfe_artifact_uses_first_green_oos_expectancy_for_runtime_ev(tmp_path: Path):
+def test_captured_exit_artifact_uses_captured_oos_expectancy_for_runtime_ev(tmp_path: Path):
     class Pipeline:
         models = [object(), object()]
 
@@ -101,7 +105,7 @@ def test_mfe_artifact_uses_first_green_oos_expectancy_for_runtime_ev(tmp_path: P
     predictor.metadata = {
         "horizons_s": [10],
         "decision_horizon_s": 10,
-        "target_definition": "mfe_first",
+        "target_definition": "captured_exit_replay",
         "threshold": 0.5,
         "min_model_agreement": 0.6,
         "max_uncertainty": 0.2,
@@ -110,15 +114,15 @@ def test_mfe_artifact_uses_first_green_oos_expectancy_for_runtime_ev(tmp_path: P
         "oos": {
             "sealed_by_horizon": {
                 "10": {
-                    "mean_harvest_return": 0.001,
-                    "harvest_lcb95_return": 0.0005,
+                    "mean_captured_exit_return": 0.001,
+                    "captured_exit_lcb95_return": 0.0005,
                 }
             },
             "sealed_by_symbol_horizon": {
                 "EURUSD": {
                     "10": {
-                        "mean_harvest_return": 0.002,
-                        "harvest_lcb95_return": 0.001,
+                        "mean_captured_exit_return": 0.002,
+                        "captured_exit_lcb95_return": 0.001,
                     }
                 }
             },
@@ -135,8 +139,9 @@ def test_mfe_artifact_uses_first_green_oos_expectancy_for_runtime_ev(tmp_path: P
     )
 
     assert result is not None
-    assert result["harvest_mode"] == "first_green"
-    assert result["expected_harvest_return"] == 0.002
+    assert result["harvest_mode"] == "captured_exit_replay"
+    assert result["expected_harvest_return"] is None
+    assert result["expected_captured_exit_return"] == 0.002
     assert result["expected_net_pnl"] > 0.0
     assert result["expected_net_pnl_lcb95"] > 0.0
     assert result["threshold"] == 0.7
@@ -147,7 +152,10 @@ def test_execution_candidate_rejects_symbol_without_exact_scope_permission(tmp_p
     predictor = ShortHorizonPredictor(tmp_path / "missing")
     predictor.execution_status = "EXECUTION_CANDIDATE"
     predictor.status = "ready"
-    predictor.metadata = {"authorized_symbols": ["GBPUSD"]}
+    predictor.metadata = {
+        "target_definition": "captured_exit_replay",
+        "authorized_symbols": ["GBPUSD"],
+    }
 
     result = predictor.predict(symbol="EURUSD", quote_buffer=None, now_ts=1.0)
 
@@ -192,8 +200,8 @@ def test_runtime_exposes_precise_abstention_diagnostics(tmp_path: Path):
     )
 
     assert result is not None
-    assert result["abstain_reason"] == "model_disagreement+uncertainty_high"
-    assert result["model_disagreement"] is True
+    assert result["abstain_reason"] == "artifact_shadow_only"
+    assert result["abstain"] is True
 
 
 def test_runtime_diagnostics_handle_vector_model_outputs(tmp_path: Path):
@@ -231,5 +239,5 @@ def test_runtime_diagnostics_handle_vector_model_outputs(tmp_path: Path):
     )
 
     assert result is not None
-    assert result["abstain_reason"] == "uncertainty_high"
-    assert result["model_disagreement"] is False
+    assert result["abstain_reason"] == "artifact_shadow_only"
+    assert result["abstain"] is True

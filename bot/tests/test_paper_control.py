@@ -260,7 +260,7 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert float(cfg["order_quantity"]) == 0.01
     # The global percentage halt is intentionally disabled for this governed DEMO
     # Firehose. The separate dollar exploration cap remains armed below.
-    assert float(cfg.get("max_daily_loss_percent") or 0) == 0.0
+    assert float(cfg.get("max_daily_loss_percent") or 0) == 3.0
     assert float(cfg.get("max_total_drawdown_percent") or 0) > 0.0
     assert float(cfg["max_total_drawdown_percent"]) >= 15.0
     assert int(cfg["max_positions"]) == 40
