@@ -235,12 +235,21 @@ def summarize_fast_trade_autopsy(
             category = "WINNER_GIVEBACK" if mfe_usd is not None and pnl < mfe_usd else "FAST_CLEAN_WIN"
         elif pnl == 0:
             category = "FLAT_SCRATCH"
-        elif "no_progress" in reason_lower or "never_green" in reason_lower:
+        elif mfe_usd is not None and mfe_usd > 0:
+            # A losing close after a positive observed excursion is a distinct
+            # winner-to-loser failure.  Keep it separate from an ordinary
+            # stop/entry loss so Factory can test giveback containment.
+            category = "WINNER_GIVEBACK"
+        elif any(token in reason_lower for token in ("no_progress", "never_green", "time_decay")):
             category = "NO_PROGRESS"
         elif close_reason == "sl" or "stop" in reason_lower:
             category = "STOP_LOSS"
         elif "spread" in reason_lower:
             category = "SPREAD_COST"
+        elif any(token in reason_lower for token in ("regime_change", "regime_changed")):
+            category = "REGIME_CHANGE"
+        elif any(token in reason_lower for token in ("adverse_selection", "adverse-select")):
+            category = "ADVERSE_SELECTION"
         else:
             category = "UNCLASSIFIED_LOSS"
         trades.append(
@@ -264,6 +273,32 @@ def summarize_fast_trade_autopsy(
     winners = [trade for trade in trades if trade["pnl"] > 0]
     losses = [trade for trade in trades if trade["pnl"] < 0]
     giveback_winners = [trade for trade in winners if trade["category"] == "WINNER_GIVEBACK"]
+    loss_category_metrics: dict[str, dict[str, Any]] = {}
+    for category, category_losses in sorted(
+        ((name, [trade for trade in losses if trade["category"] == name])
+         for name in {trade["category"] for trade in losses}),
+    ):
+        category_pnls = [float(trade["pnl"]) for trade in category_losses]
+        loss_category_metrics[category] = {
+            "n": len(category_losses),
+            "complete_evidence": sum(
+                trade["evidence_status"] == "COMPLETE" for trade in category_losses
+            ),
+            "net_pnl": round(sum(category_pnls), 8),
+            "avg_loss": round(sum(category_pnls) / len(category_pnls), 8),
+            "median_hold_s": _median(
+                trade["hold_s"] for trade in category_losses
+                if trade["hold_s"] is not None
+            ),
+            "median_mfe_usd": _median(
+                trade["mfe_usd"] for trade in category_losses
+                if trade["mfe_usd"] is not None
+            ),
+            "median_mae_usd": _median(
+                trade["mae_usd"] for trade in category_losses
+                if trade["mae_usd"] is not None
+            ),
+        }
     complete = sum(trade["evidence_status"] == "COMPLETE" for trade in trades)
     with_runtime_trace = sum(
         trade["evidence_status"] == "COMPLETE" or trade["hold_s"] is not None
@@ -295,6 +330,7 @@ def summarize_fast_trade_autopsy(
         "median_mae_usd": _median(trade["mae_usd"] for trade in trades if trade["mae_usd"] is not None),
         "winner_giveback_rate": (len(giveback_winners) / len(winners) if winners else None),
         "loss_categories": dict(Counter(trade["category"] for trade in losses)),
+        "loss_category_metrics": loss_category_metrics,
         "by_symbol": by_symbol,
         "trades": trades,
         "next_experiments": [
@@ -329,6 +365,7 @@ def record_fast_trade_autopsy(
             "seconds_in_red_observed_s": summary.get("seconds_in_red_observed_s"),
             "winner_giveback_rate": summary.get("winner_giveback_rate"),
             "loss_categories": summary.get("loss_categories") or {},
+            "loss_category_metrics": summary.get("loss_category_metrics") or {},
             "next_experiments": summary.get("next_experiments") or [],
         }
     )

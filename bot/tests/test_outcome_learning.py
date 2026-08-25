@@ -111,3 +111,36 @@ def test_fast_trade_autopsy_joins_runtime_evidence_and_records_no_evidence(tmp_p
     assert row is not None
     assert row["status"] == "failed"
     assert "observation only" in row["rejection_reason"]
+
+
+def test_fast_trade_autopsy_separates_explicit_giveback_and_time_decay_losses():
+    outcomes = [
+        {"ticket": "giveback-loss", "is_exit": True, "pnl": -0.01, "symbol": "AUDNZD"},
+        {"ticket": "time-loss", "is_exit": True, "pnl": -0.04, "symbol": "EURUSD"},
+    ]
+    journal = {
+        "giveback-loss": [
+            {"event": "firehose_open", "ticket": "giveback-loss", "timestamp": "2026-01-01T00:00:00+00:00"},
+            {"event": "firehose_exit_trace", "ticket": "giveback-loss", "timestamp": "2026-01-01T00:00:03+00:00", "pnl_usd": -0.01, "mfe_usd": 0.18},
+            {"event": "pm_exit", "ticket": "giveback-loss", "timestamp": "2026-01-01T00:00:04+00:00", "mfe_before_close": 0.18, "exit_reason": "fast_take:mfe_giveback_limit"},
+        ],
+        "time-loss": [
+            {"event": "pm_exit", "ticket": "time-loss", "timestamp": "2026-01-01T00:00:40+00:00", "mfe_before_close": 0.0, "exit_reason": "pm_time_decay"},
+        ],
+    }
+
+    summary = summarize_fast_trade_autopsy(outcomes, journal)
+
+    assert summary["loss_categories"] == {
+        "NO_PROGRESS": 1,
+        "WINNER_GIVEBACK": 1,
+    }
+    assert summary["loss_category_metrics"]["WINNER_GIVEBACK"] == {
+        "n": 1,
+        "complete_evidence": 0,
+        "net_pnl": -0.01,
+        "avg_loss": -0.01,
+        "median_hold_s": None,
+        "median_mfe_usd": 0.18,
+        "median_mae_usd": None,
+    }
