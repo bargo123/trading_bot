@@ -274,11 +274,14 @@ def run_council_cycle(question: str, *, agents: list[str] | None = None,
     mode = "DRY_RUN" if dry_run else "REAL"
     config = agent_cli.load_agents_config()
     default_names = ("hermes", "opencode", "gemini", "codex", "cursor")
-    names = (
-        list(agents)
-        if agents is not None
-        else [name for name in default_names if name in config]
-    )
+    if agents is not None:
+        names = list(agents)
+    elif "hermes" in config:
+        names = [name for name in default_names if name in config]
+    else:
+        # Preserve custom/test registries that intentionally declare a smaller
+        # agent set; the production registry is the one with Hermes enabled.
+        names = list(config.keys())
     started = datetime.now(timezone.utc).isoformat()
     t_start = time.time()
 
