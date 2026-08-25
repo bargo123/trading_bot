@@ -62,7 +62,8 @@ function Invoke-KeepAlive {
     if (-not (Test-CmdMatch "run_broker_paper\.py")) {
         Write-Log "paper runner down; starting $PaperCfg"
         Start-Process -FilePath $Python -ArgumentList @(
-            "-u", "scripts\run_broker_paper.py", "--config", $PaperCfg
+            "-u", "scripts\run_broker_paper.py", "--config", $PaperCfg,
+            "--video-style"
         ) -WorkingDirectory $BotRoot -WindowStyle Hidden
     }
 
