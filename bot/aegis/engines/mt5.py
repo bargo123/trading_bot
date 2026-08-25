@@ -501,12 +501,14 @@ class MT5Engine(BrokerEngine):
     def history_deals(self, lookback_days: int = 14) -> list[dict[str, Any]]:
         """Read-only deal history. Does not place orders. Caller must not shutdown()."""
         mt5 = self._require()
-        # MetaQuotes demo timestamps and history query bounds use the broker's
-        # server clock, while the rest of AEGIS uses UTC.  Query through the
-        # server-time window and normalize returned deal times back to UTC so
-        # reconciliation sees closes that happened after the last watermark.
+        # MetaQuotes deal timestamps use the broker's server clock.  The
+        # Windows Python binding also interprets naive query bounds in the
+        # machine's local timezone, so the UTC window needs the detected
+        # server offset on both sides of that conversion.  Normalize returned
+        # deal times back to UTC for the reconciliation watermark.
         server_offset = self._server_utc_offset()
-        end = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=server_offset)
+        query_offset = 2.0 * server_offset
+        end = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=query_offset)
         start = end - timedelta(days=max(1, int(lookback_days)))
         raw = mt5.history_deals_get(start, end)
         if raw is None:
