@@ -105,6 +105,7 @@ def main() -> None:
             -(row.get("captured_exit_expectancy") or -float("inf")),
         )
     )
+    published_candidates = top_candidates[:50]
     previous_report = None
     previous_path = args.out_dir / "fast_edge_leaderboard.json"
     if previous_path.exists():
@@ -153,29 +154,29 @@ def main() -> None:
             (previous_report or {}).get("leaderboard_top_50", [None])[0]
             if (previous_report or {}).get("leaderboard_top_50") else None
         ),
-        "best_new_candidate": top_candidates[0] if top_candidates else None,
+        "best_new_candidate": published_candidates[0] if published_candidates else None,
         "best_pf": max(
-            (float(row["captured_exit_pf"]) for row in top_candidates if row.get("captured_exit_pf") is not None),
+            (float(row["captured_exit_pf"]) for row in published_candidates if row.get("captured_exit_pf") is not None),
             default=None,
         ),
         "best_expectancy": max(
-            (float(row["captured_exit_expectancy"]) for row in top_candidates if row.get("captured_exit_expectancy") is not None),
+            (float(row["captured_exit_expectancy"]) for row in published_candidates if row.get("captured_exit_expectancy") is not None),
             default=None,
         ),
         "best_wr": max(
-            (float(row["precision"]) for row in top_candidates if row.get("precision") is not None),
+            (float(row["precision"]) for row in published_candidates if row.get("precision") is not None),
             default=None,
         ),
         "best_tail_loss": min(
-            (float(row["p99_loss"]) for row in top_candidates if row.get("p99_loss") is not None),
+            (float(row["p99_loss"]) for row in published_candidates if row.get("p99_loss") is not None),
             default=None,
         ),
         "best_trades_per_hour": max(
-            (float(row["trades_per_hour"]) for row in top_candidates if row.get("trades_per_hour") is not None),
+            (float(row["trades_per_hour"]) for row in published_candidates if row.get("trades_per_hour") is not None),
             default=None,
         ),
         "best_time_to_green": min(
-            (float(row["median_time_to_green_s"]) for row in top_candidates if row.get("median_time_to_green_s") is not None),
+            (float(row["median_time_to_green_s"]) for row in published_candidates if row.get("median_time_to_green_s") is not None),
             default=None,
         ),
         "candidate_sides": sorted(frame["side"].unique().tolist()),
@@ -188,7 +189,7 @@ def main() -> None:
         "multi_outcome_models": model_report["multi_outcome_models"],
         "book_evidence": book_evidence,
         "exit_policy_comparison": exit_policy_comparison[:50],
-        "leaderboard_top_50": top_candidates[:50],
+        "leaderboard_top_50": published_candidates,
         "scored_oos_rows": int(len(sealed_predictions)) if sealed_predictions is not None else 0,
         "scored_oos_path": str(scored_path) if sealed_predictions is not None else None,
         "OOS_TEST_N": model_report["oos"]["test_n"],

@@ -420,15 +420,51 @@ def _calibration_ece(probability: np.ndarray, actual: np.ndarray) -> float | Non
     return float(ece)
 
 
-def _metrics(frame: pd.DataFrame, probability: np.ndarray, threshold: float) -> dict[str, Any]:
+def _non_overlapping_selected(frame: pd.DataFrame, selected: np.ndarray) -> np.ndarray:
+    """Keep a conservative single-slot subset of selected shadow candidates."""
+    mask = np.asarray(selected, dtype=bool)
+    keep = np.zeros(len(frame), dtype=bool)
+    if not len(frame) or "time" not in frame:
+        return keep
+    timestamps = pd.to_datetime(frame["time"], utc=True, errors="coerce").map(
+        lambda value: value.timestamp() if pd.notna(value) else np.nan
+    ).to_numpy(dtype=float)
+    horizon = pd.to_numeric(frame.get("horizon_s"), errors="coerce")
+    horizon_s = float(horizon.median()) if horizon is not None and horizon.notna().any() else 1.0
+    next_available = None
+    for index in np.argsort(timestamps, kind="stable"):
+        if not mask[index] or not np.isfinite(timestamps[index]):
+            continue
+        if next_available is None or timestamps[index] >= next_available:
+            keep[index] = True
+            next_available = timestamps[index] + horizon_s
+    return keep
+
+
+def _metrics(
+    frame: pd.DataFrame,
+    probability: np.ndarray,
+    threshold: float,
+    *,
+    duration_frame: pd.DataFrame | None = None,
+) -> dict[str, Any]:
     probability = np.asarray(probability, dtype=float)
     actual = frame["target"].to_numpy(dtype=int)
     selected = probability >= float(threshold)
     captured = pd.to_numeric(frame["captured_exit_return"], errors="coerce").to_numpy(dtype=float)
     selected_values = captured[selected]
+    executable_selected = _non_overlapping_selected(frame, selected)
+    executable_values = captured[executable_selected]
     wins = selected_values[selected_values > 0.0]
     losses = selected_values[selected_values < 0.0]
-    ordered_times = pd.to_datetime(frame["time"], utc=True, errors="coerce") if "time" in frame else pd.Series(dtype="datetime64[ns, UTC]")
+    executable_wins = executable_values[executable_values > 0.0]
+    executable_losses = executable_values[executable_values < 0.0]
+    duration_source = duration_frame if duration_frame is not None else frame
+    ordered_times = (
+        pd.to_datetime(duration_source["time"], utc=True, errors="coerce")
+        if "time" in duration_source
+        else pd.Series(dtype="datetime64[ns, UTC]")
+    )
     duration_hours = (
         max(float((ordered_times.max() - ordered_times.min()).total_seconds()) / 3600.0, 1e-9)
         if len(ordered_times) and ordered_times.notna().all() else None
@@ -445,8 +481,18 @@ def _metrics(frame: pd.DataFrame, probability: np.ndarray, threshold: float) -> 
         "avg_loss": float(losses.mean()) if len(losses) else None,
         "median_time_to_green_s": float(pd.to_numeric(frame.loc[selected, "time_to_green_s"], errors="coerce").median())
         if selected.any() and "time_to_green_s" in frame else None,
-        "trades_per_hour": float(selected.sum() / duration_hours) if duration_hours else None,
-        "net_per_hour": float(selected_values.sum() / duration_hours) if duration_hours and len(selected_values) else None,
+        "trades_per_hour": float(executable_selected.sum() / duration_hours) if duration_hours else None,
+        "net_per_hour": float(executable_values.sum() / duration_hours) if duration_hours and len(executable_values) else None,
+        "candidate_arrivals_per_hour": float(selected.sum() / duration_hours) if duration_hours else None,
+        "non_overlapping_selected": int(executable_selected.sum()),
+        "executable_trades_per_hour": float(executable_selected.sum() / duration_hours) if duration_hours else None,
+        "executable_net_per_hour": float(executable_values.sum() / duration_hours)
+        if duration_hours and len(executable_values) else None,
+        "executable_captured_exit_expectancy": float(executable_values.mean())
+        if len(executable_values) else None,
+        "executable_captured_exit_pf": float(executable_wins.sum() / abs(executable_losses.sum()))
+        if len(executable_wins) and len(executable_losses) else None,
+        "observation_window_hours": duration_hours,
         "exit_policy": "captured_exit_replay",
         "calibration_ece": _calibration_ece(probability, actual),
         "abstain_rate": float((~selected).mean()) if len(selected) else None,
@@ -587,7 +633,12 @@ def fit_segmented_logistic_models(
             ]
             threshold = max(candidates, default=(0.0, 0.5))[1]
             sealed_probability = model.predict_proba(x_sealed_all.loc[sealed_mask.to_numpy()])[:, 1]
-            metrics = _metrics(sealed_part, sealed_probability, threshold)
+            metrics = _metrics(
+                sealed_part,
+                sealed_probability,
+                threshold,
+                duration_frame=slices.sealed,
+            )
             row = {
                 "model": f"segmented_regularized_logistic_{dimension}",
                 "segment_dimension": dimension,
@@ -634,7 +685,12 @@ def evaluate_shadow_leaderboard(
         for threshold in dict.fromkeys(float(value) for value in thresholds):
             for keys, group in work.groupby(group_columns, sort=False, dropna=False):
                 indexes = group.index.to_numpy()
-                metrics = _metrics(group, probabilities[indexes], float(threshold))
+                metrics = _metrics(
+                    group,
+                    probabilities[indexes],
+                    float(threshold),
+                    duration_frame=work,
+                )
                 if int(metrics["selected"]) < int(min_samples):
                     continue
                 row = dict(zip(group_columns, keys))
@@ -662,6 +718,11 @@ def evaluate_exit_policies(
         raise ValueError(f"shadow frame missing segment columns: {sorted(required - set(frame.columns))}")
     work = frame.reset_index(drop=True)
     group_columns = ["symbol", "side", "session", "regime", "structure", "family", "horizon_s"]
+    work_times = pd.to_datetime(work["time"], utc=True, errors="coerce")
+    observation_window_hours = max(
+        float((work_times.max() - work_times.min()).total_seconds()) / 3600.0,
+        1e-9,
+    )
     rows: list[dict[str, Any]] = []
     for policy in policies:
         policy_key = str(policy).replace("_", "")
@@ -670,17 +731,15 @@ def evaluate_exit_policies(
         if return_column not in work or time_column not in work:
             raise ValueError(f"shadow frame missing policy outcome columns for {policy}")
         for keys, group in work.groupby(group_columns, sort=False, dropna=False):
-            values = pd.to_numeric(group[return_column], errors="coerce").dropna().to_numpy(dtype=float)
+            values_series = pd.to_numeric(group[return_column], errors="coerce").dropna()
+            values = values_series.to_numpy(dtype=float)
             if len(values) < int(min_samples):
                 continue
             wins = values[values > 0.0]
             losses = values[values < 0.0]
             row = dict(zip(group_columns, keys))
-            group_times = pd.to_datetime(group["time"], utc=True, errors="coerce")
-            duration_hours = max(
-                float((group_times.max() - group_times.min()).total_seconds()) / 3600.0,
-                1e-9,
-            )
+            executable_mask = _non_overlapping_selected(group.loc[values_series.index], np.ones(len(values), dtype=bool))
+            executable_values = values[executable_mask]
             row.update(
                 {
                     "exit_policy": str(policy),
@@ -694,8 +753,17 @@ def evaluate_exit_policies(
                     "p95_loss": float(np.quantile(losses, 0.05)) if len(losses) else None,
                     "p99_loss": float(np.quantile(losses, 0.01)) if len(losses) else None,
                     "median_exit_time_s": float(pd.to_numeric(group[time_column], errors="coerce").median()),
-                    "trades_per_hour": float(len(values) / duration_hours),
-                    "net_per_hour": float(values.sum() / duration_hours),
+                    "trades_per_hour": float(len(executable_values) / observation_window_hours),
+                    "net_per_hour": float(executable_values.sum() / observation_window_hours)
+                    if len(executable_values) else None,
+                    "candidate_arrivals_per_hour": float(len(values) / observation_window_hours),
+                    "non_overlapping_selected": int(executable_mask.sum()),
+                    "executable_trades_per_hour": float(len(executable_values) / observation_window_hours),
+                    "executable_net_per_hour": float(executable_values.sum() / observation_window_hours)
+                    if len(executable_values) else None,
+                    "executable_captured_exit_expectancy": float(executable_values.mean())
+                    if len(executable_values) else None,
+                    "observation_window_hours": observation_window_hours,
                 }
             )
             rows.append(row)

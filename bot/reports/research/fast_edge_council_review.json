@@ -1,7 +1,7 @@
 {
   "schema": "fast_edge_council_review.v1",
-  "generated_at": "2026-08-25T16:43:55.699307+00:00",
-  "source_report": "reports\\research\\fast_edge_leaderboard.json",
+  "generated_at": "2026-08-25T18:02:00.161955+00:00",
+  "source_report": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\reports\\research\\fast_edge_leaderboard.json",
   "execution_authority": "NONE",
   "hermes_models_configured": [
     "x-preview-f-free",
@@ -12,16 +12,436 @@
     "muse-spark-1.2-contributor-free"
   ],
   "hermes": {
-    "agent": "hermes",
-    "adapter": "ai_council.hermes",
-    "ok": false,
-    "status": "UNAVAILABLE_CLI",
-    "duration_s": 0.03,
-    "streaming": false,
-    "structured_output": "json-in-text",
-    "model": "x-preview-f-free",
-    "cli": "C:\\Users\\Zaid barghouthi\\AppData\\Local\\hermes\\bin\\hermes.exe",
-    "error": "[WinError 206] The filename or extension is too long"
+    "status": "AVAILABLE",
+    "models_requested": [
+      "hy3-free"
+    ],
+    "roles_requested": [
+      "MICROSTRUCTURE RESEARCHER"
+    ],
+    "models_answered": [
+      "hy3-free"
+    ],
+    "requests": [
+      {
+        "role": "MICROSTRUCTURE RESEARCHER",
+        "model": "hy3-free",
+        "status": "AVAILABLE",
+        "ok": true,
+        "duration_s": 46.19,
+        "parsed": {
+          "role": "MICROSTRUCTURE_RESEARCHER",
+          "status_assessment": "SHADOW_ONLY_NO_POSITIVE_OOS \u2014 every reported number is an in-sample/shadow (replay) artifact with zero chronologically sealed OOS. The council must reject all candidates as non-trading-ready pending the experiments below. This is not a promotion candidate under any gate in promote.py.",
+          "headline_findings": {
+            "edge_is_sub_pip_and_gross": "Top candidate AUDUSD expectancy 8.07e-06/trade, avg_win 3.24e-05, avg_loss -3.21e-05. On AUDUSD (~0.65) that win is ~0.32 pip \u2014 inside the spread. With no bid/ask fill model stated, this is almost certainly mid-price only and therefore NOT net of spread/slippage, violating the project's net-of-cost rule.",
+            "edge_is_winrate_not_payout": "avg_win and |avg_loss| are near-symmetric (~3.2e-05 each). PF 1.6667 is produced entirely by a 65% win rate over a coin-flip payout: PF = (0.622*3.243e-05)/(0.378*3.205e-05) = 1.666. No directional magnitude edge exists.",
+            "winrate_not_significant": "AUDUSD n=45, 28 wins: one-tailed binomial vs p=0.5 gives z~1.64, p~0.05. EURCAD n=31, 18 wins: z~0.90, p~0.18. Neither survives correction for 94 features x 26 symbols x horizons x sessions x regimes (~10^4+ implicit tests). The single 'hit' is expected by chance.",
+            "internal_incoherence": "trades_per_hour=453.78 for a 45s horizon single-symbol strategy is impossible (max flat-to-flat = 3600/45 = 80/hr). Either trades overlap multi-instance, are double-counted, or the horizon/throughput fields are inconsistent \u2014 a calibration/data-integrity failure that invalidates the net_per_hour extrapolation (0.37%/hr is meaningless until reconciled).",
+            "time_to_green_signature": "best_time_to_green=1.0s, AUDUSD median_time_to_green=6.0s on a 45s horizon. Edge is captured in the first 1-6 seconds \u2014 the classic signature of bid/ask bounce / immediate quote mean-reversion / spread capture, NOT sustained directional alpha."
+          },
+          "hypotheses": [
+            {
+              "id": "H1_spread_artifact",
+              "statement": "The entire apparent edge is an artifact of mid-price measurement (not net of spread/slippage).",
+              "required_features": [
+                "entry_fill_model=ask_for_buy_bid_for_sell",
+                "realistic_slippage_bps",
+                "per_symbol_spread_series",
+                "commission_per_lot"
+              ],
+              "rejection_gate": "Re-run shadow with bid/ask fill + slippage. If PF collapses below 1.05 or expectancy turns negative on ALL top candidates, H1 accepted (edge is illusory) and candidates rejected.",
+              "provisional_verdict": "LIKELY TRUE \u2014 magnitudes are sub-spread."
+            },
+            {
+              "id": "H2_first_seconds_bounce",
+              "statement": "Edge is concentrated in the first 1-6 seconds (time_to_green) and reflects quote bounce / microstructure mean-reversion, not predictive signal.",
+              "required_features": [
+                "holding_period_decomposition_at_[1,2,3,5,8,10,15,20,30,45]s",
+                "quote_imbalance_at_entry",
+                "bid_ask_bounce_indicator"
+              ],
+              "rejection_gate": "If expectancy at t>10s is statistically indistinguishable from zero while t<=6s is positive, H2 accepted; directional-alpha hypothesis rejected.",
+              "provisional_verdict": "LIKELY TRUE \u2014 time_to_green=1-6s supports it."
+            },
+            {
+              "id": "H3_throughput_bug",
+              "statement": "trades_per_hour=453 vs horizon=45s indicates a measurement/labeling bug (overlapping trades, multi-instance double count, or field mismatch).",
+              "required_features": [
+                "trade_lifetime_distribution",
+                "max_concurrent_positions",
+                "distinct_trade_id_count",
+                "horizon_field_traceability"
+              ],
+              "rejection_gate": "If max achievable throughput given horizon and single-position constraint is <=80/hr yet reported is 453/hr, H3 accepted: net_per_hour and trades_per_hour fields are unreliable and must be recomputed before any use.",
+              "provisional_verdict": "LIKELY TRUE \u2014 arithmetic contradiction."
+            },
+            {
+              "id": "H4_spread_regime_dependence",
+              "statement": "Any residual edge is concentrated in tight-spread, normal_volatility, new_york sessions and vanishes in wide-spread/illiquid regimes.",
+              "required_features": [
+                "spread_zscore_at_entry",
+                "session_tag",
+                "regime_volatility_band",
+                "liquidity_proxy"
+              ],
+              "rejection_gate": "Condition PF by spread_zscore quintile. If top-quintile (tight) carries >90% of edge and wide-spread quintiles are negative, H4 accepted and strategy is regime-fragile.",
+              "provisional_verdict": "UNTESTED \u2014 needs data."
+            }
+          ],
+          "loss_autopsies": [
+            {
+              "candidate": "AUDUSD buy / NY / normal_vol / m1_range / horizon45 / captured_exit_replay",
+              "observed_tail": {
+                "p95_loss": -8.94e-05,
+                "p99_loss": -0.000107,
+                "best_tail_loss": -0.000273
+              },
+              "microstructure_interpretation": "Tail magnitudes are <0.3 pip \u2014 dominated by measurement noise, not real adverse selection. In live fill these would be WORSE: adverse exits pay full spread + slippage, so the observed 'tail' understates true tail risk.",
+              "net_of_spread_note": "Reported losses are mid-price only; true net tail loss = observed + spread + slippage on exit. Real p99 is likely 2-4x larger. Tail containment is unproven, not demonstrated."
+            },
+            {
+              "candidate": "EURCAD sell / NY / normal_vol / m1_range / horizon45 / mfe_protection",
+              "observed_tail": {
+                "p95_loss": -9.23e-05,
+                "p99_loss": -9.77e-05,
+                "median_exit_time_s": 34
+              },
+              "microstructure_interpretation": "MFE protection holds to median 34s \u2014 nearly the full 45s horizon. Holding through the spread for 34s bleeds the bounce edge; the small positive PF likely reflects only the tight-spread subset. Tail is tight only because it never lets losers run \u2014 but that also caps winners, leaving no real EV.",
+              "net_of_spread_note": "Long hold + spread bleed => net-negative once costs applied. MFE here is microstructure-harmful, not protective."
+            }
+          ],
+          "exit_recommendations": [
+            {
+              "current_policies_tested": [
+                "captured_exit_replay (AUDUSD PF1.667, n=45)",
+                "mfe_protection (EURCAD PF1.584, n=31)"
+              ],
+              "microstructure_verdict": "Both hold far too long for a first-seconds bounce edge. Median_time_to_green=6s means the trade is already 'green' early; continuing to 34-45s only exposes spread/slippage decay.",
+              "recommended_policy": "Microstructure-aware quick exit: exit at first_green + half-spread buffer (target ~1-3s), NOT MFE protection. If the edge is genuine bounce, capturing the spread immediately is the only defensible exit; if it is NOT genuine, no exit policy salvages it.",
+              "caveat": "Recommended policy is still gross-of-cost. It must be re-validated under H1's bid/ask fill model. If net-of-spread the quick-exit wins also vanish, the strategy has no exit that works \u2014 i.e., no strategy."
+            }
+          ],
+          "feature_tests": [
+            {
+              "feature": "spread_zscore_at_entry",
+              "rationale": "If edge is sub-spread, it should correlate with tight spread; this is the primary discriminator for H1/H4.",
+              "test": "Rank PF by spread_zscore quintile across all 26 symbols.",
+              "expected_if_valid": "Edge confined to tightest quintile; collapses in wide spreads."
+            },
+            {
+              "feature": "quote_imbalance / depth_imbalance",
+              "rationale": "Genuine microstructure alpha should load on order-book imbalance, not generic 'universal_quote_entry'.",
+              "test": "Ablation: drop imbalance features, re-measure PF; if PF survives, edge is NOT imbalance-driven (suspicious).",
+              "expected_if_valid": "PF drops materially when imbalance features removed."
+            },
+            {
+              "feature": "bid_ask_bounce_indicator",
+              "rationale": "Direct test of H2 (first-seconds bounce).",
+              "test": "Stratify by bounce indicator on/off; measure t<=6s vs t>10s expectancy.",
+              "expected_if_valid": "Positive only when bounce present and only at t<=6s."
+            },
+            {
+              "feature": "time_since_last_tick / latency_to_quote",
+              "rationale": "453 trades/hr impossibility (H3) may indicate stale-quote or multi-instance artifacts.",
+              "test": "Histogram trade inter-arrival vs horizon; flag overlaps.",
+              "expected_if_valid": "Reveals double-count or overlapping positions explaining H3."
+            },
+            {
+              "feature": "session_open_gap / volatility_regime_transition",
+              "rationale": "NY session concentration suggests event-driven microstructure, not persistent edge.",
+              "test": "PF by session and by regime-transition vs steady-regime.",
+              "expected_if_valid": "Edge concentrated at regime transitions / session opens only."
+            }
+          ],
+          "book_contradictions": [
+            {
+              "claim": "Shadow shows positive PF (1.58-1.67) on AUDUSD/EURCAD NY normal_vol regimes.",
+              "source_to_verify": "bot/intel/expected_value.jsonl and bot/intel/analogue_index.json (Book Brain) \u2014 check whether these symbols/regimes are tagged negative-EV or 'no edge' from prior research.",
+              "resolution_required": "If Book Brain already labels these as negative-EV, the shadow contradicts the book and the discrepancy (measurement gross-of-cost vs book net-of-cost) must be explained before ANY promotion. Champion promotion is gated by promote.py and must not proceed on shadow-only positive PF."
+            },
+            {
+              "claim": "High throughput (453 trades/hr) implies a scalable high-frequency edge.",
+              "source_to_verify": "Prior research on sub-minute horizons for these majors (likely established as spread-dominated, no persistent edge).",
+              "resolution_required": "Reconcile with prior negative findings; the H3 incoherence suggests the throughput claim is a bug, not a real edge."
+            }
+          ],
+          "next_experiments": [
+            {
+              "id": "E1_net_of_cost_refit",
+              "description": "Re-run the full shadow with bid/ask fill model + per-symbol spread + realistic slippage + commission. This is the single most important experiment; it likely nullifies H1 candidates.",
+              "gates_before_promotion": [
+                "PF_net >= 1.10 on >=3 symbols",
+                "expectancy_net > 0"
+              ]
+            },
+            {
+              "id": "E2_sealed_oos_walkforward",
+              "description": "Status is NO_POSITIVE_OOS. Implement chronological sealed walk-forward (train on block T, test on untouched future block T+1). No peeking, no in-sample selection.",
+              "gates_before_promotion": [
+                "positive PF_net in sealed OOS",
+                "OOS PF >= 0.8 * IS PF (no decay)"
+              ]
+            },
+            {
+              "id": "E3_statistical_power",
+              "description": "Current n=45 / n=31 are tiny. Increase per-cell sample to n>=2000 via longer shadow windows or pooled symbols; apply Bonferroni/Holm over all tested configurations.",
+              "gates_before_promotion": [
+                "win-rate significance survives multiple-comparison correction",
+                "confidence interval on PF excludes 1.0"
+              ]
+            },
+            {
+              "id": "E4_holding_period_decomposition",
+              "description": "Measure expectancy at each horizon [1,2,3,5,8,10,15,20,30,45]s to localize the edge and test H2 (first-seconds bounce).",
+              "gates_before_promotion": [
+                "edge localized and economically interpretable",
+                "not solely t<=6s bounce that dies net-of-spread"
+              ]
+            },
+            {
+              "id": "E5_throughput_reconciliation",
+              "description": "Trace trade IDs and lifetimes to resolve the 453/hr vs 45s contradiction (H3). Fix labeling before trusting any net_per_hour figure.",
+              "gates_before_promotion": [
+                "reported throughput <= theoretical max for constraint",
+                "no double-counting"
+              ]
+            },
+            {
+              "id": "E6_spread_regime_conditioning",
+              "description": "Condition all metrics by spread_zscore quintile and volatility regime to test H4 fragility.",
+              "gates_before_promotion": [
+                "edge robust across >=2 spread regimes OR explicitly documented as regime-fragile with guardrails"
+              ]
+            }
+          ],
+          "council_rejection_summary": {
+            "selection_bias": "REJECTED \u2014 best candidate chosen from 94 features x 26 symbols x 5 models x horizons; no correction applied.",
+            "tiny_sample": "REJECTED \u2014 n=45 and n=31 fail binomial significance even pre-correction.",
+            "calibration_failure": "REJECTED \u2014 453 trades/hr vs 45s horizon is arithmetically impossible; throughput/net_per_hour unreliable.",
+            "no_sealed_oos": "REJECTED \u2014 status SHADOW_ONLY_NO_POSITIVE_OOS; nothing here passes promote.py gates.",
+            "net_of_cost": "REJECTED \u2014 magnitudes sub-spread and mid-price only; violates net-of-cost rule.",
+            "promotion_decision": "DO NOT PROMOTE. No champion promotion, no MT5 DEMO order, no config change. Route to E1-E6."
+          }
+        },
+        "error": null
+      }
+    ]
+  },
+  "hermes_swarm": {
+    "status": "AVAILABLE",
+    "models_requested": [
+      "hy3-free"
+    ],
+    "roles_requested": [
+      "MICROSTRUCTURE RESEARCHER"
+    ],
+    "models_answered": [
+      "hy3-free"
+    ],
+    "requests": [
+      {
+        "role": "MICROSTRUCTURE RESEARCHER",
+        "model": "hy3-free",
+        "status": "AVAILABLE",
+        "ok": true,
+        "duration_s": 46.19,
+        "parsed": {
+          "role": "MICROSTRUCTURE_RESEARCHER",
+          "status_assessment": "SHADOW_ONLY_NO_POSITIVE_OOS \u2014 every reported number is an in-sample/shadow (replay) artifact with zero chronologically sealed OOS. The council must reject all candidates as non-trading-ready pending the experiments below. This is not a promotion candidate under any gate in promote.py.",
+          "headline_findings": {
+            "edge_is_sub_pip_and_gross": "Top candidate AUDUSD expectancy 8.07e-06/trade, avg_win 3.24e-05, avg_loss -3.21e-05. On AUDUSD (~0.65) that win is ~0.32 pip \u2014 inside the spread. With no bid/ask fill model stated, this is almost certainly mid-price only and therefore NOT net of spread/slippage, violating the project's net-of-cost rule.",
+            "edge_is_winrate_not_payout": "avg_win and |avg_loss| are near-symmetric (~3.2e-05 each). PF 1.6667 is produced entirely by a 65% win rate over a coin-flip payout: PF = (0.622*3.243e-05)/(0.378*3.205e-05) = 1.666. No directional magnitude edge exists.",
+            "winrate_not_significant": "AUDUSD n=45, 28 wins: one-tailed binomial vs p=0.5 gives z~1.64, p~0.05. EURCAD n=31, 18 wins: z~0.90, p~0.18. Neither survives correction for 94 features x 26 symbols x horizons x sessions x regimes (~10^4+ implicit tests). The single 'hit' is expected by chance.",
+            "internal_incoherence": "trades_per_hour=453.78 for a 45s horizon single-symbol strategy is impossible (max flat-to-flat = 3600/45 = 80/hr). Either trades overlap multi-instance, are double-counted, or the horizon/throughput fields are inconsistent \u2014 a calibration/data-integrity failure that invalidates the net_per_hour extrapolation (0.37%/hr is meaningless until reconciled).",
+            "time_to_green_signature": "best_time_to_green=1.0s, AUDUSD median_time_to_green=6.0s on a 45s horizon. Edge is captured in the first 1-6 seconds \u2014 the classic signature of bid/ask bounce / immediate quote mean-reversion / spread capture, NOT sustained directional alpha."
+          },
+          "hypotheses": [
+            {
+              "id": "H1_spread_artifact",
+              "statement": "The entire apparent edge is an artifact of mid-price measurement (not net of spread/slippage).",
+              "required_features": [
+                "entry_fill_model=ask_for_buy_bid_for_sell",
+                "realistic_slippage_bps",
+                "per_symbol_spread_series",
+                "commission_per_lot"
+              ],
+              "rejection_gate": "Re-run shadow with bid/ask fill + slippage. If PF collapses below 1.05 or expectancy turns negative on ALL top candidates, H1 accepted (edge is illusory) and candidates rejected.",
+              "provisional_verdict": "LIKELY TRUE \u2014 magnitudes are sub-spread."
+            },
+            {
+              "id": "H2_first_seconds_bounce",
+              "statement": "Edge is concentrated in the first 1-6 seconds (time_to_green) and reflects quote bounce / microstructure mean-reversion, not predictive signal.",
+              "required_features": [
+                "holding_period_decomposition_at_[1,2,3,5,8,10,15,20,30,45]s",
+                "quote_imbalance_at_entry",
+                "bid_ask_bounce_indicator"
+              ],
+              "rejection_gate": "If expectancy at t>10s is statistically indistinguishable from zero while t<=6s is positive, H2 accepted; directional-alpha hypothesis rejected.",
+              "provisional_verdict": "LIKELY TRUE \u2014 time_to_green=1-6s supports it."
+            },
+            {
+              "id": "H3_throughput_bug",
+              "statement": "trades_per_hour=453 vs horizon=45s indicates a measurement/labeling bug (overlapping trades, multi-instance double count, or field mismatch).",
+              "required_features": [
+                "trade_lifetime_distribution",
+                "max_concurrent_positions",
+                "distinct_trade_id_count",
+                "horizon_field_traceability"
+              ],
+              "rejection_gate": "If max achievable throughput given horizon and single-position constraint is <=80/hr yet reported is 453/hr, H3 accepted: net_per_hour and trades_per_hour fields are unreliable and must be recomputed before any use.",
+              "provisional_verdict": "LIKELY TRUE \u2014 arithmetic contradiction."
+            },
+            {
+              "id": "H4_spread_regime_dependence",
+              "statement": "Any residual edge is concentrated in tight-spread, normal_volatility, new_york sessions and vanishes in wide-spread/illiquid regimes.",
+              "required_features": [
+                "spread_zscore_at_entry",
+                "session_tag",
+                "regime_volatility_band",
+                "liquidity_proxy"
+              ],
+              "rejection_gate": "Condition PF by spread_zscore quintile. If top-quintile (tight) carries >90% of edge and wide-spread quintiles are negative, H4 accepted and strategy is regime-fragile.",
+              "provisional_verdict": "UNTESTED \u2014 needs data."
+            }
+          ],
+          "loss_autopsies": [
+            {
+              "candidate": "AUDUSD buy / NY / normal_vol / m1_range / horizon45 / captured_exit_replay",
+              "observed_tail": {
+                "p95_loss": -8.94e-05,
+                "p99_loss": -0.000107,
+                "best_tail_loss": -0.000273
+              },
+              "microstructure_interpretation": "Tail magnitudes are <0.3 pip \u2014 dominated by measurement noise, not real adverse selection. In live fill these would be WORSE: adverse exits pay full spread + slippage, so the observed 'tail' understates true tail risk.",
+              "net_of_spread_note": "Reported losses are mid-price only; true net tail loss = observed + spread + slippage on exit. Real p99 is likely 2-4x larger. Tail containment is unproven, not demonstrated."
+            },
+            {
+              "candidate": "EURCAD sell / NY / normal_vol / m1_range / horizon45 / mfe_protection",
+              "observed_tail": {
+                "p95_loss": -9.23e-05,
+                "p99_loss": -9.77e-05,
+                "median_exit_time_s": 34
+              },
+              "microstructure_interpretation": "MFE protection holds to median 34s \u2014 nearly the full 45s horizon. Holding through the spread for 34s bleeds the bounce edge; the small positive PF likely reflects only the tight-spread subset. Tail is tight only because it never lets losers run \u2014 but that also caps winners, leaving no real EV.",
+              "net_of_spread_note": "Long hold + spread bleed => net-negative once costs applied. MFE here is microstructure-harmful, not protective."
+            }
+          ],
+          "exit_recommendations": [
+            {
+              "current_policies_tested": [
+                "captured_exit_replay (AUDUSD PF1.667, n=45)",
+                "mfe_protection (EURCAD PF1.584, n=31)"
+              ],
+              "microstructure_verdict": "Both hold far too long for a first-seconds bounce edge. Median_time_to_green=6s means the trade is already 'green' early; continuing to 34-45s only exposes spread/slippage decay.",
+              "recommended_policy": "Microstructure-aware quick exit: exit at first_green + half-spread buffer (target ~1-3s), NOT MFE protection. If the edge is genuine bounce, capturing the spread immediately is the only defensible exit; if it is NOT genuine, no exit policy salvages it.",
+              "caveat": "Recommended policy is still gross-of-cost. It must be re-validated under H1's bid/ask fill model. If net-of-spread the quick-exit wins also vanish, the strategy has no exit that works \u2014 i.e., no strategy."
+            }
+          ],
+          "feature_tests": [
+            {
+              "feature": "spread_zscore_at_entry",
+              "rationale": "If edge is sub-spread, it should correlate with tight spread; this is the primary discriminator for H1/H4.",
+              "test": "Rank PF by spread_zscore quintile across all 26 symbols.",
+              "expected_if_valid": "Edge confined to tightest quintile; collapses in wide spreads."
+            },
+            {
+              "feature": "quote_imbalance / depth_imbalance",
+              "rationale": "Genuine microstructure alpha should load on order-book imbalance, not generic 'universal_quote_entry'.",
+              "test": "Ablation: drop imbalance features, re-measure PF; if PF survives, edge is NOT imbalance-driven (suspicious).",
+              "expected_if_valid": "PF drops materially when imbalance features removed."
+            },
+            {
+              "feature": "bid_ask_bounce_indicator",
+              "rationale": "Direct test of H2 (first-seconds bounce).",
+              "test": "Stratify by bounce indicator on/off; measure t<=6s vs t>10s expectancy.",
+              "expected_if_valid": "Positive only when bounce present and only at t<=6s."
+            },
+            {
+              "feature": "time_since_last_tick / latency_to_quote",
+              "rationale": "453 trades/hr impossibility (H3) may indicate stale-quote or multi-instance artifacts.",
+              "test": "Histogram trade inter-arrival vs horizon; flag overlaps.",
+              "expected_if_valid": "Reveals double-count or overlapping positions explaining H3."
+            },
+            {
+              "feature": "session_open_gap / volatility_regime_transition",
+              "rationale": "NY session concentration suggests event-driven microstructure, not persistent edge.",
+              "test": "PF by session and by regime-transition vs steady-regime.",
+              "expected_if_valid": "Edge concentrated at regime transitions / session opens only."
+            }
+          ],
+          "book_contradictions": [
+            {
+              "claim": "Shadow shows positive PF (1.58-1.67) on AUDUSD/EURCAD NY normal_vol regimes.",
+              "source_to_verify": "bot/intel/expected_value.jsonl and bot/intel/analogue_index.json (Book Brain) \u2014 check whether these symbols/regimes are tagged negative-EV or 'no edge' from prior research.",
+              "resolution_required": "If Book Brain already labels these as negative-EV, the shadow contradicts the book and the discrepancy (measurement gross-of-cost vs book net-of-cost) must be explained before ANY promotion. Champion promotion is gated by promote.py and must not proceed on shadow-only positive PF."
+            },
+            {
+              "claim": "High throughput (453 trades/hr) implies a scalable high-frequency edge.",
+              "source_to_verify": "Prior research on sub-minute horizons for these majors (likely established as spread-dominated, no persistent edge).",
+              "resolution_required": "Reconcile with prior negative findings; the H3 incoherence suggests the throughput claim is a bug, not a real edge."
+            }
+          ],
+          "next_experiments": [
+            {
+              "id": "E1_net_of_cost_refit",
+              "description": "Re-run the full shadow with bid/ask fill model + per-symbol spread + realistic slippage + commission. This is the single most important experiment; it likely nullifies H1 candidates.",
+              "gates_before_promotion": [
+                "PF_net >= 1.10 on >=3 symbols",
+                "expectancy_net > 0"
+              ]
+            },
+            {
+              "id": "E2_sealed_oos_walkforward",
+              "description": "Status is NO_POSITIVE_OOS. Implement chronological sealed walk-forward (train on block T, test on untouched future block T+1). No peeking, no in-sample selection.",
+              "gates_before_promotion": [
+                "positive PF_net in sealed OOS",
+                "OOS PF >= 0.8 * IS PF (no decay)"
+              ]
+            },
+            {
+              "id": "E3_statistical_power",
+              "description": "Current n=45 / n=31 are tiny. Increase per-cell sample to n>=2000 via longer shadow windows or pooled symbols; apply Bonferroni/Holm over all tested configurations.",
+              "gates_before_promotion": [
+                "win-rate significance survives multiple-comparison correction",
+                "confidence interval on PF excludes 1.0"
+              ]
+            },
+            {
+              "id": "E4_holding_period_decomposition",
+              "description": "Measure expectancy at each horizon [1,2,3,5,8,10,15,20,30,45]s to localize the edge and test H2 (first-seconds bounce).",
+              "gates_before_promotion": [
+                "edge localized and economically interpretable",
+                "not solely t<=6s bounce that dies net-of-spread"
+              ]
+            },
+            {
+              "id": "E5_throughput_reconciliation",
+              "description": "Trace trade IDs and lifetimes to resolve the 453/hr vs 45s contradiction (H3). Fix labeling before trusting any net_per_hour figure.",
+              "gates_before_promotion": [
+                "reported throughput <= theoretical max for constraint",
+                "no double-counting"
+              ]
+            },
+            {
+              "id": "E6_spread_regime_conditioning",
+              "description": "Condition all metrics by spread_zscore quintile and volatility regime to test H4 fragility.",
+              "gates_before_promotion": [
+                "edge robust across >=2 spread regimes OR explicitly documented as regime-fragile with guardrails"
+              ]
+            }
+          ],
+          "council_rejection_summary": {
+            "selection_bias": "REJECTED \u2014 best candidate chosen from 94 features x 26 symbols x 5 models x horizons; no correction applied.",
+            "tiny_sample": "REJECTED \u2014 n=45 and n=31 fail binomial significance even pre-correction.",
+            "calibration_failure": "REJECTED \u2014 453 trades/hr vs 45s horizon is arithmetically impossible; throughput/net_per_hour unreliable.",
+            "no_sealed_oos": "REJECTED \u2014 status SHADOW_ONLY_NO_POSITIVE_OOS; nothing here passes promote.py gates.",
+            "net_of_cost": "REJECTED \u2014 magnitudes sub-spread and mid-price only; violates net-of-cost rule.",
+            "promotion_decision": "DO NOT PROMOTE. No champion promotion, no MT5 DEMO order, no config change. Route to E1-E6."
+          }
+        },
+        "error": null
+      }
+    ]
   },
   "claude": null
 }

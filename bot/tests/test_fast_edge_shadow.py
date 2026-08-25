@@ -28,6 +28,38 @@ def test_shadow_horizons_cover_requested_fast_and_ceiling_windows():
     assert SHADOW_HORIZONS_S == (1, 2, 3, 5, 8, 10, 15, 20, 30, 45)
 
 
+def test_segment_rates_use_full_oos_observation_window_not_sparse_group_span():
+    times = list(pd.date_range("2026-01-01T00:00:00Z", periods=21, freq="1s"))
+    times.append(pd.Timestamp("2026-01-01T01:00:00Z"))
+    frame = pd.DataFrame(
+        {
+            "time": times,
+            "symbol": ["EURUSD"] * 21 + ["GBPUSD"],
+            "side": ["buy"] * 22,
+            "session": ["london"] * 22,
+            "regime": ["normal_volatility"] * 22,
+            "structure": ["m1_range_or_pullback"] * 22,
+            "family": ["universal_quote_entry"] * 22,
+            "horizon_s": [5.0] * 22,
+            "captured_exit_return": [0.001] * 22,
+            "target": [1] * 22,
+            "time_to_green_s": [1.0] * 22,
+        }
+    )
+    rows = evaluate_shadow_leaderboard(
+        frame,
+        {"test_model": np.ones(len(frame))},
+        thresholds=(0.5,),
+        min_samples=20,
+    )
+    assert len(rows) == 1
+    assert rows[0]["selected"] == 21
+    assert rows[0]["observation_window_hours"] == pytest.approx(1.0)
+    assert rows[0]["candidate_arrivals_per_hour"] == pytest.approx(21.0)
+    assert rows[0]["non_overlapping_selected"] == 5
+    assert rows[0]["trades_per_hour"] == pytest.approx(5.0)
+
+
 def test_replay_uses_executable_sides_and_stops_sequentially():
     outcome = replay_executable_path(
         entry_time=pd.Timestamp("2026-01-01T00:00:00Z"),
