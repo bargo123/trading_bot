@@ -285,6 +285,10 @@ def test_multi_outcome_models_report_sealed_probabilities_and_expectations():
     assert {"EXPECTED_NET_PNL", "EXPECTED_MFE", "EXPECTED_TIME_TO_GREEN"}.issubset(
         report["regression"]
     )
+    assert report["probability"]["P_GREEN_1S"]["test"]["status"] == "TEST_OOS"
+    assert report["probability"]["P_GREEN_1S"]["sealed"]["status"] == "SEALED_OOS"
+    assert report["regression"]["EXPECTED_NET_PNL"]["test"]["status"] == "TEST_OOS"
+    assert report["regression"]["EXPECTED_NET_PNL"]["sealed"]["status"] == "SEALED_OOS"
     assert all(value["status"] in {"SEALED_OOS", "missing_target", "single_class_train"} for value in report["probability"].values())
 
 

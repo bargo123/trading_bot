@@ -724,8 +724,40 @@ def fit_multi_outcome_models(frame: pd.DataFrame) -> dict[str, Any]:
     """
     slices = chronological_shadow_slices(frame)
     train_features = shadow_model_frame(slices.train).drop(columns=["target"])
+    validation_features = shadow_model_frame(slices.validation).drop(columns=["target"])
+    test_features = shadow_model_frame(slices.test).drop(columns=["target"])
     sealed_features = shadow_model_frame(slices.sealed).drop(columns=["target"])
     report: dict[str, Any] = {"probability": {}, "regression": {}}
+
+    def probability_metrics(
+        actual: np.ndarray,
+        probability: np.ndarray,
+        *,
+        status: str,
+    ) -> dict[str, Any]:
+        return {
+            "status": status,
+            "oos_n": int(len(actual)),
+            "oos_positive_rate": float(actual.mean()) if len(actual) else None,
+            "oos_probability_mean": float(probability.mean()) if len(probability) else None,
+            "oos_brier": float(np.mean(np.square(probability - actual))) if len(actual) else None,
+            "calibration_ece": _calibration_ece(probability, actual),
+        }
+
+    def regression_metrics(
+        actual: np.ndarray,
+        prediction: np.ndarray,
+        *,
+        status: str,
+    ) -> dict[str, Any]:
+        return {
+            "status": status,
+            "oos_n": int(len(actual)),
+            "oos_prediction_mean": float(np.mean(prediction)) if len(prediction) else None,
+            "oos_actual_mean": float(np.mean(actual)) if len(actual) else None,
+            "oos_mae": float(np.mean(np.abs(prediction - actual))) if len(actual) else None,
+        }
+
     for label, target_column in SHADOW_PROBABILITY_TARGETS.items():
         if target_column not in slices.train or target_column not in slices.sealed:
             report["probability"][label] = {"status": "missing_target", "target_column": target_column}
@@ -748,17 +780,36 @@ def fit_multi_outcome_models(frame: pd.DataFrame) -> dict[str, Any]:
             ]
         )
         model.fit(train_features, y_train)
-        probability = model.predict_proba(sealed_features)[:, 1]
+        validation_raw = model.predict_proba(validation_features)[:, 1]
+        validation_actual = pd.to_numeric(
+            slices.validation[target_column], errors="coerce"
+        ).fillna(0.0).astype(int).to_numpy()
+        test_raw = model.predict_proba(test_features)[:, 1]
+        sealed_raw = model.predict_proba(sealed_features)[:, 1]
+        test_probability, calibration_method = _calibrate_probability_vector(
+            validation_raw, validation_actual, test_raw
+        )
+        sealed_probability, _ = _calibrate_probability_vector(
+            validation_raw, validation_actual, sealed_raw
+        )
         actual = y_sealed.to_numpy(dtype=int)
+        test_actual = pd.to_numeric(
+            slices.test[target_column], errors="coerce"
+        ).fillna(0.0).astype(int).to_numpy()
         report["probability"][label] = {
             "status": "SEALED_OOS",
             "target_column": target_column,
             "model": "regularized_logistic",
-            "oos_n": int(len(actual)),
-            "oos_positive_rate": float(actual.mean()) if len(actual) else None,
-            "oos_probability_mean": float(probability.mean()) if len(probability) else None,
-            "oos_brier": float(np.mean(np.square(probability - actual))) if len(actual) else None,
-            "calibration_ece": _calibration_ece(probability, actual),
+            "calibration_method": calibration_method,
+            **{
+                key: value
+                for key, value in probability_metrics(
+                    actual, sealed_probability, status="SEALED_OOS"
+                ).items()
+                if key != "status"
+            },
+            "test": probability_metrics(test_actual, test_probability, status="TEST_OOS"),
+            "sealed": probability_metrics(actual, sealed_probability, status="SEALED_OOS"),
         }
     for label, target_column in SHADOW_REGRESSION_TARGETS.items():
         if target_column not in slices.train or target_column not in slices.sealed:
@@ -768,18 +819,29 @@ def fit_multi_outcome_models(frame: pd.DataFrame) -> dict[str, Any]:
         sealed_target = pd.to_numeric(slices.sealed[target_column], errors="coerce")
         fill_value = float(train_target.median()) if train_target.notna().any() else 0.0
         y_train = train_target.fillna(fill_value).to_numpy(dtype=float)
+        test_target = pd.to_numeric(slices.test[target_column], errors="coerce")
         y_sealed = sealed_target.fillna(fill_value).to_numpy(dtype=float)
         model = Pipeline([("scale", RobustScaler()), ("model", Ridge(alpha=1.0, solver="lsqr"))])
         model.fit(train_features, y_train)
+        test_prediction = model.predict(test_features)
         prediction = model.predict(sealed_features)
         report["regression"][label] = {
             "status": "SEALED_OOS",
             "target_column": target_column,
             "model": "ridge",
-            "oos_n": int(len(y_sealed)),
-            "oos_prediction_mean": float(np.mean(prediction)) if len(prediction) else None,
-            "oos_actual_mean": float(np.mean(y_sealed)) if len(y_sealed) else None,
-            "oos_mae": float(np.mean(np.abs(prediction - y_sealed))) if len(y_sealed) else None,
+            **{
+                key: value
+                for key, value in regression_metrics(
+                    y_sealed, prediction, status="SEALED_OOS"
+                ).items()
+                if key != "status"
+            },
+            "test": regression_metrics(
+                test_target.fillna(fill_value).to_numpy(dtype=float),
+                test_prediction,
+                status="TEST_OOS",
+            ),
+            "sealed": regression_metrics(y_sealed, prediction, status="SEALED_OOS"),
         }
     return report
 

@@ -86,6 +86,18 @@ def _bounded_evidence(report: dict, *, candidate_limit: int = 6) -> str:
                     )
                     if key in value
                 }
+                for split in ("test", "sealed"):
+                    metrics = value.get(split)
+                    if isinstance(metrics, dict):
+                        outcome_summary[family][target][split] = {
+                            key: metrics.get(key)
+                            for key in (
+                                "status", "oos_n", "oos_positive_rate",
+                                "oos_probability_mean", "oos_brier", "calibration_ece",
+                                "oos_prediction_mean", "oos_actual_mean", "oos_mae",
+                            )
+                            if key in metrics
+                        }
     discovery = report.get("fast_winner_feature_discovery") or {}
     discovery_summary = {
         "analysis_scope": discovery.get("analysis_scope"),
@@ -157,6 +169,17 @@ def _bounded_evidence(report: dict, *, candidate_limit: int = 6) -> str:
         "book_evidence": book_rows,
         "promotion_candidates": (model_space.get("promotion_candidates") or [])[:4],
     }
+    compact_outcome_summary = {
+        family: {
+            target: values[target]
+            for target in (
+                "P_GREEN_1S", "P_GREEN_5S", "P_CAPTURED_WIN_5S",
+                "P_TAIL_LOSS", "EXPECTED_NET_PNL",
+            )
+            if target in values
+        }
+        for family, values in outcome_summary.items()
+    }
     encoded = json.dumps(payload, separators=(",", ":"), default=str)
     if len(encoded) <= 1400:
         return encoded
@@ -170,6 +193,7 @@ def _bounded_evidence(report: dict, *, candidate_limit: int = 6) -> str:
             "progress": payload["progress"],
             "top_candidates": candidates[:1],
             "exit_policy_comparison": exit_rows[:1],
+            "multi_outcome": compact_outcome_summary,
             "fast_winner_feature_discovery": discovery_summary,
             "spread_vol_gate_sweep": gate_rows[:2],
             "spread_vol_soft_gate_sweep": soft_gate_rows[:2],

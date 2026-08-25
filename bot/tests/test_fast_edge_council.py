@@ -18,7 +18,15 @@ def test_council_evidence_stays_bounded_and_valid_json():
         ],
         "exit_policy_comparison": [{"symbol": "EURUSD", "noise": "x" * 10000} for _ in range(50)],
         "book_evidence": [{"query": "scalping", "sources": ["x"] * 10000}],
-        "multi_outcome_models": {"probability": {"P_GREEN_1S": {"oos_n": 100}}},
+        "multi_outcome_models": {
+            "probability": {
+                "P_GREEN_1S": {
+                    "oos_n": 100,
+                    "test": {"status": "TEST_OOS", "oos_n": 40},
+                    "sealed": {"status": "SEALED_OOS", "oos_n": 60},
+                }
+            }
+        },
         "fast_winner_feature_discovery": {
             "analysis_scope": "descriptive_sealed_oos",
             "horizons": {"1": {"fast_clean_n": 12, "slow_or_losing_n": 88, "top_feature_differences": []}},
@@ -38,6 +46,8 @@ def test_council_evidence_stays_bounded_and_valid_json():
     assert bounded["fast_winner_feature_discovery"]["analysis_scope"] == "descriptive_sealed_oos"
     assert bounded["spread_vol_gate_sweep"][0]["sealed"]["selected"] == 12
     assert bounded["spread_vol_soft_gate_sweep"][0]["sealed"]["selected"] == 9
+    assert bounded["multi_outcome"]["probability"]["P_GREEN_1S"]["test"]["oos_n"] == 40
+    assert bounded["multi_outcome"]["probability"]["P_GREEN_1S"]["sealed"]["oos_n"] == 60
     assert len(_prompt(report, role="ML CRITIC")) < 8000
 
 
