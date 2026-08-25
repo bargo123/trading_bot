@@ -21,6 +21,7 @@ from aegis.research.fast_edge_shadow import (
     evaluate_soft_spread_vol_gates,
     fit_multi_outcome_models,
     fit_segmented_logistic_models,
+    _non_overlapping_selected,
 )
 
 
@@ -70,6 +71,17 @@ def test_segment_rates_use_full_oos_observation_window_not_sparse_group_span():
     assert rows[0]["candidate_arrivals_per_hour"] == pytest.approx(21.0)
     assert rows[0]["non_overlapping_selected"] == 5
     assert rows[0]["trades_per_hour"] == pytest.approx(5.0)
+
+
+def test_non_overlapping_selection_uses_each_candidate_horizon():
+    frame = pd.DataFrame(
+        {
+            "time": pd.date_range("2026-01-01T00:00:00Z", periods=3, freq="1s"),
+            "horizon_s": [10.0, 1.0, 1.0],
+        }
+    )
+    selected = _non_overlapping_selected(frame, np.ones(len(frame), dtype=bool))
+    assert selected.tolist() == [True, False, False]
 
 
 def test_replay_uses_executable_sides_and_stops_sequentially():

@@ -544,15 +544,22 @@ def _non_overlapping_selected(frame: pd.DataFrame, selected: np.ndarray) -> np.n
         timestamps = pd.to_datetime(frame["time"], utc=True, errors="coerce").map(
             lambda value: value.timestamp() if pd.notna(value) else np.nan
         ).to_numpy(dtype=float)
-    horizon = pd.to_numeric(frame.get("horizon_s"), errors="coerce")
-    horizon_s = float(horizon.median()) if horizon is not None and horizon.notna().any() else 1.0
+    if "horizon_s" in frame:
+        horizon_values = pd.to_numeric(frame["horizon_s"], errors="coerce").to_numpy(dtype=float)
+    else:
+        horizon_values = np.full(len(frame), np.nan, dtype=float)
+    finite_horizons = horizon_values[np.isfinite(horizon_values) & (horizon_values > 0.0)]
+    fallback_horizon_s = float(np.median(finite_horizons)) if len(finite_horizons) else 1.0
     next_available = None
     for index in np.argsort(timestamps, kind="stable"):
         if not mask[index] or not np.isfinite(timestamps[index]):
             continue
         if next_available is None or timestamps[index] >= next_available:
             keep[index] = True
-            next_available = timestamps[index] + horizon_s
+            horizon_s = horizon_values[index]
+            if not np.isfinite(horizon_s) or horizon_s <= 0.0:
+                horizon_s = fallback_horizon_s
+            next_available = timestamps[index] + float(horizon_s)
     return keep
 
 
