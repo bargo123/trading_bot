@@ -633,6 +633,7 @@ class IntelligentFirehoseBrain:
             "short_horizon_probability_reject": 0,
             "short_horizon_expected_value_reject": 0,
             "short_horizon_missing": 0,
+            "short_horizon_abstain_reasons": {},
         }
 
     def _note_skip(self, reason: str) -> None:
@@ -1637,15 +1638,30 @@ class IntelligentFirehoseBrain:
                     key: short_horizon_prediction.get(key)
                     for key in (
                         "probability",
+                        "decision",
                         "expected_net_pnl",
+                        "expected_net_pnl_lcb95",
                         "calibration_status",
                         "abstain",
+                        "abstain_reason",
+                        "model_agreement",
+                        "model_disagreement",
+                        "uncertainty",
+                        "threshold",
+                        "decision_horizon_s",
+                        "harvest_mode",
                     )
                     if key in short_horizon_prediction
                 },
                 "short_horizon_gate": prediction_reason,
             }
             if not prediction_ok:
+                abstain_reasons = self.counts.setdefault(
+                    "short_horizon_abstain_reasons", {}
+                )
+                abstain_reasons[prediction_reason] = int(
+                    abstain_reasons.get(prediction_reason, 0)
+                ) + 1
                 if any(token in prediction_reason for token in ("uncertainty", "abstain", "not_calibrated")):
                     self.counts["uncertainty_reject"] = int(
                         self.counts.get("uncertainty_reject", 0)

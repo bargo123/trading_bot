@@ -63,6 +63,35 @@ def seed_quote_buffer(quote_buffer: Any, symbol: str, quotes: Any) -> int:
     return added
 
 
+def _abstain_reason(
+    prediction: Mapping[str, Any],
+    *,
+    min_model_agreement: float,
+    max_uncertainty: float,
+) -> tuple[str, bool]:
+    """Explain an ensemble abstention without relaxing the decision gate."""
+    if not bool(prediction.get("abstain", True)):
+        return "ensemble_eligible", False
+    reasons: list[str] = []
+    try:
+        disagreement = float(prediction.get("model_agreement", 0.0)) < float(
+            min_model_agreement
+        )
+    except (TypeError, ValueError):
+        disagreement = True
+    try:
+        uncertain = float(prediction.get("uncertainty", 1.0)) > float(
+            max_uncertainty
+        )
+    except (TypeError, ValueError):
+        uncertain = True
+    if disagreement:
+        reasons.append("model_disagreement")
+    if uncertain:
+        reasons.append("uncertainty_high")
+    return "+".join(reasons) if reasons else "ensemble_abstain", disagreement
+
+
 class ShortHorizonPredictor:
     """Runtime-only wrapper around a validated local calibrated ensemble."""
 
@@ -149,6 +178,8 @@ class ShortHorizonPredictor:
             "uncertainty": 1.0,
             "model_count": len(self.pipeline.models) if self.pipeline is not None else 0,
             "threshold": float(self.metadata.get("threshold", 0.5) or 0.5),
+            "abstain_reason": str(reason),
+            "model_disagreement": False,
             "expected_net_pnl": 0.0,
             "prediction_reason": str(reason),
         }
@@ -214,12 +245,23 @@ class ShortHorizonPredictor:
                     "side_buy": 1.0 if str(side).lower() == "buy" else 0.0,
                     "horizon_s": float(horizon),
                 }])
+                min_model_agreement = float(
+                    self.metadata.get("min_model_agreement", 0.6) or 0.6
+                )
+                max_uncertainty = float(
+                    self.metadata.get("max_uncertainty", 0.2) or 0.2
+                )
                 result = self.pipeline.get_calibrated_ensemble_prediction(
                     row,
                     threshold=horizon_threshold,
                     min_models=2,
-                    min_model_agreement=float(self.metadata.get("min_model_agreement", 0.6) or 0.6),
-                    max_uncertainty=float(self.metadata.get("max_uncertainty", 0.2) or 0.2),
+                    min_model_agreement=min_model_agreement,
+                    max_uncertainty=max_uncertainty,
+                )
+                abstain_reason, model_disagreement = _abstain_reason(
+                    result,
+                    min_model_agreement=min_model_agreement,
+                    max_uncertainty=max_uncertainty,
                 )
                 by_horizon[horizon_key] = {
                     "probability": float(result["probability"][0]),
@@ -228,6 +270,8 @@ class ShortHorizonPredictor:
                     "model_agreement": float(result["model_agreement"][0]),
                     "uncertainty": float(result["uncertainty"][0]),
                     "threshold": horizon_threshold,
+                    "abstain_reason": abstain_reason,
+                    "model_disagreement": model_disagreement,
                 }
             if not by_horizon:
                 return None
@@ -271,6 +315,8 @@ class ShortHorizonPredictor:
                 "calibration_status": "calibrated",
                 "model_agreement": selected["model_agreement"],
                 "uncertainty": selected["uncertainty"],
+                "abstain_reason": selected.get("abstain_reason", "ensemble_eligible"),
+                "model_disagreement": bool(selected.get("model_disagreement", False)),
                 "model_count": len(self.pipeline.models),
                 "horizons_s": self.metadata.get("horizons_s"),
                 "decision_horizon_s": int(selected_horizon),

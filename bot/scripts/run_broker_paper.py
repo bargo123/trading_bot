@@ -2279,6 +2279,9 @@ def main() -> None:
                     "MODEL_MISSING_REJECT": int(
                         _brain_counts.get("short_horizon_missing", 0) or 0
                     ),
+                    "SHORT_HORIZON_ABSTAIN_REASONS": dict(
+                        _brain_counts.get("short_horizon_abstain_reasons") or {}
+                    ),
                     "TAIL_REJECT": int(_brain_counts.get("tail_reject", 0) or 0),
                     "STALE_REJECT": int(_funnel.get("STALE_REJECT", 0) or 0),
                     "RISK_REJECT": int(_funnel.get("RISK_REJECT", 0) or 0),
