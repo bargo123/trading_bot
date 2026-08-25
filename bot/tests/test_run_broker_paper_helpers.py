@@ -12,6 +12,7 @@ from scripts.run_broker_paper import (
     close_ticket_confirmed,
     exploration_order_risk_check,
     firehose_lifecycle_identity,
+    firehose_funnel_risk_row,
     normalize_protective_stops,
     order_margin_for_send,
     persist_confirmed_firehose_basket,
@@ -21,6 +22,31 @@ from scripts.run_broker_paper import (
     remove_confirmed_firehose_basket_then_cleanup,
     video_style_signal_for_scan,
 )
+
+
+def test_risk_halt_records_one_terminal_funnel_row_without_order_intent():
+    row = firehose_funnel_risk_row(
+        scan_id="scan_123",
+        symbol="EURUSD",
+        bar="2026-08-25T09:00:00+00:00",
+        reason="daily_loss 10.11%",
+    )
+
+    assert row == {
+        "event": "firehose_funnel.v1",
+        "scan_id": "scan_123",
+        "symbol": "EURUSD",
+        "bar": "2026-08-25T09:00:00+00:00",
+        "terminal": "RISK_REJECT",
+        "micro_candidate_count": 0,
+        "book_supported": False,
+        "validated_match": False,
+        "exploration_eligible": False,
+        "brain_intent": False,
+        "submitted": False,
+        "filled": False,
+        "reason": "daily_loss 10.11%",
+    }
 
 
 def test_order_margin_for_send_uses_broker_native_calculator_for_cross_currency_pair():

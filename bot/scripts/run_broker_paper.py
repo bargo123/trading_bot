@@ -220,9 +220,37 @@ def funnel_terminal_for_reason(reason: object) -> str:
         return "ECONOMICS_REJECT"
     if "geometry" in text or "stop" in text or "target" in text:
         return "GEOMETRY_REJECT"
-    if any(token in text for token in ("risk", "margin", "sizing", "lot", "position", "circuit", "halt")):
+    if any(token in text for token in (
+        "risk", "margin", "sizing", "lot", "position", "circuit", "halt", "daily_loss",
+    )):
         return "RISK_REJECT"
     return "OTHER_REJECT"
+
+
+def firehose_funnel_risk_row(
+    *,
+    scan_id: str,
+    symbol: str,
+    bar: object,
+    reason: object,
+) -> dict[str, object]:
+    """Record a risk terminal without creating broker intent or an order."""
+    text = str(reason or "")
+    return {
+        "event": "firehose_funnel.v1",
+        "scan_id": str(scan_id),
+        "symbol": str(symbol),
+        "bar": str(bar),
+        "terminal": funnel_terminal_for_reason(text),
+        "micro_candidate_count": 0,
+        "book_supported": False,
+        "validated_match": False,
+        "exploration_eligible": False,
+        "brain_intent": False,
+        "submitted": False,
+        "filled": False,
+        "reason": text,
+    }
 
 
 def write_runner_heartbeat(
@@ -1175,6 +1203,15 @@ def main() -> None:
             if not ok:
                 logger.warning("Risk halt: %s (continuing watch)", reason)
                 risk.save_json(risk_path)
+                append_journal(
+                    journal,
+                    firehose_funnel_risk_row(
+                        scan_id=scan_id,
+                        symbol=sym,
+                        bar=bar_time,
+                        reason=reason,
+                    ),
+                )
                 now_s = time.time()
                 if now_s - last_halt_journal >= 60:
                     last_halt_journal = now_s
