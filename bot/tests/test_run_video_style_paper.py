@@ -37,6 +37,28 @@ def test_cli_writes_truthful_all_symbol_artifacts(tmp_path: Path):
     assert "placed_orders: false" in (output_dir / "video_style_paper_summary.md").read_text()
 
 
+def test_cli_accepts_seconds_horizon(tmp_path: Path):
+    bars_dir = tmp_path / "bars"
+    output_dir = tmp_path / "reports"
+    bars_dir.mkdir()
+    pd.DataFrame(
+        [
+            ("2026-01-01T00:00:00Z", 100.0, 100.5, 99.5, 100.0),
+            ("2026-01-01T00:00:01Z", 100.0, 102.0, 99.5, 101.5),
+            ("2026-01-01T00:00:02Z", 101.5, 101.8, 101.2, 101.6),
+            ("2026-01-01T00:00:05Z", 101.6, 101.8, 101.4, 101.7),
+        ],
+        columns=["time", "open", "high", "low", "close"],
+    ).to_csv(bars_dir / "EURUSD.csv", index=False)
+
+    assert main([
+        "--bars-dir", str(bars_dir), "--output-dir", str(output_dir),
+        "--max-hold-s", "3",
+    ]) == 0
+    result = json.loads((output_dir / "video_style_paper_result.json").read_text())
+    assert result["trades"][0]["exit_reason"] == "time"
+
+
 def test_cli_rejects_malformed_input_without_success_artifacts(tmp_path: Path):
     bars_dir = tmp_path / "bars"
     output_dir = tmp_path / "reports"

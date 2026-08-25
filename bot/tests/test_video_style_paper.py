@@ -92,6 +92,27 @@ def test_costs_reduce_reported_pnl():
     assert with_cost.ending_equity < no_cost.ending_equity
 
 
+def test_seconds_horizon_closes_position_without_waiting_for_end_of_data():
+    bars = pd.DataFrame(
+        [
+            ("2026-01-01T00:00:00Z", 100.0, 100.5, 99.5, 100.0),
+            ("2026-01-01T00:00:01Z", 100.0, 102.0, 99.5, 101.5),
+            ("2026-01-01T00:00:02Z", 101.5, 101.8, 101.2, 101.6),
+            ("2026-01-01T00:00:05Z", 101.6, 101.8, 101.4, 101.7),
+            ("2026-01-01T00:00:10Z", 101.7, 101.9, 101.5, 101.8),
+        ],
+        columns=["time", "open", "high", "low", "close"],
+    )
+
+    result = simulate_video_style(
+        {"EURUSD": bars},
+        VideoStyleConfig(max_layers=1, max_hold_s=3),
+    )
+
+    assert result.trades[0].exit_reason == "time"
+    assert result.trades[0].exit_time == "2026-01-01T00:00:05Z"
+
+
 def test_all_supplied_symbols_are_simulated_without_symbol_hardcoding():
     result = simulate_video_style(
         {"EURUSD": _winning_bars(), "SILVER": _winning_bars()},

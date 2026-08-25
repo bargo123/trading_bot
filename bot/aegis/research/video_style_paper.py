@@ -193,6 +193,25 @@ def _pnl(side: str, entry: float, exit_price: float, quantity: float) -> float:
     return quantity * direction * (exit_price - entry)
 
 
+def _elapsed_seconds(start: Any, end: Any) -> float | None:
+    """Return elapsed seconds for numeric or timestamp-like bar times."""
+    if isinstance(start, (int, float)) and not isinstance(start, bool):
+        if isinstance(end, (int, float)) and not isinstance(end, bool):
+            return float(end) - float(start)
+        return None
+    try:
+        start_ts = pd.Timestamp(start)
+        end_ts = pd.Timestamp(end)
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(start_ts) or pd.isna(end_ts):
+        return None
+    try:
+        return float((end_ts - start_ts).total_seconds())
+    except (TypeError, ValueError):
+        return None
+
+
 def _close_layers(
     *,
     symbol: str,
@@ -304,7 +323,12 @@ def _symbol_result(
                     exit_price, reason = target, "target"
             for layer in layers:
                 layer.bars_held += 1
-            if reason is None and cfg.max_hold_bars and layers[0].bars_held >= cfg.max_hold_bars:
+            elapsed_s = _elapsed_seconds(first.entry_time, row["time"])
+            time_expired = elapsed_s is not None and elapsed_s >= float(cfg.max_hold_s)
+            if reason is None and (
+                time_expired
+                or (cfg.max_hold_bars and layers[0].bars_held >= cfg.max_hold_bars)
+            ):
                 exit_price, reason = float(row["close"]), "time"
             if reason is not None:
                 closed = _close_layers(

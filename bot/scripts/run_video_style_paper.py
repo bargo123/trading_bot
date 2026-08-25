@@ -182,6 +182,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--slippage-cost", type=float, default=0.0)
     parser.add_argument("--commission-cost", type=float, default=0.0)
     parser.add_argument("--max-hold-bars", type=int, default=0)
+    parser.add_argument("--max-hold-s", type=int, default=45)
     args = parser.parse_args(argv)
     try:
         if bool(args.bars_dir) == bool(args.mt5_config):
@@ -197,6 +198,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             slippage_cost=args.slippage_cost,
             commission_cost=args.commission_cost,
             max_hold_bars=args.max_hold_bars,
+            max_hold_s=args.max_hold_s,
         )
         if args.mt5_config:
             return _run_mt5_readonly(
