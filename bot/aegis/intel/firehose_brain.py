@@ -38,7 +38,7 @@ from aegis.intel.trade_economics import (
     TradeEconomics,
     evaluate_trade_economics,
 )
-from aegis.research.video_style_paper import (
+from aegis.intel.video_style import (
     VideoStyleConfig,
     VideoStyleSignal,
     video_style_geometry,

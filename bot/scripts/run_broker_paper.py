@@ -69,6 +69,23 @@ from aegis.intel.ticket_metadata import firehose_lifecycle_identity  # noqa: E40
 logger = logging.getLogger(__name__)
 
 
+def video_style_signal_for_scan(
+    completed_m1: pd.DataFrame,
+    *,
+    symbol: str,
+    enabled: bool,
+):
+    """Return the shared video-style signal used to align prediction direction."""
+    if not enabled:
+        return None
+    from aegis.intel.video_style import video_style_signal
+
+    try:
+        return video_style_signal(completed_m1, symbol=symbol)
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return None
+
+
 def bars_to_frame(bars) -> pd.DataFrame:
     rows = [
         {
@@ -1164,7 +1181,21 @@ def main() -> None:
                     logger.warning("%s symbol_spec unavailable for economics: %s", sym, exc)
                     brain_spec = None
                 brain_side = None if hint is None else hint.side
-                brain_entry = float(q.ask if brain_side == "buy" else q.bid) if brain_side else None
+                video_signal_hint = video_style_signal_for_scan(
+                    completed,
+                    symbol=sym,
+                    enabled=video_style_mode,
+                )
+                prediction_side = (
+                    video_signal_hint.side
+                    if video_signal_hint is not None
+                    else (brain_side or "buy")
+                )
+                entry_side = video_signal_hint.side if video_signal_hint is not None else brain_side
+                brain_entry = (
+                    float(q.ask if entry_side == "buy" else q.bid)
+                    if entry_side else None
+                )
                 decision = intelligent_brain.evaluate(
                     symbol=sym,
                     row=row,
@@ -1185,7 +1216,7 @@ def main() -> None:
                         symbol=sym,
                         quote_buffer=quote_buffer,
                         now_ts=now_ts,
-                        side=brain_side or "buy",
+                        side=prediction_side,
                         notional_usd=(
                             float(qty) * float((brain_spec or {}).get("trade_contract_size", 0) or 0)
                             if brain_spec else None

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pandas as pd
+
 from aegis.engines.base import PositionSnapshot
 from aegis.intel.firehose_basket import BasketMetadataStore
 from aegis.intel.firehose_turnover import FirehoseReentryGuard, TurnoverMetrics
@@ -15,7 +17,24 @@ from scripts.run_broker_paper import (
     reconcile_confirmed_firehose_basket_cleanups,
     remove_confirmed_firehose_basket,
     remove_confirmed_firehose_basket_then_cleanup,
+    video_style_signal_for_scan,
 )
+
+
+def test_video_style_prediction_signal_uses_shared_direction_only_when_enabled():
+    frame = pd.DataFrame({
+        "time": pd.date_range("2026-01-01", periods=3, freq="min", tz="UTC"),
+        "open": [1.09995, 1.10045, 1.10145],
+        "high": [1.10012, 1.10062, 1.10162],
+        "low": [1.09988, 1.10038, 1.10138],
+        "close": [1.10000, 1.10050, 1.10150],
+    })
+
+    signal = video_style_signal_for_scan(frame, symbol="EURUSD", enabled=True)
+
+    assert signal is not None
+    assert signal.side == "buy"
+    assert video_style_signal_for_scan(frame, symbol="EURUSD", enabled=False) is None
 
 
 def test_normalize_protective_stops_buy_respects_broker_min_distance():
