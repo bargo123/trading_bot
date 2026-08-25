@@ -597,6 +597,10 @@ def main() -> None:
 
     cfg = load_config(args.config)
     video_style_mode = bool(args.video_style)
+    if video_style_mode:
+        # Research/video behavior is seconds-first even when a restart finds
+        # an older ticket without exact metadata.
+        cfg["_video_style_max_hold_s"] = int(cfg.get("video_style_max_hold_s") or 45)
     engine_name = str(cfg.get("engine", "")).lower()
     if engine_name == "mt5":
         from aegis.paper_control import paper_execution_enabled
@@ -1894,7 +1898,11 @@ def main() -> None:
                                             or (q.ask if side == "buy" else q.bid))
                         stop_loss = float(brain_decision.sl) if brain_decision.sl is not None else 0.0
                         target_price = brain_decision.tp
-                        max_hold_s = int(brain_decision.journal.get("max_hold_s") or 120)
+                        max_hold_s = int(
+                            brain_decision.journal.get("max_hold_s")
+                            or (cfg.get("_video_style_max_hold_s") if video_style_mode else 120)
+                            or 120
+                        )
                         regime = str(brain_decision.journal.get("regime") or "")
                         session = str(brain_decision.journal.get("session") or "")
                         information_id = brain_decision.information_id
@@ -2374,7 +2382,7 @@ def main() -> None:
                                 remaining_ev_status=_rem_status,
                             )
                             # Fast exit state machine governs FAST tickets.
-                            _is_fast = False
+                            _is_fast = bool(video_style_mode)
                             _ticket_meta = ticket_metadata_store.get(tk)
                             if _ticket_meta is not None:
                                 # Fresh ticket with exact metadata - use it for fast exit

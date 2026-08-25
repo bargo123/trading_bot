@@ -276,6 +276,25 @@ class TestFastExitProductionHelper:
         assert captured["stop_pips"] == pytest.approx(15.0)
         assert captured["target"] == pytest.approx(1.20100)
 
+    def test_video_style_fallback_horizon_applies_without_ticket_metadata(self):
+        """Legacy/open tickets still receive the seconds-first video horizon."""
+        ctx = self.create_context(
+            ticket="T_VIDEO_LEGACY",
+            ticket_meta=None,
+            config={"_video_style_max_hold_s": 5},
+            opened_ts=1000.0,
+            now_ts=1010.0,
+            current_bid=1.10000,
+            current_ask=1.10002,
+            mfe_usd=0.0,
+            mae_usd=-0.01,
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["action"] == "SCRATCH"
+        assert verdict["reason"] == "time_decay_no_progress"
+
     def test_metadata_without_target_uses_confirmed_fallback_target(self):
         """Metadata tickets derive their own fallback target instead of using legacy experiments."""
         meta = create_ticket_metadata(
