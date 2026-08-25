@@ -238,6 +238,31 @@ def test_incremental_wrapper_preserves_label_cursor_when_advancing_raw_cursor():
     }
 
 
+def test_fast_exit_error_record_does_not_require_symbol_loop_bar_time():
+    from scripts.run_broker_paper import fast_exit_error_event
+
+    record = fast_exit_error_event(
+        ticket="T1",
+        symbol="EURUSD",
+        error_type="MissingLiquidationMarkError",
+        message="missing bid",
+        observed_at="2026-08-25T00:00:01+00:00",
+    )
+
+    assert record["event"] == "fast_exit_error"
+    assert record["bar"] == "2026-08-25T00:00:01+00:00"
+    assert "bar_time" not in record
+
+
+def test_ticket_track_uses_regime_at_open_for_fast_exit_context():
+    from aegis.intel.profit_management import TicketTrack
+
+    track = TicketTrack(ticket="T1", regime_at_open="trend")
+
+    assert track.regime_at_open == "trend"
+    assert not hasattr(track, "regime_at_entry")
+
+
 # ---------------------------------------------------------------------------
 # Defect 6: LEVEL A OOS must test the SAME family trained on
 # ---------------------------------------------------------------------------

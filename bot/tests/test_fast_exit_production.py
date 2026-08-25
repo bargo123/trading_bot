@@ -295,6 +295,40 @@ class TestFastExitProductionHelper:
         assert verdict["action"] == "SCRATCH"
         assert verdict["reason"] == "time_decay_no_progress"
 
+    def test_video_style_cap_overrides_stale_long_ticket_metadata(self):
+        meta = create_ticket_metadata(
+            ticket="T_VIDEO_STALE_HORIZON",
+            hypothesis_id="hyp_123",
+            thesis_key="key_123",
+            strategy_family="video_style_breakout",
+            expected_mechanism="breakout",
+            side="buy",
+            entry_price=1.10000,
+            stop_loss=1.09900,
+            target_price=1.10200,
+            max_hold_s=120,
+            regime="trend",
+            session="asia",
+            symbol="EURUSD",
+        )
+        meta.opened_ts = 1000.0
+        ctx = self.create_context(
+            ticket="T_VIDEO_STALE_HORIZON",
+            ticket_meta=meta,
+            config={"_video_style_max_hold_s": 5},
+            opened_ts=1000.0,
+            now_ts=1010.0,
+            current_bid=1.10000,
+            current_ask=1.10002,
+            mfe_usd=0.0,
+            mae_usd=-0.01,
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["action"] == "SCRATCH"
+        assert verdict["reason"] == "time_decay_no_progress"
+
     def test_metadata_without_target_uses_confirmed_fallback_target(self):
         """Metadata tickets derive their own fallback target instead of using legacy experiments."""
         meta = create_ticket_metadata(

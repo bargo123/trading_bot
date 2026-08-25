@@ -141,7 +141,12 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     # Use exact ticket metadata for target and max_hold_s (first priority)
     _tgt_px = _ticket_meta.target_price if _ticket_meta else None
     _video_fallback = int(ctx.config.get("_video_style_max_hold_s") or 0)
-    _max_hold_s = int(_ticket_meta.max_hold_s) if _ticket_meta else (_video_fallback or 120)
+    if _ticket_meta:
+        _max_hold_s = int(_ticket_meta.max_hold_s)
+        if _video_fallback > 0:
+            _max_hold_s = min(_max_hold_s, _video_fallback)
+    else:
+        _max_hold_s = _video_fallback or 120
 
     # Fallback to experiment scan for legacy tickets ONLY when exact metadata absent
     if _ticket_meta is None and _tgt_px is None and ctx.intelligent_brain is not None:

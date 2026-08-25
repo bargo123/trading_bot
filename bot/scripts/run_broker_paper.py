@@ -90,6 +90,20 @@ def append_journal(path: Path, event: dict) -> None:
         f.write(json.dumps(event, default=str) + "\n")
 
 
+def fast_exit_error_event(
+    *, ticket: str, symbol: str, error_type: str, message: str, observed_at: object,
+) -> dict:
+    """Build a FastExit diagnostic without depending on the symbol scan loop."""
+    return {
+        "event": "fast_exit_error",
+        "ticket": ticket,
+        "symbol": symbol,
+        "error_type": error_type,
+        "message": message,
+        "bar": str(observed_at),
+    }
+
+
 def firehose_scan_id(symbol: str, bar: object) -> str:
     """Stable identity for one symbol/completed-bar evaluation."""
     payload = f"firehose-scan|{str(symbol).upper()}|{bar}"
@@ -1898,11 +1912,10 @@ def main() -> None:
                                             or (q.ask if side == "buy" else q.bid))
                         stop_loss = float(brain_decision.sl) if brain_decision.sl is not None else 0.0
                         target_price = brain_decision.tp
-                        max_hold_s = int(
-                            brain_decision.journal.get("max_hold_s")
-                            or (cfg.get("_video_style_max_hold_s") if video_style_mode else 120)
-                            or 120
-                        )
+                        if video_style_mode:
+                            max_hold_s = int(cfg.get("_video_style_max_hold_s") or 45)
+                        else:
+                            max_hold_s = int(brain_decision.journal.get("max_hold_s") or 120)
                         regime = str(brain_decision.journal.get("regime") or "")
                         session = str(brain_decision.journal.get("session") or "")
                         information_id = brain_decision.information_id
@@ -2439,7 +2452,7 @@ def main() -> None:
                                         mfe_usd=float(_track.mfe_usd or 0),
                                         mae_usd=float(_track.mae_usd or 0),
                                         opened_ts=_track.opened_ts,
-                                        regime_at_entry=_track.regime_at_entry,
+                                        regime_at_entry=_track.regime_at_open,
                                         track_target=_track.target if _track else 0.0,
                                         track_invalidation=_track.invalidation if _track else 0.0,
                                         track_entry_ev=float(_track.entry_ev_at_open or 0.0),
@@ -2461,14 +2474,16 @@ def main() -> None:
                                         fast_verdict = evaluate_fast_exit(fast_exit_ctx)
                                     except MissingLiquidationMarkError:
                                         fast_exit_error_count += 1
-                                        append_journal(journal, {
-                                            "event": "fast_exit_error",
-                                            "ticket": tk,
-                                            "symbol": _sym,
-                                            "error_type": "MissingLiquidationMarkError",
-                                            "message": f"Missing liquidation mark for {_side_l.upper()}",
-                                            "bar": str(bar_time),
-                                        })
+                                        append_journal(
+                                            journal,
+                                            fast_exit_error_event(
+                                                ticket=tk,
+                                                symbol=_sym,
+                                                error_type="MissingLiquidationMarkError",
+                                                message=f"Missing liquidation mark for {_side_l.upper()}",
+                                                observed_at=datetime.now(timezone.utc).isoformat(),
+                                            ),
+                                        )
                                         continue
                                     trace = firehose_exit_trace(fast_exit_ctx, fast_verdict)
                                     trace["timestamp"] = datetime.now(timezone.utc).isoformat()
@@ -2514,14 +2529,16 @@ def main() -> None:
                                         }
                                 except Exception as fast_exc:
                                     fast_exit_error_count += 1
-                                    append_journal(journal, {
-                                        "event": "fast_exit_error",
-                                        "ticket": tk,
-                                        "symbol": str(getattr(pos, "symbol", "")),
-                                        "error_type": type(fast_exc).__name__,
-                                        "message": str(fast_exc)[:200],
-                                        "bar": str(bar_time),
-                                    })
+                                    append_journal(
+                                        journal,
+                                        fast_exit_error_event(
+                                            ticket=tk,
+                                            symbol=str(getattr(pos, "symbol", "")),
+                                            error_type=type(fast_exc).__name__,
+                                            message=str(fast_exc)[:200],
+                                            observed_at=datetime.now(timezone.utc).isoformat(),
+                                        ),
+                                    )
                             if verdict["action"] == "EXIT" and hasattr(eng, "close_ticket"):
                                 res_close = eng.close_ticket(tk)
                                 summary = profit_manager.close_summary(
