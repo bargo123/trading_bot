@@ -362,6 +362,7 @@ def test_history_deals_and_orders_readonly():
             magic=1,
             comment="out",
             time=1_700_000_000,
+            time_msc=1_700_000_000_000,
         )
     ]
     api.orders_hist = [
@@ -386,6 +387,7 @@ def test_history_deals_and_orders_readonly():
     orders = eng.history_orders(7)
     assert deals[0]["profit"] == 0.12
     assert deals[0]["time"] == "2023-11-14T21:13:20+00:00"
+    assert deals[0]["time_msc"] == 1_699_996_400_000
     assert orders[0]["ticket"] == "8"
     assert api.shutdown_calls == 0
 
@@ -418,11 +420,12 @@ def test_positions_include_ticket_sl_tp():
     ]
     eng = _engine(api)
     eng.connect_readonly()
+    eng._server_utc_offset_s = 3600
     pos = eng.positions()
     assert pos[0].ticket == "42"
     assert pos[0].stop_loss == 1.09
     assert pos[0].take_profit == 1.11
-    assert pos[0].opened_ts == 1_700_000_123.456
+    assert pos[0].opened_ts == 1_699_996_523.456
     assert api.shutdown_calls == 0
 
 

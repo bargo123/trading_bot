@@ -485,9 +485,13 @@ class MT5Engine(BrokerEngine):
             side = "buy" if int(getattr(pos, "type", 0) or 0) == 0 else "sell"
             opened_msc = float(getattr(pos, "time_msc", 0) or 0)
             opened_ts = (
-                opened_msc / 1000.0
+                opened_msc / 1000.0 - self._server_utc_offset()
                 if opened_msc > 0
-                else float(getattr(pos, "time", 0) or 0) or None
+                else (
+                    float(getattr(pos, "time", 0) or 0) - self._server_utc_offset()
+                    if float(getattr(pos, "time", 0) or 0) > 0
+                    else None
+                )
             )
             out.append(
                 PositionSnapshot(
@@ -542,7 +546,11 @@ class MT5Engine(BrokerEngine):
                         datetime.fromtimestamp(ts - server_offset, tz=timezone.utc).isoformat()
                         if ts else ""
                     ),
-                    "time_msc": int(getattr(row, "time_msc", 0) or 0) or None,
+                    "time_msc": (
+                        int(float(getattr(row, "time_msc", 0) or 0) - server_offset * 1000.0)
+                        if getattr(row, "time_msc", 0)
+                        else None
+                    ),
                 }
             )
         return out
