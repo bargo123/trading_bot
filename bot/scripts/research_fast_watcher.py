@@ -45,6 +45,7 @@ CYCLE_STATUS = REPORTS / "aegis_cycle_status.md"
 BOOK_MEMORY_REPORT = REPORTS / "book_memory.json"
 OUTCOME_REPORT = REPORTS / "outcome_learning.json"
 ML_REPORT = REPORTS / "ml_pipeline.json"
+FAST_AUTOPSY_REPORT = REPORTS / "fast_trade_autopsy.json"
 NOTES_DIR = BOT / "research" / "source_notes"
 STATE_DIR = BOT / "research" / "fast_watcher_state"
 OPENCODE_DIR = BOT / "reports" / "opencode"
@@ -503,6 +504,13 @@ def run_cycle(
     # P7: refresh the throughput/degradation report cheaply.
     throughput = _run_script("firehose_throughput.py", timeout_s=300)
 
+    # Join each new broker-confirmed exit to its fast lifecycle traces before
+    # outcome learning.  The consumer is research-only and records NO_EVIDENCE
+    # until a replay/OOS experiment proves a proposed improvement.
+    autopsy: dict[str, Any] | None = None
+    if evidence_changed or notes_changed or fetch_exit:
+        autopsy = _run_script("research_fast_trade_autopsy.py", timeout_s=300)
+
     # P10: autonomous REAL council round on meaningful triggers only.
     council: dict[str, Any] | None = None
     trigger = None
@@ -555,6 +563,7 @@ def run_cycle(
             "keepalive_invoked": keepalive,
             "council": council,
             "ingest": ingest,
+            "fast_trade_autopsy": autopsy,
         }
 
     outcome = _run_script("research_outcome_learning.py")
@@ -592,6 +601,7 @@ def run_cycle(
         "keepalive_invoked": keepalive,
         "council": council,
         "ingest": ingest,
+        "fast_trade_autopsy": autopsy,
     }
 
 

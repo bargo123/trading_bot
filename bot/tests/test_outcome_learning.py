@@ -7,9 +7,12 @@ import pytest
 
 from aegis.research.outcome_learning import (
     exit_pnls,
+    record_fast_trade_autopsy,
     read_outcomes,
+    summarize_fast_trade_autopsy,
     summarize_outcomes,
 )
+from aegis.research.registry import ExperimentRegistry
 
 
 def _row(ticket: str, pnl: float, is_exit: bool = True, **extra) -> dict:
@@ -73,3 +76,38 @@ def test_slice_learning_requires_minimum_sample():
     reasons = {r["key"] for r in summary["by_close_reason"]}
     assert "tp" in reasons
     assert "sl" not in reasons
+
+
+def test_fast_trade_autopsy_joins_runtime_evidence_and_records_no_evidence(tmp_path):
+    outcomes = [
+        {"ticket": "deal-loss-1", "position": "loss-1", "is_exit": True, "pnl": -0.02, "symbol": "AUDUSD", "close_reason": "manual"},
+        {"ticket": "deal-win-1", "position": "win-1", "is_exit": True, "pnl": 0.05, "symbol": "EURAUD", "close_reason": "manual"},
+    ]
+    journal = {
+        "loss-1": [
+            {"event": "firehose_open", "ticket": "loss-1", "timestamp": "2026-01-01T00:00:00+00:00"},
+            {"event": "firehose_exit_trace", "ticket": "loss-1", "timestamp": "2026-01-01T00:00:05+00:00", "pnl_usd": -0.01, "mfe_usd": 0.0},
+            {"event": "pm_exit", "ticket": "loss-1", "timestamp": "2026-01-01T00:00:40+00:00", "mfe_before_close": 0.0, "mae_before_close": -0.04, "exit_reason": "fast_scratch:time_decay_no_progress"},
+            {"event": "firehose_close", "ticket": "loss-1", "timestamp": "2026-01-01T00:00:40+00:00", "confirmed": True},
+        ],
+        "win-1": [
+            {"event": "firehose_open", "ticket": "win-1", "timestamp": "2026-01-01T00:01:00+00:00"},
+            {"event": "firehose_exit_trace", "ticket": "win-1", "timestamp": "2026-01-01T00:01:03+00:00", "pnl_usd": 0.01, "mfe_usd": 0.01},
+            {"event": "pm_exit", "ticket": "win-1", "timestamp": "2026-01-01T00:01:08+00:00", "mfe_before_close": 0.05, "mae_before_close": -0.01, "exit_reason": "fast_take"},
+            {"event": "firehose_close", "ticket": "win-1", "timestamp": "2026-01-01T00:01:08+00:00", "confirmed": True},
+        ],
+    }
+
+    summary = summarize_fast_trade_autopsy(outcomes, journal)
+
+    assert summary["n_trades"] == 2
+    assert summary["median_hold_s"] == pytest.approx(24.0)
+    assert summary["median_time_to_green_s"] == pytest.approx(3.0)
+    assert summary["loss_categories"]["NO_PROGRESS"] == 1
+    assert summary["winner_giveback_rate"] == pytest.approx(0.0)
+    registry = ExperimentRegistry(tmp_path / "experiments.sqlite")
+    experiment_id = record_fast_trade_autopsy(summary, registry=registry)
+    row = registry.get(experiment_id)
+    assert row is not None
+    assert row["status"] == "failed"
+    assert "observation only" in row["rejection_reason"]

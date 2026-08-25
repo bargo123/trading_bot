@@ -8,12 +8,17 @@ trading state.
 from __future__ import annotations
 
 import json
-from collections import defaultdict
+import hashlib
+import math
+from collections import Counter, defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from aegis.intel.expected_value import payoff_metrics
 from aegis.research.costs import pnl_summary
+from aegis.research.registry import DuplicateExperimentError, ExperimentRegistry
+from aegis.research_factory.evaluation import record_outcome
 
 DEFAULT_OUTCOME_PATH = Path(__file__).resolve().parents[2] / "intel" / "outcome_log.jsonl"
 
@@ -108,6 +113,246 @@ def summarize_outcomes(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         "by_close_reason": by_reason,
         "by_symbol_side": by_symbol_side,
     }
+
+
+def _finite_number(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _event_time(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+def _median(values: Iterable[float]) -> float | None:
+    items = sorted(float(value) for value in values if math.isfinite(float(value)))
+    if not items:
+        return None
+    middle = len(items) // 2
+    if len(items) % 2:
+        return items[middle]
+    return (items[middle - 1] + items[middle]) / 2.0
+
+
+def summarize_fast_trade_autopsy(
+    outcomes: Iterable[Mapping[str, Any]],
+    journal_events: Mapping[str, Iterable[Mapping[str, Any]]],
+) -> dict[str, Any]:
+    """Join broker exits to runtime traces and classify only observed causes.
+
+    Missing trace facts remain ``None`` and become ``UNCLASSIFIED_LOSS`` rather
+    than being guessed.  This is an observation report, not a promotion gate.
+    """
+    trades: list[dict[str, Any]] = []
+    for outcome in outcomes:
+        if not outcome.get("is_exit"):
+            continue
+        ticket = str(outcome.get("ticket") or "").strip()
+        pnl = _finite_number(outcome.get("pnl"))
+        if not ticket or pnl is None:
+            continue
+        position = str(outcome.get("position") or "").strip()
+        event_groups = [journal_events.get(ticket) or []]
+        if position and position != ticket:
+            event_groups.append(journal_events.get(position) or [])
+        events = [dict(event) for group in event_groups for event in group]
+        events.sort(
+            key=lambda event: _event_time(event.get("timestamp"))
+            or datetime.min.replace(tzinfo=timezone.utc)
+        )
+        opens = [event for event in events if event.get("event") == "firehose_open"]
+        closes = [
+            event for event in events
+            if event.get("event") == "firehose_close" and event.get("confirmed") is True
+        ]
+        traces = [event for event in events if event.get("event") == "firehose_exit_trace"]
+        pm_exits = [event for event in events if event.get("event") == "pm_exit"]
+        opened_at = _event_time(opens[0].get("timestamp")) if opens else None
+        closed_at = _event_time(closes[-1].get("timestamp")) if closes else None
+        if closed_at is None:
+            closed_at = _event_time(outcome.get("time")) or _event_time(outcome.get("ts_utc"))
+        hold_s = (
+            (closed_at - opened_at).total_seconds()
+            if opened_at is not None and closed_at is not None
+            else None
+        )
+        trace_pnls = [
+            (event, _finite_number(event.get("pnl_usd")))
+            for event in traces
+        ]
+        green_at = next(
+            (event_time for event, pnl_usd in trace_pnls
+             if pnl_usd is not None and pnl_usd > 0
+             for event_time in [_event_time(event.get("timestamp"))]
+             if event_time is not None),
+            None,
+        )
+        time_to_green_s = (
+            (green_at - opened_at).total_seconds()
+            if green_at is not None and opened_at is not None
+            else None
+        )
+        seconds_in_red = 0.0
+        for current, following in zip(trace_pnls, trace_pnls[1:]):
+            current_time = _event_time(current[0].get("timestamp"))
+            next_time = _event_time(following[0].get("timestamp"))
+            if current[1] is not None and current[1] <= 0 and current_time and next_time:
+                seconds_in_red += max(0.0, (next_time - current_time).total_seconds())
+        if trace_pnls and closed_at is not None:
+            last_time = _event_time(trace_pnls[-1][0].get("timestamp"))
+            if trace_pnls[-1][1] is not None and trace_pnls[-1][1] <= 0 and last_time:
+                seconds_in_red += max(0.0, (closed_at - last_time).total_seconds())
+        mfe_values = [
+            value for event in traces + pm_exits
+            for value in [_finite_number(event.get("mfe_usd") or event.get("mfe_before_close"))]
+            if value is not None
+        ]
+        mae_values = [
+            value for event in traces + pm_exits
+            for value in [_finite_number(event.get("mae_usd") or event.get("mae_before_close"))]
+            if value is not None
+        ]
+        mfe_usd = max(mfe_values) if mfe_values else None
+        mae_usd = min(mae_values) if mae_values else None
+        exit_reason = str(
+            (pm_exits[-1].get("exit_reason") if pm_exits else None)
+            or outcome.get("close_reason")
+            or outcome.get("reason")
+            or "unknown"
+        )
+        reason_lower = exit_reason.lower()
+        close_reason = str(outcome.get("close_reason") or "").lower()
+        if pnl > 0:
+            category = "WINNER_GIVEBACK" if mfe_usd is not None and pnl < mfe_usd else "FAST_CLEAN_WIN"
+        elif pnl == 0:
+            category = "FLAT_SCRATCH"
+        elif "no_progress" in reason_lower or "never_green" in reason_lower:
+            category = "NO_PROGRESS"
+        elif close_reason == "sl" or "stop" in reason_lower:
+            category = "STOP_LOSS"
+        elif "spread" in reason_lower:
+            category = "SPREAD_COST"
+        else:
+            category = "UNCLASSIFIED_LOSS"
+        trades.append(
+            {
+                "ticket": ticket,
+                "symbol": str(outcome.get("symbol") or "unknown"),
+                "side": str(outcome.get("side") or "unknown"),
+                "pnl": pnl,
+                "category": category,
+                "exit_reason": exit_reason,
+                "hold_s": hold_s,
+                "time_to_green_s": time_to_green_s,
+                "seconds_in_red_observed_s": seconds_in_red,
+                "mfe_usd": mfe_usd,
+                "mae_usd": mae_usd,
+                "giveback_usd": (mfe_usd - pnl if mfe_usd is not None else None),
+                "evidence_status": "COMPLETE" if opens and closes and (traces or pm_exits) else "PARTIAL",
+            }
+        )
+    pnls = [trade["pnl"] for trade in trades]
+    winners = [trade for trade in trades if trade["pnl"] > 0]
+    losses = [trade for trade in trades if trade["pnl"] < 0]
+    giveback_winners = [trade for trade in winners if trade["category"] == "WINNER_GIVEBACK"]
+    complete = sum(trade["evidence_status"] == "COMPLETE" for trade in trades)
+    with_runtime_trace = sum(
+        trade["evidence_status"] == "COMPLETE" or trade["hold_s"] is not None
+        for trade in trades
+    )
+    by_symbol: dict[str, dict[str, Any]] = {}
+    for trade in trades:
+        bucket = by_symbol.setdefault(trade["symbol"], {"n": 0, "net_pnl": 0.0})
+        bucket["n"] += 1
+        bucket["net_pnl"] += trade["pnl"]
+    for bucket in by_symbol.values():
+        bucket["net_pnl"] = round(bucket["net_pnl"], 8)
+    return {
+        "schema": "fast_trade_autopsy.v1",
+        "label": "research_observation",
+        "n_trades": len(trades),
+        "n_wins": len(winners),
+        "n_losses": len(losses),
+        "n_with_runtime_trace": with_runtime_trace,
+        "n_with_complete_evidence": complete,
+        "n_partial_evidence": len(trades) - complete,
+        "metrics": payoff_metrics(pnls),
+        "median_hold_s": _median(trade["hold_s"] for trade in trades if trade["hold_s"] is not None),
+        "median_winning_hold_s": _median(trade["hold_s"] for trade in winners if trade["hold_s"] is not None),
+        "median_losing_hold_s": _median(trade["hold_s"] for trade in losses if trade["hold_s"] is not None),
+        "median_time_to_green_s": _median(trade["time_to_green_s"] for trade in trades if trade["time_to_green_s"] is not None),
+        "seconds_in_red_observed_s": round(sum(trade["seconds_in_red_observed_s"] for trade in trades), 6),
+        "median_mfe_usd": _median(trade["mfe_usd"] for trade in trades if trade["mfe_usd"] is not None),
+        "median_mae_usd": _median(trade["mae_usd"] for trade in trades if trade["mae_usd"] is not None),
+        "winner_giveback_rate": (len(giveback_winners) / len(winners) if winners else None),
+        "loss_categories": dict(Counter(trade["category"] for trade in losses)),
+        "by_symbol": by_symbol,
+        "trades": trades,
+        "next_experiments": [
+            {
+                "category": category,
+                "observed_losses": count,
+                "status": "PROPOSED_NEEDS_REPLAY",
+                "question": f"Can {category.lower()} losses be reduced without lowering positive costed OOS expectancy?",
+            }
+            for category, count in sorted(Counter(trade["category"] for trade in losses).items())
+        ],
+    }
+
+
+def record_fast_trade_autopsy(
+    summary: Mapping[str, Any],
+    *,
+    registry: ExperimentRegistry,
+) -> str:
+    """Persist aggregate runtime evidence as a non-authorizing Factory row."""
+    payload_hash = hashlib.sha256(
+        json.dumps(summary, default=str, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    experiment_id = f"fast_trade_autopsy_{payload_hash[:16]}"
+    if registry.get(experiment_id) is not None:
+        return experiment_id
+    metrics = dict(summary.get("metrics") or {})
+    metrics.update(
+        {
+            "median_hold_s": summary.get("median_hold_s"),
+            "median_time_to_green_s": summary.get("median_time_to_green_s"),
+            "seconds_in_red_observed_s": summary.get("seconds_in_red_observed_s"),
+            "winner_giveback_rate": summary.get("winner_giveback_rate"),
+            "loss_categories": summary.get("loss_categories") or {},
+            "next_experiments": summary.get("next_experiments") or [],
+        }
+    )
+    hypothesis = {
+        "hypothesis_id": experiment_id,
+        "origin": "FAST_TRADE_AUTOPSY",
+        "problem": "reduce avoidable fast-trade losses and winner giveback",
+        "proposed_mechanism": "join broker-confirmed exits to point-in-time Firehose lifecycle traces",
+        "features_required": "entry, quote, exit-trace, MFE, MAE, and broker-confirmed close evidence",
+        "entry_rule": "observation only; no runtime authority",
+        "exit_rule": "observation only; replay required before any challenger",
+        "max_hold_s": 45,
+    }
+    try:
+        return record_outcome(
+            registry,
+            hypothesis,
+            payload_hash,
+            "NO_EVIDENCE",
+            "observation only; no replay or sealed-OOS challenger evidence",
+            metrics,
+        )
+    except DuplicateExperimentError:
+        return experiment_id
 
 
 def outcome_learning_markdown(summary: Mapping[str, Any]) -> str:
