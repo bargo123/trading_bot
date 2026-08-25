@@ -59,9 +59,32 @@ a trade.
 
 Do not force trades merely to demonstrate execution.
 
-2. **Never edit live trading YAML.** `bot/config*.yaml`,
-   `bot/aegis/research/ingest.py`'s `PROTECTED_LIVE_YAML`, and any runner
-   config are immutable. Research configs are separate and safe.
+2. **MT5 DEMO config policy.** Trading YAML remains protected by default.
+   However, the designated DEMO Firehose config,
+   `bot/config_mt5_demo_firehose_hw.yaml`, has an explicit operator-approved
+   exception: `max_daily_loss_percent: 0`. This intentionally disables the
+   global daily-loss halt for this MT5 DEMO research environment. Agents must
+   not automatically restore or increase that value based on generic risk
+   recommendations.
+
+   This exception applies only to MT5 DEMO and does not authorize:
+   - real-money execution or `allow_live: true`
+   - changing away from `mode: mt5_demo`
+   - bypassing DEMO-account verification
+   - silently increasing per-trade quantity or risk
+   - removing broker, quote, EV, spread, OMS, or total-drawdown checks
+   - Council, Factory, Watcher, Book Brain, or research processes placing
+     orders
+
+   Loss containment must remain governed primarily by per-trade risk,
+   prediction abstention, rapid invalidation/scratch, remaining-EV and
+   tail-loss controls, confirmed close, and immediate rescan. The absence of
+   a global daily halt is intentional and must not be treated as a defect.
+
+   Any other protected trading-config change still requires explicit operator
+   authorization. `bot/aegis/research/ingest.py`'s `PROTECTED_LIVE_YAML` and
+   all non-designated trading YAML remain immutable. Research configs are
+   separate and safe.
 3. **Champion promotion is governed.** `intel/intelligent_champion.json` is
    written ONLY by `bot/scripts/research_promote_champion.py` or
    `bot/scripts/research_asia_sell_strategy.py`, and only after every gate in
@@ -98,7 +121,8 @@ Run the full cycle with the `/aegis-cycle` command or the 20-min fast watcher:
 
 ## Commit etiquette
 
-- Only commit when asked. Commit on branch `opencode/aegis-infra`.
+- Only commit when asked. For this work, commit on branch
+  `opencode/exploration-firehose`.
 - Never commit secrets or live config. Generated reports and experiment
   records are welcome.
 - Use concise messages describing findings, not just "done".
