@@ -1619,6 +1619,18 @@ class IntelligentFirehoseBrain:
         if gating and current_state not in allowed:
             fire = ThesisFireDecision("skip", "state_not_in_validated_set", None)
         short_horizon_journal: dict[str, Any] = {}
+        if video_candidate is not None:
+            # Preserve candidate discovery telemetry even when the calibrated
+            # short-horizon model vetoes the entry before exploration runs.
+            self.counts["micro_candidates"] = int(
+                self.counts.get("micro_candidates", 0)
+            ) + 1
+            short_horizon_journal.update({
+                "micro_candidate_count": 1,
+                "micro_diagnostics": {
+                    "video_style_candidate": "candidate_matched",
+                },
+            })
         if short_horizon_prediction is not None:
             calibration_status = str(short_horizon_prediction.get("calibration_status") or "")
             if calibration_status == "calibrated":
@@ -1634,6 +1646,7 @@ class IntelligentFirehoseBrain:
                 ),
             )
             short_horizon_journal = {
+                **short_horizon_journal,
                 "short_horizon_prediction": {
                     key: short_horizon_prediction.get(key)
                     for key in (

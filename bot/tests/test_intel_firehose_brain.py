@@ -235,6 +235,48 @@ def test_brain_skips_without_analogue_evidence(tmp_path):
     assert brain.counts["short_horizon_abstain_reasons"]["uncertainty_high"] == 1
 
 
+def test_video_candidate_is_recorded_when_short_horizon_abstains(tmp_path):
+    """A model veto must not erase an already-detected video-style candidate."""
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "records": []}), encoding="utf-8")
+    brain = IntelligentFirehoseBrain({
+        "analogue_index_path": str(index),
+        "intelligent_exploration_enabled": True,
+        "intelligent_min_analogues": 20,
+        "order_quantity": 0.01,
+    })
+    frame = _frame([1.1000, 1.1005, 1.1015])
+    row = frame.iloc[-1].copy()
+
+    decision = brain.evaluate(
+        symbol="EURUSD",
+        row=row,
+        completed_m1=frame,
+        positions=[],
+        equity=100.0,
+        pip=0.0001,
+        core_side="buy",
+        actual_bid=1.1014,
+        actual_ask=1.1015,
+        entry_price=1.1015,
+        video_style=True,
+        short_horizon_prediction={
+            "calibration_status": "calibrated",
+            "abstain": True,
+            "abstain_reason": "uncertainty_high",
+            "model_agreement": 1.0,
+            "model_disagreement": False,
+            "uncertainty": 0.8,
+            "probability": 0.5,
+            "expected_net_pnl": 0.01,
+        },
+    )
+
+    assert decision.action == "skip"
+    assert decision.reason == "short_horizon_abstain"
+    assert decision.journal["micro_candidate_count"] == 1
+    assert decision.journal["micro_diagnostics"]["video_style_candidate"] == "candidate_matched"
+
 def test_brain_can_fire_with_bootstrap_analogues(tmp_path):
     m1_for_signature = _m1()
     records = _positive_records(n=40, signature=_signature_for_m1(m1_for_signature.iloc[:-1]))
