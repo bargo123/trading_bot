@@ -1173,6 +1173,11 @@ def main() -> None:
                         symbol=sym,
                         quote_buffer=quote_buffer,
                         now_ts=now_ts,
+                        side=brain_side or "buy",
+                        notional_usd=(
+                            float(order_qty) * float((brain_spec or {}).get("trade_contract_size", 0) or 0)
+                            if brain_spec else None
+                        ),
                     ),
                 )
                 brain_decision = decision

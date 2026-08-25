@@ -29,6 +29,7 @@ class ShortHorizonPredictor:
         self.metadata: dict[str, Any] = {}
         self.status = "missing_artifact"
         self.reason = "artifact_not_found"
+        self.execution_status = "NO_ARTIFACT"
         self._load()
 
     @classmethod
@@ -51,6 +52,7 @@ class ShortHorizonPredictor:
                 self.status, self.reason = "invalid_artifact", "metadata_not_mapping"
                 return
             self.metadata = metadata
+            self.execution_status = str(metadata.get("execution_status") or "SHADOW_ONLY_NO_POSITIVE_OOS")
             if metadata.get("schema") != SHORT_HORIZON_ARTIFACT_SCHEMA:
                 self.status, self.reason = "invalid_artifact", "schema_mismatch"
                 return
@@ -71,7 +73,13 @@ class ShortHorizonPredictor:
                 self.status, self.reason = "not_calibrated", "model_calibration_incomplete"
                 self.pipeline = None
                 return
-            self.status, self.reason = "ready", "validated_calibrated_ensemble"
+            self.status = (
+                "ready" if self.execution_status == "EXECUTION_CANDIDATE" else "shadow_only"
+            )
+            self.reason = (
+                "validated_calibrated_ensemble"
+                if self.status == "ready" else self.execution_status.lower()
+            )
         except Exception as exc:  # fail closed on corrupt/incompatible artifacts
             self.pipeline = None
             self.status, self.reason = "invalid_artifact", type(exc).__name__
@@ -85,6 +93,7 @@ class ShortHorizonPredictor:
             "validation_hash": self.metadata.get("validation_hash"),
             "horizons_s": self.metadata.get("horizons_s"),
             "model_count": len(self.pipeline.models) if self.pipeline is not None else 0,
+            "execution_status": self.execution_status,
         }
 
     def predict(
@@ -93,8 +102,10 @@ class ShortHorizonPredictor:
         symbol: str,
         quote_buffer: Any,
         now_ts: float,
+        side: str = "buy",
+        notional_usd: float | None = None,
     ) -> dict[str, Any] | None:
-        if self.pipeline is None or self.status != "ready":
+        if self.pipeline is None or self.status not in {"ready", "shadow_only"}:
             return None
         buffer = getattr(quote_buffer, "buffers", {}).get(str(symbol).upper())
         points = [point for point in getattr(buffer, "points", ()) if point.timestamp <= float(now_ts)]
@@ -116,23 +127,55 @@ class ShortHorizonPredictor:
                 at=frame["time"].iloc[-1],
                 symbol=str(symbol).upper(),
             )
-            row = pd.DataFrame([features])
-            result = self.pipeline.get_calibrated_ensemble_prediction(
-                row,
-                threshold=float(self.metadata.get("threshold", 0.5) or 0.5),
-                min_models=2,
-                min_model_agreement=float(self.metadata.get("min_model_agreement", 0.6) or 0.6),
-                max_uncertainty=float(self.metadata.get("max_uncertainty", 0.2) or 0.2),
-            )
+            by_horizon: dict[str, dict[str, Any]] = {}
+            for horizon in self.metadata.get("horizons_s") or ():
+                row = pd.DataFrame([{
+                    **features,
+                    "side_buy": 1.0 if str(side).lower() == "buy" else 0.0,
+                    "horizon_s": float(horizon),
+                }])
+                result = self.pipeline.get_calibrated_ensemble_prediction(
+                    row,
+                    threshold=float(self.metadata.get("threshold", 0.5) or 0.5),
+                    min_models=2,
+                    min_model_agreement=float(self.metadata.get("min_model_agreement", 0.6) or 0.6),
+                    max_uncertainty=float(self.metadata.get("max_uncertainty", 0.2) or 0.2),
+                )
+                by_horizon[str(int(horizon))] = {
+                    "probability": float(result["probability"][0]),
+                    "decision": bool(result["decision"][0]),
+                    "abstain": bool(result["abstain"][0]),
+                    "model_agreement": float(result["model_agreement"][0]),
+                    "uncertainty": float(result["uncertainty"][0]),
+                }
+            if not by_horizon:
+                return None
+            selected_horizon = str(int(self.metadata.get("decision_horizon_s", 10) or 10))
+            selected = by_horizon.get(selected_horizon) or next(iter(by_horizon.values()))
+            oos_by_horizon = ((self.metadata.get("oos") or {}).get("sealed_by_horizon") or {})
+            selected_oos = oos_by_horizon.get(selected_horizon) or {}
+            expected_return = selected_oos.get("mean_terminal_return")
+            expected_net = None
+            if notional_usd is not None:
+                # No selected sealed-OOS rows are an explicit zero-evidence
+                # veto, never an omitted field that could bypass the gate.
+                expected_net = (
+                    float(expected_return) * float(features["mid"]) * float(notional_usd)
+                    if expected_return is not None else 0.0
+                )
             return {
-                "probability": float(result["probability"][0]),
-                "decision": bool(result["decision"][0]),
-                "abstain": bool(result["abstain"][0]),
-                "calibration_status": str(result["calibration_status"]),
-                "model_agreement": float(result["model_agreement"][0]),
-                "uncertainty": float(result["uncertainty"][0]),
-                "model_count": int(result["model_count"]),
+                "probability": selected["probability"],
+                "decision": selected["decision"],
+                "abstain": selected["abstain"],
+                "calibration_status": "calibrated",
+                "model_agreement": selected["model_agreement"],
+                "uncertainty": selected["uncertainty"],
+                "model_count": len(self.pipeline.models),
                 "horizons_s": self.metadata.get("horizons_s"),
+                "decision_horizon_s": int(selected_horizon),
+                "by_horizon": by_horizon,
+                "expected_net_pnl": expected_net,
+                "tail_loss_probability": selected_oos.get("tail_loss_rate"),
             }
         except Exception:
             return None
