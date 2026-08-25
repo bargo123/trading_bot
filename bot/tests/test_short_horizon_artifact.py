@@ -89,6 +89,19 @@ def test_mfe_first_execution_candidate_requires_positive_harvest_oos():
     assert reason == "positive_test_sealed_decision_horizon_harvest_oos"
 
 
+def test_fast_harvest_execution_candidate_uses_harvest_oos_gate():
+    status, reason = _execution_status(
+        target_definition="fast_harvest",
+        decision_horizon_s=10,
+        test_metrics=_positive_mfe_metrics(0.001),
+        sealed_metrics=_positive_mfe_metrics(0.001),
+        sealed_by_horizon={"10": _positive_mfe_metrics(0.001)},
+    )
+
+    assert status == "EXECUTION_CANDIDATE"
+    assert reason == "positive_test_sealed_decision_horizon_harvest_oos"
+
+
 def test_mfe_first_execution_candidate_rejects_negative_harvest_lcb():
     metrics = _positive_mfe_metrics(0.001)
     metrics["harvest_lcb95_return"] = -0.001
@@ -289,6 +302,25 @@ def test_terminal_profit_target_does_not_label_temporary_mfe_as_a_win():
     assert mfe_row["harvest_return"] > 0
     assert mfe_row["target"] == 1
     assert terminal_row["target"] == 0
+
+
+def test_fast_harvest_target_rejects_tiny_temporary_green():
+    times = pd.date_range("2026-01-01T00:00:00Z", periods=70, freq="1s")
+    mid = np.full(70, 1.1)
+    mid[1] = 1.10003
+    mid[2:11] = np.linspace(1.10002, 1.0995, 9)
+    quotes = pd.DataFrame(
+        {"time": times, "bid": mid - 0.00001, "ask": mid + 0.00001}
+    )
+
+    fast = build_quote_training_frame(
+        {"EURUSD": quotes}, horizons=(10,), sample_every_s=1, target_mode="fast_harvest"
+    )
+    fast_row = fast[(fast["time"] == times[0]) & (fast["side"] == "buy")].iloc[0]
+
+    assert fast_row["mfe"] > 0
+    assert fast_row["harvest_return"] < 0
+    assert fast_row["target"] == 0
 
 
 def test_chronological_slices_are_disjoint_and_ordered():

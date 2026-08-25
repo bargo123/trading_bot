@@ -287,7 +287,9 @@ class ShortHorizonPredictor:
             )
             oos_by_horizon = scoped_oos or (oos.get("sealed_by_horizon") or {})
             selected_oos = oos_by_horizon.get(selected_horizon) or {}
-            harvest_mode = str(self.metadata.get("target_definition") or "terminal_profit").strip().lower() == "mfe_first"
+            harvest_mode = str(
+                self.metadata.get("target_definition") or "terminal_profit"
+            ).strip().lower() in {"mfe_first", "fast_harvest"}
             expected_return = (
                 selected_oos.get("mean_harvest_return") if harvest_mode
                 else selected_oos.get("mean_terminal_return")

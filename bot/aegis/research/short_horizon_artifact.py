@@ -74,7 +74,7 @@ def record_artifact_outcome(
         if str(metadata.get("execution_status") or "") == "EXECUTION_CANDIDATE"
         else "NO_EVIDENCE"
     )
-    harvest_mode = str(metadata.get("target_definition") or "terminal_profit").strip().lower() == "mfe_first"
+    harvest_mode = str(metadata.get("target_definition") or "terminal_profit").strip().lower() in {"mfe_first", "fast_harvest"}
     reason = (
         "positive chronological test and sealed-OOS first-green harvest returns support a challenger"
         if status == "CHALLENGER" and harvest_mode
@@ -238,10 +238,10 @@ def build_quote_training_frame(
     """Create point-in-time feature/label rows from completed quotes.
 
     ``mfe_first`` predicts whether the executable path becomes green at any
-    point in the horizon.  ``terminal_profit`` predicts whether the
-    executable terminal mark is still green at the horizon endpoint.  Both
-    labels are point-in-time and cost-aware; the latter is a research
-    challenger for the runtime's terminal-EV gate.
+    point in the horizon. ``fast_harvest`` requires a realized move of at
+    least two observed spreads before treating the path as a harvestable win.
+    ``terminal_profit`` predicts whether the executable terminal mark is still
+    green at the horizon endpoint. All labels are point-in-time and cost-aware.
     """
     horizon_values = tuple(sorted({int(value) for value in horizons if int(value) > 0}))
     if not horizon_values:
@@ -249,8 +249,8 @@ def build_quote_training_frame(
     if int(sample_every_s) <= 0:
         raise ValueError("sample_every_s must be positive")
     target_mode = str(target_mode).strip().lower()
-    if target_mode not in {"mfe_first", "terminal_profit"}:
-        raise ValueError("target_mode must be mfe_first or terminal_profit")
+    if target_mode not in {"mfe_first", "fast_harvest", "terminal_profit"}:
+        raise ValueError("target_mode must be mfe_first, fast_harvest, or terminal_profit")
     rows: list[dict[str, Any]] = []
     for symbol, quotes in sorted(quotes_by_symbol.items()):
         features = _feature_frame(quotes, symbol)
@@ -263,6 +263,7 @@ def build_quote_training_frame(
         # A tiny slippage buffer is intentionally not invented here; the
         # artifact metadata records this as spread-only evidence.
         tail_threshold = max(float(np.nanmedian(spreads)) * 3.0, 1e-12)
+        harvest_threshold = max(float(np.nanmedian(spreads)) * 2.0, 1e-12)
         eligible = np.flatnonzero(times <= times[-1] - max(horizon_values))
         if not len(eligible):
             continue
@@ -290,18 +291,29 @@ def build_quote_training_frame(
                     terminal = float(signed[-1])
                     future_times = features["time"].iloc[index + 1 : end + 1]
                     profitable = np.flatnonzero(signed > 0.0)
+                    harvestable = (
+                        np.flatnonzero(signed >= harvest_threshold)
+                        if target_mode == "fast_harvest"
+                        else profitable
+                    )
                     failures = np.flatnonzero(signed <= -tail_threshold)
                     time_to_profit = (
-                        float((future_times.iloc[int(profitable[0])] - features.iloc[index]["time"]).total_seconds())
-                        if len(profitable) else None
+                        float((future_times.iloc[int(harvestable[0])] - features.iloc[index]["time"]).total_seconds())
+                        if len(harvestable) else None
                     )
                     time_to_failure = (
                         float((future_times.iloc[int(failures[0])] - features.iloc[index]["time"]).total_seconds())
                         if len(failures) else None
                     )
-                    harvest = float(signed[int(profitable[0])]) if len(profitable) else terminal
+                    harvest = float(signed[int(harvestable[0])]) if len(harvestable) else terminal
                     row = features.iloc[index].to_dict()
-                    target = int(mfe > 0.0) if target_mode == "mfe_first" else int(terminal > 0.0)
+                    target = (
+                        int(len(harvestable) > 0)
+                        if target_mode == "fast_harvest"
+                        else int(mfe > 0.0)
+                        if target_mode == "mfe_first"
+                        else int(terminal > 0.0)
+                    )
                     row.update(
                         {
                             "time": features.iloc[index]["time"],
@@ -552,8 +564,9 @@ def _select_threshold_for_prediction(
 ) -> tuple[float, dict[str, Any]]:
     """Select a scope threshold from validation predictions only."""
     target = str(target_definition).strip().lower()
-    mean_key = "mean_harvest_return" if target == "mfe_first" else "mean_terminal_return"
-    lcb_key = "harvest_lcb95_return" if target == "mfe_first" else "expectancy_lcb95_return"
+    harvest_mode = target in {"mfe_first", "fast_harvest"}
+    mean_key = "mean_harvest_return" if harvest_mode else "mean_terminal_return"
+    lcb_key = "harvest_lcb95_return" if harvest_mode else "expectancy_lcb95_return"
     candidates: list[tuple[float, dict[str, Any]]] = []
     for threshold in _threshold_candidates(base_prediction["probability"]):
         prediction = _threshold_prediction(
@@ -602,9 +615,9 @@ def _execution_status(
 ) -> tuple[str, str]:
     """Authorize execution only for a costed label the exit can realize."""
     target = str(target_definition).strip().lower()
-    if target not in {"terminal_profit", "mfe_first"}:
+    if target not in {"terminal_profit", "mfe_first", "fast_harvest"}:
         return "SHADOW_ONLY_NO_POSITIVE_OOS", "execution_requires_supported_harvest_labels"
-    harvest_mode = target == "mfe_first"
+    harvest_mode = target in {"mfe_first", "fast_harvest"}
     mean_key = "mean_harvest_return" if harvest_mode else "mean_terminal_return"
     lcb_key = "harvest_lcb95_return" if harvest_mode else "expectancy_lcb95_return"
 
@@ -658,8 +671,9 @@ def _select_decision_horizon(
 ) -> tuple[int, str]:
     """Choose the fastest horizon with positive validation LCB evidence."""
     target = str(target_definition).strip().lower()
-    mean_key = "mean_harvest_return" if target == "mfe_first" else "mean_terminal_return"
-    lcb_key = "harvest_lcb95_return" if target == "mfe_first" else "expectancy_lcb95_return"
+    harvest_mode = target in {"mfe_first", "fast_harvest"}
+    mean_key = "mean_harvest_return" if harvest_mode else "mean_terminal_return"
+    lcb_key = "harvest_lcb95_return" if harvest_mode else "expectancy_lcb95_return"
 
     def supported(metrics: Mapping[str, Any] | None) -> bool:
         if not isinstance(metrics, Mapping):
@@ -695,10 +709,11 @@ def _authorized_symbols(
 ) -> list[str]:
     """Return only symbols with exact test and sealed horizon evidence."""
     target = str(target_definition).strip().lower()
-    if target not in {"terminal_profit", "mfe_first"}:
+    if target not in {"terminal_profit", "mfe_first", "fast_harvest"}:
         return []
-    mean_key = "mean_harvest_return" if target == "mfe_first" else "mean_terminal_return"
-    lcb_key = "harvest_lcb95_return" if target == "mfe_first" else "expectancy_lcb95_return"
+    harvest_mode = target in {"mfe_first", "fast_harvest"}
+    mean_key = "mean_harvest_return" if harvest_mode else "mean_terminal_return"
+    lcb_key = "harvest_lcb95_return" if harvest_mode else "expectancy_lcb95_return"
 
     def positive(metrics: Mapping[str, Any] | None) -> bool:
         if not isinstance(metrics, Mapping):
@@ -763,7 +778,11 @@ def train_and_publish(
     # Select the threshold only from chronological validation rows.  A
     # first-green artifact optimizes its realizable harvest proxy; terminal
     # artifacts optimize terminal economics.
-    selection_metric = "mean_harvest_return" if str(target_definition).strip().lower() == "mfe_first" else "mean_terminal_return"
+    selection_metric = (
+        "mean_harvest_return"
+        if str(target_definition).strip().lower() in {"mfe_first", "fast_harvest"}
+        else "mean_terminal_return"
+    )
     validation_prediction = pipeline.get_calibrated_ensemble_prediction(
         _model_frame(slices.validation), threshold=0.5, min_models=2,
         min_model_agreement=0.6, max_uncertainty=1.0,
