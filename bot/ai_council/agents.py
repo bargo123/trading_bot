@@ -1,6 +1,7 @@
 """Generic agent adapters for the AI Council.
 
-Each agent wraps a local CLI (opencode, claude, gemini, codex, cursor). The
+Each agent wraps a local CLI (opencode, claude, gemini, codex, cursor). Hermes
+uses its dedicated research-only adapter. The
 adapter is intentionally thin: detect availability, run one non-interactive
 ask with a timeout, extract JSON if present. A UNAVAILABLE agent is never
 auto-paid and never blocks the cycle.
@@ -78,6 +79,18 @@ def _tool_version(text: str) -> str | None:
 
 
 DEFAULT_AGENTS = {
+    "hermes": {
+        "label": "Hermes Research",
+        "provider": "Nous Portal free",
+        "adapter": "ai_council.hermes",
+        "models": [
+            "x-preview-f-free",
+            "hy3-free",
+            "nemotron-3.5-lightning-free",
+        ],
+        "available_default": False,
+        "hint": "Research-only Hermes adapter; free models only, never an execution authority.",
+    },
     "opencode": {
         "label": "OpenCode",
         "provider": "opencode",
@@ -332,6 +345,16 @@ def ask_agent(
     import time
 
     config = load_agents_config().get(name) or {}
+    if name == "hermes":
+        from ai_council import hermes as hermes_adapter
+
+        return hermes_adapter.ask(
+            prompt,
+            models=config.get("models"),
+            timeout_s=timeout_s,
+            cwd=cwd,
+            line_sink=line_sink,
+        )
     argv = _agent_argv(name)
     started = time.time()
     started_utc = datetime.now(timezone.utc).isoformat()
@@ -593,6 +616,17 @@ def all_statuses(*, probe: bool = False) -> dict[str, Any]:
     for name, cfg in config.items():
         if probe:
             statuses[name] = probe_agent(name)
+            continue
+        if name == "hermes":
+            from ai_council import hermes as hermes_adapter
+
+            executable = hermes_adapter.find_executable()
+            statuses[name] = {
+                "agent": name,
+                "status": "CLI_FOUND" if executable else "UNAVAILABLE_CLI",
+                "cli": str(executable) if executable else None,
+                "hint": cfg.get("hint", ""),
+            }
             continue
         argv = _agent_argv(name)
         if cfg.get("disabled"):

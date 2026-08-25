@@ -99,7 +99,7 @@ def run_change_vote(
     if not agents_env:
         env_names = [a.strip() for a in
                      os.environ.get("AEGIS_COUNCIL_AGENTS",
-                                    "opencode,gemini,codex,cursor").split(",")
+                                    "hermes,opencode,gemini,codex,cursor").split(",")
                      if a.strip()]
         agents_env = env_names
     votes: list[dict[str, Any]] = []

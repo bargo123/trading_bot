@@ -670,8 +670,7 @@ def _run_council_round(*, trigger: str | None = None) -> dict[str, Any]:
     from ai_council.cycle import dump_live, run_council_cycle
     from ai_council.change_vote import run_change_vote
 
-    agents_env = os.environ.get("AEGIS_COUNCIL_AGENTS", "opencode,gemini,codex,cursor")
-    agents = [a.strip() for a in agents_env.split(",") if a.strip()]
+    agents = _council_agents_for_trigger(trigger)
     started = time.time()
 
     # Phase 1: brainstorm generates the raw proposal (old council = generator).
@@ -756,6 +755,33 @@ def _run_council_round(*, trigger: str | None = None) -> dict[str, Any]:
         "elapsed_s": elapsed_total,
         "agents": [v.get("agent") for v in (vote_result.get("votes") or [])],
     }
+
+
+_SENIOR_REVIEW_TRIGGERS = frozenset({
+    "strategy_degradation",
+    "major_loss_cluster",
+    "strong_challenger",
+    "unexpected_oos_result",
+    "calibration_failure",
+    "tail_loss",
+})
+
+
+def _council_agents_for_trigger(trigger: str | None) -> list[str]:
+    """Select asynchronous research agents without touching the order path.
+
+    Hermes and the configured free/local agents form the normal research team.
+    Claude is added only for high-value review triggers, never per tick.
+    ``AEGIS_COUNCIL_AGENTS`` remains an explicit operator override.
+    """
+    agents_env = os.environ.get(
+        "AEGIS_COUNCIL_AGENTS",
+        "hermes,opencode,gemini,codex,cursor",
+    )
+    agents = [a.strip() for a in agents_env.split(",") if a.strip()]
+    if trigger in _SENIOR_REVIEW_TRIGGERS and "claude" not in agents:
+        agents.append("claude")
+    return agents
 
 
 def main() -> int:

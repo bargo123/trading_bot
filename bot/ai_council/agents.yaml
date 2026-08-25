@@ -3,6 +3,18 @@
 # `ask_cmd` is the subcommand list. Status is detected at runtime; a UNAVAILABLE
 # agent never blocks the council cycle (no paid fallback, no blocking wait).
 agents:
+  hermes:
+    label: "Hermes Research"
+    provider: "Nous Portal free"
+    adapter: "ai_council.hermes"
+    # Verified through Hermes' real --model/-z interface. These are the only
+    # models the adapter may try; it never falls back to a paid provider.
+    models:
+      - "x-preview-f-free"
+      - "hy3-free"
+      - "nemotron-3.5-lightning-free"
+    available_default: false
+    hint: "Research-only Hermes adapter; never an execution authority."
   opencode:
     label: "OpenCode"
     provider: "opencode"
