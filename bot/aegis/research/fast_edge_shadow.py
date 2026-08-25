@@ -514,6 +514,18 @@ def _calibrate_probability_vector(
     return np.clip(calibrator.predict(np.clip(raw, 0.0, 1.0)), 0.0, 1.0), "isotonic_validation"
 
 
+def _mean_confidence_bounds(values: np.ndarray, *, z: float = 1.96) -> tuple[float | None, float | None]:
+    """Return a transparent normal-approximation 95% CI for a sample mean."""
+    finite = np.asarray(values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if len(finite) < 2:
+        return None, None
+    mean = float(finite.mean())
+    standard_error = float(np.std(finite, ddof=1) / np.sqrt(len(finite)))
+    margin = float(z) * standard_error
+    return mean - margin, mean + margin
+
+
 def _non_overlapping_selected(frame: pd.DataFrame, selected: np.ndarray) -> np.ndarray:
     """Keep a conservative single-slot subset of selected shadow candidates."""
     mask = np.asarray(selected, dtype=bool)
@@ -557,6 +569,8 @@ def _metrics(
     losses = selected_values[selected_values < 0.0]
     executable_wins = executable_values[executable_values > 0.0]
     executable_losses = executable_values[executable_values < 0.0]
+    captured_lower_95, captured_upper_95 = _mean_confidence_bounds(selected_values)
+    executable_lower_95, executable_upper_95 = _mean_confidence_bounds(executable_values)
     if duration_hours is None:
         duration_source = duration_frame if duration_frame is not None else frame
         ordered_times = (
@@ -573,6 +587,8 @@ def _metrics(
         "selected": int(selected.sum()),
         "precision": float(actual[selected].mean()) if selected.any() else None,
         "captured_exit_expectancy": float(selected_values.mean()) if len(selected_values) else None,
+        "captured_exit_expectancy_lower_95": captured_lower_95,
+        "captured_exit_expectancy_upper_95": captured_upper_95,
         "captured_exit_pf": float(wins.sum() / abs(losses.sum())) if len(wins) and len(losses) else None,
         "p95_loss": float(np.quantile(losses, 0.05)) if len(losses) else None,
         "p99_loss": float(np.quantile(losses, 0.01)) if len(losses) else None,
@@ -589,6 +605,8 @@ def _metrics(
         if duration_hours and len(executable_values) else None,
         "executable_captured_exit_expectancy": float(executable_values.mean())
         if len(executable_values) else None,
+        "executable_captured_exit_expectancy_lower_95": executable_lower_95,
+        "executable_captured_exit_expectancy_upper_95": executable_upper_95,
         "executable_captured_exit_pf": float(executable_wins.sum() / abs(executable_losses.sum()))
         if len(executable_wins) and len(executable_losses) else None,
         "observation_window_hours": duration_hours,
@@ -989,6 +1007,12 @@ def fit_shadow_model_space(
             and (test_row.get("captured_exit_expectancy") or 0.0) > 0.0
             and (sealed_row.get("captured_exit_pf") or 0.0) > 1.0
             and (test_row.get("captured_exit_pf") or 0.0) > 1.0
+            and (sealed_row.get("executable_captured_exit_expectancy") or 0.0) > 0.0
+            and (test_row.get("executable_captured_exit_expectancy") or 0.0) > 0.0
+            and (sealed_row.get("executable_captured_exit_pf") or 0.0) > 1.0
+            and (test_row.get("executable_captured_exit_pf") or 0.0) > 1.0
+            and (sealed_row.get("executable_captured_exit_expectancy_lower_95") or 0.0) > 0.0
+            and (test_row.get("executable_captured_exit_expectancy_lower_95") or 0.0) > 0.0
             and int(sealed_row.get("selected") or 0) >= int(min_samples)
             and int(test_row.get("selected") or 0) >= int(min_samples)
         ):

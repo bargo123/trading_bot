@@ -7,6 +7,7 @@ from research_fast_edge_shadow import select_research_symbols
 
 from aegis.research.fast_edge_shadow import (
     SHADOW_HORIZONS_S,
+    _mean_confidence_bounds,
     _calibrate_probability_vector,
     build_shadow_dataset,
     chronological_shadow_slices,
@@ -166,6 +167,8 @@ def test_leaderboard_reports_captured_metrics_and_is_ranked():
         "symbol", "side", "session", "regime", "structure", "family", "horizon_s",
         "model", "threshold", "captured_exit_expectancy", "captured_exit_pf",
         "p95_loss", "p99_loss", "calibration_ece",
+        "captured_exit_expectancy_lower_95", "captured_exit_expectancy_upper_95",
+        "executable_captured_exit_expectancy_lower_95", "executable_captured_exit_expectancy_upper_95",
     }.issubset(rows[0])
 
 
@@ -190,6 +193,13 @@ def test_probability_calibration_uses_only_prior_calibration_observations():
     assert method == "isotonic_validation"
     assert np.all((calibrated >= 0.0) & (calibrated <= 1.0))
     assert calibrated[0] < calibrated[1]
+
+
+def test_confidence_bounds_require_more_than_one_observation_and_bound_mean():
+    assert _mean_confidence_bounds(np.array([0.01])) == (None, None)
+    lower, upper = _mean_confidence_bounds(np.array([0.01, 0.03, 0.02]))
+    assert lower is not None and upper is not None
+    assert lower <= 0.02 <= upper
 
 
 def test_fast_winner_feature_discovery_compares_oos_groups_without_outcome_features():
