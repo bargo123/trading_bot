@@ -426,9 +426,12 @@ def _non_overlapping_selected(frame: pd.DataFrame, selected: np.ndarray) -> np.n
     keep = np.zeros(len(frame), dtype=bool)
     if not len(frame) or "time" not in frame:
         return keep
-    timestamps = pd.to_datetime(frame["time"], utc=True, errors="coerce").map(
-        lambda value: value.timestamp() if pd.notna(value) else np.nan
-    ).to_numpy(dtype=float)
+    if "_time_epoch_s" in frame:
+        timestamps = pd.to_numeric(frame["_time_epoch_s"], errors="coerce").to_numpy(dtype=float)
+    else:
+        timestamps = pd.to_datetime(frame["time"], utc=True, errors="coerce").map(
+            lambda value: value.timestamp() if pd.notna(value) else np.nan
+        ).to_numpy(dtype=float)
     horizon = pd.to_numeric(frame.get("horizon_s"), errors="coerce")
     horizon_s = float(horizon.median()) if horizon is not None and horizon.notna().any() else 1.0
     next_available = None
@@ -447,6 +450,7 @@ def _metrics(
     threshold: float,
     *,
     duration_frame: pd.DataFrame | None = None,
+    duration_hours: float | None = None,
 ) -> dict[str, Any]:
     probability = np.asarray(probability, dtype=float)
     actual = frame["target"].to_numpy(dtype=int)
@@ -459,16 +463,17 @@ def _metrics(
     losses = selected_values[selected_values < 0.0]
     executable_wins = executable_values[executable_values > 0.0]
     executable_losses = executable_values[executable_values < 0.0]
-    duration_source = duration_frame if duration_frame is not None else frame
-    ordered_times = (
-        pd.to_datetime(duration_source["time"], utc=True, errors="coerce")
-        if "time" in duration_source
-        else pd.Series(dtype="datetime64[ns, UTC]")
-    )
-    duration_hours = (
-        max(float((ordered_times.max() - ordered_times.min()).total_seconds()) / 3600.0, 1e-9)
-        if len(ordered_times) and ordered_times.notna().all() else None
-    )
+    if duration_hours is None:
+        duration_source = duration_frame if duration_frame is not None else frame
+        ordered_times = (
+            pd.to_datetime(duration_source["time"], utc=True, errors="coerce")
+            if "time" in duration_source
+            else pd.Series(dtype="datetime64[ns, UTC]")
+        )
+        duration_hours = (
+            max(float((ordered_times.max() - ordered_times.min()).total_seconds()) / 3600.0, 1e-9)
+            if len(ordered_times) and ordered_times.notna().all() else None
+        )
     return {
         "n": int(len(frame)),
         "selected": int(selected.sum()),
@@ -675,7 +680,15 @@ def evaluate_shadow_leaderboard(
     required = {"symbol", "side", "session", "regime", "structure", "family", "horizon_s"}
     if not required.issubset(frame.columns):
         raise ValueError(f"shadow frame missing segment columns: {sorted(required - set(frame.columns))}")
-    work = frame.reset_index(drop=True)
+    work = frame.reset_index(drop=True).copy()
+    work["_time_epoch_s"] = pd.to_datetime(work["time"], utc=True, errors="coerce").map(
+        lambda value: value.timestamp() if pd.notna(value) else np.nan
+    )
+    work_times = pd.to_datetime(work["time"], utc=True, errors="coerce")
+    observation_window_hours = max(
+        float((work_times.max() - work_times.min()).total_seconds()) / 3600.0,
+        1e-9,
+    )
     rows: list[dict[str, Any]] = []
     group_columns = ["symbol", "side", "session", "regime", "structure", "family", "horizon_s"]
     for model_name, values in model_probabilities.items():
@@ -690,6 +703,7 @@ def evaluate_shadow_leaderboard(
                     probabilities[indexes],
                     float(threshold),
                     duration_frame=work,
+                    duration_hours=observation_window_hours,
                 )
                 if int(metrics["selected"]) < int(min_samples):
                     continue
@@ -716,7 +730,10 @@ def evaluate_exit_policies(
     required = {"symbol", "side", "session", "regime", "structure", "family", "horizon_s"}
     if not required.issubset(frame.columns):
         raise ValueError(f"shadow frame missing segment columns: {sorted(required - set(frame.columns))}")
-    work = frame.reset_index(drop=True)
+    work = frame.reset_index(drop=True).copy()
+    work["_time_epoch_s"] = pd.to_datetime(work["time"], utc=True, errors="coerce").map(
+        lambda value: value.timestamp() if pd.notna(value) else np.nan
+    )
     group_columns = ["symbol", "side", "session", "regime", "structure", "family", "horizon_s"]
     work_times = pd.to_datetime(work["time"], utc=True, errors="coerce")
     observation_window_hours = max(
@@ -793,6 +810,7 @@ def fit_shadow_model_space(
     train, validation, sealed = slices.train, slices.validation, slices.sealed
     x_train = shadow_model_frame(train).drop(columns=["target"])
     x_validation = shadow_model_frame(validation).drop(columns=["target"])
+    x_test = shadow_model_frame(slices.test).drop(columns=["target"])
     x_sealed = shadow_model_frame(sealed).drop(columns=["target"])
     y_train = train["target"].astype(int).to_numpy()
     if len(np.unique(y_train)) < 2:
@@ -821,9 +839,7 @@ def fit_shadow_model_space(
                 if int(chosen.sum()) >= int(min_samples):
                     candidates.append((float(validation_captured[chosen].mean()), float(threshold)))
             selected_thresholds[name] = max(candidates, default=(0.0, 0.5))[1]
-            test_probability = model.predict_proba(
-                shadow_model_frame(slices.test).drop(columns=["target"])
-            )[:, 1]
+            test_probability = model.predict_proba(x_test)[:, 1]
             test_probabilities[name] = test_probability
             probabilities[name] = model.predict_proba(x_sealed)[:, 1]
             oos_metrics[name] = {
