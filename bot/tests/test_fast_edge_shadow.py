@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+from research_fast_edge_shadow import select_research_symbols
 
 from aegis.research.fast_edge_shadow import (
     SHADOW_HORIZONS_S,
@@ -28,6 +29,12 @@ def _quotes(periods: int = 180) -> pd.DataFrame:
 
 def test_shadow_horizons_cover_requested_fast_and_ceiling_windows():
     assert SHADOW_HORIZONS_S == (1, 2, 3, 5, 8, 10, 15, 20, 30, 45)
+
+
+def test_research_symbol_filter_preserves_configured_order_and_rejects_unknowns():
+    configured = ["EURUSD", "EURCAD", "GBPJPY"]
+    assert select_research_symbols(configured, ["eurcad", "missing"]) == ["EURCAD"]
+    assert select_research_symbols(configured, None) == configured
 
 
 def test_segment_rates_use_full_oos_observation_window_not_sparse_group_span():

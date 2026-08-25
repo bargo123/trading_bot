@@ -7,6 +7,7 @@ import sys
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Sequence
 
 import pandas as pd
 import yaml
@@ -30,11 +31,24 @@ from aegis.research.books_index import BookIndex  # noqa: E402
 from aegis.research.knowledge import search_full_book_knowledge  # noqa: E402
 
 
+def select_research_symbols(configured: Sequence[str], overrides: Sequence[str] | None) -> list[str]:
+    """Select a configured, ordered subset for focused read-only replay."""
+    configured_order = [str(symbol).upper() for symbol in configured]
+    if not overrides:
+        return configured_order
+    requested = {str(symbol).strip().upper() for symbol in overrides if str(symbol).strip()}
+    selected = [symbol for symbol in configured_order if symbol in requested]
+    if not selected:
+        raise ValueError("symbol filter did not match any configured symbol")
+    return selected
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=BOT_ROOT / "config_mt5_demo_firehose_hw.yaml")
     parser.add_argument("--lookback-seconds", type=int, default=3600)
     parser.add_argument("--sample-every-seconds", type=int, default=1)
+    parser.add_argument("--symbol", action="append", dest="symbol_overrides", help="focused configured symbol replay (repeatable)")
     parser.add_argument("--out-dir", type=Path, default=BOT_ROOT / "reports" / "research")
     parser.add_argument("--no-rows", action="store_true", help="do not persist the row-level shadow dataset")
     parser.add_argument("--rows-input", type=Path, help="reuse a previously persisted shadow JSONL dataset")
@@ -46,7 +60,7 @@ def main() -> None:
         print(f"REUSED_SHADOW_ROWS {len(frame)} source={args.rows_input}", flush=True)
     else:
         cfg = yaml.safe_load(args.config.read_text(encoding="utf-8")) or {}
-        symbols = list(configured_symbols(cfg))
+        symbols = select_research_symbols(configured_symbols(cfg), args.symbol_overrides)
         if not symbols:
             raise SystemExit("config has no eligible symbols")
         engine = MT5Engine(dict(cfg))
