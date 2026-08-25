@@ -105,6 +105,13 @@ def main() -> None:
             -(row.get("captured_exit_expectancy") or -float("inf")),
         )
     )
+    previous_report = None
+    previous_path = args.out_dir / "fast_edge_leaderboard.json"
+    if previous_path.exists():
+        try:
+            previous_report = json.loads(previous_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous_report = None
     primary_metrics = (
         model_report["oos_metrics"].get(model_report["primary_model"], {}).get("sealed", {})
         if model_report.get("primary_model") else {}
@@ -139,6 +146,39 @@ def main() -> None:
         "horizons_s": list(SHADOW_HORIZONS_S),
         "symbols": sorted(frame["symbol"].astype(str).str.upper().unique().tolist()),
         "candidate_rows": int(len(frame)),
+        "shadow_trades_evaluated": int(len(frame)),
+        "models_tested": model_report["model_names"],
+        "features_tested": model_report["feature_names"],
+        "new_hypotheses": [item["query"] for item in book_evidence],
+        "best_previous_candidate": (
+            (previous_report or {}).get("leaderboard_top_50", [None])[0]
+            if (previous_report or {}).get("leaderboard_top_50") else None
+        ),
+        "best_new_candidate": top_candidates[0] if top_candidates else None,
+        "best_pf": max(
+            (float(row["captured_exit_pf"]) for row in top_candidates if row.get("captured_exit_pf") is not None),
+            default=None,
+        ),
+        "best_expectancy": max(
+            (float(row["captured_exit_expectancy"]) for row in top_candidates if row.get("captured_exit_expectancy") is not None),
+            default=None,
+        ),
+        "best_wr": max(
+            (float(row["precision"]) for row in top_candidates if row.get("precision") is not None),
+            default=None,
+        ),
+        "best_tail_loss": min(
+            (float(row["p99_loss"]) for row in top_candidates if row.get("p99_loss") is not None),
+            default=None,
+        ),
+        "best_trades_per_hour": max(
+            (float(row["trades_per_hour"]) for row in top_candidates if row.get("trades_per_hour") is not None),
+            default=None,
+        ),
+        "best_time_to_green": min(
+            (float(row["median_time_to_green_s"]) for row in top_candidates if row.get("median_time_to_green_s") is not None),
+            default=None,
+        ),
         "candidate_sides": sorted(frame["side"].unique().tolist()),
         "dataset_hash": model_report["dataset_hash"],
         "time_range": [str(frame["time"].min()), str(frame["time"].max())],

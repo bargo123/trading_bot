@@ -82,6 +82,9 @@ def test_shadow_dataset_is_universal_and_outcome_columns_are_not_features():
     assert set(frame["side"]) == {"buy", "sell"}
     assert set(frame["candidate_authority"]) == {"SHADOW_ONLY"}
     assert set(frame["family_version"]) == {"quote_microstructure_v1"}
+    assert {"m1_return", "m5_return", "m15_return", "m1_range", "structure_context", "regime_context"}.issubset(
+        frame.columns
+    )
     assert {"pnl_1s", "pnl_2s", "pnl_5s", "green_within_1s", "captured_win_5s"}.issubset(frame.columns)
     assert {
         "exit_capturedexitreplay_return", "exit_mfeprotection_return",
@@ -92,6 +95,7 @@ def test_shadow_dataset_is_universal_and_outcome_columns_are_not_features():
     assert "future_path_observed_n" not in features.columns
     assert "pnl_1s" not in features.columns
     assert "green_within_5s" not in features.columns
+    assert "structure_context" not in features.columns
     assert {"return_1s", "return_2s", "return_3s", "micro_reversal", "volatility_expansion"}.issubset(
         features.columns
     )

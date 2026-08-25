@@ -74,6 +74,52 @@ class ShadowSlices:
     sealed: pd.DataFrame
 
 
+def _add_completed_bar_context(features: pd.DataFrame) -> pd.DataFrame:
+    """Attach only completed M1/M5/M15 quote-derived bars as-of each tick."""
+    result = features.copy()
+    quote = result.loc[:, ["time", "mid"]].sort_values("time", kind="stable")
+    quote_indexed = quote.set_index("time")["mid"]
+    for minutes in (1, 5, 15):
+        bars = quote_indexed.resample(
+            f"{minutes}min", label="right", closed="right"
+        ).agg(["first", "max", "min", "last"]).dropna()
+        bars = bars.rename(
+            columns={
+                "first": f"m{minutes}_open",
+                "max": f"m{minutes}_high",
+                "min": f"m{minutes}_low",
+                "last": f"m{minutes}_close",
+            }
+        )
+        bars[f"m{minutes}_return"] = bars[f"m{minutes}_close"] / bars[f"m{minutes}_open"] - 1.0
+        bars[f"m{minutes}_range"] = bars[f"m{minutes}_high"] - bars[f"m{minutes}_low"]
+        bars = bars.reset_index().rename(columns={"time": "bar_time"})
+        result = pd.merge_asof(
+            result.sort_values("time", kind="stable"),
+            bars.sort_values("bar_time", kind="stable"),
+            left_on="time", right_on="bar_time", direction="backward",
+        ).drop(columns=["bar_time"])
+        close = result[f"m{minutes}_close"]
+        high = result[f"m{minutes}_high"]
+        low = result[f"m{minutes}_low"]
+        result[f"m{minutes}_close_location"] = np.divide(
+            close - low, np.maximum(high - low, 1e-12)
+        )
+    m1_high = result["m1_high"].shift(1).rolling(20, min_periods=2).max()
+    m1_low = result["m1_low"].shift(1).rolling(20, min_periods=2).min()
+    result["structure_context"] = np.select(
+        [result["m1_close"] > m1_high, result["m1_close"] < m1_low],
+        ["m1_breakout_up", "m1_breakout_down"],
+        default="m1_range_or_pullback",
+    )
+    result["regime_context"] = np.select(
+        [result["volatility_expansion"] >= 1.2, result["volatility_expansion"] <= 0.8],
+        ["volatility_expansion", "compression"],
+        default="normal_volatility",
+    )
+    return result
+
+
 def replay_executable_path(
     *,
     entry_time: Any,
@@ -226,6 +272,7 @@ def build_shadow_dataset(
             # other symbols' evidence.  Keep the omission visible to callers.
             warnings.warn(f"shadow history skipped for {symbol}: {exc}", RuntimeWarning)
             continue
+        features = _add_completed_bar_context(features)
         times = pd.to_datetime(features["time"], utc=True)
         # Use a relative seconds axis so pandas' ns/us resolution is harmless.
         epoch = (times - times.iloc[0]).dt.total_seconds().to_numpy(dtype=float)
@@ -275,8 +322,8 @@ def build_shadow_dataset(
                             "session": _session_name(int(times.iloc[index].hour)),
                             "candidate_source": "all_quote_entries",
                             "candidate_authority": "SHADOW_ONLY",
-                            "regime": "unknown_quote_regime",
-                            "structure": "quote_microstructure",
+                            "regime": str(features.iloc[index].get("regime_context") or "unknown_quote_regime"),
+                            "structure": str(features.iloc[index].get("structure_context") or "unknown_structure"),
                             "family": "universal_quote_entry",
                             "family_version": "quote_microstructure_v1",
                         }
@@ -325,7 +372,8 @@ def shadow_model_frame(frame: pd.DataFrame) -> pd.DataFrame:
     excluded = _OUTCOME_COLUMNS | frozenset(
         {
             "time", "symbol", "side", "session", "regime", "structure", "family",
-            "family_version", "candidate_source", "candidate_authority",
+            "family_version", "structure_context", "regime_context",
+            "candidate_source", "candidate_authority",
         }
     )
     columns = [

@@ -1,11 +1,11 @@
 {
   "schema": "fast_edge_factory_handoff.v1",
-  "source_report": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\reports\\research\\fast_edge_leaderboard.json",
-  "dataset_hash": "957466f3fbe48a3531725b60ad4b6fcfc71f54099547ec49a888d9e417f0a691",
+  "source_report": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\reports\\research\\fast_edge_generations\\20260825T161021Z\\fast_edge_leaderboard.json",
+  "dataset_hash": "55b38182c6c4c7ebcd12bb94845a7aa6c4859a593af2f2d165997f620271adc8",
   "target_definition": "captured_exit_replay",
-  "candidate_rows": 326062,
-  "oos_test_n": 34362,
-  "oos_sealed_n": 32674,
+  "candidate_rows": 329950,
+  "oos_test_n": 31936,
+  "oos_sealed_n": 34680,
   "model_space": [
     "gradient_boosting",
     "hist_gradient_boosting",
@@ -23,10 +23,26 @@
     "horizon_s"
   ],
   "exit_policies": [
+    "mfe_protection",
+    "mfe_protection",
+    "mfe_protection",
+    "mfe_protection",
     "captured_exit_replay",
     "first_meaningful_green",
     "mfe_protection",
-    "no_progress_3s"
+    "mfe_protection",
+    "mfe_protection",
+    "mfe_protection",
+    "mfe_protection",
+    "captured_exit_replay",
+    "first_meaningful_green",
+    "captured_exit_replay",
+    "first_meaningful_green",
+    "mfe_protection",
+    "mfe_protection",
+    "mfe_protection",
+    "mfe_protection",
+    "mfe_protection"
   ],
   "next_research_tasks": [
     "replay promotion candidates across a longer independent window",
