@@ -35,7 +35,10 @@ def test_short_horizon_features_do_not_read_future_quotes():
     changed.loc[150:, ["bid", "ask"]] += 0.25
     first = _feature_frame(original, "EURUSD")
     second = _feature_frame(changed, "EURUSD")
-    columns = ["bid", "ask", "spread", "return_5s", "return_60s", "micro_volatility"]
+    columns = [
+        "bid", "ask", "spread", "return_5s", "return_60s", "micro_volatility",
+        "spread_to_micro_vol", "spread_to_realized_vol",
+    ]
     left = first[first["time"] < pd.Timestamp("2026-01-01T00:02:00Z")][columns].reset_index(drop=True)
     right = second[second["time"] < pd.Timestamp("2026-01-01T00:02:00Z")][columns].reset_index(drop=True)
     pd.testing.assert_frame_equal(left, right)

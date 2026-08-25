@@ -55,6 +55,8 @@ def test_features_are_point_in_time_and_include_microstructure():
     assert "tick_velocity" in features
     assert "return_5s" in features
     assert "realized_vol_60s" in features
+    assert features["spread_to_micro_vol"] >= 0.0
+    assert features["spread_to_realized_vol"] >= 0.0
 
     changed = quotes.copy()
     changed.loc[5:, ["bid", "ask"]] += 100.0

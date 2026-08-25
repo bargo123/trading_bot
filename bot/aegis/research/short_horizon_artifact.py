@@ -193,6 +193,16 @@ def _feature_frame(quotes: pd.DataFrame, symbol: str) -> pd.DataFrame:
     values["realized_vol_60s"] = np.sqrt(
         returns.pow(2).rolling(60, min_periods=2).sum().fillna(0.0).to_numpy(dtype=float)
     )
+    relative_spread = np.divide(
+        spread, np.maximum(np.abs(mid), 1e-12),
+        out=np.zeros_like(spread), where=np.abs(mid) > 0,
+    )
+    values["spread_to_micro_vol"] = np.divide(
+        relative_spread, np.maximum(values["micro_volatility"], 1e-12)
+    )
+    values["spread_to_realized_vol"] = np.divide(
+        relative_spread, np.maximum(values["realized_vol_60s"], 1e-12)
+    )
     for window in (5, 10, 15, 30, 60):
         starts = _asof_index(times, window)
         valid = starts >= 0

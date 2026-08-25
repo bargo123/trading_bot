@@ -288,6 +288,9 @@ def point_in_time_features(
     realized_returns = (
         np.diff(recent_60) / recent_60[:-1] if len(recent_60) > 1 else np.array([], dtype=float)
     )
+    relative_spread = float(current["_spread"]) / max(abs(float(current["_mid"])), 1e-12)
+    micro_volatility = float(np.std(recent_returns, ddof=0)) if len(recent_returns) else 0.0
+    realized_vol_60s = float(np.sqrt(np.square(realized_returns).sum())) if len(realized_returns) else 0.0
     symbol_value = symbol
     if symbol_value is None and "symbol" in current.index:
         symbol_value = str(current["symbol"])
@@ -312,10 +315,10 @@ def point_in_time_features(
         "return_15s": _return_since(history, target, 15),
         "return_30s": _return_since(history, target, 30),
         "return_60s": _return_since(history, target, 60),
-        "micro_volatility": float(np.std(recent_returns, ddof=0)) if len(recent_returns) else None,
-        "realized_vol_60s": float(np.sqrt(np.square(realized_returns).sum()))
-        if len(realized_returns)
-        else 0.0,
+        "micro_volatility": micro_volatility if len(recent_returns) else None,
+        "realized_vol_60s": realized_vol_60s,
+        "spread_to_micro_vol": relative_spread / max(micro_volatility, 1e-12),
+        "spread_to_realized_vol": relative_spread / max(realized_vol_60s, 1e-12),
         "quote_age_s": 0.0,
         "hour_utc": float(target.hour),
         "dow_utc": float(target.dayofweek),
