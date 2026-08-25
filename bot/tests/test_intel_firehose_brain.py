@@ -214,6 +214,26 @@ def test_brain_skips_without_analogue_evidence(tmp_path):
     assert gated.journal["short_horizon_gate"] == "short_horizon_negative_expected_value"
     assert brain.counts["short_horizon_expected_value_reject"] == 1
 
+    abstained = brain.evaluate(
+        symbol="EURUSD",
+        row=row,
+        completed_m1=m1.iloc[:-1],
+        positions=[],
+        equity=100.0,
+        pip=0.0001,
+        core_side="buy",
+        short_horizon_prediction={
+            "calibration_status": "calibrated",
+            "abstain": True,
+            "abstain_reason": "uncertainty_high",
+            "probability": 0.55,
+            "model_agreement": 2.0 / 3.0,
+            "uncertainty": 0.45,
+        },
+    )
+    assert abstained.reason == "short_horizon_abstain"
+    assert brain.counts["short_horizon_abstain_reasons"]["uncertainty_high"] == 1
+
 
 def test_brain_can_fire_with_bootstrap_analogues(tmp_path):
     m1_for_signature = _m1()

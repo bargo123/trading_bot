@@ -1656,11 +1656,15 @@ class IntelligentFirehoseBrain:
                 "short_horizon_gate": prediction_reason,
             }
             if not prediction_ok:
+                diagnostic_reason = str(
+                    short_horizon_prediction.get("abstain_reason")
+                    or prediction_reason
+                )
                 abstain_reasons = self.counts.setdefault(
                     "short_horizon_abstain_reasons", {}
                 )
-                abstain_reasons[prediction_reason] = int(
-                    abstain_reasons.get(prediction_reason, 0)
+                abstain_reasons[diagnostic_reason] = int(
+                    abstain_reasons.get(diagnostic_reason, 0)
                 ) + 1
                 if any(token in prediction_reason for token in ("uncertainty", "abstain", "not_calibrated")):
                     self.counts["uncertainty_reject"] = int(
