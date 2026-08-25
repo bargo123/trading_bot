@@ -17,6 +17,7 @@ import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier, HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import Ridge
+from sklearn.isotonic import IsotonicRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import RobustScaler
 
@@ -418,6 +419,22 @@ def _calibration_ece(probability: np.ndarray, actual: np.ndarray) -> float | Non
         if mask.any():
             ece += float(mask.mean()) * abs(float(probability[mask].mean()) - float(actual[mask].mean()))
     return float(ece)
+
+
+def _calibrate_probability_vector(
+    calibration_probability: np.ndarray,
+    calibration_actual: np.ndarray,
+    probability: np.ndarray,
+) -> tuple[np.ndarray, str]:
+    """Calibrate later predictions from the immediately prior OOS slice only."""
+    raw = np.asarray(probability, dtype=float)
+    prior_probability = np.asarray(calibration_probability, dtype=float)
+    prior_actual = np.asarray(calibration_actual, dtype=int)
+    if len(prior_probability) < 2 or len(np.unique(prior_actual)) < 2:
+        return np.clip(raw, 0.0, 1.0), "identity_insufficient_calibration_data"
+    calibrator = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")
+    calibrator.fit(np.clip(prior_probability, 0.0, 1.0), prior_actual)
+    return np.clip(calibrator.predict(np.clip(raw, 0.0, 1.0)), 0.0, 1.0), "isotonic_validation"
 
 
 def _non_overlapping_selected(frame: pd.DataFrame, selected: np.ndarray) -> np.ndarray:
@@ -825,13 +842,20 @@ def fit_shadow_model_space(
     probabilities: dict[str, np.ndarray] = {}
     test_probabilities: dict[str, np.ndarray] = {}
     selected_thresholds: dict[str, float] = {}
+    calibration_methods: dict[str, str] = {}
     model_errors: dict[str, str] = {}
     oos_metrics: dict[str, dict[str, Any]] = {}
     for name, estimator in factories.items():
         try:
             model = Pipeline([("scale", RobustScaler()), ("model", estimator)])
             model.fit(x_train, y_train)
-            validation_probability = model.predict_proba(x_validation)[:, 1]
+            validation_raw = model.predict_proba(x_validation)[:, 1]
+            validation_probability, calibration_method = _calibrate_probability_vector(
+                validation_raw,
+                validation["target"].astype(int).to_numpy(),
+                validation_raw,
+            )
+            calibration_methods[name] = calibration_method
             candidates: list[tuple[float, float]] = []
             validation_captured = validation["captured_exit_return"].to_numpy(dtype=float)
             for threshold in SHADOW_THRESHOLDS:
@@ -839,9 +863,19 @@ def fit_shadow_model_space(
                 if int(chosen.sum()) >= int(min_samples):
                     candidates.append((float(validation_captured[chosen].mean()), float(threshold)))
             selected_thresholds[name] = max(candidates, default=(0.0, 0.5))[1]
-            test_probability = model.predict_proba(x_test)[:, 1]
+            test_raw = model.predict_proba(x_test)[:, 1]
+            test_probability, _ = _calibrate_probability_vector(
+                validation_raw,
+                validation["target"].astype(int).to_numpy(),
+                test_raw,
+            )
             test_probabilities[name] = test_probability
-            probabilities[name] = model.predict_proba(x_sealed)[:, 1]
+            sealed_raw = model.predict_proba(x_sealed)[:, 1]
+            probabilities[name], _ = _calibrate_probability_vector(
+                validation_raw,
+                validation["target"].astype(int).to_numpy(),
+                sealed_raw,
+            )
             oos_metrics[name] = {
                 "test": _metrics(slices.test, test_probability, selected_thresholds[name]),
                 "sealed": _metrics(slices.sealed, probabilities[name], selected_thresholds[name]),
@@ -923,6 +957,7 @@ def fit_shadow_model_space(
         "model_names": sorted(probabilities),
         "model_count": len(probabilities),
         "selected_thresholds": selected_thresholds,
+        "calibration_methods": calibration_methods,
         "model_errors": model_errors,
         "oos_metrics": oos_metrics,
         "primary_model": primary_model,

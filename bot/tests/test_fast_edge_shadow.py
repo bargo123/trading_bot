@@ -6,6 +6,7 @@ import pytest
 
 from aegis.research.fast_edge_shadow import (
     SHADOW_HORIZONS_S,
+    _calibrate_probability_vector,
     build_shadow_dataset,
     chronological_shadow_slices,
     evaluate_shadow_leaderboard,
@@ -168,9 +169,19 @@ def test_shadow_model_space_searches_local_models_without_authority():
     )
     assert report["oos"]["sealed_n"] > 0
     assert all(row["model"] in report["model_names"] for row in report["leaderboard"])
+    assert set(report["calibration_methods"]) == set(report["model_names"])
     assert {"model_probability_mean", "model_disagreement", "prediction_vector"}.issubset(
         report["sealed_predictions"].columns
     )
+
+
+def test_probability_calibration_uses_only_prior_calibration_observations():
+    raw = np.array([0.05, 0.20, 0.80, 0.95])
+    actual = np.array([0, 0, 1, 1])
+    calibrated, method = _calibrate_probability_vector(raw, actual, np.array([0.10, 0.90]))
+    assert method == "isotonic_validation"
+    assert np.all((calibrated >= 0.0) & (calibrated <= 1.0))
+    assert calibrated[0] < calibrated[1]
 
 
 def test_exit_policy_comparison_is_segmented_and_cost_aware():
