@@ -301,7 +301,7 @@ def video_style_micro_candidate(
 def short_horizon_gate(
     prediction: Mapping[str, Any] | None,
     *,
-    min_probability: float = 0.5,
+    min_probability: float | None = 0.5,
 ) -> tuple[bool, str]:
     """Fail-closed gate for an optional calibrated short-horizon prediction."""
     if prediction is None:
@@ -316,7 +316,16 @@ def short_horizon_gate(
         return False, "short_horizon_probability_invalid"
     if probability != probability or not 0.0 <= probability <= 1.0:
         return False, "short_horizon_probability_invalid"
-    if probability < float(min_probability):
+    threshold = min_probability
+    if threshold is None:
+        threshold = prediction.get("threshold", 0.5)
+    try:
+        threshold = float(threshold)
+    except (TypeError, ValueError):
+        return False, "short_horizon_probability_invalid"
+    if not 0.0 < threshold < 1.0:
+        return False, "short_horizon_probability_invalid"
+    if probability < threshold:
         return False, "short_horizon_probability_below_threshold"
     if "decision" in prediction and not bool(prediction["decision"]):
         return False, "short_horizon_negative_prediction"
@@ -621,6 +630,9 @@ class IntelligentFirehoseBrain:
             "uncertainty_reject": 0,
             "model_disagreement": 0,
             "tail_reject": 0,
+            "short_horizon_probability_reject": 0,
+            "short_horizon_expected_value_reject": 0,
+            "short_horizon_missing": 0,
         }
 
     def _note_skip(self, reason: str) -> None:
@@ -1614,8 +1626,10 @@ class IntelligentFirehoseBrain:
                 self.counts["model_disagreement"] = int(self.counts.get("model_disagreement", 0)) + 1
             prediction_ok, prediction_reason = short_horizon_gate(
                 short_horizon_prediction,
-                min_probability=float(
-                    self.cfg.get("short_horizon_min_probability", 0.5) or 0.5
+                min_probability=(
+                    float(self.cfg["short_horizon_min_probability"])
+                    if self.cfg.get("short_horizon_min_probability") is not None
+                    else None
                 ),
             )
             short_horizon_journal = {
@@ -1638,6 +1652,21 @@ class IntelligentFirehoseBrain:
                     ) + 1
                 if "tail" in prediction_reason:
                     self.counts["tail_reject"] = int(self.counts.get("tail_reject", 0)) + 1
+                if prediction_reason in {
+                    "short_horizon_probability_below_threshold",
+                    "short_horizon_negative_prediction",
+                }:
+                    self.counts["short_horizon_probability_reject"] = int(
+                        self.counts.get("short_horizon_probability_reject", 0)
+                    ) + 1
+                elif prediction_reason == "short_horizon_negative_expected_value":
+                    self.counts["short_horizon_expected_value_reject"] = int(
+                        self.counts.get("short_horizon_expected_value_reject", 0)
+                    ) + 1
+                elif prediction_reason == "short_horizon_prediction_missing":
+                    self.counts["short_horizon_missing"] = int(
+                        self.counts.get("short_horizon_missing", 0)
+                    ) + 1
                 fire = ThesisFireDecision("skip", prediction_reason, fire.expected_net_value)
             elif calibration_status == "calibrated":
                 self.counts["high_confidence"] = int(self.counts.get("high_confidence", 0)) + 1

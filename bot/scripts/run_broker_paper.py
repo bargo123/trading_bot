@@ -694,7 +694,7 @@ def main() -> None:
     # Quote buffer for genuine sub-minute features
     from aegis.intel.quote_buffer import QuoteBuffer
     quote_buffer = QuoteBuffer(max_points_per_symbol=3600)
-    from aegis.intel.short_horizon_runtime import ShortHorizonPredictor
+    from aegis.intel.short_horizon_runtime import ShortHorizonPredictor, seed_quote_buffer
     short_horizon_predictor = ShortHorizonPredictor.from_config(cfg)
     # Exact ticket->hypothesis metadata persistence
     from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
@@ -744,6 +744,18 @@ def main() -> None:
         if not live_symbols:
             raise SystemExit("No tradeable symbols on this MT5 account.")
         symbols = live_symbols
+        if short_horizon_predictor.pipeline is not None:
+            seeded = 0
+            for name in symbols:
+                try:
+                    seeded += seed_quote_buffer(
+                        quote_buffer,
+                        name,
+                        eng.copy_ticks(name, lookback_seconds=90),
+                    )
+                except Exception as exc:
+                    logger.debug("short-horizon seed skipped symbol=%s error=%s", name, type(exc).__name__)
+            logger.info("[SHORT HORIZON] seeded quote history points=%s symbols=%s", seeded, len(symbols))
         logger.info(
             "Connected engine=%s account=%s equity=%.2f paper=%s qty=%s symbols=%s",
             eng.name,
@@ -2258,6 +2270,15 @@ def main() -> None:
                     ),
                     "UNCERTAINTY_REJECT": int(_brain_counts.get("uncertainty_reject", 0) or 0),
                     "MODEL_DISAGREEMENT": int(_brain_counts.get("model_disagreement", 0) or 0),
+                    "MODEL_PROBABILITY_REJECT": int(
+                        _brain_counts.get("short_horizon_probability_reject", 0) or 0
+                    ),
+                    "MODEL_EXPECTED_VALUE_REJECT": int(
+                        _brain_counts.get("short_horizon_expected_value_reject", 0) or 0
+                    ),
+                    "MODEL_MISSING_REJECT": int(
+                        _brain_counts.get("short_horizon_missing", 0) or 0
+                    ),
                     "TAIL_REJECT": int(_brain_counts.get("tail_reject", 0) or 0),
                     "STALE_REJECT": int(_funnel.get("STALE_REJECT", 0) or 0),
                     "RISK_REJECT": int(_funnel.get("RISK_REJECT", 0) or 0),

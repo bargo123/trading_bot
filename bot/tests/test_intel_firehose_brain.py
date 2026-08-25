@@ -212,6 +212,7 @@ def test_brain_skips_without_analogue_evidence(tmp_path):
     assert gated.action == "skip"
     assert gated.reason == "short_horizon_negative_expected_value"
     assert gated.journal["short_horizon_gate"] == "short_horizon_negative_expected_value"
+    assert brain.counts["short_horizon_expected_value_reject"] == 1
 
 
 def test_brain_can_fire_with_bootstrap_analogues(tmp_path):

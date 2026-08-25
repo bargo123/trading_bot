@@ -20,6 +20,26 @@ from aegis.research_factory.ml_pipeline import MLPipeline
 SHORT_HORIZON_ARTIFACT_SCHEMA = "short_horizon_ensemble.v1"
 
 
+def seed_quote_buffer(quote_buffer: Any, symbol: str, quotes: Any) -> int:
+    """Seed local features from valid, read-only broker quote rows."""
+    recorder = getattr(quote_buffer, "record", None)
+    if not callable(recorder):
+        return 0
+    added = 0
+    for quote in quotes or ():
+        try:
+            timestamp = float(quote.get("time") or 0.0)
+            bid = float(quote.get("bid") or 0.0)
+            ask = float(quote.get("ask") or 0.0)
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if timestamp <= 0.0 or bid <= 0.0 or ask <= 0.0 or ask < bid:
+            continue
+        recorder(str(symbol).upper(), timestamp, bid, ask)
+        added += 1
+    return added
+
+
 class ShortHorizonPredictor:
     """Runtime-only wrapper around a validated local calibrated ensemble."""
 
@@ -96,6 +116,20 @@ class ShortHorizonPredictor:
             "execution_status": self.execution_status,
         }
 
+    def _fail_closed_prediction(self, reason: str) -> dict[str, Any]:
+        return {
+            "probability": 0.0,
+            "decision": False,
+            "abstain": True,
+            "calibration_status": "calibrated",
+            "model_agreement": 0.0,
+            "uncertainty": 1.0,
+            "model_count": len(self.pipeline.models) if self.pipeline is not None else 0,
+            "threshold": float(self.metadata.get("threshold", 0.5) or 0.5),
+            "expected_net_pnl": 0.0,
+            "prediction_reason": str(reason),
+        }
+
     def predict(
         self,
         *,
@@ -108,9 +142,11 @@ class ShortHorizonPredictor:
         if self.pipeline is None or self.status not in {"ready", "shadow_only"}:
             return None
         buffer = getattr(quote_buffer, "buffers", {}).get(str(symbol).upper())
+        if buffer is None:
+            return self._fail_closed_prediction("quote_history_missing")
         points = [point for point in getattr(buffer, "points", ()) if point.timestamp <= float(now_ts)]
         if len(points) < 2:
-            return None
+            return self._fail_closed_prediction("quote_history_insufficient")
         frame = pd.DataFrame(
             [
                 {
@@ -173,9 +209,10 @@ class ShortHorizonPredictor:
                 "model_count": len(self.pipeline.models),
                 "horizons_s": self.metadata.get("horizons_s"),
                 "decision_horizon_s": int(selected_horizon),
+                "threshold": float(self.metadata.get("threshold", 0.5) or 0.5),
                 "by_horizon": by_horizon,
                 "expected_net_pnl": expected_net,
                 "tail_loss_probability": selected_oos.get("tail_loss_rate"),
             }
         except Exception:
-            return None
+            return self._fail_closed_prediction("prediction_error")
