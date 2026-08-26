@@ -808,6 +808,7 @@ class IntelligentFirehoseBrain:
         state: Mapping[str, Any] | None = None,
         actual_bid: float | None = None,
         actual_ask: float | None = None,
+        slippage_price: float | None = None,
         market_ctx: Any = None,
         quote_buffer: Any = None,
         now_ts: float | None = None,
@@ -1144,6 +1145,29 @@ class IntelligentFirehoseBrain:
             return None, str(sizing.get("reason"))
         lots = float(sizing["lots"])
 
+        # Exploration owns the final micro-candidate geometry, so price that
+        # exact order after sizing as well. A structural target alone is not
+        # an executable EV estimate: missing probability evidence must remain
+        # an abstention even when the shadow-only model probe is enabled.
+        exploration_econ = self._trade_economics(
+            side=side,
+            entry=entry,
+            invalidation=invalidation,
+            target=target,
+            lots=lots,
+            spec=spec,
+            spread_price=spread_price,
+            slippage_price=(
+                0.3 * float(pip) if slippage_price is None else slippage_price
+            ),
+            evidence=evidence,
+        )
+        if not exploration_econ.acceptable:
+            return None, (
+                "exploration_economics_rejected:"
+                f"{exploration_econ.reason}"
+            )
+
         exp_open_total, exp_open_symbol = self.exploration_open_counts(symbol)
         ok, reason = check_exploration_limits(
             self._exploration_limits,
@@ -1231,6 +1255,7 @@ class IntelligentFirehoseBrain:
             "sizing": sizing,
             "exit_plan": exit_plan,
             "book_logic": book_logic,
+            "exploration_economics": exploration_econ.journal(),
             **self._last_exploration_micro_diagnostics,
         }
         decision = DemoDecision(
@@ -1886,6 +1911,15 @@ class IntelligentFirehoseBrain:
         exploration_classified = (
             fire.action == "skip"
             and not predictive_veto
+            # Shadow-only status can classify an undercovered opportunity, but
+            # it must never bypass explicit probability/EV rejection for this
+            # executable fill. Legacy geometry failures remain discoverable by
+            # _maybe_explore, which evaluates the final micro candidate.
+            and econ.reason not in {
+                "no_win_probability_evidence",
+                "expected_net_value_not_positive",
+                "payoff_below_floor",
+            }
             and (
                 exploration_shadow_model_probe
                 or fire_base in _EXPLORATION_ALLOWED_BASES
@@ -1927,6 +1961,10 @@ class IntelligentFirehoseBrain:
                                   else (state.get("regime") or "")),
                 evidence=evidence,
                 spread_price=spread_price,
+                slippage_price=(
+                    None if measured_spread is None
+                    else measured_spread.slippage_pips * float(pip)
+                ),
                 row=row,
                 completed_m1=completed_m1,
                 state=state,

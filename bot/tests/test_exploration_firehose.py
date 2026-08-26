@@ -251,6 +251,16 @@ class _FakeEvidence:
     similarity_score = 0.0
 
 
+class _PositiveEvidence(_FakeEvidence):
+    eligible = True
+    analogue_n = 60
+    analogue_n_losses = 12
+    expectancy = 0.01
+    profit_factor = 2.0
+    uncertainty = "calibrated"
+    similarity_score = 0.8
+
+
 def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
     from aegis.intel.firehose_brain import IntelligentFirehoseBrain
     from aegis.intel.fast_firehose import FastMarketContext, check_entry_economics
@@ -290,7 +300,7 @@ def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
         portfolio_ok=True, portfolio_reason='',
         symbol_spec=spec, question='test',
         volatility='stable', regime_label='range',
-        evidence=None, spread_price=0.00002,
+        evidence=_PositiveEvidence(), spread_price=0.00002,
         actual_bid=ctx.bid, actual_ask=ctx.ask,
         row=pd.Series({'open': 1.100005, 'high': ctx.m1_high,
                        'low': ctx.m1_low, 'close': ctx.m1_close,
@@ -821,6 +831,58 @@ def test_short_horizon_abstention_still_reaches_bounded_exploration(tmp_path, mo
 
     assert not invoked, "predictive abstention must not create an exploration order intent"
     assert decision.action == "skip"
+
+
+def test_shadow_only_exploration_requires_positive_trade_economics(tmp_path, monkeypatch):
+    """Shadow status cannot override missing executable EV evidence."""
+    from aegis.intel import firehose_brain as fb
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+    from aegis.intel.video_style import VideoStyleSignal
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(
+        json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1", "records": []}),
+        encoding="utf-8",
+    )
+    brain = IntelligentFirehoseBrain({
+        "analogue_index_path": str(index),
+        "intelligent_gate_validated_states": True,
+        "validated_states_path": str(tmp_path / "empty_states.json"),
+        "intelligent_firehose_bootstrap": True,
+        "intelligent_exploration_enabled": True,
+        "intelligent_min_analogues": 20,
+        "intelligent_min_similarity": 0.5,
+        "intelligent_risk_budget_usd": 100.0,
+        "order_quantity": 0.01,
+        "max_positions": 40,
+        "exploration_max_risk_per_trade_usd": 0.15,
+    })
+    frame = _exploration_frame()
+    signal = VideoStyleSignal(
+        symbol="EURUSD", side="buy", signal_time=frame["time"].iloc[-1],
+        breakout_price=float(frame["close"].iloc[-1]), risk_distance=0.0001,
+    )
+    monkeypatch.setattr(fb, "video_style_signal", lambda *args, **kwargs: signal)
+    invoked = []
+    monkeypatch.setattr(brain, "_maybe_explore", lambda **kwargs: invoked.append(kwargs))
+
+    row = frame.iloc[-1].copy()
+    decision = brain.evaluate(
+        symbol="EURUSD", row=row, completed_m1=frame.iloc[:-1], positions=[],
+        equity=100.0, pip=0.0001, core_side="buy", spread_price=0.0001,
+        symbol_spec={"volume_min": 0.01, "volume_step": 0.01,
+                     "trade_contract_size": 100000.0},
+        entry_price=float(row["close"]), actual_bid=float(row["close"]),
+        actual_ask=float(row["close"] + 0.0001), video_style=True,
+        short_horizon_prediction={
+            "calibration_status": "unavailable", "abstain": True,
+            "abstain_reason": "artifact_shadow_only",
+        },
+    )
+
+    assert not invoked
+    assert decision.action == "skip"
+    assert decision.reason != "exploration_hypothesis_test"
 
 
 def test_exploration_journal_records_micro_rejection_reason(tmp_path, monkeypatch):
