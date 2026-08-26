@@ -14,6 +14,14 @@ IB_PAPER_PORTS = frozenset({4002, 7497})
 MT5_DEMO_MODES = frozenset({"mt5_demo", "mt5_paper", "demo"})
 
 
+def firehose_stop_requested(stop_file: Path | str) -> bool:
+    """Return whether the explicit operator STOP FIREHOSE marker is present."""
+    try:
+        return Path(stop_file).is_file()
+    except (OSError, TypeError, ValueError):
+        return False
+
+
 def heartbeat_max_age(cfg: dict[str, Any]) -> float:
     """Allow two configured poll cycles plus broker-call scheduling margin."""
     poll_seconds = max(0.0, float(cfg.get("poll_seconds", 0.0) or 0.0))

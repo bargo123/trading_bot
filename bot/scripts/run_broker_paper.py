@@ -55,9 +55,10 @@ from aegis.paper_control import (  # noqa: E402
     ProcessLock,
     firehose_can_add,
     firehose_consume_bar,
+    firehose_stop_requested,
     jpy_cluster_blocks,
 )
-from aegis.risk import RiskEngine  # noqa: E402
+from aegis.risk import RiskEngine, demo_global_loss_halt_disabled  # noqa: E402
 from aegis.sizing import ContractSpec, size_lots_for_risk  # noqa: E402
 from aegis.strategy import prepare, signal_from_row  # noqa: E402
 from aegis.intel.firehose_basket import BasketMetadataStore  # noqa: E402
@@ -870,6 +871,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     cfg = load_config(args.config)
+    stop_file = ROOT / "reports" / "FIREHOSE_STOP"
     video_style_mode = bool(args.video_style)
     if video_style_mode:
         # Research/video behavior is seconds-first even when a restart finds
@@ -1055,8 +1057,22 @@ def main() -> None:
             open_n = len(eng.positions())
         except Exception:
             open_n = 0
-        risk.allow(acct.equity, open_positions=open_n)
+        _risk_ok, _risk_reason = risk.allow(acct.equity, open_positions=open_n)
         risk.save_json(risk_path)
+        if engine_name == "mt5" and acct.is_paper:
+            logger.info("[MT5 DEMO] CONNECTED")
+            logger.info("[DEMO ORDER PATH] %s", "ENABLED" if send_orders else "DISABLED")
+        logger.info(
+            "[TOTAL_DRAWDOWN_DEMO_HALT] %s",
+            "DISABLED" if risk.demo_global_loss_halt_disabled else "ACTIVE",
+        )
+        logger.info("[PER_TRADE_RISK] %s", "ACTIVE" if risk.risk_percent > 0 else "DISABLED")
+        logger.info(
+            "[PREDICTION_ENGINE] %s",
+            "ACTIVE" if short_horizon_predictor.pipeline is not None else "ABSTAIN",
+        )
+        logger.info("[FAST_EXIT] ACTIVE")
+        logger.info("[TRADING_ELIGIBLE] %s", str(bool(_risk_ok)).upper())
         append_journal(
             journal,
             {
@@ -2441,7 +2457,12 @@ def main() -> None:
             symbols[:] = configured_symbols(cfg)
             risk.risk_percent = float(cfg.get("risk_percent", 0.75))
             risk.max_daily_loss_percent = float(cfg.get("max_daily_loss_percent", 0) or 0)
-            risk.max_total_drawdown_percent = float(cfg.get("max_total_drawdown_percent", 0) or 0)
+            risk.demo_global_loss_halt_disabled = demo_global_loss_halt_disabled(cfg)
+            risk.max_total_drawdown_percent = (
+                0.0
+                if risk.demo_global_loss_halt_disabled
+                else float(cfg.get("max_total_drawdown_percent", 0) or 0)
+            )
             risk.max_positions = max_positions
             risk.kill_switch = bool(cfg.get("kill_switch", False))
             circuit.reconfigure(
@@ -2461,6 +2482,13 @@ def main() -> None:
         while True:
             try:
                 reload_live_yaml()
+                if firehose_stop_requested(stop_file):
+                    logger.warning("[FIREHOSE] STOP FIREHOSE requested; exiting")
+                    append_journal(
+                        journal,
+                        {"event": "operator_stop", "reason": "STOP FIREHOSE"},
+                    )
+                    break
                 if intelligent_brain is not None:
                     intelligent_brain.refresh()
                 poll = float(cfg.get("poll_seconds", 60))
@@ -2495,11 +2523,16 @@ def main() -> None:
                     "position_sizing_mode": str(cfg.get("position_sizing_mode") or ""),
                     "risk_halted": bool(risk.state.halted),
                     "risk_reason": str(risk.state.reason or ""),
+                    "total_drawdown_demo_halt_disabled": bool(
+                        risk.demo_global_loss_halt_disabled
+                    ),
+                    "per_trade_risk_active": bool(risk.risk_percent > 0),
                     "circuit_blocked_until": float(circuit.blocked_until or 0),
                 }
                 _risk_ok, _risk_why = risk.allow(equity, open_positions=len(all_pos))
                 extra_hb["risk_halted"] = bool(risk.state.halted) or (not _risk_ok)
                 extra_hb["risk_reason"] = str(risk.state.reason or _risk_why or "")
+                extra_hb["trading_eligible"] = bool(_risk_ok)
                 _c_ok, _c_why = circuit.allow(now=time.time())
                 extra_hb["circuit_ok"] = bool(_c_ok)
                 if not _c_ok:

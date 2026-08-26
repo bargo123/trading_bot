@@ -117,16 +117,12 @@ allow_unsafe_high_risk: false
 hr_risk_max_cap: 2
 hr_equity_floor_frac: 0.5
 hr_max_consecutive_losses: 20
-# These were both 0 (guards fully disabled) to keep spraying after a 39% drawdown
-# off peak $94.28. That drawdown was caused by negative expectancy, not by the
-# guards, and the per-trade EV gate now addresses the cause. Limits are restored
-# deliberately loose - far looser than the 3%/12% defaults - so the firehose keeps
-# its throughput while a genuine blowup still halts it.
-# Operator-approved MT5 DEMO exception: the global daily halt is disabled.
-# Per-trade controls and total drawdown protection remain active at 25%.
+# Operator-approved MT5 DEMO exception: global daily and total-drawdown halts
+# are disabled. Per-trade, margin, quote, economics, portfolio, and execution
+# controls remain active; 0 means no global DEMO loss halt.
 max_daily_loss_percent: 0
 fast_firehose_remaining_ev_policy: fast_firehose_remaining_ev_v1
-max_total_drawdown_percent: 25
+max_total_drawdown_percent: 0
 max_positions: 40
 no_money_reject_limit: 3
 no_money_window_s: 300

@@ -73,6 +73,51 @@ def test_zero_total_drawdown_clears_persisted_halt_and_keeps_trading() -> None:
     assert risk.state.permanent_halt is False
 
 
+def test_unlimited_demo_policy_ignores_historical_total_drawdown_only() -> None:
+    cfg = {
+        "engine": "mt5",
+        "mode": "mt5_demo",
+        "allow_live": False,
+        "dry_run": False,
+        "paper_trading_enabled": True,
+        "risk_percent": 1.0,
+        "max_daily_loss_percent": 0.0,
+        "exploration_max_daily_loss_usd": 0.0,
+        # A stale non-zero value must not reintroduce the DEMO global halt.
+        "max_total_drawdown_percent": 25.0,
+        "max_positions": 40,
+    }
+    risk = RiskEngine.from_config(cfg)
+    risk.update(100.0, now=datetime(2026, 8, 26, 12, tzinfo=timezone.utc))
+    ok, reason = risk.allow(70.0, 0, now=datetime(2026, 8, 26, 12, tzinfo=timezone.utc))
+    assert ok, reason
+    assert reason == "ok"
+    assert risk.demo_global_loss_halt_disabled is True
+    assert risk.max_total_drawdown_percent == 0.0
+
+
+def test_non_demo_total_drawdown_and_per_trade_risk_remain_active() -> None:
+    cfg = {
+        "engine": "mt5",
+        "mode": "live",
+        "allow_live": False,
+        "dry_run": False,
+        "paper_trading_enabled": True,
+        "risk_percent": 1.0,
+        "max_daily_loss_percent": 0.0,
+        "exploration_max_daily_loss_usd": 0.0,
+        "max_total_drawdown_percent": 25.0,
+        "max_positions": 40,
+    }
+    risk = RiskEngine.from_config(cfg)
+    risk.update(100.0, now=datetime(2026, 8, 26, 12, tzinfo=timezone.utc))
+    ok, reason = risk.allow(70.0, 0, now=datetime(2026, 8, 26, 12, tzinfo=timezone.utc))
+    assert not ok
+    assert "max_drawdown" in reason
+    assert risk.demo_global_loss_halt_disabled is False
+    assert risk.size_units(100.0, 100.0, 99.0) == 1.0
+
+
 def test_total_drawdown_halt_persists_across_days() -> None:
     risk = RiskEngine(1.0, 50.0, 10.0, 1)
     day1 = datetime(2020, 1, 2, 12, tzinfo=timezone.utc)

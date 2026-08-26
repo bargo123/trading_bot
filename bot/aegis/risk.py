@@ -7,6 +7,27 @@ from pathlib import Path
 from typing import Any
 
 
+def demo_global_loss_halt_disabled(cfg: dict[str, Any]) -> bool:
+    """Recognize the explicit unlimited-loss-halt MT5 DEMO policy marker.
+
+    This is deliberately strict: a zero loss setting never disables global
+    drawdown protection for live, non-MT5, dry-run, or incompletely governed
+    configurations.
+    """
+    try:
+        return (
+            str(cfg.get("engine") or "").casefold() == "mt5"
+            and str(cfg.get("mode") or "").casefold() == "mt5_demo"
+            and cfg.get("allow_live") is False
+            and cfg.get("paper_trading_enabled") is True
+            and cfg.get("dry_run") is False
+            and float(cfg["max_daily_loss_percent"]) == 0.0
+            and float(cfg["exploration_max_daily_loss_usd"]) == 0.0
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
 @dataclass
 class RiskState:
     day: date | None = None
@@ -24,16 +45,23 @@ class RiskEngine:
     max_total_drawdown_percent: float
     max_positions: int
     kill_switch: bool = False
+    demo_global_loss_halt_disabled: bool = False
     state: RiskState = field(default_factory=RiskState)
 
     @classmethod
     def from_config(cls, cfg: dict[str, Any]) -> "RiskEngine":
+        demo_unlimited = demo_global_loss_halt_disabled(cfg)
         return cls(
             risk_percent=float(cfg.get("risk_percent", 0.75)),
             max_daily_loss_percent=float(cfg.get("max_daily_loss_percent", 3.0)),
-            max_total_drawdown_percent=float(cfg.get("max_total_drawdown_percent", 12.0)),
+            max_total_drawdown_percent=(
+                0.0
+                if demo_unlimited
+                else float(cfg.get("max_total_drawdown_percent", 12.0))
+            ),
             max_positions=int(cfg.get("max_positions", 1)),
             kill_switch=bool(cfg.get("kill_switch", False)),
+            demo_global_loss_halt_disabled=demo_unlimited,
         )
 
     def update(self, equity: float, now: datetime | None = None) -> None:
@@ -122,6 +150,8 @@ class RiskEngine:
             "halted": self.state.halted,
             "permanent_halt": self.state.permanent_halt,
             "reason": self.state.reason,
+            "demo_global_loss_halt_disabled": self.demo_global_loss_halt_disabled,
+            "max_total_drawdown_percent": self.max_total_drawdown_percent,
         }
 
     def load_json(self, path: Path) -> bool:

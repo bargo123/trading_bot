@@ -12,6 +12,7 @@ $Python = Join-Path $RepoRoot ".venv\Scripts\python.exe"
 $LogFile = Join-Path $BotRoot "optimizer\keepalive.log"
 $PaperCfg = "config_mt5_demo_firehose_hw.yaml"
 $Mt5Path = "C:\Program Files\MetaTrader 5\terminal64.exe"
+$FirehoseStop = Join-Path $BotRoot "reports\FIREHOSE_STOP"
 
 function Write-Log([string]$msg) {
     $line = "{0} {1}" -f (Get-Date -Format "yyyy-MM-ddTHH:mm:ssK"), $msg
@@ -49,6 +50,11 @@ function Ensure-MT5 {
 function Invoke-KeepAlive {
     if (-not (Test-Path $Python)) {
         Write-Log "missing venv python: $Python"
+        return
+    }
+
+    if (Test-Path $FirehoseStop) {
+        Write-Log "[FIREHOSE] STOP FIREHOSE marker present; not restarting runner"
         return
     }
 

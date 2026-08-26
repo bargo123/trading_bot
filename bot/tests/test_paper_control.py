@@ -14,6 +14,7 @@ from aegis.paper_control import (
     firehose_can_add,
     firehose_consume_bar,
     jpy_cluster_blocks,
+    firehose_stop_requested,
     paper_execution_enabled,
     target_clears_costs,
 )
@@ -114,6 +115,15 @@ def test_process_lock_try_acquire_returns_false_when_held():
         assert first.try_acquire()
         assert not second.try_acquire()
         first.release()
+
+def test_stop_firehose_marker_is_explicit_and_fail_closed(tmp_path):
+    marker = tmp_path / "FIREHOSE_STOP"
+    assert not firehose_stop_requested(marker)
+    marker.write_text("STOP FIREHOSE\n", encoding="utf-8")
+    assert firehose_stop_requested(marker)
+    marker.unlink()
+    marker.mkdir()
+    assert not firehose_stop_requested(marker)
 
 
 def test_ib_paper_config_defaults_to_observation_only():
@@ -258,11 +268,11 @@ def test_mt5_firehose_hw_is_demo_gated_shape():
     assert int(cfg["firehose_max_per_symbol"]) == 3
     assert str(cfg.get("position_sizing_mode") or "") != "risk"
     assert float(cfg["order_quantity"]) == 0.01
-    # Both global and exploration daily halts are intentionally disabled for
-    # this operator-approved MT5 DEMO environment; per-trade controls remain.
+    # Global daily, total-drawdown, and exploration halts are intentionally
+    # disabled for this operator-approved MT5 DEMO environment; per-trade
+    # controls remain.
     assert float(cfg.get("max_daily_loss_percent") or 0) == 0.0
-    assert float(cfg.get("max_total_drawdown_percent") or 0) > 0.0
-    assert float(cfg["max_total_drawdown_percent"]) >= 15.0
+    assert float(cfg.get("max_total_drawdown_percent") or 0) == 0.0
     assert int(cfg["max_positions"]) == 40
     assert int(cfg.get("no_money_reject_limit") or 0) == 3
     assert float(cfg.get("no_money_window_s") or 0) == 300
