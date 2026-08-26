@@ -12,8 +12,10 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from aegis.intel.broker_math import BrokerSymbolSpec
 from aegis.intel.paths import BOT_ROOT, resolve_bot_path
 from aegis.research.short_horizon import point_in_time_features
+from aegis.research.short_horizon_artifact import MIN_CAPTURED_EXIT_LOSSES
 from aegis.research_factory.ml_pipeline import MLPipeline
 
 
@@ -94,6 +96,22 @@ def _abstain_reason(
     return "+".join(reasons) if reasons else "ensemble_abstain", disagreement
 
 
+def execution_candidate_has_current_promotion_policy(metadata: Mapping[str, Any]) -> bool:
+    """Reject legacy execution candidates that lack current downside-evidence proof."""
+    if str(metadata.get("execution_status") or "") != "EXECUTION_CANDIDATE":
+        return True
+    policy = metadata.get("promotion_policy")
+    if not isinstance(policy, Mapping):
+        return False
+    try:
+        return (
+            int(policy.get("min_captured_exit_losses") or 0) >= MIN_CAPTURED_EXIT_LOSSES
+            and policy.get("requires_positive_test_and_sealed_lcb95") is True
+        )
+    except (TypeError, ValueError):
+        return False
+
+
 class ShortHorizonPredictor:
     """Runtime-only wrapper around a validated local calibrated ensemble."""
 
@@ -145,6 +163,36 @@ class ShortHorizonPredictor:
                     "execution_requires_captured_exit_replay",
                 )
                 return
+            if not execution_candidate_has_current_promotion_policy(metadata):
+                self.status, self.reason = (
+                    "invalid_artifact",
+                    "execution_candidate_missing_current_promotion_policy",
+                )
+                return
+            if self.execution_status == "EXECUTION_CANDIDATE":
+                authorized_values = metadata.get("authorized_symbols")
+                authorized = (
+                    [str(value).upper() for value in authorized_values if str(value).strip()]
+                    if isinstance(authorized_values, list)
+                    else []
+                )
+                if not authorized:
+                    self.status, self.reason = (
+                        "invalid_artifact",
+                        "execution_requires_authorized_symbols",
+                    )
+                    return
+                decision_horizon = str(int(metadata.get("decision_horizon_s", 0) or 0))
+                scoped_oos = (metadata.get("oos") or {}).get("sealed_by_symbol_horizon") or {}
+                if not decision_horizon or any(
+                    not isinstance((scoped_oos.get(symbol) or {}).get(decision_horizon), Mapping)
+                    for symbol in authorized
+                ):
+                    self.status, self.reason = (
+                        "invalid_artifact",
+                        "execution_requires_exact_symbol_horizon_oos",
+                    )
+                    return
             self.pipeline = MLPipeline.load(self.artifact_path)
             if len(self.pipeline.models) < 2:
                 self.status, self.reason = "invalid_artifact", "insufficient_models"
@@ -211,6 +259,8 @@ class ShortHorizonPredictor:
         now_ts: float,
         side: str = "buy",
         notional_usd: float | None = None,
+        broker_spec: Mapping[str, Any] | None = None,
+        quantity: float | None = None,
     ) -> dict[str, Any] | None:
         normalized_symbol = str(symbol).upper()
         if (
@@ -219,11 +269,17 @@ class ShortHorizonPredictor:
             != "captured_exit_replay"
         ):
             return self._fail_closed_prediction("execution_requires_captured_exit_replay")
-        authorized_values = self.metadata.get("authorized_symbols") or ()
-        if authorized_values:
-            authorized = {str(value).upper() for value in authorized_values}
-            if normalized_symbol not in authorized:
+        authorized_values = self.metadata.get("authorized_symbols")
+        authorized = (
+            {str(value).upper() for value in authorized_values if str(value).strip()}
+            if isinstance(authorized_values, (list, tuple, set))
+            else set()
+        )
+        if self.execution_status == "EXECUTION_CANDIDATE":
+            if not authorized or normalized_symbol not in authorized:
                 return self._fail_closed_prediction("symbol_not_authorized")
+        elif authorized and normalized_symbol not in authorized:
+            return self._fail_closed_prediction("symbol_not_authorized")
         if self.pipeline is None:
             return self._fail_closed_prediction(self.reason or "artifact_unavailable")
         if self.status != "ready":
@@ -303,13 +359,15 @@ class ShortHorizonPredictor:
             selected_horizon = str(int(self.metadata.get("decision_horizon_s", 10) or 10))
             selected = by_horizon.get(selected_horizon) or next(iter(by_horizon.values()))
             oos = self.metadata.get("oos") or {}
-            scoped_oos = (
-                (oos.get("sealed_by_symbol_horizon") or {}).get(normalized_symbol) or {}
-                if self.execution_status == "EXECUTION_CANDIDATE"
-                else {}
-            )
-            oos_by_horizon = scoped_oos or (oos.get("sealed_by_horizon") or {})
-            selected_oos = oos_by_horizon.get(selected_horizon) or {}
+            if self.execution_status == "EXECUTION_CANDIDATE":
+                scoped_oos = (
+                    (oos.get("sealed_by_symbol_horizon") or {}).get(normalized_symbol) or {}
+                )
+                selected_oos = scoped_oos.get(selected_horizon) or {}
+                if not isinstance(selected_oos, Mapping) or not selected_oos:
+                    return self._fail_closed_prediction("symbol_horizon_oos_missing")
+            else:
+                selected_oos = (oos.get("sealed_by_horizon") or {}).get(selected_horizon) or {}
             target_definition = str(
                 self.metadata.get("target_definition") or "terminal_profit"
             ).strip().lower()
@@ -327,9 +385,30 @@ class ShortHorizonPredictor:
             )
             expected_net = None
             expected_net_lcb95 = None
-            if notional_usd is not None:
-                # No selected sealed-OOS rows are an explicit zero-evidence
-                # veto, never an omitted field that could bypass the gate.
+            if broker_spec is not None or quantity is not None:
+                # Production money math uses broker-native USD tick value so
+                # JPY/CHF/CAD and other non-USD quote currencies are not
+                # accidentally reported as USD. The artifact return is a
+                # relative price return, so convert it back to price units
+                # before applying the broker's USD-per-price-unit value.
+                if broker_spec is None or quantity is None:
+                    return self._fail_closed_prediction("broker_money_evidence_incomplete")
+                spec = BrokerSymbolSpec.from_mapping(broker_spec)
+                lots = float(quantity)
+                if lots <= 0:
+                    return self._fail_closed_prediction("broker_quantity_invalid")
+                mid = float(features["mid"])
+                expected_net = (
+                    spec.price_units_to_usd(float(expected_return) * mid, lots)
+                    if expected_return is not None else 0.0
+                )
+                expected_net_lcb95 = (
+                    spec.price_units_to_usd(float(expected_lcb_return) * mid, lots)
+                    if expected_lcb_return is not None else 0.0
+                )
+            elif notional_usd is not None:
+                # Backward-compatible research/test fallback. Production calls
+                # should supply broker_spec + quantity for true USD money math.
                 expected_net = (
                     float(expected_return) * float(features["mid"]) * float(notional_usd)
                     if expected_return is not None else 0.0

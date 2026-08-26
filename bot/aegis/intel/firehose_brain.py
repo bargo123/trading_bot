@@ -298,6 +298,35 @@ def video_style_micro_candidate(
     )
 
 
+def exploration_may_probe_shadow_only_model(
+    cfg: Mapping[str, Any],
+    prediction: Mapping[str, Any] | None,
+    gate_reason: str,
+) -> bool:
+    """Permit only tiny-risk MT5 DEMO exploration behind a shadow-only artifact.
+
+    This is deliberately narrower than the production short-horizon gate. It
+    does not authorize champion/canary trading and never overrides a calibrated
+    negative probability/EV decision, missing quote history, invalid artifact,
+    or an unauthorized symbol. Its sole purpose is to let the governed DEMO
+    exploration lane buy execution evidence while the current artifact remains
+    globally SHADOW_ONLY_NO_POSITIVE_OOS.
+    """
+    if bool(cfg.get("allow_live", False)):
+        return False
+    if str(cfg.get("mode") or "").strip().lower() != "mt5_demo":
+        return False
+    if not bool(cfg.get("paper_trading_enabled", False)):
+        return False
+    if not bool(cfg.get("intelligent_exploration_enabled", False)):
+        return False
+    if str(gate_reason) != "short_horizon_not_calibrated":
+        return False
+    if not isinstance(prediction, Mapping):
+        return False
+    return str(prediction.get("abstain_reason") or "") == "artifact_shadow_only"
+
+
 def short_horizon_gate(
     prediction: Mapping[str, Any] | None,
     *,
@@ -336,6 +365,13 @@ def short_horizon_gate(
             return False, "short_horizon_expected_value_invalid"
         if expected != expected or expected <= 0.0:
             return False, "short_horizon_negative_expected_value"
+    if "expected_net_pnl_lcb95" in prediction:
+        try:
+            expected_lcb95 = float(prediction["expected_net_pnl_lcb95"])
+        except (TypeError, ValueError):
+            return False, "short_horizon_expected_value_lcb95_invalid"
+        if expected_lcb95 != expected_lcb95 or expected_lcb95 <= 0.0:
+            return False, "short_horizon_negative_expected_value_lcb95"
     return True, "short_horizon_eligible"
 
 
@@ -1444,6 +1480,7 @@ class IntelligentFirehoseBrain:
         clip_qty = float(self.cfg.get("order_quantity", 0.01))
         clip_risk = max(self._risk_budget * float(self.cfg.get("intelligent_risk_fraction", 0.08)) / 5.0, 0.01)
         predictive_veto = False
+        exploration_shadow_model_probe = False
         self.counts["scans"] = int(self.counts.get("scans", 0)) + 1
         self.memory.sync_from_positions(symbol, positions, clip_risk)
         state = build_runtime_state(symbol=symbol, m1=completed_m1)
@@ -1686,7 +1723,10 @@ class IntelligentFirehoseBrain:
                 "short_horizon_gate": prediction_reason,
             }
             if not prediction_ok:
-                predictive_veto = bool(video_style)
+                exploration_shadow_model_probe = bool(video_style) and exploration_may_probe_shadow_only_model(
+                    self.cfg, short_horizon_prediction, prediction_reason
+                )
+                predictive_veto = bool(video_style) and not exploration_shadow_model_probe
                 diagnostic_reason = str(
                     short_horizon_prediction.get("abstain_reason")
                     or prediction_reason
@@ -1846,8 +1886,11 @@ class IntelligentFirehoseBrain:
         exploration_classified = (
             fire.action == "skip"
             and not predictive_veto
-            and (fire_base in _EXPLORATION_ALLOWED_BASES
-                 or str(fire.reason or "").startswith("shadow:"))
+            and (
+                exploration_shadow_model_probe
+                or fire_base in _EXPLORATION_ALLOWED_BASES
+                or str(fire.reason or "").startswith("shadow:")
+            )
         )
         economics_hard_reject = (
             fire.action == "skip" and fire_base in _HARD_REJECT_BASES
@@ -1901,6 +1944,7 @@ class IntelligentFirehoseBrain:
                     "state_not_in_validated_set": "UNDERCOVERED_STATE",
                     "unacceptable_uncertainty": "UNCERTAIN_PLAUSIBLE_MECHANISM",
                     "short_horizon_abstain": "UNCERTAIN_PLAUSIBLE_MECHANISM",
+                    "short_horizon_not_calibrated": "SHADOW_ONLY_MODEL_PROBE",
                 }
                 _base = str(fire.reason or "").split(":", 1)[0]
                 _trigger = _trigger_map.get(
@@ -1927,6 +1971,8 @@ class IntelligentFirehoseBrain:
                     analogue_n=evidence.analogue_n,
                     close_clips=0,
                     journal={**exp_decision.journal,
+                             **short_horizon_journal,
+                             "exploration_shadow_model_probe": exploration_shadow_model_probe,
                              "equity": equity,
                              "currency_exposure": exposure.get("currency_direction"),
                              **econ.journal()},

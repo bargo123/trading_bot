@@ -279,6 +279,16 @@ def merge_firehose_funnel_counts(
     return merged
 
 
+def record_funnel_execution(
+    counts: dict[str, int], *, submitted: bool, filled: bool
+) -> None:
+    """Record only broker execution outcomes in the runner-owned funnel."""
+    if submitted:
+        counts["FIRES"] = int(counts.get("FIRES", 0)) + 1
+    if filled:
+        counts["FILLS"] = int(counts.get("FILLS", 0)) + 1
+
+
 def write_runner_heartbeat(
     path: Path,
     *,
@@ -1367,10 +1377,8 @@ def main() -> None:
                         quote_buffer=quote_buffer,
                         now_ts=now_ts,
                         side=prediction_side,
-                        notional_usd=(
-                            float(qty) * float((brain_spec or {}).get("trade_contract_size", 0) or 0)
-                            if brain_spec else None
-                        ),
+                        broker_spec=brain_spec,
+                        quantity=float(qty),
                     ),
                 )
                 brain_decision = decision
@@ -1577,6 +1585,7 @@ def main() -> None:
             if should_block_scratch_cooldown(
                 since_s=None if sym not in last_scratch_at else time.time() - last_scratch_at[sym],
                 cfg=cfg,
+                video_style=video_style_mode,
             ):
                 return
             if not intelligent_mode:
@@ -1598,7 +1607,7 @@ def main() -> None:
             else:
                 age = None if sym not in last_entry_at else time.time() - last_entry_at[sym]
                 interval = float(clip_interval_s or 0.0)
-                if interval > 0 and age is not None and float(age) < interval:
+                if eng.positions(sym) and interval > 0 and age is not None and float(age) < interval:
                     return
                 if len(eng.positions()) >= max_positions:
                     return
@@ -2039,6 +2048,9 @@ def main() -> None:
                 )
             latency.request_ts = time.time()
             submitted_count += 1
+            record_funnel_execution(
+                observed_funnel_counts, submitted=True, filled=False
+            )
             res = eng.place_order(req)
             latency.response_ts = time.time()
             audit = classify_execution(
@@ -2069,6 +2081,9 @@ def main() -> None:
                 )
             execution_status_counts[status] = int(execution_status_counts.get(status, 0)) + 1
             if status in {"POSITION_CONFIRMED", "DEAL_EXECUTED"}:
+                record_funnel_execution(
+                    observed_funnel_counts, submitted=False, filled=True
+                )
                 fill_count += 1
                 latency.confirmed_ts = time.time()
             # Only uncertain outcomes arm the dedup guard. Definitive rejections
@@ -2347,6 +2362,7 @@ def main() -> None:
                     "open": len(all_pos),
                     "held": [f"{p.symbol}:{p.side}" for p in all_pos],
                     "max_positions": max_positions,
+                    "video_style_mode": bool(video_style_mode),
                     "firehose_every_bar": bool(cfg.get("firehose_every_bar")),
                     "position_sizing_mode": str(cfg.get("position_sizing_mode") or ""),
                     "risk_halted": bool(risk.state.halted),
@@ -2693,7 +2709,7 @@ def main() -> None:
                                     _rem_ev = round(
                                         base_ev * max(0.0, min(2.0, rem_rr / max(init_rr, 1e-9))),
                                         4)
-                                    _rem_status = "ESTIMATED"
+                                    _rem_status = "PROXY"
                             verdict = profit_manager.evaluate(
                                 ticket=tk,
                                 volume=float(getattr(pos, "quantity", 0) or 0),
@@ -2717,6 +2733,27 @@ def main() -> None:
                                 try:
                                     _sym = str(getattr(pos, "symbol", ""))
                                     _side_l = str(getattr(pos, "side", "")).lower()
+                                    _fast_now_ts = time.time()
+                                    _fast_quantity = float(getattr(pos, "quantity", 0) or 0)
+                                    try:
+                                        _fast_engine_spec = eng.symbol_spec(_sym) if hasattr(eng, "symbol_spec") else None
+                                    except (AttributeError, OSError, TypeError, ValueError):
+                                        _fast_engine_spec = None
+                                    try:
+                                        _current_short_prediction = short_horizon_predictor.predict(
+                                            symbol=_sym,
+                                            quote_buffer=quote_buffer,
+                                            now_ts=_fast_now_ts,
+                                            side=_side_l,
+                                            broker_spec=_fast_engine_spec,
+                                            quantity=_fast_quantity,
+                                        )
+                                    except Exception as exc:
+                                        logger.debug(
+                                            "short-horizon exit refresh skipped symbol=%s ticket=%s error=%s",
+                                            _sym, tk, type(exc).__name__,
+                                        )
+                                        _current_short_prediction = None
                                     # Build context for production FastExit helper
                                     from aegis.intel.fast_exit_runner import FastExitContext, evaluate_fast_exit, MissingLiquidationMarkError
                                     from aegis.intel.broker_math import BrokerSymbolSpec
@@ -2741,7 +2778,7 @@ def main() -> None:
                                             _cost_entry, _cost_stop,
                                             float(getattr(pos, "quantity", 0) or 0),
                                             _cur_bid, _cur_ask,
-                                            eng.symbol_spec(_sym) if hasattr(eng, "symbol_spec") else None,
+                                            _fast_engine_spec,
                                         )
                                     except (TypeError, ValueError):
                                         pass
@@ -2768,17 +2805,18 @@ def main() -> None:
                                         track_entry_ev=float(_track.entry_ev_at_open or 0.0),
                                         track_side=_side_l,
                                         ticket_meta=_ticket_meta,
-                                        engine_spec=eng.symbol_spec(_sym) if hasattr(eng, 'symbol_spec') else None,
+                                        engine_spec=_fast_engine_spec,
                                         config=cfg,
                                         live_marks=live_marks,
                                         intelligent_brain=intelligent_brain,
                                         profit_manager=profit_manager,
-                                        now_ts=time.time(),
+                                        now_ts=_fast_now_ts,
                                         legacy_hypothesis_id=_legacy_hyp_id,
                                         quote_buffer=quote_buffer,
                                         remaining_ev=_rem_ev,
                                         remaining_ev_status=_rem_status,
                                         observed_spread_r=_spread_r,
+                                        short_horizon_prediction=_current_short_prediction,
                                     )
                                     try:
                                         fast_verdict = evaluate_fast_exit(fast_exit_ctx)
@@ -3132,6 +3170,7 @@ def main() -> None:
                                 continue
                         if not open_pos:
                             position_opened_at.pop(sym, None)
+                            last_entry_at.pop(sym, None)
                             if sym in mfe:
                                 mfe.pop(sym, None)
                                 save_mfe(mfe_path, mfe)
