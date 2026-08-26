@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from aegis.intel.firehose_brain import (
     exploration_may_probe_shadow_only_model,
+    _prediction_for_candidate,
     short_horizon_gate,
 )
 
@@ -137,3 +138,26 @@ def test_shadow_only_exploration_override_is_demo_only():
         {**safe_cfg, "intelligent_exploration_enabled": False}, prediction,
         "short_horizon_not_calibrated"
     ) is False
+
+
+def test_candidate_prediction_uses_its_own_side_and_horizon():
+    prediction = {
+        "selected_side": "buy",
+        "side_predictions": {
+            "buy": {"by_horizon": {
+                "3": {"probability": 0.61, "expected_net_pnl": 0.03},
+                "20": {"probability": 0.42, "expected_net_pnl": -0.02},
+            }},
+            "sell": {"by_horizon": {
+                "3": {"probability": 0.58, "expected_net_pnl": 0.01},
+            }},
+        },
+    }
+
+    fast = _prediction_for_candidate(prediction, side="buy", horizon_s=3)
+    slow = _prediction_for_candidate(prediction, side="buy", horizon_s=20)
+    other_side = _prediction_for_candidate(prediction, side="sell", horizon_s=3)
+
+    assert fast["expected_net_pnl"] == 0.03
+    assert slow["expected_net_pnl"] == -0.02
+    assert other_side["expected_net_pnl"] == 0.01

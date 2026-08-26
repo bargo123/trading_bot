@@ -462,23 +462,108 @@ class ShortHorizonPredictor:
                 }
             if not by_horizon:
                 return self._fail_closed_prediction("decision_horizon_missing")
-            selected_horizon = str(int(self.metadata.get("decision_horizon_s", 10) or 10))
-            selected = by_horizon.get(selected_horizon) or next(iter(by_horizon.values()))
             oos = self.metadata.get("oos") or {}
-            if self.execution_status == "EXECUTION_CANDIDATE":
-                scoped_oos = (
-                    (oos.get("sealed_by_symbol_horizon") or {}).get(normalized_symbol) or {}
-                )
-                selected_oos = scoped_oos.get(selected_horizon) or {}
-                if not isinstance(selected_oos, Mapping) or not selected_oos:
-                    return self._fail_closed_prediction("symbol_horizon_oos_missing")
-            else:
-                selected_oos = (oos.get("sealed_by_horizon") or {}).get(selected_horizon) or {}
             target_definition = str(
                 self.metadata.get("target_definition") or "terminal_profit"
             ).strip().lower()
             harvest_mode = target_definition in {"mfe_first", "fast_harvest"}
             captured_exit_mode = target_definition == "captured_exit_replay"
+
+            def horizon_oos(horizon_key: str) -> Mapping[str, Any]:
+                if self.execution_status == "EXECUTION_CANDIDATE":
+                    scoped = (
+                        (oos.get("sealed_by_symbol_horizon") or {})
+                        .get(normalized_symbol) or {}
+                    )
+                    value = scoped.get(horizon_key) or {}
+                else:
+                    value = (oos.get("sealed_by_horizon") or {}).get(horizon_key) or {}
+                return value if isinstance(value, Mapping) else {}
+
+            def horizon_returns(metrics: Mapping[str, Any]) -> tuple[Any, Any]:
+                return (
+                    metrics.get("mean_captured_exit_return") if captured_exit_mode
+                    else metrics.get("mean_harvest_return") if harvest_mode
+                    else metrics.get("mean_terminal_return"),
+                    metrics.get("captured_exit_lcb95_return") if captured_exit_mode
+                    else metrics.get("harvest_lcb95_return") if harvest_mode
+                    else metrics.get("expectancy_lcb95_return"),
+                )
+
+            money_spec = None
+            lots = None
+            if broker_spec is not None or quantity is not None:
+                if broker_spec is None or quantity is None:
+                    return self._fail_closed_prediction("broker_money_evidence_incomplete")
+                money_spec = BrokerSymbolSpec.from_mapping(broker_spec)
+                lots = float(quantity)
+                if lots <= 0:
+                    return self._fail_closed_prediction("broker_quantity_invalid")
+            mid = float(features["mid"])
+            for horizon_key, horizon_prediction in by_horizon.items():
+                metrics = horizon_oos(horizon_key)
+                expected_return, expected_lcb_return = horizon_returns(metrics)
+                if money_spec is not None and lots is not None:
+                    horizon_net = (
+                        money_spec.price_units_to_usd(float(expected_return) * mid, lots)
+                        if expected_return is not None else 0.0
+                    )
+                    horizon_net_lcb95 = (
+                        money_spec.price_units_to_usd(float(expected_lcb_return) * mid, lots)
+                        if expected_lcb_return is not None else 0.0
+                    )
+                elif notional_usd is not None:
+                    horizon_net = (
+                        float(expected_return) * mid * float(notional_usd)
+                        if expected_return is not None else 0.0
+                    )
+                    horizon_net_lcb95 = (
+                        float(expected_lcb_return) * mid * float(notional_usd)
+                        if expected_lcb_return is not None else 0.0
+                    )
+                else:
+                    # A horizon without broker money context cannot authorize
+                    # executable Firehose activity.
+                    horizon_net = 0.0
+                    horizon_net_lcb95 = 0.0
+                horizon_prediction.update({
+                    "horizon_s": int(horizon_key),
+                    "calibration_status": "calibrated",
+                    "expected_net_pnl": horizon_net,
+                    "expected_net_pnl_lcb95": horizon_net_lcb95,
+                    "expected_captured_exit_return": (
+                        expected_return if captured_exit_mode else None
+                    ),
+                    "expected_captured_exit_return_lcb95": (
+                        expected_lcb_return if captured_exit_mode else None
+                    ),
+                    "expected_harvest_return": expected_return if harvest_mode else None,
+                    "expected_harvest_return_lcb95": expected_lcb_return if harvest_mode else None,
+                    "prediction_reason": horizon_prediction.get(
+                        "abstain_reason", "ensemble_eligible"
+                    ),
+                })
+
+            executable_horizons = [
+                (key, value) for key, value in by_horizon.items()
+                if bool(value.get("decision"))
+                and not bool(value.get("abstain"))
+                and float(value.get("expected_net_pnl") or 0.0) > 0.0
+                and float(value.get("expected_net_pnl_lcb95") or 0.0) > 0.0
+            ]
+            selected_horizon = str(int(self.metadata.get("decision_horizon_s", 10) or 10))
+            if executable_horizons:
+                selected_horizon = max(
+                    executable_horizons,
+                    key=lambda item: (
+                        float(item[1].get("expected_net_pnl") or 0.0),
+                        float(item[1].get("probability") or 0.0),
+                    ),
+                )[0]
+            selected = by_horizon.get(selected_horizon) or next(iter(by_horizon.values()))
+            selected_oos = horizon_oos(selected_horizon)
+            if self.execution_status == "EXECUTION_CANDIDATE" and not selected_oos:
+                return self._fail_closed_prediction("symbol_horizon_oos_missing")
             expected_return = (
                 selected_oos.get("mean_captured_exit_return") if captured_exit_mode
                 else selected_oos.get("mean_harvest_return") if harvest_mode
@@ -497,19 +582,14 @@ class ShortHorizonPredictor:
                 # accidentally reported as USD. The artifact return is a
                 # relative price return, so convert it back to price units
                 # before applying the broker's USD-per-price-unit value.
-                if broker_spec is None or quantity is None:
+                if money_spec is None or lots is None:
                     return self._fail_closed_prediction("broker_money_evidence_incomplete")
-                spec = BrokerSymbolSpec.from_mapping(broker_spec)
-                lots = float(quantity)
-                if lots <= 0:
-                    return self._fail_closed_prediction("broker_quantity_invalid")
-                mid = float(features["mid"])
                 expected_net = (
-                    spec.price_units_to_usd(float(expected_return) * mid, lots)
+                    money_spec.price_units_to_usd(float(expected_return) * mid, lots)
                     if expected_return is not None else 0.0
                 )
                 expected_net_lcb95 = (
-                    spec.price_units_to_usd(float(expected_lcb_return) * mid, lots)
+                    money_spec.price_units_to_usd(float(expected_lcb_return) * mid, lots)
                     if expected_lcb_return is not None else 0.0
                 )
             elif notional_usd is not None:

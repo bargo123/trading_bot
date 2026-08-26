@@ -375,6 +375,45 @@ def short_horizon_gate(
     return True, "short_horizon_eligible"
 
 
+def _prediction_for_candidate(
+    prediction: Mapping[str, Any] | None,
+    *,
+    side: str,
+    horizon_s: int,
+) -> dict[str, Any] | None:
+    """Select the calibrated result for one exact side/horizon variant."""
+    if not isinstance(prediction, Mapping):
+        return None
+    side_predictions = prediction.get("side_predictions")
+    side_prediction = (
+        side_predictions.get(str(side).lower())
+        if isinstance(side_predictions, Mapping)
+        else None
+    )
+    if not isinstance(side_prediction, Mapping):
+        if str(prediction.get("selected_side") or "").lower() != str(side).lower():
+            return None
+        side_prediction = prediction
+    by_horizon = side_prediction.get("by_horizon")
+    if not isinstance(by_horizon, Mapping):
+        selected_horizon = side_prediction.get("decision_horizon_s")
+        try:
+            if int(selected_horizon) != int(horizon_s):
+                return None
+        except (TypeError, ValueError):
+            return None
+        return dict(side_prediction)
+    selected = by_horizon.get(str(int(horizon_s)))
+    if not isinstance(selected, Mapping):
+        return None
+    return {
+        **dict(side_prediction),
+        **dict(selected),
+        "decision_horizon_s": int(horizon_s),
+        "by_horizon": dict(by_horizon),
+    }
+
+
 def _load_strategy(cfg: Mapping[str, Any]) -> ValidatedStrategyModel | None:
     """Load a promoted champion. Only a sealed-validation accepted artifact can
     reach DEMO_CHAMPION stage; anything else returns None (no pseudo-champion)."""
@@ -815,17 +854,12 @@ class IntelligentFirehoseBrain:
 
     def record_exploration_close(self, *, hypothesis_id: str, pnl: float,
                                  **meta: Any) -> dict[str, Any] | None:
-        """Sequential-learning hook: every closed exploration trade updates its
-        experiment's evidence; losses arm the per-hypothesis cooldown."""
+        """Sequential-learning hook for state-specific experiment memory."""
         rec = self.experiments.record_close(
             hypothesis_id=hypothesis_id, pnl=pnl,
             max_trades=self._exploration_limits.max_trades_per_hypothesis,
             **meta,
         )
-        if rec is not None and float(pnl) <= 0:
-            self.experiments.note_failure(
-                hypothesis_id, self._exploration_limits.cooldown_after_failure_s,
-            )
         return rec
 
     def _measured_hedge_cost(self, symbol: str) -> float | None:
@@ -908,6 +942,10 @@ class IntelligentFirehoseBrain:
         quote_buffer: Any = None,
         now_ts: float | None = None,
         video_candidate: Any = None,
+        previous_row: Any = None,
+        positions: Sequence[PositionSnapshot] = (),
+        short_horizon_prediction: Mapping[str, Any] | None = None,
+        exploration_shadow_model_probe: bool = False,
     ) -> tuple[DemoDecision | None, str | None]:
         """Exploration Firehose gate chain. Returns (fire_decision, skip_reason).
 
@@ -1016,16 +1054,14 @@ class IntelligentFirehoseBrain:
                 budget2 = self._exploration_limits.max_risk_per_trade_usd * 2
                 if spread_cost is not None and spread_cost > budget2:
                     return None, "self_hedge_blocked_spread_cost_exceeds_budget"
-        if not portfolio_ok:
-            return None, portfolio_reason or "portfolio_risk"
-
         # --- FAST_TURNOVER_FIREHOSE: build REAL FastMarketContext from
         # genuine point-in-time M1/M5/M15 data. NO fabricated values.
         from aegis.intel.fast_firehose import (
             FastMarketContext,
             check_entry_economics,
             diagnose_micro_candidates,
-            generate_micro_search_candidates,
+            generate_runtime_search_candidates,
+            runtime_mechanism_specs,
         )
 
         bid_px = float(actual_bid) if actual_bid is not None else None
@@ -1151,17 +1187,19 @@ class IntelligentFirehoseBrain:
         micro_cands, micro_diagnostics = diagnose_micro_candidates(ctx)
         horizons = self._search_horizons()
         self._search_horizons_seen.update(horizons)
-        self._search_mechanisms_seen.update({
-            "micro_momentum_burst", "failed_breakout_fade", "fair_value_snapback",
-        })
-        variants_per_side = 3 * len(horizons)
+        runtime_specs = runtime_mechanism_specs()
+        self._search_mechanisms_seen.update(spec.mechanism_id for spec in runtime_specs)
+        variants_per_side = max(0, len(runtime_specs) - 1) * len(horizons)
         self.counts["buy_variants_tested"] = int(
             self.counts.get("buy_variants_tested", 0)
         ) + variants_per_side
         self.counts["sell_variants_tested"] = int(
             self.counts.get("sell_variants_tested", 0)
         ) + variants_per_side
-        search_cands = generate_micro_search_candidates(ctx, horizons=horizons)
+        search_cands = generate_runtime_search_candidates(
+            ctx, row=row, previous_row=previous_row, cfg=self.cfg,
+            horizons=horizons,
+        )
         if video_candidate is not None:
             if not getattr(video_candidate, "variant_id", ""):
                 video_candidate.variant_id = (
@@ -1211,6 +1249,45 @@ class IntelligentFirehoseBrain:
                 ),
             )
             candidate_evidence = evidence
+            candidate_prediction = _prediction_for_candidate(
+                short_horizon_prediction,
+                side=str(mc.side), horizon_s=int(mc.max_hold_s),
+            )
+            p_green = None
+            if candidate_prediction is not None:
+                try:
+                    p_green = float(candidate_prediction.get("probability"))
+                except (TypeError, ValueError):
+                    p_green = None
+            if short_horizon_prediction is not None:
+                shadow_probe = bool(
+                    exploration_shadow_model_probe
+                    and str(short_horizon_prediction.get("abstain_reason") or "")
+                    == "artifact_shadow_only"
+                )
+                if not shadow_probe:
+                    if candidate_prediction is None:
+                        reason = "horizon_prediction_missing"
+                        all_rejections.append(reason)
+                        candidate_evaluations.append(self._record_search_evaluation(
+                            candidate=mc, reasons=[reason], p_green=p_green,
+                        ))
+                        continue
+                    candidate_ok, candidate_reason = short_horizon_gate(
+                        candidate_prediction,
+                        min_probability=(
+                            float(self.cfg["short_horizon_min_probability"])
+                            if self.cfg.get("short_horizon_min_probability") is not None
+                            else None
+                        ),
+                    )
+                    if not candidate_ok:
+                        reason = f"horizon_prediction:{candidate_reason}"
+                        all_rejections.append(reason)
+                        candidate_evaluations.append(self._record_search_evaluation(
+                            candidate=mc, reasons=[reason], p_green=p_green,
+                        ))
+                        continue
             if mc.side != side or mc.family != setup:
                 try:
                     variant_signature = dict(signature)
@@ -1226,7 +1303,8 @@ class IntelligentFirehoseBrain:
                     )
                 except Exception:
                     candidate_evidence = None
-            p_green = getattr(candidate_evidence, "win_probability", None)
+            if p_green is None:
+                p_green = getattr(candidate_evidence, "win_probability", None)
             if not econ["allowed"]:
                 reasons = [str(reason) for reason in econ.get("rejections", [])]
                 all_rejections.extend(reasons)
@@ -1268,6 +1346,29 @@ class IntelligentFirehoseBrain:
                 ))
                 continue
 
+            candidate_portfolio_ok, candidate_portfolio_reason = pretrade_ok(
+                positions=list(positions),
+                symbol=str(mc.symbol).upper(), side=str(mc.side),
+                quantity=float(sizing_preview["lots"]),
+                avg_price=float(mc.entry_price),
+                cfg={
+                    "max_positions": int(self.cfg.get("max_positions", 40) or 40),
+                    "max_currency_direction_positions": int(
+                        self.cfg.get("max_currency_direction_positions", 0) or 0
+                    ),
+                    "max_per_symbol": int(
+                        self.cfg.get("intelligent_max_clips_per_thesis", 5) or 5
+                    ),
+                },
+            )
+            if not candidate_portfolio_ok:
+                reason = f"portfolio:{candidate_portfolio_reason or 'rejected'}"
+                all_rejections.append(reason)
+                candidate_evaluations.append(self._record_search_evaluation(
+                    candidate=mc, reasons=[reason], p_green=p_green,
+                ))
+                continue
+
             candidate_econ = self._trade_economics(
                 side=mc.side,
                 entry=mc.entry_price,
@@ -1280,6 +1381,7 @@ class IntelligentFirehoseBrain:
                     0.3 * float(pip) if slippage_price is None else slippage_price
                 ),
                 evidence=candidate_evidence,
+                p_win=p_green,
             )
             if not candidate_econ.acceptable:
                 reason = str(candidate_econ.reason or "net_ev_rejected")
@@ -1396,6 +1498,7 @@ class IntelligentFirehoseBrain:
                 })
             return None, str(sizing.get("reason"))
         lots = float(sizing["lots"])
+        selected_p_win = getattr(exploration_econ, "p_win", None)
 
         # Exploration owns the final micro-candidate geometry, so price that
         # exact order after sizing as well. A structural target alone is not
@@ -1413,6 +1516,7 @@ class IntelligentFirehoseBrain:
                 0.3 * float(pip) if slippage_price is None else slippage_price
             ),
             evidence=candidate_evidence,
+            p_win=selected_p_win,
         )
         if not exploration_econ.acceptable:
             return None, (
@@ -1437,7 +1541,7 @@ class IntelligentFirehoseBrain:
         record, created = self.experiments.register(
             {
                 "hypothesis_id": hyp_id,
-                "strategy_family": setup,
+                "strategy_family": variant_identity,
                 "symbol": symbol,
                 "side": side,
                 "entry_rule": f"{setup} {side} on {regime}/{session} state at market"
@@ -1749,6 +1853,7 @@ class IntelligentFirehoseBrain:
         spread_price: float | None,
         slippage_price: float | None,
         evidence: Any,
+        p_win: float | None = None,
     ) -> TradeEconomics:
         """Price the prospective trade. Win probability comes from analogue evidence.
 
@@ -1772,6 +1877,7 @@ class IntelligentFirehoseBrain:
             spread_price=spread_price,
             slippage_price=slippage_price,
             commission_round_trip_usd=float(self.cfg.get("commission_round_trip_usd", 0.0) or 0.0),
+            p_win=p_win,
             analogue_n=analogue_n,
             analogue_n_losses=analogue_losses,
             min_payoff_ratio=float(
@@ -1799,6 +1905,7 @@ class IntelligentFirehoseBrain:
         now_ts: float | None = None,
         video_style: bool = False,
         short_horizon_prediction: Mapping[str, Any] | None = None,
+        previous_row: pd.Series | None = None,
     ) -> DemoDecision:
         clip_qty = float(self.cfg.get("order_quantity", 0.01))
         clip_risk = max(self._risk_budget * float(self.cfg.get("intelligent_risk_fraction", 0.08)) / 5.0, 0.01)
@@ -2320,6 +2427,10 @@ class IntelligentFirehoseBrain:
                 quote_buffer=quote_buffer,
                 now_ts=now_ts,
                 video_candidate=video_candidate,
+                previous_row=previous_row,
+                positions=positions,
+                short_horizon_prediction=short_horizon_prediction,
+                exploration_shadow_model_probe=exploration_shadow_model_probe,
             )
             if exp_decision is not None:
                 # Explicit exploration classification (audited fix, defect 6).

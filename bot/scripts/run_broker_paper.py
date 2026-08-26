@@ -67,6 +67,7 @@ from aegis.intel.firehose_runtime_evidence import (  # noqa: E402
     build_runtime_snapshot,
 )
 from aegis.intel.ticket_metadata import firehose_lifecycle_identity  # noqa: E402
+from aegis.intel.send_guard import candidate_spread_limit  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,34 @@ def video_style_signal_for_scan(
         return video_style_signal(completed_m1, symbol=symbol)
     except (AttributeError, KeyError, TypeError, ValueError):
         return None
+
+
+def intelligent_refresh_spread_limit(decision, cfg) -> float:
+    """Return the selected intelligent candidate's executable spread budget.
+
+    Legacy modes keep the configured universal spread ceiling. Intelligent
+    candidates use their already-priced reward geometry and cost inputs;
+    missing candidate economics fail closed with a zero budget.
+    """
+    journal = dict(getattr(decision, "journal", {}) or {})
+    nested = journal.get("exploration_economics")
+    economics = dict(nested) if isinstance(nested, dict) else journal
+    try:
+        entry = float(economics["econ_entry"])
+        target = float(economics["econ_target"])
+        per_unit = economics.get("econ_usd_per_price_unit")
+        commission = float(cfg.get("commission_round_trip_usd", 0.0) or 0.0)
+        slippage_bps = abs(float(cfg.get("slippage_bps", 0.0) or 0.0))
+        slippage_price = abs(entry) * slippage_bps / 10000.0
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return 0.0
+    return candidate_spread_limit(
+        entry=entry,
+        target=target,
+        slippage_price=slippage_price,
+        commission_round_trip_usd=commission,
+        usd_per_price_unit=per_unit,
+    )
 
 
 def firehose_decision_snapshot(
@@ -1518,6 +1547,7 @@ def main() -> None:
                     now_ts=now_ts,
                     video_style=video_style_mode,
                     short_horizon_prediction=selected_prediction,
+                    previous_row=(frame.iloc[-3] if len(frame) >= 3 else None),
                 )
                 brain_decision = decision
                 _book_logic = decision.journal.get("book_logic") or {}
@@ -2052,6 +2082,11 @@ def main() -> None:
                     new_spread=live_spread,
                     max_age_s=max_age_send,
                     max_spread=max_spread,
+                    candidate_spread_limit=(
+                        intelligent_refresh_spread_limit(brain_decision, cfg)
+                        if intelligent_mode and brain_decision is not None
+                        else None
+                    ),
                 )
                 if not verdict.ok:
                     quote_refresh_counts["candidate_invalidated_after_refresh"] += 1

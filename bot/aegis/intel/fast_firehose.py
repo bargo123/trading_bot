@@ -174,6 +174,15 @@ class MicroCandidate:
         return self.net_target_pips > 0.1 and self.payoff >= 0.5
 
 
+@dataclass(frozen=True)
+class RuntimeMechanismSpec:
+    """One already-implemented mechanism compiled for local runtime search."""
+
+    mechanism_id: str
+    source_kind: str
+    source_refs: tuple[str, ...] = ()
+
+
 # ---------------------------------------------------------------------------
 # Micro-firehose families (Phase 5)
 # Each returns a MicroCandidate or None if conditions don't match.
@@ -441,6 +450,146 @@ def generate_micro_search_candidates(
                     max_hold_s=horizon_s,
                     variant_id=variant_id,
                 ))
+    return candidates
+
+
+def runtime_mechanism_specs() -> tuple[RuntimeMechanismSpec, ...]:
+    """Return the executable mechanisms available to the fast search layer.
+
+    The catalog strategies are existing deterministic signal functions.  This
+    registry is only a runtime compilation index; it grants no execution
+    authority and every emitted candidate still passes the normal gates.
+    """
+    specs = [
+        RuntimeMechanismSpec("micro_momentum_burst", "DATA_DERIVED"),
+        RuntimeMechanismSpec("failed_breakout_fade", "BOOK_DERIVED"),
+        RuntimeMechanismSpec("fair_value_snapback", "DATA_DERIVED"),
+        RuntimeMechanismSpec("video_style_breakout", "VIDEO_BEHAVIOR"),
+    ]
+    from aegis.strategies_catalog import STRATEGIES
+
+    specs.extend(
+        RuntimeMechanismSpec(
+            strategy.id,
+            "BOOK_DERIVED",
+            (strategy.book_basis,),
+        )
+        for strategy in STRATEGIES
+    )
+    return tuple(specs)
+
+
+def _compiled_catalog_candidate(
+    ctx: FastMarketContext,
+    *,
+    row: Any,
+    previous_row: Any,
+    cfg: Mapping[str, Any],
+    strategy: Any,
+    horizon_s: int,
+) -> MicroCandidate | None:
+    """Adapt one existing catalog signal into broker-priced candidate geometry."""
+    if row is None or not hasattr(row, "copy"):
+        return None
+    working = row.copy()
+    if previous_row is not None and hasattr(previous_row, "get"):
+        for name in ("ema_fast", "ema_slow", "macd", "macd_signal", "macd_hist", "ema_13"):
+            working[f"{name}_prev"] = previous_row.get(name)
+    try:
+        signal = strategy.signal_fn(working, dict(cfg))
+    except Exception:
+        return None
+    if signal is None or signal.side not in {"buy", "sell"}:
+        return None
+    entry = ctx.ask if signal.side == "buy" else ctx.bid
+    if entry is None:
+        return None
+    try:
+        stop = float(signal.sl)
+        entry = float(entry)
+        atr = float(working.get("atr"))
+    except (TypeError, ValueError):
+        return None
+    if not all(value == value and abs(value) != float("inf") for value in (entry, stop, atr)):
+        return None
+    target = signal.tp
+    if target is None:
+        # Catalog trend signals specify an ATR-trailing exit rather than a
+        # fixed TP.  Compile that explicit exit thesis into a conservative 1R
+        # capture floor so costed runtime economics remain testable.
+        trail = float(signal.trail_atr_mult or 1.0)
+        target_distance = max(abs(entry - stop), abs(atr) * max(trail, 1.0))
+        target = entry + (target_distance if signal.side == "buy" else -target_distance)
+    try:
+        target = float(target)
+    except (TypeError, ValueError):
+        return None
+    if signal.side == "buy" and not stop < entry < target:
+        return None
+    if signal.side == "sell" and not target < entry < stop:
+        return None
+    pip = pip_value(ctx.symbol)
+    stop_pips = abs(entry - stop) / max(pip, 1e-12)
+    target_pips = abs(target - entry) / max(pip, 1e-12)
+    if stop_pips <= 0 or target_pips <= 0:
+        return None
+    family = str(strategy.id)
+    variant_id = f"{family}:{signal.side}:{int(horizon_s)}s"
+    return MicroCandidate(
+        hypothesis_id=firehose_hypothesis_id(
+            family=f"{family}@{int(horizon_s)}s", symbol=ctx.symbol,
+            side=signal.side, regime=str(getattr(signal, "mode", "") or ""),
+            session=str(ctx.session or ""),
+        ),
+        family=family,
+        symbol=ctx.symbol,
+        side=signal.side,
+        entry_price=entry,
+        invalidation=stop,
+        target=target,
+        max_hold_s=int(horizon_s),
+        required_regime=str(getattr(signal, "mode", "") or ""),
+        required_session=str(ctx.session or ""),
+        spread_pips=float(ctx.spread_pips or 0.0),
+        stop_pips=round(stop_pips, 4),
+        target_pips=round(target_pips, 4),
+        risk_usd_min_lot=0.0,
+        lane=FirehoseLane.SHADOW_MICRO,
+        mechanism=(
+            f"compiled catalog {family}: {strategy.book_basis}; "
+            + ("explicit target" if signal.tp is not None
+               else "ATR trailing exit with 1R capture floor")
+        ),
+        book_family=family,
+        falsification="negative executable OOS expectancy after measured costs",
+        variant_id=variant_id,
+    )
+
+
+def generate_runtime_search_candidates(
+    ctx: FastMarketContext,
+    *,
+    row: Any = None,
+    previous_row: Any = None,
+    cfg: Mapping[str, Any] | None = None,
+    horizons: tuple[int, ...] = SEARCH_HORIZONS_S,
+) -> list[MicroCandidate]:
+    """Generate micro plus every compiled catalog strategy for each horizon."""
+    candidates = generate_micro_search_candidates(ctx, horizons=horizons)
+    if row is None:
+        return candidates
+    from aegis.strategies_catalog import STRATEGIES
+
+    settings = dict(cfg or {})
+    valid_horizons = tuple(sorted({int(value) for value in horizons if int(value) > 0}))
+    for strategy in STRATEGIES:
+        for horizon_s in valid_horizons:
+            candidate = _compiled_catalog_candidate(
+                ctx, row=row, previous_row=previous_row, cfg=settings,
+                strategy=strategy, horizon_s=horizon_s,
+            )
+            if candidate is not None:
+                candidates.append(candidate)
     return candidates
 
 

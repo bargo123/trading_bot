@@ -10,8 +10,9 @@ a stable hypothesis_id. Sequential evidence updates after every closed trade;
 bad experiments are REJECTED permanently and remembered (failed-experiment
 memory blocks rediscovery of the same idea).
 
-Hard limits are independent of champion/canary limits and conservative for a
-~$100 DEMO account by default. Exploration can NEVER:
+Per-trade risk and broker/portfolio gates remain hard limits; optional
+exploration slot and cooldown caps are disabled when configured as zero.
+Exploration can NEVER:
   martingale / average down / recover losses / size up when behind /
   bypass max positions or currency concentration / bypass stale-quote or
   spread checks / touch a live account.
@@ -34,6 +35,16 @@ EXPERIMENT_SCHEMA = "exploration_experiments.v1"
 MIN_N_TO_JUDGE = 4
 REJECT_EXPECTANCY = 0.0     # expectancy <= this at judgement -> REJECTED
 PROMISE_P05 = 0.0           # bootstrap-ish lower bound > this -> PROMISING
+
+
+def _optional_positive_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return parsed if parsed > 0 else None
 
 LIFECYCLE_NEW = "NEW"
 LIFECYCLE_ACTIVE = "ACTIVE"
@@ -61,12 +72,14 @@ def hypothesis_id(*, strategy_family: str, symbol: str, side: str,
 class ExplorationLimits:
     """Independent hard limits for exploration exposure (DEMO only)."""
 
-    max_positions: int = 2
-    max_positions_per_symbol: int = 1
+    # ``None`` means no exploration-specific slot cap.  Runtime portfolio,
+    # margin, currency, and thesis gates remain authoritative.
+    max_positions: int | None = None
+    max_positions_per_symbol: int | None = None
     max_daily_loss_usd: float = 1.0
     max_risk_per_trade_usd: float = 0.15
     max_trades_per_hypothesis: int = 5
-    cooldown_after_failure_s: int = 1800
+    cooldown_after_failure_s: int = 0
 
     @classmethod
     def from_cfg(cls, cfg: Mapping[str, Any]) -> "ExplorationLimits":
@@ -74,12 +87,16 @@ class ExplorationLimits:
         if daily_loss_limit is None:
             daily_loss_limit = 1.0
         return cls(
-            max_positions=int(cfg.get("exploration_max_positions", 2) or 2),
-            max_positions_per_symbol=int(cfg.get("exploration_max_positions_per_symbol", 1) or 1),
+            max_positions=_optional_positive_int(cfg.get("exploration_max_positions")),
+            max_positions_per_symbol=_optional_positive_int(
+                cfg.get("exploration_max_positions_per_symbol")
+            ),
             max_daily_loss_usd=float(daily_loss_limit),
             max_risk_per_trade_usd=float(cfg.get("exploration_max_risk_per_trade_usd", 0.15) or 0.15),
             max_trades_per_hypothesis=int(cfg.get("exploration_max_trades_per_hypothesis", 5) or 5),
-            cooldown_after_failure_s=int(cfg.get("exploration_cooldown_after_failure_s", 1800) or 1800),
+            cooldown_after_failure_s=max(
+                0, int(cfg.get("exploration_cooldown_after_failure_s", 0) or 0)
+            ),
         )
 
 
@@ -412,15 +429,20 @@ def check_exploration_limits(
     exploration_open_symbol: int,
 ) -> tuple[bool, str]:
     """All limits must pass; each rejection reason is specific."""
-    if exploration_open_total >= limits.max_positions:
+    if limits.max_positions is not None and exploration_open_total >= limits.max_positions:
         return False, f"exploration_max_positions:{exploration_open_total}"
-    if exploration_open_symbol >= limits.max_positions_per_symbol:
+    if (
+        limits.max_positions_per_symbol is not None
+        and exploration_open_symbol >= limits.max_positions_per_symbol
+    ):
         return False, "exploration_max_positions_per_symbol"
     if limits.max_daily_loss_usd > 0 and store.daily_pnl() <= -limits.max_daily_loss_usd:
         return False, f"exploration_max_daily_loss_usd:{store.daily_pnl():.2f}"
     if store.hypothesis_trade_count(hypothesis_id) >= limits.max_trades_per_hypothesis:
         return False, "exploration_max_trades_per_hypothesis"
-    if store.cooldown_active(hypothesis_id, limits.cooldown_after_failure_s):
+    if limits.cooldown_after_failure_s > 0 and store.cooldown_active(
+        hypothesis_id, limits.cooldown_after_failure_s
+    ):
         return False, "exploration_cooldown_after_failure"
     # Portfolio-level caps remain the caller's pretrade_ok responsibility.
     _ = open_positions_total, open_positions_symbol
@@ -439,9 +461,12 @@ def exploration_room_reason(
     cap, there is NO room for the current order - even before counting its own
     reservation. Returns a rejection reason or None when room exists.
     """
-    if int(total_open) >= int(limits.max_positions):
+    if limits.max_positions is not None and int(total_open) >= int(limits.max_positions):
         return f"exploration_max_positions:{int(total_open)}"
-    if int(symbol_open) >= int(limits.max_positions_per_symbol):
+    if (
+        limits.max_positions_per_symbol is not None
+        and int(symbol_open) >= int(limits.max_positions_per_symbol)
+    ):
         return "exploration_max_positions_per_symbol"
     return None
 

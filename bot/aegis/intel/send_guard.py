@@ -25,6 +25,7 @@ def refresh_verdict(
     new_spread: float,
     max_age_s: float,
     max_spread: float,
+    candidate_spread_limit: float | None = None,
 ) -> RefreshVerdict:
     """After fetching ONE fresh tick, decide whether the candidate survives.
 
@@ -34,9 +35,49 @@ def refresh_verdict(
     """
     if max_age_s > 0 and float(new_age_s) > float(max_age_s):
         return RefreshVerdict(False, "refresh_still_stale")
-    if max_spread > 0 and float(new_spread) > float(max_spread) + 1e-12:
-        return RefreshVerdict(False, "spread_widened_beyond_max")
+    spread_limit = (
+        float(candidate_spread_limit)
+        if candidate_spread_limit is not None
+        else float(max_spread)
+    )
+    if spread_limit > 0 and float(new_spread) > spread_limit + 1e-12:
+        reason = (
+            "spread_widened_beyond_candidate_limit"
+            if candidate_spread_limit is not None
+            else "spread_widened_beyond_max"
+        )
+        return RefreshVerdict(False, reason)
     return RefreshVerdict(True, "fresh_quote_recovered")
+
+
+def candidate_spread_limit(
+    *,
+    entry: float,
+    target: float,
+    slippage_price: float = 0.0,
+    commission_round_trip_usd: float = 0.0,
+    usd_per_price_unit: float | None = None,
+) -> float:
+    """Return the candidate-specific spread budget for a fresh quote.
+
+    The executable reward must still clear measured slippage and commission.
+    A missing/invalid geometry yields zero, so the refresh guard fails closed.
+    """
+    try:
+        reward = abs(float(target) - float(entry))
+        slippage = abs(float(slippage_price or 0.0))
+        if reward != reward or slippage != slippage or reward <= 0:
+            return 0.0
+        commission = max(0.0, float(commission_round_trip_usd or 0.0))
+        if commission > 0:
+            if usd_per_price_unit is None or float(usd_per_price_unit) <= 0:
+                return 0.0
+            commission_price = commission / float(usd_per_price_unit)
+        else:
+            commission_price = 0.0
+        return max(0.0, reward - slippage - commission_price)
+    except (TypeError, ValueError, OverflowError, ZeroDivisionError):
+        return 0.0
 
 
 def margin_precheck_ok(

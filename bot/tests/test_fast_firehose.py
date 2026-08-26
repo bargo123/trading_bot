@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -19,6 +20,7 @@ from aegis.intel.fast_firehose import (  # noqa: E402
     diagnose_micro_candidates,
     generate_micro_candidates,
     generate_micro_search_candidates,
+    runtime_mechanism_specs,
     micro_momentum_burst,
     failed_breakout_fade,
     fair_value_snapback,
@@ -264,6 +266,39 @@ def test_search_candidates_enumerate_both_sides_and_learned_horizons():
         "micro_momentum_burst", "failed_breakout_fade", "fair_value_snapback",
     }
     assert all(candidate.variant_id for candidate in candidates)
+
+
+def test_runtime_registry_exposes_compiled_catalog_mechanisms():
+    ids = {spec.mechanism_id for spec in runtime_mechanism_specs()}
+
+    assert {
+        "micro_momentum_burst", "failed_breakout_fade", "fair_value_snapback",
+        "video_style_breakout", "aegis_range_hw", "donch55", "donch20",
+        "ema_cross", "rsi_pure", "bb_mr", "macd_cross", "stoch_mr",
+        "atr_breakout", "bb_squeeze", "elder_impulse",
+    } <= ids
+
+
+def test_compiled_catalog_candidate_uses_executable_quote_geometry():
+    from aegis.intel.fast_firehose import generate_runtime_search_candidates
+
+    row = pd.Series({
+        "time": pd.Timestamp("2026-08-21T12:00:00Z"), "close": 1.0990,
+        "atr": 0.0005, "adx": 10.0, "rsi": 20.0,
+        "bb_lower": 1.0995, "bb_upper": 1.1005, "bb_mid": 1.1000,
+        "ema_fast": 1.1000, "ema_slow": 1.1002,
+    })
+    candidates = generate_runtime_search_candidates(
+        _ctx(symbol="EURUSD", bid=1.09898, ask=1.09900, spread_pips=0.2),
+        row=row, previous_row=row, cfg={"session_start_utc": 0, "session_end_utc": 24},
+        horizons=(3,),
+    )
+
+    range_candidates = [c for c in candidates if c.family == "aegis_range_hw"]
+    assert range_candidates
+    candidate = range_candidates[0]
+    assert candidate.entry_price == pytest.approx(1.09900)
+    assert candidate.invalidation < candidate.entry_price < candidate.target
 
 
 def test_entry_economics_reports_near_miss_distances():

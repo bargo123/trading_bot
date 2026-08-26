@@ -196,6 +196,38 @@ def test_per_hypothesis_trade_cap_and_failure_cooldown(store):
     assert not ok and reason == "exploration_cooldown_after_failure"
 
 
+def test_zero_exploration_concurrency_and_cooldown_are_disabled():
+    limits = ExplorationLimits.from_cfg({
+        "exploration_max_positions": 0,
+        "exploration_max_positions_per_symbol": 0,
+        "exploration_cooldown_after_failure_s": 0,
+    })
+
+    assert limits.max_positions is None
+    assert limits.max_positions_per_symbol is None
+    assert limits.cooldown_after_failure_s == 0
+
+
+def test_exploration_close_does_not_pause_unrelated_search_after_one_loss(tmp_path):
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "records": []}), encoding="utf-8")
+    brain = IntelligentFirehoseBrain({
+        "analogue_index_path": str(index),
+        "exploration_cooldown_after_failure_s": 1800,
+    })
+    rec, _ = brain.experiments.register(
+        {"hypothesis_id": "h-loss", "strategy_family": "x", "symbol": "EURUSD",
+         "side": "buy", "regime": "range", "session": "asia"},
+        reason="test", mechanism="test",
+    )
+
+    brain.record_exploration_close(hypothesis_id=rec["hypothesis_id"], pnl=-0.01)
+
+    assert "cooldown_until_utc" not in brain.experiments.data["experiments"]["h-loss"]
+
+
 def test_tiny_fixed_risk_sizing_rejects_when_min_lot_exceeds_budget():
     """Audited defect 1: broker-minimum lot whose stop risk exceeds the
     configured budget MUST be rejected - never rounded up to 0.01."""

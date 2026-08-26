@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from aegis.engines.base import PositionSnapshot
 from aegis.intel.firehose_basket import BasketMetadataStore
@@ -23,8 +24,10 @@ from scripts.run_broker_paper import (
     remove_confirmed_firehose_basket,
     remove_confirmed_firehose_basket_then_cleanup,
     firehose_decision_snapshot,
+    intelligent_refresh_spread_limit,
     video_style_signal_for_scan,
 )
+from aegis.intel.send_guard import candidate_spread_limit, refresh_verdict
 
 
 def test_risk_halt_records_one_terminal_funnel_row_without_order_intent():
@@ -107,6 +110,57 @@ def test_order_margin_for_send_uses_broker_native_calculator_for_cross_currency_
 
     assert margin == 30.0
     assert source == "broker_native"
+
+
+def test_intelligent_refresh_uses_candidate_spread_allowance_not_legacy_ceiling():
+    allowance = candidate_spread_limit(
+        entry=1.1000, target=1.1010, slippage_price=0.0001,
+        commission_round_trip_usd=0.0, usd_per_price_unit=1000.0,
+    )
+
+    verdict = refresh_verdict(
+        new_age_s=0.1, new_spread=0.00005, max_age_s=5.0,
+        max_spread=0.00003, candidate_spread_limit=allowance,
+    )
+
+    assert allowance == pytest.approx(0.0009)
+    assert verdict.ok is True
+
+
+def test_runner_derives_candidate_spread_limit_from_selected_economics():
+    decision = type("Decision", (), {
+        "journal": {
+            "exploration_economics": {
+                "econ_entry": 1.1000,
+                "econ_target": 1.1010,
+                "econ_usd_per_price_unit": 1000.0,
+            }
+        }
+    })()
+
+    assert intelligent_refresh_spread_limit(
+        decision, {"commission_round_trip_usd": 0.0, "slippage_bps": 0.0}
+    ) == pytest.approx(0.001)
+
+
+def test_intelligent_refresh_rejects_destructive_candidate_spread():
+    verdict = refresh_verdict(
+        new_age_s=0.1, new_spread=0.0002, max_age_s=5.0,
+        max_spread=0.00003, candidate_spread_limit=0.0001,
+    )
+
+    assert verdict.ok is False
+    assert verdict.reason == "spread_widened_beyond_candidate_limit"
+
+
+def test_legacy_refresh_still_uses_universal_spread_ceiling():
+    verdict = refresh_verdict(
+        new_age_s=0.1, new_spread=0.00005, max_age_s=5.0,
+        max_spread=0.00003,
+    )
+
+    assert verdict.ok is False
+    assert verdict.reason == "spread_widened_beyond_max"
 
 
 def test_exploration_order_risk_check_rejects_stale_quote_size_breach():

@@ -178,6 +178,69 @@ def test_captured_exit_artifact_uses_captured_oos_expectancy_for_runtime_ev(tmp_
     assert result["by_horizon"]["10"]["threshold"] == 0.7
 
 
+def test_runtime_learns_distinct_net_ev_for_each_horizon(tmp_path: Path):
+    class Pipeline:
+        models = [object(), object()]
+
+        def get_calibrated_ensemble_prediction(self, row, **kwargs):
+            horizon = int(float(row["horizon_s"].iloc[0]))
+            return {
+                "probability": [0.60 if horizon == 3 else 0.80],
+                "decision": [True],
+                "abstain": [False],
+                "model_agreement": [1.0],
+                "uncertainty": [0.01],
+            }
+
+    class Buffer:
+        points = [
+            SimpleNamespace(timestamp=1787659200.0, bid=1.1, ask=1.1002),
+            SimpleNamespace(timestamp=1787659201.0, bid=1.1001, ask=1.1003),
+        ]
+
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+    predictor.pipeline = Pipeline()
+    predictor.status = "ready"
+    predictor.execution_status = "SHADOW_ONLY_NO_POSITIVE_OOS"
+    predictor.metadata = {
+        "horizons_s": [3, 20],
+        "decision_horizon_s": 3,
+        "target_definition": "captured_exit_replay",
+        "threshold": 0.5,
+        "min_model_agreement": 0.6,
+        "max_uncertainty": 0.2,
+        "oos": {
+            "sealed_by_horizon": {
+                "3": {
+                    "mean_captured_exit_return": 0.0001,
+                    "captured_exit_lcb95_return": 0.00005,
+                },
+                "20": {
+                    "mean_captured_exit_return": 0.0003,
+                    "captured_exit_lcb95_return": 0.0002,
+                },
+            }
+        },
+    }
+
+    result = predictor.predict(
+        symbol="EURUSD",
+        quote_buffer=SimpleNamespace(buffers={"EURUSD": Buffer()}),
+        now_ts=1787659201.0,
+        side="buy",
+        broker_spec={
+            "trade_tick_value": 1.0,
+            "trade_tick_size": 0.0001,
+            "volume_min": 0.01,
+        },
+        quantity=0.01,
+    )
+
+    assert result["by_horizon"]["3"]["probability"] != result["by_horizon"]["20"]["probability"]
+    assert result["by_horizon"]["3"]["expected_net_pnl"] != result["by_horizon"]["20"]["expected_net_pnl"]
+    assert result["decision_horizon_s"] == 20
+
+
 def test_runtime_compares_buy_and_sell_and_selects_best_positive_side(tmp_path: Path):
     class Pipeline:
         models = [object(), object()]

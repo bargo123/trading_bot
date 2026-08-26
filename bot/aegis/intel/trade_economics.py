@@ -74,6 +74,7 @@ class TradeEconomics:
             "econ_expected_net_usd": self.expected_net_value_usd,
             "econ_payoff_ratio": self.payoff_ratio,
             "econ_breakeven_wr": self.breakeven_win_rate,
+            "econ_usd_per_price_unit": self.usd_per_price_unit,
         }
 
 
