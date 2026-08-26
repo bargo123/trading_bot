@@ -976,6 +976,81 @@ def test_shadow_only_exploration_is_not_blocked_by_validated_lane_economics(tmp_
     assert decision.journal["exploration_shadow_model_probe"] is True
 
 
+def test_shadow_only_exploration_full_route_uses_independent_measured_evidence(tmp_path, monkeypatch):
+    """A shadow artifact may probe only after the exploration gates pass."""
+    from aegis.intel import firehose_brain as fb
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+    from aegis.intel.video_style import VideoStyleSignal
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(
+        json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1", "records": []}),
+        encoding="utf-8",
+    )
+    brain = IntelligentFirehoseBrain({
+        "analogue_index_path": str(index),
+        "engine": "mt5",
+        "mode": "mt5_demo",
+        "allow_live": False,
+        "paper_trading_enabled": True,
+        "intelligent_gate_validated_states": True,
+        "validated_states_path": str(tmp_path / "empty_states.json"),
+        "intelligent_firehose_bootstrap": True,
+        "intelligent_exploration_enabled": True,
+        "intelligent_min_analogues": 20,
+        "intelligent_min_similarity": 0.5,
+        "intelligent_risk_budget_usd": 100.0,
+        "order_quantity": 0.01,
+        "max_positions": 40,
+        "exploration_max_risk_per_trade_usd": 0.15,
+    })
+    frame = _exploration_frame()
+    signal = VideoStyleSignal(
+        symbol="EURUSD", side="buy", signal_time=frame["time"].iloc[-1],
+        breakout_price=float(frame["close"].iloc[-1]), risk_distance=0.0001,
+    )
+    monkeypatch.setattr(fb, "video_style_signal", lambda *args, **kwargs: signal)
+    monkeypatch.setattr(
+        fb,
+        "build_runtime_state",
+        lambda **kwargs: {
+            "structure": {"M15": {"kind": "none", "support": None, "resistance": None}},
+            "session": "asia",
+            "regime": {"label": "range"},
+            "multi_timeframe": {"H1": {"direction": "up"}, "M5": {"direction": "up"}},
+            "volatility": {"phase": "stable"},
+        },
+    )
+    monkeypatch.setattr(
+        fb,
+        "runtime_signature",
+        lambda state, side, setup: {
+            "symbol": "EURUSD", "side": side, "setup": setup,
+            "regime": "range", "structure": "none", "session": "asia",
+        },
+    )
+    monkeypatch.setattr(brain.analogues, "query", lambda **kwargs: _PositiveEvidence())
+
+    row = frame.iloc[-1].copy()
+    decision = brain.evaluate(
+        symbol="EURUSD", row=row, completed_m1=frame.iloc[:-1], positions=[],
+        equity=100.0, pip=0.0001, core_side="buy", spread_price=0.00002,
+        symbol_spec={"volume_min": 0.01, "volume_step": 0.01,
+                     "trade_contract_size": 100000.0},
+        entry_price=float(row["close"]), actual_bid=float(row["close"]),
+        actual_ask=float(row["close"] + 0.00002), video_style=True,
+        short_horizon_prediction={
+            "calibration_status": "unavailable", "abstain": True,
+            "abstain_reason": "artifact_shadow_only",
+        },
+    )
+
+    assert decision.action == "fire"
+    assert decision.journal["exploration_authority"] == "SAFE_TO_LEARN_ON_DEMO"
+    assert decision.journal["validated_artifact_required"] is False
+    assert decision.journal["short_horizon_prediction"]["abstain_reason"] == "artifact_shadow_only"
+
+
 def test_exploration_journal_records_micro_rejection_reason(tmp_path, monkeypatch):
     from aegis.intel import firehose_brain as fb
     from aegis.intel.firehose_brain import IntelligentFirehoseBrain
