@@ -1245,6 +1245,15 @@ class IntelligentFirehoseBrain:
             "setup_family": setup,
             "thesis_key": thesis_key_exp,
             "exploration": True,
+            # This is a separate DEMO-learning authority. It does not inherit
+            # validated-model status or its symbol allowlist; it earns a fire
+            # only through the independent candidate, cost, geometry, risk,
+            # and measured-evidence gates above.
+            "exploration_authority": "SAFE_TO_LEARN_ON_DEMO",
+            "validated_artifact_required": False,
+            "validated_symbol_allowlist_required": False,
+            "evidence_provenance": str(getattr(evidence, "provenance", "unknown")),
+            "evidence_n": int(getattr(evidence, "analogue_n", 0) or 0),
             "promotion_stage": "EXPLORATION_CANARY",
             "hypothesis_id": hyp_id,
             "experiment_created": created,
@@ -1933,12 +1942,16 @@ class IntelligentFirehoseBrain:
         exploration_classified = (
             fire.action == "skip"
             and not predictive_veto
-            # Shadow-only status can classify an undercovered opportunity, but
-            # it must never bypass explicit probability/EV rejection for this
-            # executable fill. Legacy geometry failures remain discoverable by
-            # _maybe_explore, which evaluates the final micro candidate.
+            # Shadow-only status can classify an undercovered opportunity. It
+            # may bypass the *validated lane's* missing-evidence result only so
+            # the independent exploration lane can evaluate its own measured
+            # candidate economics. It must never bypass explicit negative EV or
+            # payoff rejection; those remain hard stops.
+            and (
+                econ.reason != "no_win_probability_evidence"
+                or exploration_shadow_model_probe
+            )
             and econ.reason not in {
-                "no_win_probability_evidence",
                 "expected_net_value_not_positive",
                 "payoff_below_floor",
             }

@@ -330,6 +330,9 @@ def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
     if econ['allowed']:
         assert result is not None, f"economics allow but got skip: {skip}"
         assert result.action == 'fire'
+        assert result.journal['exploration_authority'] == 'SAFE_TO_LEARN_ON_DEMO'
+        assert result.journal['validated_artifact_required'] is False
+        assert result.journal['validated_symbol_allowlist_required'] is False
         hyp = result.journal.get('hypothesis_id')
         assert hyp and hyp in brain.experiments.data['experiments']
     else:
@@ -901,10 +904,15 @@ def test_predictor_unavailable_reaches_brain_as_explicit_zero_intent(tmp_path, m
     assert decision.quantity == 0.0
 
 
-def test_shadow_only_exploration_requires_positive_trade_economics(tmp_path, monkeypatch):
-    """Shadow status cannot override missing executable EV evidence."""
+def test_shadow_only_exploration_is_not_blocked_by_validated_lane_economics(tmp_path, monkeypatch):
+    """Shadow probing reaches its independent exploration lane.
+
+    The exploration lane still has to pass its own real candidate/economics
+    checks; the legacy validated-lane ``no_win_probability_evidence`` result
+    must not prevent that lane from evaluating the candidate.
+    """
     from aegis.intel import firehose_brain as fb
-    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+    from aegis.intel.firehose_brain import DemoDecision, IntelligentFirehoseBrain
     from aegis.intel.video_style import VideoStyleSignal
 
     index = tmp_path / "analogue_index.json"
@@ -914,6 +922,10 @@ def test_shadow_only_exploration_requires_positive_trade_economics(tmp_path, mon
     )
     brain = IntelligentFirehoseBrain({
         "analogue_index_path": str(index),
+        "engine": "mt5",
+        "mode": "mt5_demo",
+        "allow_live": False,
+        "paper_trading_enabled": True,
         "intelligent_gate_validated_states": True,
         "validated_states_path": str(tmp_path / "empty_states.json"),
         "intelligent_firehose_bootstrap": True,
@@ -932,7 +944,18 @@ def test_shadow_only_exploration_requires_positive_trade_economics(tmp_path, mon
     )
     monkeypatch.setattr(fb, "video_style_signal", lambda *args, **kwargs: signal)
     invoked = []
-    monkeypatch.setattr(brain, "_maybe_explore", lambda **kwargs: invoked.append(kwargs))
+
+    def explore(**kwargs):
+        invoked.append(kwargs)
+        return (
+            DemoDecision(
+                "fire", "independent_exploration", side="buy",
+                sl=1.0994, tp=1.1005, quantity=0.01,
+            ),
+            None,
+        )
+
+    monkeypatch.setattr(brain, "_maybe_explore", explore)
 
     row = frame.iloc[-1].copy()
     decision = brain.evaluate(
@@ -948,9 +971,9 @@ def test_shadow_only_exploration_requires_positive_trade_economics(tmp_path, mon
         },
     )
 
-    assert not invoked
-    assert decision.action == "skip"
-    assert decision.reason != "exploration_hypothesis_test"
+    assert invoked, "shadow-only model probe must reach the exploration lane"
+    assert decision.action == "fire"
+    assert decision.journal["exploration_shadow_model_probe"] is True
 
 
 def test_exploration_journal_records_micro_rejection_reason(tmp_path, monkeypatch):
