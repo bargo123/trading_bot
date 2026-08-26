@@ -347,7 +347,7 @@ def firehose_funnel_risk_row(
 def merge_firehose_funnel_counts(
     base: dict[str, object] | None,
     observed: dict[str, object] | None,
-) -> dict[str, int]:
+) -> dict[str, object]:
     """Merge cumulative runner observations without decreasing brain counts."""
     stage_aliases = {
         stage.lower(): stage
@@ -367,6 +367,17 @@ def merge_firehose_funnel_counts(
                 continue
             key = stage_aliases.get(str(stage).lower(), str(stage))
             merged[key] = max(merged.get(key, 0), count)
+    # The funnel also carries diagnostic values, not counters. Keep these
+    # values truthful instead of coercing ``None``/text to zero.
+    for key in (
+        "BEST_REJECTED_CANDIDATE_EV",
+        "BEST_REJECTED_CANDIDATE_P_GREEN",
+        "BEST_REJECTED_REASON",
+    ):
+        if key in (observed or {}):
+            merged[key] = (observed or {})[key]
+        elif key in (base or {}):
+            merged[key] = (base or {})[key]
     return merged
 
 
