@@ -226,6 +226,7 @@ class ShortHorizonPredictor:
             "artifact_path": str(self.artifact_path),
             "dataset_hash": self.metadata.get("dataset_hash"),
             "validation_hash": self.metadata.get("validation_hash"),
+            "model_version": self.metadata.get("model_version"),
             "horizons_s": self.metadata.get("horizons_s"),
             "model_count": len(self.pipeline.models) if self.pipeline is not None else 0,
             "execution_status": self.execution_status,
@@ -249,7 +250,109 @@ class ShortHorizonPredictor:
             "model_disagreement": False,
             "expected_net_pnl": 0.0,
             "prediction_reason": str(reason),
+            "artifact_status": self.status,
+            "execution_status": self.execution_status,
+            "dataset_hash": self.metadata.get("dataset_hash"),
+            "validation_hash": self.metadata.get("validation_hash"),
+            "artifact_path": str(self.artifact_path),
+            "model_version": self.metadata.get("model_version"),
         }
+
+    @staticmethod
+    def _side_is_executable(prediction: Mapping[str, Any] | None) -> bool:
+        """Return whether one side has enough runtime evidence to be ranked.
+
+        Side comparison is deliberately stricter than merely receiving a model
+        score.  A side must be calibrated, non-abstaining, positively predicted,
+        and have positive executable EV (including its lower bound when the
+        artifact provides one).  Otherwise it remains an abstention candidate.
+        """
+        if not isinstance(prediction, Mapping):
+            return False
+        if str(prediction.get("calibration_status") or "") != "calibrated":
+            return False
+        if bool(prediction.get("abstain", True)) or not bool(prediction.get("decision", False)):
+            return False
+        try:
+            expected = float(prediction.get("expected_net_pnl"))
+            if expected != expected or expected <= 0.0:
+                return False
+            if "expected_net_pnl_lcb95" in prediction:
+                lower = float(prediction.get("expected_net_pnl_lcb95"))
+                if lower != lower or lower <= 0.0:
+                    return False
+        except (TypeError, ValueError):
+            return False
+        return True
+
+    def predict_sides(
+        self,
+        *,
+        symbol: str,
+        quote_buffer: Any,
+        now_ts: float,
+        notional_usd: float | None = None,
+        broker_spec: Mapping[str, Any] | None = None,
+        quantity: float | None = None,
+    ) -> dict[str, Any]:
+        """Evaluate BUY and SELL independently, then select or abstain.
+
+        The returned mapping is itself a normal prediction for the selected
+        side, augmented with the complete side comparison.  If neither side
+        is executable, it is an explicit fail-closed abstention carrying both
+        side results for diagnosis.
+        """
+        predictions: dict[str, dict[str, Any]] = {}
+        for candidate_side in ("buy", "sell"):
+            try:
+                result = self.predict(
+                    symbol=symbol,
+                    quote_buffer=quote_buffer,
+                    now_ts=now_ts,
+                    side=candidate_side,
+                    notional_usd=notional_usd,
+                    broker_spec=broker_spec,
+                    quantity=quantity,
+                )
+            except Exception:
+                result = self._fail_closed_prediction("prediction_error")
+            predictions[candidate_side] = dict(result or self._fail_closed_prediction("prediction_missing"))
+
+        eligible = [
+            side for side, prediction in predictions.items()
+            if self._side_is_executable(prediction)
+        ]
+        ranking = sorted(
+            eligible,
+            key=lambda side: (
+                float(predictions[side].get("expected_net_pnl") or 0.0),
+                float(predictions[side].get("probability") or 0.0),
+                -float(predictions[side].get("uncertainty") or 1.0),
+            ),
+            reverse=True,
+        )
+        comparison = {
+            "selected_side": ranking[0] if ranking else None,
+            "ranking": ranking,
+            "predictions": predictions,
+        }
+        if not ranking:
+            reasons = [
+                str(prediction.get("prediction_reason") or prediction.get("abstain_reason") or "prediction_unavailable")
+                for prediction in predictions.values()
+            ]
+            reason = reasons[0] if reasons and len(set(reasons)) == 1 else "no_eligible_side"
+            result = self._fail_closed_prediction(reason)
+            result["selected_side"] = None
+            result["side_comparison"] = comparison
+            result["side_predictions"] = predictions
+            return result
+
+        selected = dict(predictions[ranking[0]])
+        selected["selected_side"] = ranking[0]
+        selected["side_comparison"] = comparison
+        selected["side_predictions"] = predictions
+        return selected
 
     def predict(
         self,
@@ -263,6 +366,9 @@ class ShortHorizonPredictor:
         quantity: float | None = None,
     ) -> dict[str, Any] | None:
         normalized_symbol = str(symbol).upper()
+        normalized_side = str(side).strip().lower()
+        if normalized_side not in {"buy", "sell"}:
+            return self._fail_closed_prediction("side_invalid")
         if (
             self.execution_status == "EXECUTION_CANDIDATE"
             and str(self.metadata.get("target_definition") or "").strip().lower()
@@ -323,7 +429,7 @@ class ShortHorizonPredictor:
                 )
                 row = pd.DataFrame([{
                     **features,
-                    "side_buy": 1.0 if str(side).lower() == "buy" else 0.0,
+                    "side_buy": 1.0 if normalized_side == "buy" else 0.0,
                     "horizon_s": float(horizon),
                 }])
                 min_model_agreement = float(
@@ -450,6 +556,13 @@ class ShortHorizonPredictor:
                 "expected_time_to_failure_s": selected_oos.get("median_time_to_failure_s"),
                 "winner_giveback_rate": selected_oos.get("winner_giveback_rate"),
                 "calibration_ece": selected_oos.get("calibration_ece"),
+                "feature_snapshot": dict(features),
+                "artifact_status": self.status,
+                "execution_status": self.execution_status,
+                "dataset_hash": self.metadata.get("dataset_hash"),
+                "validation_hash": self.metadata.get("validation_hash"),
+                "artifact_path": str(self.artifact_path),
+                "model_version": self.metadata.get("model_version"),
             }
         except Exception:
             return self._fail_closed_prediction("prediction_error")

@@ -178,6 +178,81 @@ def test_captured_exit_artifact_uses_captured_oos_expectancy_for_runtime_ev(tmp_
     assert result["by_horizon"]["10"]["threshold"] == 0.7
 
 
+def test_runtime_compares_buy_and_sell_and_selects_best_positive_side(tmp_path: Path):
+    class Pipeline:
+        models = [object(), object()]
+
+        def get_calibrated_ensemble_prediction(self, row, **kwargs):
+            is_buy = bool(float(row["side_buy"].iloc[0]))
+            return {
+                "probability": [0.62 if is_buy else 0.84],
+                "decision": [True],
+                "abstain": [False],
+                "model_agreement": [1.0],
+                "uncertainty": [0.01],
+            }
+
+    class Buffer:
+        points = [
+            SimpleNamespace(timestamp=1787659200.0, bid=1.1, ask=1.1002),
+            SimpleNamespace(timestamp=1787659201.0, bid=1.1001, ask=1.1003),
+        ]
+
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+    predictor.pipeline = Pipeline()
+    predictor.status = "ready"
+    predictor.execution_status = "EXECUTION_CANDIDATE"
+    predictor.metadata = {
+        "horizons_s": [10],
+        "decision_horizon_s": 10,
+        "target_definition": "captured_exit_replay",
+        "threshold": 0.5,
+        "min_model_agreement": 0.6,
+        "max_uncertainty": 0.2,
+        "authorized_symbols": ["EURUSD"],
+        "oos": {
+            "sealed_by_symbol_horizon": {
+                "EURUSD": {
+                    "10": {
+                        "mean_captured_exit_return": 0.001,
+                        "captured_exit_lcb95_return": 0.0005,
+                    }
+                }
+            }
+        },
+    }
+
+    result = predictor.predict_sides(
+        symbol="EURUSD",
+        quote_buffer=SimpleNamespace(buffers={"EURUSD": Buffer()}),
+        now_ts=1787659201.0,
+        broker_spec={
+            "trade_tick_value": 1.0,
+            "trade_tick_size": 0.0001,
+            "volume_min": 0.01,
+        },
+        quantity=0.01,
+    )
+
+    assert result["selected_side"] == "sell"
+    assert result["side_comparison"]["ranking"] == ["sell", "buy"]
+    assert set(result["side_predictions"]) == {"buy", "sell"}
+    assert result["side_predictions"]["buy"]["feature_snapshot"] == result["side_predictions"]["sell"]["feature_snapshot"]
+
+
+def test_runtime_side_comparison_abstains_when_both_sides_are_unavailable(tmp_path: Path):
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+
+    result = predictor.predict_sides(
+        symbol="EURUSD", quote_buffer=None, now_ts=1.0,
+    )
+
+    assert result["selected_side"] is None
+    assert result["abstain"] is True
+    assert result["prediction_reason"] == "artifact_not_found"
+    assert set(result["side_predictions"]) == {"buy", "sell"}
+
+
 def test_runtime_ev_uses_broker_native_usd_tick_value_for_jpy_pair(tmp_path: Path):
     class Pipeline:
         models = [object(), object()]

@@ -403,6 +403,7 @@ def basket_lifecycle_trace(
                 "return_5s",
                 "return_15s",
                 "return_30s",
+                "decision_snapshot",
                 "remaining_ev_status",
                 "spread_usd",
                 "commission_usd",

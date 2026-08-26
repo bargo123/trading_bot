@@ -57,6 +57,7 @@ class TicketMetadata:
     initial_risk: float | None = None
     cost_evidence: dict[str, Any] | None = None
     entry_ev: float | None = None
+    decision_snapshot: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -307,6 +308,7 @@ def create_ticket_metadata(
     initial_risk: float | None = None,
     cost_evidence: dict[str, Any] | None = None,
     entry_ev: float | None = None,
+    decision_snapshot: dict[str, Any] | None = None,
 ) -> TicketMetadata:
     """Create ticket metadata with current timestamp."""
     return TicketMetadata(
@@ -332,4 +334,7 @@ def create_ticket_metadata(
         initial_risk=float(initial_risk) if initial_risk is not None else None,
         cost_evidence=dict(cost_evidence) if cost_evidence is not None else None,
         entry_ev=float(entry_ev) if entry_ev is not None else None,
+        decision_snapshot=(
+            dict(decision_snapshot) if decision_snapshot is not None else None
+        ),
     )

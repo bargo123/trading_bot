@@ -833,6 +833,74 @@ def test_short_horizon_abstention_still_reaches_bounded_exploration(tmp_path, mo
     assert decision.action == "skip"
 
 
+def test_predictor_unavailable_reaches_brain_as_explicit_zero_intent(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from aegis.intel import firehose_brain as fb
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+    from aegis.intel.short_horizon_runtime import ShortHorizonPredictor
+    from aegis.intel.video_style import VideoStyleSignal
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(
+        json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1", "records": []}),
+        encoding="utf-8",
+    )
+    brain = IntelligentFirehoseBrain({
+        "analogue_index_path": str(index),
+        "intelligent_gate_validated_states": True,
+        "validated_states_path": str(tmp_path / "empty_states.json"),
+        "intelligent_firehose_bootstrap": True,
+        "intelligent_exploration_enabled": True,
+        "intelligent_min_analogues": 20,
+        "intelligent_min_similarity": 0.5,
+        "intelligent_risk_budget_usd": 100.0,
+        "order_quantity": 0.01,
+        "max_positions": 40,
+        "exploration_max_risk_per_trade_usd": 0.15,
+    })
+    frame = _exploration_frame()
+    signal = VideoStyleSignal(
+        symbol="EURUSD", side="buy", signal_time=frame["time"].iloc[-1],
+        breakout_price=float(frame["close"].iloc[-1]), risk_distance=0.0001,
+    )
+    monkeypatch.setattr(fb, "video_style_signal", lambda *args, **kwargs: signal)
+    monkeypatch.setattr(
+        fb,
+        "build_runtime_state",
+        lambda **kwargs: {
+            "structure": {"M15": {"kind": "none", "support": None, "resistance": None}},
+            "session": "asia",
+            "regime": {"label": "range"},
+            "multi_timeframe": {"H1": {"direction": "up"}, "M5": {"direction": "down"}},
+            "volatility": {"phase": "stable"},
+        },
+    )
+    monkeypatch.setattr(
+        fb,
+        "runtime_signature",
+        lambda state, side, setup: {
+            "symbol": "EURUSD", "side": side, "setup": setup,
+            "regime": "range", "structure": "none", "session": "asia",
+        },
+    )
+    prediction = ShortHorizonPredictor(tmp_path / "missing").predict_sides(
+        symbol="EURUSD", quote_buffer=SimpleNamespace(buffers={}), now_ts=1.0,
+    )
+    row = frame.iloc[-1].copy()
+    decision = brain.evaluate(
+        symbol="EURUSD", row=row, completed_m1=frame.iloc[:-1], positions=[],
+        equity=100.0, pip=0.0001, core_side="buy", spread_price=0.0001,
+        entry_price=float(row["close"]), actual_bid=float(row["close"]),
+        actual_ask=float(row["close"] + 0.0001), video_style=True,
+        short_horizon_prediction=prediction,
+    )
+
+    assert prediction["prediction_reason"] == "artifact_not_found"
+    assert decision.action == "skip"
+    assert decision.quantity == 0.0
+
+
 def test_shadow_only_exploration_requires_positive_trade_economics(tmp_path, monkeypatch):
     """Shadow status cannot override missing executable EV evidence."""
     from aegis.intel import firehose_brain as fb

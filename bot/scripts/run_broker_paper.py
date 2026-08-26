@@ -87,6 +87,96 @@ def video_style_signal_for_scan(
         return None
 
 
+def firehose_decision_snapshot(
+    *,
+    decision,
+    symbol: str,
+    scan_id: str,
+    bar_time,
+    side: str,
+    qty: float,
+    entry: float,
+    stop: float | None,
+    target: float | None,
+    spread: float,
+    quote_age: float,
+) -> dict[str, object]:
+    """Build the durable explanation attached to every submitted order.
+
+    This is intentionally a snapshot of inputs available before the broker
+    mutation.  It does not infer missing model or cost evidence.
+    """
+    journal = dict(getattr(decision, "journal", {}) or {})
+    prediction = journal.get("short_horizon_prediction")
+    prediction = dict(prediction) if isinstance(prediction, dict) else {}
+    comparison = prediction.get("side_comparison")
+    comparison = dict(comparison) if isinstance(comparison, dict) else {}
+    side_predictions = comparison.get("predictions")
+    side_predictions = side_predictions if isinstance(side_predictions, dict) else {}
+    economics = {
+        "expected_net_value": getattr(decision, "expected_net_value", None),
+        "expected_net_usd": journal.get("econ_expected_net_usd"),
+        "p_win": journal.get("econ_p_win"),
+        "p_win_source": journal.get("econ_p_win_source"),
+        "payoff_ratio": journal.get("econ_payoff_ratio"),
+        "cost_usd": journal.get("econ_cost_usd"),
+        "ok": journal.get("econ_ok"),
+        "reason": journal.get("econ_reason"),
+    }
+    market_state = {
+        "bar_time": str(bar_time),
+        "regime": journal.get("regime"),
+        "structure": journal.get("structure"),
+        "session": journal.get("session"),
+        "setup_family": journal.get("setup_family"),
+        "feature_snapshot": prediction.get("feature_snapshot"),
+    }
+    return {
+        "why": f"WHY_{str(side).upper()}",
+        "symbol": str(symbol).upper(),
+        "side": str(side).lower(),
+        "scan_id": scan_id,
+        "lane": "exploration" if journal.get("exploration") else "validated",
+        "hypothesis_id": journal.get("hypothesis_id"),
+        "mechanism": journal.get("micro_mechanism") or journal.get("setup_family"),
+        "model": {
+            "status": prediction.get("artifact_status"),
+            "execution_status": prediction.get("execution_status"),
+            "dataset_hash": prediction.get("dataset_hash"),
+            "validation_hash": prediction.get("validation_hash"),
+            "artifact_path": prediction.get("artifact_path"),
+            "model_version": prediction.get("model_version"),
+            "model_count": prediction.get("model_count"),
+        },
+        "prediction": prediction,
+        "predicted_buy": bool(
+            isinstance(side_predictions.get("buy"), dict)
+            and side_predictions["buy"].get("decision")
+            and not side_predictions["buy"].get("abstain", True)
+        ),
+        "predicted_sell": bool(
+            isinstance(side_predictions.get("sell"), dict)
+            and side_predictions["sell"].get("decision")
+            and not side_predictions["sell"].get("abstain", True)
+        ),
+        "predicted_abstain": bool(
+            not comparison.get("selected_side")
+            or prediction.get("abstain", True)
+        ),
+        "ranking": comparison.get("ranking", []),
+        "market_state": market_state,
+        "economics": economics,
+        "risk": {
+            "quantity": float(qty),
+            "entry": float(entry),
+            "stop": stop,
+            "target": target,
+            "spread": float(spread),
+            "quote_age_s": float(quote_age),
+        },
+    }
+
+
 def exploration_order_risk_check(
     *,
     order_qty: float,
@@ -438,6 +528,7 @@ def record_confirmed_firehose_open(
     position, basket_metadata: dict, ticket_metadata, opened_at: float,
     slot_capacity: int, contract: dict | None = None,
     decision_reasons: list[str] | None = None, expected_net_value: float | None = None,
+    decision_snapshot: dict | None = None,
 ) -> dict[str, str | float]:
     """Persist exact fill ownership before emitting its Firehose lifecycle."""
     geometry = confirmed_position_geometry(position)
@@ -467,6 +558,9 @@ def record_confirmed_firehose_open(
         if basket_result.get("status") != "PERSISTED":
             return basket_result
     persisted = basket_result.get("status") == "PERSISTED"
+    snapshot = decision_snapshot
+    if snapshot is None:
+        snapshot = getattr(ticket_metadata, "decision_snapshot", None)
     metadata = replace(
         ticket_metadata,
         entry_price=float(geometry["entry_price"]),
@@ -480,6 +574,7 @@ def record_confirmed_firehose_open(
         } if persisted else None,
         initial_risk=float(basket_result["initial_risk_usd"]) if persisted else None,
         cost_evidence=dict(basket_metadata["cost_evidence"]) if persisted else None,
+        decision_snapshot=dict(snapshot) if isinstance(snapshot, dict) else None,
     )
     if not metadata_store.add(metadata):
         return {"status": "NO_EVIDENCE", "reason": "ticket_metadata_persistence_failed"}
@@ -512,6 +607,7 @@ def record_confirmed_firehose_open(
             "decision_reasons": decision_reasons or [],
             "ev": expected_net_value,
             "turnover": 0.0,
+            "decision_snapshot": snapshot,
         },
     )
     if basket_trace is not None:
@@ -1347,16 +1443,37 @@ def main() -> None:
                     symbol=sym,
                     enabled=video_style_mode,
                 )
-                prediction_side = (
+                side_comparison = short_horizon_predictor.predict_sides(
+                    symbol=sym,
+                    quote_buffer=quote_buffer,
+                    now_ts=now_ts,
+                    broker_spec=brain_spec,
+                    quantity=float(qty),
+                )
+                predicted_side = side_comparison.get("selected_side")
+                entry_side = (
                     video_signal_hint.side
                     if video_signal_hint is not None
-                    else (brain_side or "buy")
+                    else (brain_side or predicted_side)
                 )
-                entry_side = video_signal_hint.side if video_signal_hint is not None else brain_side
                 brain_entry = (
                     float(q.ask if entry_side == "buy" else q.bid)
                     if entry_side else None
                 )
+                selected_prediction = dict(side_comparison)
+                if predicted_side and entry_side and predicted_side != entry_side:
+                    # The video/structural candidate is directional. If the
+                    # independent side comparison prefers the opposite side,
+                    # preserve the evidence but fail closed instead of pairing
+                    # an opposite prediction with the wrong geometry.
+                    selected_prediction.update({
+                        "selected_side": predicted_side,
+                        "calibration_status": "unavailable",
+                        "decision": False,
+                        "abstain": True,
+                        "abstain_reason": "side_selection_mismatch",
+                        "prediction_reason": "side_selection_mismatch",
+                    })
                 decision = intelligent_brain.evaluate(
                     symbol=sym,
                     row=row,
@@ -1373,14 +1490,7 @@ def main() -> None:
                     quote_buffer=quote_buffer,
                     now_ts=now_ts,
                     video_style=video_style_mode,
-                    short_horizon_prediction=short_horizon_predictor.predict(
-                        symbol=sym,
-                        quote_buffer=quote_buffer,
-                        now_ts=now_ts,
-                        side=prediction_side,
-                        broker_spec=brain_spec,
-                        quantity=float(qty),
-                    ),
+                    short_horizon_prediction=selected_prediction,
                 )
                 brain_decision = decision
                 _book_logic = decision.journal.get("book_logic") or {}
@@ -2115,6 +2225,19 @@ def main() -> None:
                         close_block_until,
                         res.message,
                     )
+            decision_snapshot = firehose_decision_snapshot(
+                decision=brain_decision,
+                symbol=sym,
+                scan_id=scan_id,
+                bar_time=bar_time,
+                side=sig.side,
+                qty=order_qty,
+                entry=entry,
+                stop=req.stop_loss,
+                target=req.take_profit,
+                spread=live_spread,
+                quote_age=quote_age_s(q),
+            )
             append_journal(
                 journal,
                 {
@@ -2144,6 +2267,7 @@ def main() -> None:
                     "information_id": (
                         brain_decision.information_id if brain_decision is not None else None
                     ),
+                    "decision_snapshot": decision_snapshot,
                     **latency.as_dict(),
                     **mkt_closed_extra,
                 },
@@ -2212,6 +2336,7 @@ def main() -> None:
                                 information_id=information_id,
                                 symbol=sym,
                                 entry_ev=brain_decision.expected_net_value,
+                                decision_snapshot=decision_snapshot,
                             )
                             try:
                                 contract = eng.symbol_spec(sym)
@@ -2243,6 +2368,7 @@ def main() -> None:
                                 contract=contract,
                                 decision_reasons=[sig.reason],
                                 expected_net_value=brain_decision.expected_net_value,
+                                decision_snapshot=decision_snapshot,
                             )
                     intelligent_brain.memory.apply(
                         sym,

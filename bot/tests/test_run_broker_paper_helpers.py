@@ -22,6 +22,7 @@ from scripts.run_broker_paper import (
     reconcile_confirmed_firehose_basket_cleanups,
     remove_confirmed_firehose_basket,
     remove_confirmed_firehose_basket_then_cleanup,
+    firehose_decision_snapshot,
     video_style_signal_for_scan,
 )
 
@@ -84,11 +85,13 @@ def test_confirmed_ticket_metadata_preserves_entry_ev_for_remaining_ev_policy():
         regime="trend",
         session="london",
         entry_ev=0.12,
+        decision_snapshot={"why": "WHY_BUY", "ranking": ["buy"]},
     )
 
     restored = type(metadata).from_dict(metadata.to_dict())
 
     assert restored.entry_ev == 0.12
+    assert restored.decision_snapshot == {"why": "WHY_BUY", "ranking": ["buy"]}
 
 
 def test_order_margin_for_send_uses_broker_native_calculator_for_cross_currency_pair():
@@ -142,6 +145,50 @@ def test_video_style_prediction_signal_uses_shared_direction_only_when_enabled()
     assert signal is not None
     assert signal.side == "buy"
     assert video_style_signal_for_scan(frame, symbol="EURUSD", enabled=False) is None
+
+
+def test_firehose_decision_snapshot_records_why_side_and_prediction_evidence():
+    class Decision:
+        side = "sell"
+        reason = "short_horizon_eligible"
+        expected_net_value = 0.04
+        journal = {
+            "exploration": True,
+            "hypothesis_id": "hyp-123",
+            "setup_family": "video_style_breakout",
+            "regime": "trend",
+            "structure": "breakout",
+            "session": "new_york",
+            "short_horizon_prediction": {
+                "probability": 0.81,
+                "expected_net_pnl": 0.04,
+                "expected_mfe": 0.06,
+                "expected_mae": -0.02,
+                "expected_time_to_green_s": 3,
+                "tail_loss_probability": 0.01,
+                "feature_snapshot": {"return_3s": -0.0002},
+                "side_comparison": {
+                    "selected_side": "sell",
+                    "ranking": ["sell", "buy"],
+                },
+            },
+            "econ_ok": True,
+            "econ_expected_net_usd": 0.04,
+            "econ_p_win": 0.81,
+        }
+
+    snapshot = firehose_decision_snapshot(
+        decision=Decision(), symbol="EURUSD", scan_id="scan-1", bar_time="t-1",
+        side="sell", qty=0.01, entry=1.1, stop=1.101, target=1.097,
+        spread=0.0001, quote_age=0.1,
+    )
+
+    assert snapshot["why"] == "WHY_SELL"
+    assert snapshot["lane"] == "exploration"
+    assert snapshot["hypothesis_id"] == "hyp-123"
+    assert snapshot["prediction"]["side_comparison"]["selected_side"] == "sell"
+    assert snapshot["economics"]["expected_net_usd"] == 0.04
+    assert snapshot["risk"]["quantity"] == 0.01
 
 
 def test_normalize_protective_stops_buy_respects_broker_min_distance():
@@ -276,6 +323,27 @@ def test_confirmed_fill_persists_exact_one_clip_basket_in_symbol_store(tmp_path)
         "stop_loss": 1.09985,
     }
     assert (tmp_path / "intel" / "firehose_baskets" / "EURUSD.json").is_file()
+
+
+def test_confirmed_firehose_open_persists_decision_snapshot(tmp_path):
+    store = TicketMetadataStore(tmp_path / "tickets.json")
+    metrics = TurnoverMetrics()
+    journal = tmp_path / "journal.jsonl"
+    position = PositionSnapshot(
+        symbol="EURUSD", side="buy", quantity=0.01, avg_price=1.10000,
+        stop_loss=1.09985, ticket="T1",
+    )
+
+    result = record_confirmed_firehose_open(
+        root=tmp_path, metadata_store=store, metrics=metrics, journal=journal,
+        ticket_id="T1", position=position, basket_metadata=_basket_metadata(),
+        ticket_metadata=_ticket_metadata(), opened_at=10.0, slot_capacity=1,
+        contract=_contract("EURUSD"), decision_snapshot={"why": "WHY_BUY"},
+    )
+
+    assert result["status"] == "PERSISTED"
+    assert store.get("T1").decision_snapshot == {"why": "WHY_BUY"}
+    assert '"decision_snapshot": {"why": "WHY_BUY"}' in journal.read_text(encoding="utf-8")
 
 
 def test_unconfirmed_fill_does_not_create_basket_store(tmp_path):
