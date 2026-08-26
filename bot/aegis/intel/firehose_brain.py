@@ -1342,6 +1342,12 @@ class IntelligentFirehoseBrain:
             "BOOK_SUPPORTED": int(self.counts.get("book_supported", 0)),
             "VALIDATED_MATCH": int(self.counts.get("validated_match", 0)),
             "EXPLORATION_ELIGIBLE": int(self.counts.get("exploration_eligible", 0)),
+            "SHADOW_REJECT_VALIDATED": int(
+                self.counts.get("shadow_reject_validated", 0)
+            ),
+            "SHADOW_REJECT_EXPLORATION": int(
+                self.counts.get("shadow_reject_exploration", 0)
+            ),
             "SPREAD_REJECT": rejected("spread"),
             "ECONOMICS_REJECT": rejected("economics", "expected_net", "ev_"),
             "GEOMETRY_REJECT": rejected("geometry", "invalid_stop", "target"),
@@ -1782,6 +1788,12 @@ class IntelligentFirehoseBrain:
                 exploration_shadow_model_probe = bool(video_style) and exploration_may_probe_shadow_only_model(
                     self.cfg, short_horizon_prediction, prediction_reason
                 )
+                if exploration_shadow_model_probe:
+                    # The validated lane rejected this artifact, but that
+                    # rejection must not be attributed to the exploration lane.
+                    self.counts["shadow_reject_validated"] = int(
+                        self.counts.get("shadow_reject_validated", 0)
+                    ) + 1
                 predictive_veto = bool(video_style) and not exploration_shadow_model_probe
                 diagnostic_reason = str(
                     short_horizon_prediction.get("abstain_reason")
@@ -1961,6 +1973,17 @@ class IntelligentFirehoseBrain:
                 or str(fire.reason or "").startswith("shadow:")
             )
         )
+        if (
+            exploration_shadow_model_probe
+            and fire.action == "skip"
+            and not exploration_classified
+            and fire_base not in _HARD_REJECT_BASES
+        ):
+            # Non-hard classification failures are the only cases where the
+            # shadow artifact itself could still be blocking exploration.
+            self.counts["shadow_reject_exploration"] = int(
+                self.counts.get("shadow_reject_exploration", 0)
+            ) + 1
         economics_hard_reject = (
             fire.action == "skip" and fire_base in _HARD_REJECT_BASES
         )

@@ -2686,6 +2686,12 @@ def main() -> None:
                     "MODEL_MISSING_REJECT": int(
                         _brain_counts.get("short_horizon_missing", 0) or 0
                     ),
+                    "SHADOW_REJECT_VALIDATED": int(
+                        _brain_counts.get("shadow_reject_validated", 0) or 0
+                    ),
+                    "SHADOW_REJECT_EXPLORATION": int(
+                        _brain_counts.get("shadow_reject_exploration", 0) or 0
+                    ),
                     "SHORT_HORIZON_ABSTAIN_REASONS": dict(
                         _brain_counts.get("short_horizon_abstain_reasons") or {}
                     ),

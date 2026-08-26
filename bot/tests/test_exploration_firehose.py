@@ -974,6 +974,9 @@ def test_shadow_only_exploration_is_not_blocked_by_validated_lane_economics(tmp_
     assert invoked, "shadow-only model probe must reach the exploration lane"
     assert decision.action == "fire"
     assert decision.journal["exploration_shadow_model_probe"] is True
+    funnel = brain.snapshot()["funnel"]
+    assert funnel["SHADOW_REJECT_VALIDATED"] == 1
+    assert funnel["SHADOW_REJECT_EXPLORATION"] == 0
 
 
 def test_shadow_only_exploration_full_route_uses_independent_measured_evidence(tmp_path, monkeypatch):
