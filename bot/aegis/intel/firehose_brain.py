@@ -646,6 +646,13 @@ class IntelligentFirehoseBrain:
         self._exploration_limits = ExplorationLimits.from_cfg(cfg)
         self._exploration_theses: set[str] = set()
         self._last_exploration_micro_diagnostics: dict[str, Any] = {}
+        self._search_horizons_seen: set[int] = set()
+        self._search_mechanisms_seen: set[str] = set()
+        self._best_rejected_candidate: dict[str, Any] = {
+            "expected_net_value_usd": None,
+            "p_green": None,
+            "reason": None,
+        }
         self._seen_hypotheses: dict[str, float] = {}
         self._stage_events: dict[str, list[float]] = {
             "candidate": [], "shadow": [], "exploration_fire": [],
@@ -670,11 +677,93 @@ class IntelligentFirehoseBrain:
             "short_horizon_expected_value_reject": 0,
             "short_horizon_missing": 0,
             "short_horizon_abstain_reasons": {},
+            "search_candidates_generated": 0,
+            "buy_variants_tested": 0,
+            "sell_variants_tested": 0,
+            "spread_fail": 0,
+            "geometry_fail": 0,
+            "risk_fail": 0,
+            "net_ev_fail": 0,
+            "multi_gate_fail": 0,
+            "near_eligible": 0,
         }
 
     def _note_skip(self, reason: str) -> None:
         reasons = self.counts.setdefault("skip_reasons", {})
         reasons[reason] = int(reasons.get(reason, 0)) + 1
+
+    def _search_horizons(self) -> tuple[int, ...]:
+        from aegis.intel.fast_firehose import SEARCH_HORIZONS_S
+
+        raw = self.cfg.get("firehose_search_horizons_s")
+        if raw is None:
+            return SEARCH_HORIZONS_S
+        if isinstance(raw, str):
+            raw = raw.split(",")
+        try:
+            horizons = tuple(sorted({int(value) for value in raw if int(value) > 0}))
+        except (TypeError, ValueError):
+            return SEARCH_HORIZONS_S
+        # Keep runtime exploration bounded even if a malformed config contains
+        # an enormous grid. The configured order is not an execution bypass.
+        return horizons[:16] or SEARCH_HORIZONS_S
+
+    def _record_search_evaluation(
+        self,
+        *,
+        candidate: Any,
+        reasons: Sequence[str],
+        distance: Mapping[str, Any] | None = None,
+        near_eligible: bool = False,
+        p_green: float | None = None,
+        expected_net_value_usd: float | None = None,
+    ) -> dict[str, Any]:
+        """Record one variant's gate result and its measurable near miss."""
+        reason_list = [str(reason) for reason in reasons if str(reason)]
+        if not reason_list:
+            reason_list = ["unknown_rejection"]
+        for reason in reason_list:
+            upper = reason.upper()
+            if "SPREAD" in upper:
+                self.counts["spread_fail"] = int(self.counts.get("spread_fail", 0)) + 1
+            if "GEOMETRY" in upper or "TAIL_RISK" in upper:
+                self.counts["geometry_fail"] = int(self.counts.get("geometry_fail", 0)) + 1
+            if "RISK" in upper or "MARGIN" in upper or "LOT" in upper:
+                self.counts["risk_fail"] = int(self.counts.get("risk_fail", 0)) + 1
+            if (
+                "NET" in upper
+                or "EXPECTED_VALUE" in upper
+                or "WIN_PROBABILITY" in upper
+            ):
+                self.counts["net_ev_fail"] = int(self.counts.get("net_ev_fail", 0)) + 1
+        if len(reason_list) > 1:
+            self.counts["multi_gate_fail"] = int(self.counts.get("multi_gate_fail", 0)) + 1
+        if near_eligible:
+            self.counts["near_eligible"] = int(self.counts.get("near_eligible", 0)) + 1
+        if expected_net_value_usd is not None:
+            current = self._best_rejected_candidate.get("expected_net_value_usd")
+            if current is None or float(expected_net_value_usd) > float(current):
+                self._best_rejected_candidate = {
+                    "symbol": str(getattr(candidate, "symbol", "")),
+                    "side": str(getattr(candidate, "side", "")),
+                    "family": str(getattr(candidate, "family", "")),
+                    "variant_id": str(getattr(candidate, "variant_id", "")),
+                    "expected_net_value_usd": float(expected_net_value_usd),
+                    "p_green": p_green,
+                    "reason": reason_list[0],
+                }
+        return {
+            "variant_id": str(getattr(candidate, "variant_id", "") or getattr(candidate, "hypothesis_id", "")),
+            "symbol": str(getattr(candidate, "symbol", "")),
+            "side": str(getattr(candidate, "side", "")),
+            "mechanism": str(getattr(candidate, "family", "")),
+            "horizon_s": int(getattr(candidate, "max_hold_s", 0) or 0),
+            "reasons": reason_list,
+            "p_green": p_green,
+            "expected_net_value_usd": expected_net_value_usd,
+            "distance_to_eligibility": dict(distance or {}),
+            "near_eligible": bool(near_eligible),
+        }
 
     def _note_stage(self, stage: str) -> None:
         import time as _time
@@ -930,6 +1019,7 @@ class IntelligentFirehoseBrain:
             FastMarketContext,
             check_entry_economics,
             diagnose_micro_candidates,
+            generate_micro_search_candidates,
         )
 
         bid_px = float(actual_bid) if actual_bid is not None else None
@@ -1053,21 +1143,50 @@ class IntelligentFirehoseBrain:
         if market_ctx is not None:
             ctx = market_ctx
         micro_cands, micro_diagnostics = diagnose_micro_candidates(ctx)
+        horizons = self._search_horizons()
+        self._search_horizons_seen.update(horizons)
+        self._search_mechanisms_seen.update({
+            "micro_momentum_burst", "failed_breakout_fade", "fair_value_snapback",
+        })
+        variants_per_side = 3 * len(horizons)
+        self.counts["buy_variants_tested"] = int(
+            self.counts.get("buy_variants_tested", 0)
+        ) + variants_per_side
+        self.counts["sell_variants_tested"] = int(
+            self.counts.get("sell_variants_tested", 0)
+        ) + variants_per_side
+        search_cands = generate_micro_search_candidates(ctx, horizons=horizons)
         if video_candidate is not None:
-            micro_cands.append(video_candidate)
+            if not getattr(video_candidate, "variant_id", ""):
+                video_candidate.variant_id = (
+                    f"video_style_breakout:{video_candidate.side}:"
+                    f"{video_candidate.max_hold_s}s"
+                )
+            search_cands.append(video_candidate)
+            self._search_mechanisms_seen.add("video_style_breakout")
             micro_diagnostics = dict(micro_diagnostics)
             micro_diagnostics["video_style_candidate"] = True
+        self.counts["search_candidates_generated"] = int(
+            self.counts.get("search_candidates_generated", 0)
+        ) + len(search_cands)
+        self.counts["micro_candidates"] = int(
+            self.counts.get("micro_candidates", 0)
+        ) + len(search_cands)
+        candidate_evaluations: list[dict[str, Any]] = []
         self._last_exploration_micro_diagnostics = {
-            "micro_candidate_count": len(micro_cands),
+            "micro_candidate_count": len(search_cands),
+            "search_candidate_count": len(search_cands),
             "micro_diagnostics": micro_diagnostics,
         }
-        if not micro_cands:
+        if not search_cands:
             return None, "no_micro_candidate_matched"
 
-        # Evaluate economics INDEPENDENTLY for each candidate.
-        viable = []
-        all_rejections = []
-        for mc in micro_cands:
+        # Evaluate economics INDEPENDENTLY for every side/mechanism/horizon
+        # variant. The candidate owns its geometry before any gate is scored.
+        viable: list[tuple[Any, dict[str, Any], TradeEconomics, Any]] = []
+        all_rejections: list[str] = []
+        spec = symbol_spec or {}
+        for mc in search_cands:
             spec_tick_val = (symbol_spec or {}).get("trade_tick_value")
             spec_tick_sz = (symbol_spec or {}).get("trade_tick_size")
             econ = check_entry_economics(
@@ -1077,23 +1196,147 @@ class IntelligentFirehoseBrain:
                 contract_size=float((symbol_spec or {}).get("trade_contract_size", 100000)),
                 tick_value=spec_tick_val,
                 tick_size=spec_tick_sz,
+                commission_rt_usd=float(
+                    self.cfg.get("commission_round_trip_usd", 0.0) or 0.0
+                ),
+                slippage_pips=(
+                    0.3 if slippage_price is None
+                    else abs(float(slippage_price)) / max(float(pip), 1e-12)
+                ),
             )
-            if econ["allowed"]:
-                viable.append(mc)
-            else:
-                all_rejections.extend(econ.get("rejections", []))
+            candidate_evidence = evidence
+            if mc.side != side or mc.family != setup:
+                try:
+                    variant_signature = dict(signature)
+                    variant_signature.update({"side": mc.side, "setup": mc.family})
+                    candidate_evidence = self.analogues.query(
+                        signature=variant_signature,
+                        before_time=row["time"] if row is not None else datetime.now(timezone.utc),
+                        min_n=int(self.cfg.get("intelligent_min_analogues", 20)),
+                        min_similarity=float(self.cfg.get("intelligent_min_similarity", 0.55)),
+                        pool_across_symbols=bool(
+                            self.cfg.get("intelligent_pool_across_symbols", False)
+                        ),
+                    )
+                except Exception:
+                    candidate_evidence = None
+            p_green = getattr(candidate_evidence, "win_probability", None)
+            if not econ["allowed"]:
+                reasons = [str(reason) for reason in econ.get("rejections", [])]
+                all_rejections.extend(reasons)
+                candidate_evaluations.append(self._record_search_evaluation(
+                    candidate=mc,
+                    reasons=reasons,
+                    distance=econ.get("distance_to_eligibility"),
+                    near_eligible=bool(econ.get("near_eligible", False)),
+                    p_green=p_green,
+                ))
+                continue
+
+            sizing_preview = risk_lots_for_exploration(
+                max_risk_usd=self._exploration_limits.max_risk_per_trade_usd,
+                entry=mc.entry_price,
+                invalidation=mc.invalidation,
+                pip=pip,
+                contract_size=float(spec.get("trade_contract_size", 100000.0) or 100000.0),
+                tick_value=spec.get("trade_tick_value"),
+                tick_size=spec.get("trade_tick_size"),
+                volume_min=float(spec.get("volume_min", 0.01) or 0.01),
+                volume_step=float(spec.get("volume_step", 0.01) or 0.01),
+            )
+            if not sizing_preview.get("allowed"):
+                reason = str(sizing_preview.get("reason") or "RISK_GRANULARITY_BLOCKED")
+                all_rejections.append(reason)
+                distance = dict(econ.get("distance_to_eligibility") or {})
+                distance["risk_excess_usd"] = round(max(
+                    0.0,
+                    float(sizing_preview.get("actual_min_lot_risk_usd") or 0.0)
+                    - float(sizing_preview.get("desired_risk_usd") or 0.0),
+                ), 4)
+                candidate_evaluations.append(self._record_search_evaluation(
+                    candidate=mc,
+                    reasons=[reason],
+                    distance=distance,
+                    near_eligible=False,
+                    p_green=p_green,
+                ))
+                continue
+
+            candidate_econ = self._trade_economics(
+                side=mc.side,
+                entry=mc.entry_price,
+                invalidation=mc.invalidation,
+                target=mc.target,
+                lots=float(sizing_preview["lots"]),
+                spec=spec,
+                spread_price=spread_price,
+                slippage_price=(
+                    0.3 * float(pip) if slippage_price is None else slippage_price
+                ),
+                evidence=candidate_evidence,
+            )
+            if not candidate_econ.acceptable:
+                reason = str(candidate_econ.reason or "net_ev_rejected")
+                all_rejections.append(reason)
+                distance = dict(econ.get("distance_to_eligibility") or {})
+                if candidate_econ.expected_net_value_usd is not None:
+                    distance["net_ev_deficit_usd"] = round(max(
+                        0.0, -float(candidate_econ.expected_net_value_usd)
+                    ), 4)
+                candidate_evaluations.append(self._record_search_evaluation(
+                    candidate=mc,
+                    reasons=[reason],
+                    distance=distance,
+                    near_eligible=False,
+                    p_green=p_green,
+                    expected_net_value_usd=candidate_econ.expected_net_value_usd,
+                ))
+                continue
+            viable.append((mc, sizing_preview, candidate_econ, candidate_evidence))
         if not viable:
+            self._last_exploration_micro_diagnostics = {
+                **self._last_exploration_micro_diagnostics,
+                "candidate_evaluations": candidate_evaluations,
+                "best_rejected_candidate": dict(self._best_rejected_candidate),
+            }
             return None, f"exploration_economics_rejected:{all_rejections[0] if all_rejections else 'unknown'}"
 
-        # Select strongest: highest payoff among economically viable.
-        viable.sort(key=lambda c: -c.payoff)
-        mc = viable[0]
+        # Rank by the same captured net EV that will authorize the final order;
+        # payoff is only a deterministic tie-breaker.
+        viable.sort(key=lambda item: (
+            -(float(item[2].expected_net_value_usd)
+              if item[2].expected_net_value_usd is not None else float("-inf")),
+            -item[0].payoff,
+        ))
+        mc, sizing_preview, exploration_econ, candidate_evidence = viable[0]
+        self._last_exploration_micro_diagnostics = {
+            **self._last_exploration_micro_diagnostics,
+            "candidate_evaluations": candidate_evaluations,
+            "best_rejected_candidate": dict(self._best_rejected_candidate),
+            "selected_variant_id": str(getattr(mc, "variant_id", "")),
+        }
 
         # Structural payoff/spread checks apply to the FINAL candidate's
         # own geometry, not the legacy structural geometry.
         if mc.target_pips / max(mc.stop_pips, 0.1) < 0.25:
+            candidate_evaluations.append(self._record_search_evaluation(
+                candidate=mc,
+                reasons=["DESTRUCTIVE_PAYOFF"],
+                distance={"payoff_deficit": round(
+                    max(0.0, 0.25 - mc.target_pips / max(mc.stop_pips, 0.1)), 4
+                )},
+            ))
+            self._last_exploration_micro_diagnostics["candidate_evaluations"] = candidate_evaluations
             return None, "exploration_destructive_payoff"
         if spread_price is not None and mc.target_pips <= 2.0 * float(spread_price) / max(pip, 1e-10):
+            candidate_evaluations.append(self._record_search_evaluation(
+                candidate=mc,
+                reasons=["SPREAD_FAILURE"],
+                distance={"spread_excess_pips": round(
+                    max(0.0, float(spread_price) / max(pip, 1e-10) * 2.0 - mc.target_pips), 4
+                )},
+            ))
+            self._last_exploration_micro_diagnostics["candidate_evaluations"] = candidate_evaluations
             return None, "exploration_spread_failure"
 
         # FINAL CANDIDATE OWNS ALL EXECUTION IDENTITY.
@@ -1104,8 +1347,11 @@ class IntelligentFirehoseBrain:
         setup = mc.family       # family from source mechanism
 
         # Recompute ALL identity from FINAL candidate.
+        variant_identity = str(
+            getattr(mc, "variant_id", "") or f"{setup}:{mc.max_hold_s}s"
+        )
         hyp_id = exploration_hypothesis_id(
-            strategy_family=setup, symbol=symbol, side=side,
+            strategy_family=variant_identity, symbol=symbol, side=side,
             regime=regime, session=session,
         )
         info_id = hashlib.sha256(
@@ -1160,7 +1406,7 @@ class IntelligentFirehoseBrain:
             slippage_price=(
                 0.3 * float(pip) if slippage_price is None else slippage_price
             ),
-            evidence=evidence,
+            evidence=candidate_evidence,
         )
         if not exploration_econ.acceptable:
             return None, (
@@ -1192,6 +1438,8 @@ class IntelligentFirehoseBrain:
                 + (
                     f" [book: {book_logic.get('source_book')}]" if book_logic else ""
                 ),
+                "variant_id": variant_identity,
+                "search_horizon_s": mc.max_hold_s,
                 "invalidation": f"close beyond {invalidation:.5f}",
                 "target": (f"structure target {target:.5f}" if target is not None
                            else "profit-management policies (mfe giveback / time decay)"),
@@ -1226,7 +1474,7 @@ class IntelligentFirehoseBrain:
         record["book_logic"] = book_logic
         record["target_price"] = target
         record["initial_stop_price"] = invalidation
-        record["max_hold_s"] = mc.max_hold_s if micro_cands else 120
+        record["max_hold_s"] = mc.max_hold_s if search_cands else 120
         self.experiments.save()
         thesis_key_exp = thesis_key(symbol, side, setup, regime=regime, session=session)
         self._exploration_theses.add(thesis_key_exp)
@@ -1243,6 +1491,8 @@ class IntelligentFirehoseBrain:
             "action": "fire",
             "shadow_action": None,
             "setup_family": setup,
+            "variant_id": variant_identity,
+            "search_horizon_s": mc.max_hold_s,
             "thesis_key": thesis_key_exp,
             "exploration": True,
             # This is a separate DEMO-learning authority. It does not inherit
@@ -1368,6 +1618,30 @@ class IntelligentFirehoseBrain:
             )),
             "FIRES": int(self.counts.get("broker_fires", 0)),
             "FILLS": int(self.counts.get("broker_fills", 0)),
+            "CANDIDATES_GENERATED": int(
+                self.counts.get("search_candidates_generated", 0)
+            ),
+            "BUY_VARIANTS_TESTED": int(
+                self.counts.get("buy_variants_tested", 0)
+            ),
+            "SELL_VARIANTS_TESTED": int(
+                self.counts.get("sell_variants_tested", 0)
+            ),
+            "HORIZONS_TESTED": len(self._search_horizons_seen),
+            "MECHANISMS_TESTED": len(self._search_mechanisms_seen),
+            "SPREAD_FAIL": int(self.counts.get("spread_fail", 0)),
+            "GEOMETRY_FAIL": int(self.counts.get("geometry_fail", 0)),
+            "RISK_FAIL": int(self.counts.get("risk_fail", 0)),
+            "NET_EV_FAIL": int(self.counts.get("net_ev_fail", 0)),
+            "MULTI_GATE_FAIL": int(self.counts.get("multi_gate_fail", 0)),
+            "NEAR_ELIGIBLE": int(self.counts.get("near_eligible", 0)),
+            "BEST_REJECTED_CANDIDATE_EV": self._best_rejected_candidate.get(
+                "expected_net_value_usd"
+            ),
+            "BEST_REJECTED_CANDIDATE_P_GREEN": self._best_rejected_candidate.get(
+                "p_green"
+            ),
+            "BEST_REJECTED_REASON": self._best_rejected_candidate.get("reason"),
             # Legacy brain-only labels retained for existing consumers.
             "scans": int(self.counts.get("scans", 0)),
             "candidates": int(self.counts.get("candidates", 0)),
@@ -2071,7 +2345,7 @@ class IntelligentFirehoseBrain:
                     sl=exp_decision.sl,
                     tp=exp_decision.tp,
                     quantity=exp_decision.quantity,
-                    expected_net_value=None,
+                    expected_net_value=exp_decision.expected_net_value,
                     information_id=info_id,
                     analogue_n=evidence.analogue_n,
                     close_clips=0,

@@ -322,6 +322,10 @@ def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
     )
     snap = brain.snapshot()
     assert snap['funnel']['candidates'] >= 1
+    assert snap['funnel']['BUY_VARIANTS_TESTED'] >= 8
+    assert snap['funnel']['SELL_VARIANTS_TESTED'] >= 8
+    assert snap['funnel']['HORIZONS_TESTED'] == 8
+    assert snap['funnel']['MECHANISMS_TESTED'] >= 3
     econ = check_entry_economics(mc, max_risk_usd=0.15,
         volume_min=spec['volume_min'], contract_size=spec['trade_contract_size'],
         tick_value=spec['trade_tick_value'], tick_size=spec['trade_tick_size'])

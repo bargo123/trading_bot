@@ -1510,7 +1510,13 @@ def main() -> None:
                 )
                 brain_decision = decision
                 _book_logic = decision.journal.get("book_logic") or {}
-                _micro_count = int(decision.journal.get("micro_candidate_count", 0) or 0)
+                _micro_count = int(
+                    decision.journal.get(
+                        "search_candidate_count",
+                        decision.journal.get("micro_candidate_count", 0),
+                    )
+                    or 0
+                )
                 _is_exploration = bool(decision.journal.get("exploration"))
                 _terminal = (
                     "EXPLORATION_ELIGIBLE" if decision.action in {"fire", "scale"} and _is_exploration
@@ -2687,6 +2693,34 @@ def main() -> None:
                     "EXPLORATION_ELIGIBLE": int(
                         _funnel.get("EXPLORATION_ELIGIBLE", 0) or 0
                     ),
+                    "CANDIDATES_GENERATED": int(
+                        _funnel.get("CANDIDATES_GENERATED", 0) or 0
+                    ),
+                    "BUY_VARIANTS_TESTED": int(
+                        _funnel.get("BUY_VARIANTS_TESTED", 0) or 0
+                    ),
+                    "SELL_VARIANTS_TESTED": int(
+                        _funnel.get("SELL_VARIANTS_TESTED", 0) or 0
+                    ),
+                    "HORIZONS_TESTED": int(
+                        _funnel.get("HORIZONS_TESTED", 0) or 0
+                    ),
+                    "MECHANISMS_TESTED": int(
+                        _funnel.get("MECHANISMS_TESTED", 0) or 0
+                    ),
+                    "SPREAD_FAIL": int(_funnel.get("SPREAD_FAIL", 0) or 0),
+                    "GEOMETRY_FAIL": int(_funnel.get("GEOMETRY_FAIL", 0) or 0),
+                    "RISK_FAIL": int(_funnel.get("RISK_FAIL", 0) or 0),
+                    "NET_EV_FAIL": int(_funnel.get("NET_EV_FAIL", 0) or 0),
+                    "MULTI_GATE_FAIL": int(_funnel.get("MULTI_GATE_FAIL", 0) or 0),
+                    "NEAR_ELIGIBLE": int(_funnel.get("NEAR_ELIGIBLE", 0) or 0),
+                    "BEST_REJECTED_CANDIDATE_EV": _funnel.get(
+                        "BEST_REJECTED_CANDIDATE_EV"
+                    ),
+                    "BEST_REJECTED_CANDIDATE_P_GREEN": _funnel.get(
+                        "BEST_REJECTED_CANDIDATE_P_GREEN"
+                    ),
+                    "BEST_REJECTED_REASON": _funnel.get("BEST_REJECTED_REASON"),
                     "UNCERTAINTY_REJECT": int(_brain_counts.get("uncertainty_reject", 0) or 0),
                     "MODEL_DISAGREEMENT": int(_brain_counts.get("model_disagreement", 0) or 0),
                     "MODEL_PROBABILITY_REJECT": int(

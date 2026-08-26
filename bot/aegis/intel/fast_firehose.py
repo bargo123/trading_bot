@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Mapping
 
@@ -157,6 +157,8 @@ class MicroCandidate:
     book_source_hash: str = ""  # passage hash if book-derived
     book_family: str = ""       # source strategy family label
     falsification: str = ""     # what proves this wrong
+    # Stable identity for a mechanism tested at a particular learned horizon.
+    variant_id: str = ""
 
     @property
     def payoff(self) -> float:
@@ -192,7 +194,9 @@ def _micro_invalidation(*, side: str, entry: float, m1_low: float,
     return None
 
 
-def micro_momentum_burst(ctx: FastMarketContext) -> MicroCandidate | None:
+def micro_momentum_burst(
+    ctx: FastMarketContext, *, side: str | None = None,
+) -> MicroCandidate | None:
     """A. MICRO MOMENTUM BURST: compression → clean impulse → M15/M5 aligned."""
     if None in (ctx.m1_atr, ctx.bid, ctx.ask,
                 ctx.m1_low, ctx.m1_high,
@@ -205,7 +209,19 @@ def micro_momentum_burst(ctx: FastMarketContext) -> MicroCandidate | None:
     if ret_30s_buy is None and ret_30s_sell is None:
         return None  # required feature unavailable → SKIP
     # Determine direction from returns
-    if ret_30s_buy is not None and abs(ret_30s_buy) >= abs(ret_30s_sell or 0):
+    if side is not None:
+        if side not in {"buy", "sell"}:
+            return None
+        selected = ctx.get_return(30, side)
+        if selected is None:
+            return None
+        if side == "buy" and selected <= 0:
+            return None
+        if side == "sell" and selected >= 0:
+            return None
+        direction = side
+        m1_ret = selected if side == "buy" else -abs(selected)
+    elif ret_30s_buy is not None and abs(ret_30s_buy) >= abs(ret_30s_sell or 0):
         direction = "buy" if ret_30s_buy > 0 else "sell"
         m1_ret = ret_30s_buy if direction == "buy" else -abs(ret_30s_buy)
     else:
@@ -254,7 +270,9 @@ def micro_momentum_burst(ctx: FastMarketContext) -> MicroCandidate | None:
     )
 
 
-def failed_breakout_fade(ctx: FastMarketContext) -> MicroCandidate | None:
+def failed_breakout_fade(
+    ctx: FastMarketContext, *, side: str | None = None,
+) -> MicroCandidate | None:
     """B. FAILED BREAKOUT FADE: pierce level → fail → fade back inside."""
     if None in (ctx.m15_resistance, ctx.m15_support, ctx.m1_close,
                 ctx.bid, ctx.ask, ctx.m1_atr, ctx.m1_low, ctx.m1_high):
@@ -264,12 +282,12 @@ def failed_breakout_fade(ctx: FastMarketContext) -> MicroCandidate | None:
     if prev_close is None:
         return None
     atr = ctx.m1_atr
-    if prev_close > res and close < res:
+    if (side in (None, "sell")) and prev_close > res and close < res:
         direction = "sell"
         entry = ctx.bid
         inv = max(ctx.m1_high, res) + atr * 0.2
         tgt = sup if sup < entry else entry - atr * 2
-    elif prev_close < sup and close > sup:
+    elif (side in (None, "buy")) and prev_close < sup and close > sup:
         direction = "buy"
         entry = ctx.ask
         inv = min(ctx.m1_low, sup) - atr * 0.2
@@ -299,7 +317,9 @@ def failed_breakout_fade(ctx: FastMarketContext) -> MicroCandidate | None:
     )
 
 
-def fair_value_snapback(ctx: FastMarketContext) -> MicroCandidate | None:
+def fair_value_snapback(
+    ctx: FastMarketContext, *, side: str | None = None,
+) -> MicroCandidate | None:
     """C. FAIR-VALUE SNAPBACK: price reaches value edge → rejection → snapback."""
     mid = ctx.m15_range_mid
     hw = ctx.m15_range_half_width
@@ -311,12 +331,12 @@ def fair_value_snapback(ctx: FastMarketContext) -> MicroCandidate | None:
     edge_lower = mid - hw
     close = ctx.m1_close
     atr = ctx.m1_atr
-    if close > edge_upper:
+    if (side in (None, "sell")) and close > edge_upper:
         direction = "sell"
         entry = ctx.bid
         inv = close + atr * 0.4
         tgt = mid
-    elif close < edge_lower:
+    elif (side in (None, "buy")) and close < edge_lower:
         direction = "buy"
         entry = ctx.ask
         inv = close - atr * 0.4
@@ -371,6 +391,56 @@ def generate_micro_candidates(ctx: FastMarketContext) -> list[MicroCandidate]:
                 candidates.append(c)
         except Exception:
             pass
+    return candidates
+
+
+# Learned short-horizon buckets used by the bounded search layer. These are
+# candidate hold policies, not permission to bypass the calibrated prediction
+# gate. A mechanism must first construct its own genuine broker geometry.
+SEARCH_HORIZONS_S: tuple[int, ...] = (1, 2, 3, 5, 8, 10, 15, 20)
+SEARCH_SIDES: tuple[str, ...] = ("buy", "sell")
+
+
+def generate_micro_search_candidates(
+    ctx: FastMarketContext,
+    *,
+    horizons: tuple[int, ...] = SEARCH_HORIZONS_S,
+) -> list[MicroCandidate]:
+    """Enumerate valid side/mechanism/horizon combinations.
+
+    The family functions construct entry, invalidation, and target before this
+    function creates horizon variants. Unsupported sides and malformed family
+    evaluations are skipped; no mirrored/synthetic candidate is fabricated.
+    """
+    candidates: list[MicroCandidate] = []
+    families = (
+        ("micro_momentum_burst", micro_momentum_burst),
+        ("failed_breakout_fade", failed_breakout_fade),
+        ("fair_value_snapback", fair_value_snapback),
+    )
+    valid_horizons = tuple(sorted({int(h) for h in horizons if int(h) > 0}))
+    for family, fn in families:
+        for side in SEARCH_SIDES:
+            try:
+                base = fn(ctx, side=side)
+            except Exception:
+                continue
+            if base is None:
+                continue
+            for horizon_s in valid_horizons:
+                variant_id = f"{family}:{side}:{horizon_s}s"
+                candidates.append(replace(
+                    base,
+                    hypothesis_id=firehose_hypothesis_id(
+                        family=f"{family}@{horizon_s}s",
+                        symbol=base.symbol,
+                        side=side,
+                        regime=base.required_regime,
+                        session=base.required_session,
+                    ),
+                    max_hold_s=horizon_s,
+                    variant_id=variant_id,
+                ))
     return candidates
 
 
@@ -566,6 +636,38 @@ def check_entry_economics(candidate: MicroCandidate, *,
             and candidate.spread_pips > spread_p90:
         rejections.append("SPREAD_ABNORMAL_PERCENTILE")
 
+    spread_limit_pips = candidate.target_pips * 0.5
+    distance = {
+        # Raw distances keep a 0.1-pip near miss distinct from a structurally
+        # impossible candidate. Values are zero when that gate is satisfied.
+        "spread_excess_pips": round(max(0.0, candidate.spread_pips - spread_limit_pips), 4),
+        "spread_percentile_excess_pips": round(
+            max(0.0, candidate.spread_pips - float(spread_p90 or 0.0))
+            if measured_spread_percentile is not None and spread_p90 is not None
+            else 0.0,
+            4,
+        ),
+        "geometry_deficit_pips": round(max(0.0, 0.5 - candidate.stop_pips), 4),
+        "tail_risk_excess_pips": round(max(0.0, candidate.stop_pips - 20.0), 4),
+        "risk_excess_usd": round(max(0.0, min_lot_risk - budget), 4),
+        "net_ev_deficit_pips": round(max(0.0, -net_target), 4),
+    }
+    distance["max_gate_distance"] = round(max(distance.values()), 4)
+    failed = {str(reason) for reason in rejections}
+    near_eligible = len(failed) == 1 and any((
+        (reason in {"SPREAD_FAILURE", "SPREAD_ABNORMAL_PERCENTILE"}
+         and max(distance["spread_excess_pips"],
+                 distance["spread_percentile_excess_pips"]) <= 0.1)
+        or (reason == "INVALID_GEOMETRY"
+            and distance["geometry_deficit_pips"] <= 0.1)
+        or (reason == "TAIL_RISK_FAILURE"
+            and distance["tail_risk_excess_pips"] <= 0.1)
+        or (reason == "RISK_GRANULARITY_BLOCKED"
+            and distance["risk_excess_usd"] <= 0.01)
+        or (reason == "NEGATIVE_EXPECTED_NET_AFTER_COST"
+            and distance["net_ev_deficit_pips"] <= 0.1)
+    ) for reason in failed)
+
     return {
         "allowed": len(rejections) == 0,
         "rejections": rejections,
@@ -574,6 +676,8 @@ def check_entry_economics(candidate: MicroCandidate, *,
         "total_cost_pips": round(total_cost_pips, 2),
         "net_target_pips": round(net_target, 2),
         "payoff_net": round(net_target / max(stop_dist_price / pip, 0.1), 3),
+        "distance_to_eligibility": distance,
+        "near_eligible": near_eligible,
     }
 
 

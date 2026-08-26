@@ -18,6 +18,7 @@ from aegis.intel.fast_firehose import (  # noqa: E402
     classify_firehose_mode,
     diagnose_micro_candidates,
     generate_micro_candidates,
+    generate_micro_search_candidates,
     micro_momentum_burst,
     failed_breakout_fade,
     fair_value_snapback,
@@ -241,6 +242,45 @@ def test_micro_diagnostics_fail_closed_and_preserve_empty_set_for_exception_cont
 
     assert diagnosed == generated == []
     assert all(reason == "evaluation_error" for reason in reasons.values())
+
+
+def test_search_candidates_enumerate_both_sides_and_learned_horizons():
+    ctx = _ctx(
+        m15_direction="up", m5_direction="up",
+        return_30s_buy=0.0008, return_30s_sell=-0.0008,
+        m15_resistance=1.1050, m15_support=1.0950,
+        m1_close=1.1042, m1_prev_close=1.1052,
+        m1_low=1.1028, m1_high=1.1053,
+        m1_atr=0.0020, bid=1.1041, ask=1.1043,
+        m15_range_mid=1.1000, m15_range_half_width=0.0040,
+    )
+
+    candidates = generate_micro_search_candidates(ctx, horizons=(3, 8, 15))
+
+    assert candidates
+    assert {candidate.side for candidate in candidates} == {"buy", "sell"}
+    assert {candidate.max_hold_s for candidate in candidates} == {3, 8, 15}
+    assert {candidate.family for candidate in candidates} >= {
+        "micro_momentum_burst", "failed_breakout_fade", "fair_value_snapback",
+    }
+    assert all(candidate.variant_id for candidate in candidates)
+
+
+def test_entry_economics_reports_near_miss_distances():
+    candidate = MicroCandidate(
+        hypothesis_id="h-distance", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.09980, target=1.10020,
+        max_hold_s=8, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=2.0, target_pips=2.0,
+        risk_usd_min_lot=0.05, lane="SHADOW", mechanism="test",
+    )
+
+    result = check_entry_economics(candidate, max_risk_usd=0.15)
+
+    assert result["allowed"] is False
+    assert result["distance_to_eligibility"]["risk_excess_usd"] > 0
+    assert result["distance_to_eligibility"]["net_ev_deficit_pips"] == 0
+    assert result["near_eligible"] is False
 
 
 def test_entry_economics_blocks_min_lot_risk_exceeding_budget():
