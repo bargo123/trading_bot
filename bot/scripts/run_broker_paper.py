@@ -2675,6 +2675,18 @@ def main() -> None:
                         (_funnel.get("SPREAD_REJECT", 0) or 0)
                         + (_funnel.get("ECONOMICS_REJECT", 0) or 0)
                     ),
+                    "MICRO_CANDIDATES": int(
+                        _funnel.get("MICRO_CANDIDATES", 0) or 0
+                    ),
+                    "VALIDATED_CANDIDATES": int(
+                        _funnel.get("VALIDATED_MATCH", 0) or 0
+                    ),
+                    "EXPLORATION_CANDIDATES": int(
+                        _funnel.get("EXPLORATION_CANDIDATES", 0) or 0
+                    ),
+                    "EXPLORATION_ELIGIBLE": int(
+                        _funnel.get("EXPLORATION_ELIGIBLE", 0) or 0
+                    ),
                     "UNCERTAINTY_REJECT": int(_brain_counts.get("uncertainty_reject", 0) or 0),
                     "MODEL_DISAGREEMENT": int(_brain_counts.get("model_disagreement", 0) or 0),
                     "MODEL_PROBABILITY_REJECT": int(

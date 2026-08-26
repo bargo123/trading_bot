@@ -1342,6 +1342,9 @@ class IntelligentFirehoseBrain:
             "BOOK_SUPPORTED": int(self.counts.get("book_supported", 0)),
             "VALIDATED_MATCH": int(self.counts.get("validated_match", 0)),
             "EXPLORATION_ELIGIBLE": int(self.counts.get("exploration_eligible", 0)),
+            "EXPLORATION_CANDIDATES": int(
+                self.counts.get("exploration_candidates", 0)
+            ),
             "SHADOW_REJECT_VALIDATED": int(
                 self.counts.get("shadow_reject_validated", 0)
             ),
@@ -1990,6 +1993,12 @@ class IntelligentFirehoseBrain:
         if economics_hard_reject:
             self._note_skip(str(fire.reason))
         exploration_journal: dict[str, Any] | None = None
+        if exploration_classified and bool(
+            self.cfg.get("intelligent_exploration_enabled", True)
+        ):
+            self.counts["exploration_candidates"] = int(
+                self.counts.get("exploration_candidates", 0)
+            ) + 1
         if (
             exploration_classified
             and held.clips <= 0
