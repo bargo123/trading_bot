@@ -840,6 +840,35 @@ def test_short_horizon_abstention_still_reaches_bounded_exploration(tmp_path, mo
     assert decision.action == "skip"
 
 
+def test_rejection_report_keeps_reason_without_fabricating_ev(tmp_path):
+    from aegis.intel.fast_firehose import MicroCandidate
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "ai", "records": []}), encoding="utf-8")
+    brain = IntelligentFirehoseBrain({
+        "analogue_index_path": str(index),
+        "intelligent_exploration_enabled": True,
+    })
+    candidate = MicroCandidate(
+        hypothesis_id="h-report", family="micro", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0990, target=1.1020,
+        max_hold_s=8, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=10.0, target_pips=20.0,
+        risk_usd_min_lot=1.0, lane="SHADOW", mechanism="test",
+    )
+
+    brain._record_search_evaluation(
+        candidate=candidate,
+        reasons=["RISK_GRANULARITY_BLOCKED"],
+        distance={"risk_excess_usd": 0.85},
+    )
+
+    best = brain.snapshot()["funnel"]
+    assert best["BEST_REJECTED_CANDIDATE_EV"] is None
+    assert best["BEST_REJECTED_REASON"] == "RISK_GRANULARITY_BLOCKED"
+
+
 def test_predictor_unavailable_reaches_brain_as_explicit_zero_intent(tmp_path, monkeypatch):
     from types import SimpleNamespace
 

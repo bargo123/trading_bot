@@ -740,18 +740,24 @@ class IntelligentFirehoseBrain:
             self.counts["multi_gate_fail"] = int(self.counts.get("multi_gate_fail", 0)) + 1
         if near_eligible:
             self.counts["near_eligible"] = int(self.counts.get("near_eligible", 0)) + 1
-        if expected_net_value_usd is not None:
-            current = self._best_rejected_candidate.get("expected_net_value_usd")
-            if current is None or float(expected_net_value_usd) > float(current):
-                self._best_rejected_candidate = {
-                    "symbol": str(getattr(candidate, "symbol", "")),
-                    "side": str(getattr(candidate, "side", "")),
-                    "family": str(getattr(candidate, "family", "")),
-                    "variant_id": str(getattr(candidate, "variant_id", "")),
-                    "expected_net_value_usd": float(expected_net_value_usd),
-                    "p_green": p_green,
-                    "reason": reason_list[0],
-                }
+        current = self._best_rejected_candidate.get("expected_net_value_usd")
+        should_record = (
+            expected_net_value_usd is not None
+            and (current is None or float(expected_net_value_usd) > float(current))
+        ) or (current is None and self._best_rejected_candidate.get("reason") is None)
+        if should_record:
+            self._best_rejected_candidate = {
+                "symbol": str(getattr(candidate, "symbol", "")),
+                "side": str(getattr(candidate, "side", "")),
+                "family": str(getattr(candidate, "family", "")),
+                "variant_id": str(getattr(candidate, "variant_id", "")),
+                "expected_net_value_usd": (
+                    None if expected_net_value_usd is None
+                    else float(expected_net_value_usd)
+                ),
+                "p_green": p_green,
+                "reason": reason_list[0],
+            }
         return {
             "variant_id": str(getattr(candidate, "variant_id", "") or getattr(candidate, "hypothesis_id", "")),
             "symbol": str(getattr(candidate, "symbol", "")),
