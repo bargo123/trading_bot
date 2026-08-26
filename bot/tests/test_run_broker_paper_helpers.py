@@ -69,6 +69,28 @@ def test_record_funnel_execution_counts_only_real_submission_and_fill():
     assert counts == {"FIRES": 2, "FILLS": 1}
 
 
+def test_confirmed_ticket_metadata_preserves_entry_ev_for_remaining_ev_policy():
+    metadata = create_ticket_metadata(
+        ticket="T_EV",
+        hypothesis_id="hyp-ev",
+        thesis_key="thesis-ev",
+        strategy_family="micro",
+        expected_mechanism="continuation",
+        side="buy",
+        entry_price=1.1000,
+        stop_loss=1.0990,
+        target_price=1.1020,
+        max_hold_s=45,
+        regime="trend",
+        session="london",
+        entry_ev=0.12,
+    )
+
+    restored = type(metadata).from_dict(metadata.to_dict())
+
+    assert restored.entry_ev == 0.12
+
+
 def test_order_margin_for_send_uses_broker_native_calculator_for_cross_currency_pair():
     class _Engine:
         def order_margin(self, symbol, side, quantity, price):

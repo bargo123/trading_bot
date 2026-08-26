@@ -884,6 +884,7 @@ def main() -> None:
     from aegis.intel.fast_exit_runner import (
         FastExitContext, evaluate_fast_exit, firehose_exit_trace,
         MissingLiquidationMarkError, spread_r_from_geometry,
+        REMAINING_EV_EXIT_POLICY_ID, estimate_remaining_ev,
     )
 
     fast_exit_sm = FastExitStateMachine()
@@ -2210,6 +2211,7 @@ def main() -> None:
                                 session=session,
                                 information_id=information_id,
                                 symbol=sym,
+                                entry_ev=brain_decision.expected_net_value,
                             )
                             try:
                                 contract = eng.symbol_spec(sym)
@@ -2587,6 +2589,7 @@ def main() -> None:
                                     "stop": _ticket_meta.stop_loss,
                                     "mechanism": _ticket_meta.expected_mechanism,
                                     "information_id": _ticket_meta.information_id,
+                                    "entry_ev": _ticket_meta.entry_ev,
                                 }
                             # else: legacy ticket - will be handled below
                         # SECOND: legacy tickets without exact metadata - fallback to experiment scan
@@ -2696,20 +2699,15 @@ def main() -> None:
                                     else marks.get("ask")
                                 )
                                 _px = float(_track.entry_price or 0)
-                                spread_cost = 0.0
-                                if marks.get("bid") and marks.get("ask"):
-                                    spread_cost = marks["ask"] - marks["bid"]
-                                if _tgt and _inv and _px and _cur:
-                                    sign = 1.0 if str(_track.side) == "buy" else -1.0
-                                    rem_rr = ((_tgt - _cur) * sign) / max(
-                                        abs(_cur - _inv), 1e-9)
-                                    init_rr = abs(_tgt - _px) / max(
-                                        abs(_px - _inv), 1e-9)
-                                    base_ev = float(_track.entry_ev_at_open or 0.0)
-                                    _rem_ev = round(
-                                        base_ev * max(0.0, min(2.0, rem_rr / max(init_rr, 1e-9))),
-                                        4)
-                                    _rem_status = "PROXY"
+                                if str(cfg.get("fast_firehose_remaining_ev_policy") or "") == REMAINING_EV_EXIT_POLICY_ID:
+                                    _rem_ev, _rem_status = estimate_remaining_ev(
+                                        side=str(_track.side),
+                                        entry_price=_px,
+                                        current_mark=_cur,
+                                        invalidation=_inv,
+                                        target=_tgt,
+                                        entry_ev=_track.entry_ev_at_open,
+                                    )
                             verdict = profit_manager.evaluate(
                                 ticket=tk,
                                 volume=float(getattr(pos, "quantity", 0) or 0),

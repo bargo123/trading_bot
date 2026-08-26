@@ -147,8 +147,11 @@ def should_block_scratch_cooldown(
     *,
     since_s: float | None,
     cfg: dict[str, Any],
+    video_style: bool = False,
 ) -> bool:
-    """Elder/Davey: after a failed scalp, do not immediately re-spray the same name."""
+    """Block legacy re-spray cooldown unless video-style uses fresh-trigger re-entry."""
+    if video_style:
+        return False
     cap = float(cfg.get("scratch_cooldown_s") or 0)
     if cap <= 0 or since_s is None:
         return False

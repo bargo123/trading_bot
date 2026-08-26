@@ -119,6 +119,7 @@ def test_scratch_cooldown_blocks_immediate_respray() -> None:
     assert not should_block_scratch_cooldown(since_s=200.0, cfg=cfg)
     assert not should_block_scratch_cooldown(since_s=None, cfg=cfg)
     assert not should_block_scratch_cooldown(since_s=5.0, cfg={})
+    assert not should_block_scratch_cooldown(since_s=5.0, cfg=cfg, video_style=True)
 
 
 def test_quick_win_closes_winners_only() -> None:

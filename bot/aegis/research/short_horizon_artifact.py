@@ -26,6 +26,7 @@ from aegis.research_factory.ml_pipeline import MLPipeline, ModelConfig
 
 
 ARTIFACT_SCHEMA = "short_horizon_ensemble.v1"
+MIN_CAPTURED_EXIT_LOSSES = 5  # align with the repo's sampled-loss promotion standard
 
 
 @dataclass(frozen=True)
@@ -274,6 +275,7 @@ def build_quote_training_frame(
     horizons: Sequence[int] = DEFAULT_HORIZONS_S,
     sample_every_s: int = 5,
     target_mode: str = "captured_exit_replay",
+    slippage_bps: float = 0.0,
 ) -> pd.DataFrame:
     """Create point-in-time feature/label rows from completed quotes.
 
@@ -295,6 +297,12 @@ def build_quote_training_frame(
         raise ValueError(
             "target_mode must be mfe_first, fast_harvest, terminal_profit, or captured_exit_replay"
         )
+    try:
+        slippage_bps = float(slippage_bps)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("slippage_bps must be a finite non-negative number") from exc
+    if not np.isfinite(slippage_bps) or slippage_bps < 0.0:
+        raise ValueError("slippage_bps must be a finite non-negative number")
     rows: list[dict[str, Any]] = []
     for symbol, quotes in sorted(quotes_by_symbol.items()):
         features = _feature_frame(quotes, symbol)
@@ -304,8 +312,8 @@ def build_quote_training_frame(
         mid = features["mid"].to_numpy(dtype=float)
         spreads = features["spread"].to_numpy(dtype=float)
         # The executable entry/exit sides already include the observed spread.
-        # A tiny slippage buffer is intentionally not invented here; the
-        # artifact metadata records this as spread-only evidence.
+        # Configured slippage is charged separately on both sides of the round
+        # trip, matching the runner's round-trip-notional cost convention.
         tail_threshold = max(float(np.nanmedian(spreads)) * 3.0, 1e-12)
         harvest_threshold = max(float(np.nanmedian(spreads)) * 2.0, 1e-12)
         eligible = np.flatnonzero(times <= times[-1] - max(horizon_values))
@@ -324,10 +332,12 @@ def build_quote_training_frame(
                     continue
                 future_bid = bid[index + 1 : end + 1]
                 future_ask = ask[index + 1 : end + 1]
-                for side, signed in (
+                slippage_price = 2.0 * (slippage_bps / 10_000.0) * float(mid[index])
+                for side, raw_signed in (
                     ("buy", future_bid - ask[index]),
                     ("sell", bid[index] - future_ask),
                 ):
+                    signed = np.asarray(raw_signed, dtype=float) - slippage_price
                     if not len(signed):
                         continue
                     mfe = float(np.max(signed))
@@ -409,6 +419,7 @@ def build_quote_training_frame(
                             "captured_exit_net_pnl": captured,
                             "captured_exit_return": captured / float(mid[index]) if mid[index] > 0 else np.nan,
                             "captured_exit_reason": captured_reason,
+                            "assumed_slippage_bps": slippage_bps,
                             "mfe": mfe,
                             "mae": mae,
                             "tail_loss": int(mae <= -tail_threshold),
@@ -449,6 +460,7 @@ def _model_frame(frame: pd.DataFrame) -> pd.DataFrame:
         "terminal_return", "mfe", "mae", "tail_loss",
         "harvest_return", "time_to_profit_s", "time_to_failure_s",
         "captured_exit_net_pnl", "captured_exit_return", "captured_exit_reason",
+        "assumed_slippage_bps",
     }
     columns = [column for column in frame.columns if column not in excluded]
     result = frame.loc[:, columns].copy()
@@ -599,6 +611,7 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
             if len(finite_selected_captured) else None
         ),
         "captured_exit_profit_factor": captured_profit_factor,
+        "captured_exit_loss_count": int(len(captured_losses)),
         "p95_loss_return": p95_loss,
         "p99_loss_return": p99_loss,
         "expected_mfe": selected_mean("mfe"),
@@ -750,6 +763,14 @@ def _execution_status(
         except (TypeError, ValueError):
             return False
 
+    def enough_losses(metrics: Mapping[str, Any] | None) -> bool:
+        if not isinstance(metrics, Mapping):
+            return False
+        try:
+            return int(metrics.get("captured_exit_loss_count") or 0) >= MIN_CAPTURED_EXIT_LOSSES
+        except (TypeError, ValueError):
+            return False
+
     if not positive(test_metrics) or not positive(sealed_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", (
             "test_or_sealed_captured_exit_oos_not_positive"
@@ -757,6 +778,10 @@ def _execution_status(
     if not positive_lcb(test_metrics) or not positive_lcb(sealed_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", (
             "captured_exit_oos_lcb95_not_positive"
+        )
+    if not enough_losses(test_metrics) or not enough_losses(sealed_metrics):
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", (
+            "insufficient_captured_exit_loss_evidence"
         )
     horizon_metrics = sealed_by_horizon.get(str(int(decision_horizon_s)))
     if not positive(horizon_metrics):
@@ -766,6 +791,10 @@ def _execution_status(
     if not positive_lcb(horizon_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", (
             "captured_exit_oos_lcb95_not_positive"
+        )
+    if not enough_losses(horizon_metrics):
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", (
+            "insufficient_captured_exit_loss_evidence"
         )
     return "EXECUTION_CANDIDATE", (
         "positive_test_sealed_decision_horizon_captured_exit_oos"
@@ -836,6 +865,7 @@ def _authorized_symbols(
         try:
             return (
                 int(metrics.get("selected") or 0) >= int(min_selected)
+                and int(metrics.get("captured_exit_loss_count") or 0) >= MIN_CAPTURED_EXIT_LOSSES
                 and float(metrics.get(mean_key)) > 0.0
                 and float(metrics.get(lcb_key)) > 0.0
             )
@@ -1035,6 +1065,18 @@ def train_and_publish(
         execution_status = "SHADOW_ONLY_NO_POSITIVE_OOS"
         execution_status_reason = "no_symbol_scope_positive_oos"
 
+    slippage_values = sorted(
+        {
+            float(value)
+            for value in pd.to_numeric(
+                frame.get("assumed_slippage_bps", pd.Series([0.0])), errors="coerce"
+            ).dropna()
+        }
+    )
+    if len(slippage_values) > 1:
+        raise ValueError("training frame mixes multiple slippage assumptions")
+    assumed_slippage_bps = slippage_values[0] if slippage_values else 0.0
+
     output_path = Path(output_path)
     pipeline.save(output_path)
     metadata_path = output_path / "metadata.json"
@@ -1064,17 +1106,29 @@ def train_and_publish(
                 "sealed_by_symbol_horizon": sealed_by_symbol_horizon,
             },
             "trained_at": datetime.now(timezone.utc).isoformat(),
-            "cost_evidence": "executable_bid_ask_spread_in_labels; no synthetic slippage",
+            "cost_evidence": (
+                "executable_bid_ask_spread_in_labels; "
+                f"configured_round_trip_slippage_bps={assumed_slippage_bps}; "
+                "commission_round_trip_usd=0.0_for_current_demo_config"
+            ),
+            "assumed_slippage_bps": assumed_slippage_bps,
             "symbols": sorted(frame["symbol"].astype(str).str.upper().unique().tolist()),
             "authorized_symbols": authorized_symbols,
             "model_count": len(pipeline.models),
+            "promotion_policy": {
+                "min_captured_exit_losses": MIN_CAPTURED_EXIT_LOSSES,
+                "requires_positive_test_and_sealed_lcb95": True,
+            },
             "exit_policy": {
                 "name": "captured_exit_replay_v1",
                 "entry": "buy=ASK,sell=BID",
                 "capture": "first_executable_move_at_or_above_two_observed_spreads",
                 "abort": "first_executable_move_at_or_below_three_observed_spreads_loss",
                 "timeout": "last_future_quote_at_horizon",
-                "costs": "observed_bid_ask_spread_only; slippage_and_commission_unavailable",
+                "costs": (
+                    "observed_bid_ask_spread_plus_configured_round_trip_slippage; "
+                    "commission_round_trip_usd=0.0_for_current_demo_config"
+                ),
             },
             "runtime_proof": {
                 "SHORT_HORIZON_MODEL_STATUS": execution_status,

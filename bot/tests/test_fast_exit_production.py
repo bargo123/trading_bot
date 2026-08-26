@@ -12,7 +12,7 @@ from typing import Any, Mapping, Optional
 from aegis.intel.fast_firehose import ExitAction, FastExitConfig, FastExitStateMachine
 from aegis.intel.fast_exit_runner import (
     FastExitContext, build_harvest_input, combine_existing_exit_with_policy, evaluate_fast_exit,
-    firehose_exit_trace, pip_size_for, spread_r_from_geometry,
+    estimate_remaining_ev, firehose_exit_trace, pip_size_for, spread_r_from_geometry,
     REMAINING_EV_EXIT_POLICY_ID,
 )
 from aegis.intel.quote_buffer import QuoteBuffer
@@ -69,6 +69,7 @@ class TestFastExitProductionHelper:
         observed_slippage_r=None,
         observed_commission_r=None,
         spread_normal=None,
+        short_horizon_prediction=None,
     ) -> FastExitContext:
         """Create a test context with sensible defaults."""
         live_marks = live_marks or {symbol: {"bid": current_bid, "ask": current_ask}}
@@ -121,6 +122,7 @@ class TestFastExitProductionHelper:
             observed_slippage_r=observed_slippage_r,
             observed_commission_r=observed_commission_r,
             spread_normal=spread_normal,
+            short_horizon_prediction=short_horizon_prediction,
         )
 
     def test_buy_uses_bid(self):
@@ -150,6 +152,101 @@ class TestFastExitProductionHelper:
         verdict = evaluate_fast_exit(ctx)
         assert verdict["action"] in {"HOLD", "LOCK", "TAKE", "SCRATCH", "ABORT", "TIME_EXIT"}
         assert verdict["action"] != "ERROR"
+
+    def test_loss_fraction_scratch_exits_before_time_decay(self):
+        ctx = self.create_context(
+            side="buy",
+            current_bid=1.09969,
+            current_ask=1.09971,
+            mfe_usd=0.0,
+            mae_usd=-0.31,
+            opened_ts=1000.0,
+            now_ts=1005.0,
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["action"] == "SCRATCH"
+        assert verdict["reason"] == "loss_fraction_scratch"
+
+    def test_loss_fraction_scratch_does_not_fire_below_threshold(self):
+        ctx = self.create_context(
+            side="buy",
+            current_bid=1.09971,
+            current_ask=1.09973,
+            mfe_usd=0.0,
+            mae_usd=-0.29,
+            opened_ts=1000.0,
+            now_ts=1005.0,
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["reason"] != "loss_fraction_scratch"
+
+    def test_calibrated_short_horizon_revoke_aborts_losing_ticket(self):
+        ctx = self.create_context(
+            current_bid=1.09990,
+            current_ask=1.09992,
+            mfe_usd=0.0,
+            mae_usd=-0.10,
+            opened_ts=1000.0,
+            now_ts=1005.0,
+            short_horizon_prediction={
+                "calibration_status": "calibrated",
+                "abstain": False,
+                "decision": False,
+                "probability": 0.40,
+                "threshold": 0.60,
+            },
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["action"] == "ABORT"
+        assert verdict["reason"] == "short_horizon_support_revoked"
+
+    def test_short_horizon_abstain_does_not_masquerade_as_revoke(self):
+        ctx = self.create_context(
+            current_bid=1.09990,
+            current_ask=1.09992,
+            mfe_usd=0.0,
+            mae_usd=-0.10,
+            opened_ts=1000.0,
+            now_ts=1005.0,
+            short_horizon_prediction={
+                "calibration_status": "calibrated",
+                "abstain": True,
+                "decision": False,
+                "probability": 0.40,
+                "threshold": 0.60,
+            },
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["reason"] != "short_horizon_support_revoked"
+
+    def test_short_horizon_revoke_does_not_force_profitable_ticket_out(self):
+        ctx = self.create_context(
+            current_bid=1.10010,
+            current_ask=1.10012,
+            mfe_usd=0.0,
+            mae_usd=0.0,
+            opened_ts=1000.0,
+            now_ts=1005.0,
+            short_horizon_prediction={
+                "calibration_status": "calibrated",
+                "abstain": False,
+                "decision": False,
+                "probability": 0.40,
+                "threshold": 0.60,
+            },
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["reason"] != "short_horizon_support_revoked"
 
     def test_two_symbols_simultaneously(self):
         """Two different symbols evaluated simultaneously use correct marks."""
@@ -515,6 +612,32 @@ class TestFirehoseHarvestAdapter:
         verdict = evaluate_fast_exit(ctx)
         assert verdict["action"] == "ABORT"
         assert verdict["reason"] == "remaining_ev_negative"
+
+    def test_remaining_ev_estimate_is_costed_and_point_in_time(self):
+        value, status = estimate_remaining_ev(
+            side="buy", entry_price=1.10000, current_mark=1.10100,
+            invalidation=1.09900, target=1.10200, entry_ev=0.20,
+        )
+
+        assert status == "ESTIMATED"
+        assert value == pytest.approx(0.05)
+
+        at_target, target_status = estimate_remaining_ev(
+            side="buy", entry_price=1.10000, current_mark=1.10200,
+            invalidation=1.09900, target=1.10200, entry_ev=0.20,
+        )
+        assert target_status == "ESTIMATED"
+        assert at_target == pytest.approx(0.0)
+
+    def test_remaining_ev_estimate_fails_closed_without_valid_entry_economics(self):
+        assert estimate_remaining_ev(
+            side="buy", entry_price=1.10000, current_mark=1.10100,
+            invalidation=1.09900, target=1.10200, entry_ev=0.0,
+        ) == (None, "UNKNOWN")
+        assert estimate_remaining_ev(
+            side="buy", entry_price=1.10000, current_mark=1.10100,
+            invalidation=1.09900, target=1.09900, entry_ev=0.20,
+        ) == (None, "UNKNOWN")
 
     def test_trace_contains_observed_values_and_nulls_for_unavailable_evidence(self):
         ctx = self._context(quote_buffer=QuoteBuffer())

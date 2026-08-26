@@ -639,7 +639,18 @@ class FastExitStateMachine:
             return self._decide(ExitAction.ABORT, "regime_change",
                                 f"regime {regime_at_entry}->{regime_now}, losing")
 
-        # 3. Time decay without progress
+        # 3. Rapid downside scratch. The configured fraction is measured against
+        # the ticket's original stop distance, so a seconds-trade does not wait
+        # for the time stop after already consuming too much of its risk budget.
+        scratch_frac = float(self.cfg.min_scratch_loss_frac)
+        if scratch_frac > 0 and pnl_pips <= -(scratch_frac * R):
+            return self._decide(
+                ExitAction.SCRATCH,
+                "loss_fraction_scratch",
+                f"loss {abs(pnl_pips):.1f} pips reached {scratch_frac:.0%} of {R:.1f}-pip stop",
+            )
+
+        # 4. Time decay without progress
         if age > self.cfg.time_exit_s and not (
             mfe_pips >= self.cfg.mfe_arm_r * R
             and pnl_pips >= self.cfg.progress_frac * mfe_pips

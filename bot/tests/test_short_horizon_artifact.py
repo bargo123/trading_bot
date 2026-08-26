@@ -39,6 +39,7 @@ def _positive_captured_metrics(mean: float) -> dict[str, float | int]:
     return {
         "mean_captured_exit_return": mean,
         "captured_exit_lcb95_return": mean,
+        "captured_exit_loss_count": 5,
         "selected": 20,
     }
 
@@ -151,6 +152,22 @@ def test_execution_candidate_requires_positive_test_sealed_and_horizon_metrics()
     assert reason == "positive_test_sealed_decision_horizon_captured_exit_oos"
 
 
+def test_execution_candidate_requires_minimum_observed_captured_losses():
+    sparse_losses = _positive_captured_metrics(0.001)
+    sparse_losses["captured_exit_loss_count"] = 4
+
+    status, reason = _execution_status(
+        target_definition="captured_exit_replay",
+        decision_horizon_s=10,
+        test_metrics=sparse_losses,
+        sealed_metrics=_positive_captured_metrics(0.001),
+        sealed_by_horizon={"10": _positive_captured_metrics(0.001)},
+    )
+
+    assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
+    assert reason == "insufficient_captured_exit_loss_evidence"
+
+
 def test_decision_horizon_uses_fastest_validation_supported_horizon():
     selected, reason = _select_decision_horizon(
         {
@@ -183,6 +200,25 @@ def test_symbol_authorization_requires_positive_test_and_sealed_horizon_oos():
     )
 
     assert authorized == ["EURUSD"]
+
+
+def test_symbol_authorization_requires_minimum_observed_captured_losses():
+    positive = _positive_captured_metrics(0.001)
+    sparse_losses = _positive_captured_metrics(0.001)
+    sparse_losses["captured_exit_loss_count"] = 4
+
+    authorized = _authorized_symbols(
+        test_by_symbol={"EURUSD": sparse_losses, "GBPUSD": positive},
+        sealed_by_symbol_horizon={
+            "EURUSD": {"10": positive},
+            "GBPUSD": {"10": positive},
+        },
+        decision_horizon_s=10,
+        target_definition="captured_exit_replay",
+        min_selected=10,
+    )
+
+    assert authorized == ["GBPUSD"]
 
 
 def test_scope_threshold_selection_uses_validation_harvest_lcb():
@@ -316,6 +352,40 @@ def test_captured_exit_replay_records_sequential_executable_outcome():
     )
     assert {"captured_exit_net_pnl", "captured_exit_return", "captured_exit_reason"}.issubset(frame.columns)
     assert set(frame["captured_exit_reason"]).issubset({"harvest", "abort", "timeout"})
+
+
+def test_captured_exit_replay_subtracts_configured_slippage_without_double_counting_spread():
+    times = pd.date_range("2026-01-01T00:00:00Z", periods=70, freq="1s")
+    mid = np.full(70, 1.10005)
+    mid[0] = 1.10000
+    quotes = pd.DataFrame(
+        {"time": times, "bid": mid - 0.00001, "ask": mid + 0.00001}
+    )
+
+    spread_only = build_quote_training_frame(
+        {"EURUSD": quotes}, horizons=(10,), sample_every_s=1,
+        target_mode="captured_exit_replay", slippage_bps=0.0,
+    )
+    with_slippage = build_quote_training_frame(
+        {"EURUSD": quotes}, horizons=(10,), sample_every_s=1,
+        target_mode="captured_exit_replay", slippage_bps=0.5,
+    )
+    baseline = spread_only[
+        (spread_only["time"] == times[0]) & (spread_only["side"] == "buy")
+    ].iloc[0]
+    slipped = with_slippage[
+        (with_slippage["time"] == times[0]) & (with_slippage["side"] == "buy")
+    ].iloc[0]
+
+    expected_slippage_price = 2.0 * 0.5 / 10_000.0 * 1.10000
+    assert baseline["captured_exit_net_pnl"] > 0.0
+    assert baseline["target"] == 1
+    assert np.isclose(
+        baseline["captured_exit_net_pnl"] - slipped["captured_exit_net_pnl"],
+        expected_slippage_price,
+    )
+    assert slipped["captured_exit_net_pnl"] < 0.0
+    assert slipped["target"] == 0
 
 
 def test_terminal_profit_target_does_not_label_temporary_mfe_as_a_win():

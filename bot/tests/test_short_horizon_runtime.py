@@ -5,6 +5,7 @@ import pandas as pd
 
 from aegis.intel.short_horizon_runtime import (
     ShortHorizonPredictor,
+    execution_candidate_has_current_promotion_policy,
     resample_runtime_quotes,
     seed_quote_buffer,
 )
@@ -32,6 +33,35 @@ def test_short_horizon_runtime_rejects_non_short_horizon_metadata(tmp_path: Path
     assert result["prediction_reason"] == "schema_mismatch"
     assert predictor.snapshot()["status"] == "invalid_artifact"
     assert predictor.snapshot()["reason"] == "schema_mismatch"
+
+
+def test_execution_candidate_loader_rejects_empty_authorized_symbols(tmp_path: Path):
+    path = tmp_path / "model"
+    path.mkdir()
+    (path / "metadata.json").write_text(
+        """{
+          \"schema\": \"short_horizon_ensemble.v1\",
+          \"execution_status\": \"EXECUTION_CANDIDATE\",
+          \"target_definition\": \"captured_exit_replay\",
+          \"dataset_hash\": \"dataset\",
+          \"validation_hash\": \"validation\",
+          \"horizons_s\": [10],
+          \"decision_horizon_s\": 10,
+          \"authorized_symbols\": [],
+          \"oos\": {\"sealed_by_symbol_horizon\": {}},
+          \"promotion_policy\": {
+            \"min_captured_exit_losses\": 10,
+            \"requires_positive_test_and_sealed_lcb95\": true
+          }
+        }""",
+        encoding="utf-8",
+    )
+
+    predictor = ShortHorizonPredictor(path)
+
+    assert predictor.snapshot()["status"] == "invalid_artifact"
+    assert predictor.snapshot()["reason"] == "execution_requires_authorized_symbols"
+    assert predictor.pipeline is None
 
 
 def test_seed_quote_buffer_uses_only_valid_broker_quotes():
@@ -148,6 +178,69 @@ def test_captured_exit_artifact_uses_captured_oos_expectancy_for_runtime_ev(tmp_
     assert result["by_horizon"]["10"]["threshold"] == 0.7
 
 
+def test_runtime_ev_uses_broker_native_usd_tick_value_for_jpy_pair(tmp_path: Path):
+    class Pipeline:
+        models = [object(), object()]
+
+        def get_calibrated_ensemble_prediction(self, row, **kwargs):
+            return {
+                "probability": [0.8],
+                "decision": [True],
+                "abstain": [False],
+                "model_agreement": [1.0],
+                "uncertainty": [0.01],
+            }
+
+    class Buffer:
+        points = [
+            SimpleNamespace(timestamp=1787659200.0, bid=150.00, ask=150.02),
+            SimpleNamespace(timestamp=1787659201.0, bid=150.01, ask=150.03),
+        ]
+
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+    predictor.pipeline = Pipeline()
+    predictor.status = "ready"
+    predictor.execution_status = "EXECUTION_CANDIDATE"
+    predictor.metadata = {
+        "horizons_s": [10],
+        "decision_horizon_s": 10,
+        "target_definition": "captured_exit_replay",
+        "threshold": 0.5,
+        "min_model_agreement": 0.6,
+        "max_uncertainty": 0.2,
+        "authorized_symbols": ["USDJPY"],
+        "oos": {
+            "sealed_by_symbol_horizon": {
+                "USDJPY": {
+                    "10": {
+                        "mean_captured_exit_return": 0.0001,
+                        "captured_exit_lcb95_return": 0.00005,
+                    }
+                }
+            }
+        },
+    }
+
+    result = predictor.predict(
+        symbol="USDJPY",
+        quote_buffer=SimpleNamespace(buffers={"USDJPY": Buffer()}),
+        now_ts=1787659201.0,
+        side="buy",
+        broker_spec={
+            "trade_tick_value": 1.0,
+            "trade_tick_size": 0.01,
+            "volume_min": 0.01,
+        },
+        quantity=0.01,
+    )
+
+    # 0.0001 relative return at ~150.02 is ~0.015 price units. With the
+    # synthetic broker spec that is ~$0.015 at 0.01 lot, not 15 JPY mislabeled USD.
+    assert result["expected_net_pnl"] < 0.1
+    assert result["expected_net_pnl"] > 0.0
+    assert result["expected_net_pnl_lcb95"] > 0.0
+
+
 def test_execution_candidate_rejects_symbol_without_exact_scope_permission(tmp_path: Path):
     predictor = ShortHorizonPredictor(tmp_path / "missing")
     predictor.execution_status = "EXECUTION_CANDIDATE"
@@ -162,6 +255,81 @@ def test_execution_candidate_rejects_symbol_without_exact_scope_permission(tmp_p
     assert result is not None
     assert result["abstain"] is True
     assert result["prediction_reason"] == "symbol_not_authorized"
+
+
+def test_execution_candidate_with_empty_authorization_rejects_every_symbol(tmp_path: Path):
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+    predictor.execution_status = "EXECUTION_CANDIDATE"
+    predictor.status = "ready"
+    predictor.metadata = {
+        "target_definition": "captured_exit_replay",
+        "authorized_symbols": [],
+    }
+
+    result = predictor.predict(symbol="EURUSD", quote_buffer=None, now_ts=1.0)
+
+    assert result is not None
+    assert result["abstain"] is True
+    assert result["prediction_reason"] == "symbol_not_authorized"
+
+
+def test_execution_candidate_does_not_fallback_to_global_oos_when_symbol_scope_missing(tmp_path: Path):
+    class Pipeline:
+        models = [object(), object()]
+
+        def get_calibrated_ensemble_prediction(self, row, **kwargs):
+            return {
+                "probability": [0.8],
+                "decision": [True],
+                "abstain": [False],
+                "model_agreement": [1.0],
+                "uncertainty": [0.01],
+            }
+
+    class Buffer:
+        points = [
+            SimpleNamespace(timestamp=1787659200.0, bid=1.1, ask=1.1002),
+            SimpleNamespace(timestamp=1787659201.0, bid=1.1001, ask=1.1003),
+        ]
+
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+    predictor.pipeline = Pipeline()
+    predictor.status = "ready"
+    predictor.execution_status = "EXECUTION_CANDIDATE"
+    predictor.metadata = {
+        "horizons_s": [10],
+        "decision_horizon_s": 10,
+        "target_definition": "captured_exit_replay",
+        "threshold": 0.5,
+        "min_model_agreement": 0.6,
+        "max_uncertainty": 0.2,
+        "authorized_symbols": ["EURUSD"],
+        "oos": {
+            "sealed_by_horizon": {
+                "10": {
+                    "mean_captured_exit_return": 0.001,
+                    "captured_exit_lcb95_return": 0.0005,
+                }
+            },
+            "sealed_by_symbol_horizon": {},
+        },
+    }
+
+    result = predictor.predict(
+        symbol="EURUSD",
+        quote_buffer=SimpleNamespace(buffers={"EURUSD": Buffer()}),
+        now_ts=1787659201.0,
+        broker_spec={
+            "trade_tick_value": 1.0,
+            "trade_tick_size": 0.0001,
+            "volume_min": 0.01,
+        },
+        quantity=0.01,
+    )
+
+    assert result is not None
+    assert result["abstain"] is True
+    assert result["prediction_reason"] == "symbol_horizon_oos_missing"
 
 
 def test_runtime_exposes_precise_abstention_diagnostics(tmp_path: Path):

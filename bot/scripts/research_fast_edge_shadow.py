@@ -45,6 +45,23 @@ def select_research_symbols(configured: Sequence[str], overrides: Sequence[str] 
     return selected
 
 
+def _load_experiment_handoff(path: Path | None) -> dict | None:
+    """Load only the bounded, research-only Council handoff for traceability."""
+    if path is None or not path.exists():
+        return None
+    try:
+        handoff = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(handoff, dict):
+        return None
+    if handoff.get("execution_authority") != "NONE":
+        return None
+    if handoff.get("schema") != "fast_edge_experiment_handoff.v1":
+        return None
+    return handoff
+
+
 def primary_oos_metrics(model_report: dict) -> dict[str, object]:
     """Expose primary test and sealed economics without collapsing the splits."""
     primary_model = model_report.get("primary_model")
@@ -90,7 +107,9 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=BOT_ROOT / "reports" / "research")
     parser.add_argument("--no-rows", action="store_true", help="do not persist the row-level shadow dataset")
     parser.add_argument("--rows-input", type=Path, help="reuse a previously persisted shadow JSONL dataset")
+    parser.add_argument("--experiment-handoff", type=Path, help="prior research-only Council experiment handoff")
     args = parser.parse_args()
+    experiment_handoff = _load_experiment_handoff(args.experiment_handoff)
 
     if args.rows_input:
         frame = pd.read_json(args.rows_input, orient="records", lines=True)
@@ -203,6 +222,7 @@ def main() -> None:
         "models_tested": model_report["model_names"],
         "features_tested": model_report["feature_names"],
         "new_hypotheses": [item["query"] for item in book_evidence],
+        "council_experiment_handoff": experiment_handoff,
         "best_previous_candidate": (
             (previous_report or {}).get("leaderboard_top_50", [None])[0]
             if (previous_report or {}).get("leaderboard_top_50") else None
@@ -280,6 +300,7 @@ def main() -> None:
                     "calibrate probability vectors before any authority review",
                     "autopsy tail losses and validate MFE-protection exits",
                 ],
+                "council_experiment_handoff": experiment_handoff,
                 "execution_authority": "NONE",
             },
             indent=2,

@@ -59,6 +59,7 @@ class FastExitContext:
     observed_commission_r: Optional[float] = None
     spread_normal: Optional[bool] = None
     harvest_policy: Optional[HarvestPolicy] = None
+    short_horizon_prediction: Optional[Mapping[str, Any]] = None
 
 
 class MissingLiquidationMarkError(Exception):
@@ -201,6 +202,27 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
         harvest_input=harvest_input,
     )
 
+    # Current calibrated model support may replace only the default HOLD, and
+    # only while the ticket is non-profitable. Existing target, scratch,
+    # giveback, regime, EV, and lock decisions keep priority.
+    if (
+        fast_verdict.get("action") == "HOLD"
+        and _pnl_pips <= 0
+        and short_horizon_support_revoked(ctx.short_horizon_prediction)
+    ):
+        prediction = ctx.short_horizon_prediction or {}
+        return {
+            "action": "ABORT",
+            "reason": "short_horizon_support_revoked",
+            "why": (
+                "current calibrated short-horizon support was revoked "
+                f"(probability={float(prediction.get('probability', 0.0)):.3f}, "
+                f"threshold={float(prediction.get('threshold', 0.5)):.3f}, "
+                f"decision={bool(prediction.get('decision', False))}) while pnl is non-positive"
+            ),
+            "policy": "short_horizon_support_revoked",
+        }
+
     return fast_verdict
 
 
@@ -342,6 +364,74 @@ def spread_r_from_geometry(
         return spread_usd / risk_usd
     except (TypeError, ValueError):
         return None
+
+
+def estimate_remaining_ev(
+    *,
+    side: str,
+    entry_price: object,
+    current_mark: object,
+    invalidation: object,
+    target: object,
+    entry_ev: object,
+) -> tuple[float | None, str]:
+    """Estimate remaining costed EV from current executable geometry.
+
+    This is the explicitly configured ``fast_firehose_remaining_ev_v1`` rule.
+    It scales the already-costed entry EV by the remaining reward/risk ratio;
+    it does not invent EV when the entry economics or directional geometry are
+    unavailable. ``UNKNOWN`` is fail-closed and never activates an exit.
+    """
+    normalized_side = str(side or "").strip().lower()
+    if normalized_side not in {"buy", "sell"}:
+        return None, "UNKNOWN"
+    values = (entry_price, current_mark, invalidation, target, entry_ev)
+    if not all(_finite(value) for value in values):
+        return None, "UNKNOWN"
+    entry = float(entry_price)
+    current = float(current_mark)
+    invalid = float(invalidation)
+    target_price = float(target)
+    base_ev = float(entry_ev)
+    if entry <= 0.0 or current <= 0.0 or base_ev <= 0.0:
+        return None, "UNKNOWN"
+    sign = 1.0 if normalized_side == "buy" else -1.0
+    initial_reward = (target_price - entry) * sign
+    initial_risk = (entry - invalid) * sign
+    if initial_reward <= 0.0 or initial_risk <= 0.0:
+        return None, "UNKNOWN"
+    remaining_reward = (target_price - current) * sign
+    remaining_risk = abs(current - invalid)
+    if remaining_risk <= 0.0:
+        return None, "UNKNOWN"
+    initial_rr = initial_reward / initial_risk
+    remaining_rr = remaining_reward / remaining_risk
+    if not (_finite(initial_rr) and _finite(remaining_rr)):
+        return None, "UNKNOWN"
+    ratio = max(0.0, min(2.0, remaining_rr / initial_rr))
+    return float(base_ev * ratio), "ESTIMATED"
+
+
+def short_horizon_support_revoked(prediction: Mapping[str, Any] | None) -> bool:
+    """Return True only for current, calibrated, non-abstaining negative support."""
+    if not isinstance(prediction, Mapping):
+        return False
+    if str(prediction.get("calibration_status") or "") != "calibrated":
+        return False
+    if bool(prediction.get("abstain", True)):
+        return False
+    try:
+        probability = float(prediction["probability"])
+        threshold = float(prediction.get("threshold", 0.5))
+    except (KeyError, TypeError, ValueError):
+        return False
+    if not (math.isfinite(probability) and math.isfinite(threshold)):
+        return False
+    if not 0.0 <= probability <= 1.0 or not 0.0 < threshold < 1.0:
+        return False
+    return probability < threshold or (
+        "decision" in prediction and not bool(prediction.get("decision"))
+    )
 
 
 def _finite(value: object) -> bool:
