@@ -146,7 +146,7 @@ def main() -> int:
             brain_skip_reasons[str(row.get("reason"))] += 1
         elif ev == "intel_skip":
             intel_skip_reasons[str(row.get("reason"))] += 1
-        el        if ev == "order":
+        elif ev == "order":
             ok = bool(row.get("ok"))
             order_results["ok" if ok else "rejected"] += 1
             if not ok:
