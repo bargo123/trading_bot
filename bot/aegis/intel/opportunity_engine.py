@@ -99,6 +99,7 @@ def rank_and_allocate(
                 "p_captured_win",
             ),
             -_number(row, "p_captured_win", default=float("-inf")),
+            -int(str(row.get("lane") or "").lower() == "validated"),
             _number(row, "uncertainty", default=float("inf")),
             _number(row, "fast_loser_similarity"),
             _number(row, "tail_loss_probability"),

@@ -119,6 +119,41 @@ def test_frozen_opportunity_preserves_the_decision_identity():
     assert frozen["shadow_model_probability"] is None
 
 
+def test_validated_frozen_opportunity_enters_global_pool_with_model_probability():
+    from aegis.intel.firehose_brain import DemoDecision
+    from aegis.intel.opportunity_engine import rank_and_allocate
+
+    decision = DemoDecision(
+        "fire", "positive_state_ev_on_validated_strategy", side="buy",
+        sl=1.0990, tp=1.1010, quantity=0.01, expected_net_value=0.12,
+        journal={
+            "exploration": False,
+            "setup_family": "validated_breakout",
+            "variant_id": "validated_breakout:buy:5s",
+            "short_horizon_prediction": {
+                "probability": 0.82,
+                "p_captured_win_lcb95": 0.61,
+                "expected_net_pnl": 0.12,
+                "decision_horizon_s": 5,
+            },
+        },
+    )
+
+    frozen = frozen_opportunity_from_decision(
+        decision=decision, symbol="EURUSD", scan_id="scan-v", bar_time="t-v",
+        bid=1.1000, ask=1.1002, stop=1.0990, target=1.1010, quantity=0.01,
+    )
+    ranked, selected = rank_and_allocate([frozen], max_positions=1)
+
+    assert len(ranked) == 1
+    assert selected[0] is ranked[0]
+    assert selected[0]["lane"] == "validated"
+    assert selected[0]["p_captured_win"] == 0.82
+    assert selected[0]["p_captured_win_lcb95"] == 0.61
+    assert selected[0]["side"] == "buy"
+    assert selected[0]["horizon_s"] == 5
+
+
 def test_risk_halt_records_one_terminal_funnel_row_without_order_intent():
     row = firehose_funnel_risk_row(
         scan_id="scan_123",

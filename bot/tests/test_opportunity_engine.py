@@ -5,11 +5,15 @@ import pytest
 from aegis.intel.opportunity_engine import FrozenOpportunity, freeze_opportunity, rank_and_allocate
 
 
-def _candidate(name, *, symbol, thesis, p_capture, ev, lcb=0.0, risk=0.10):
+def _candidate(name, *, symbol, thesis, p_capture, ev, lcb=0.0, risk=0.10,
+               side="buy", lane="exploration", mechanism="micro", horizon=5):
     return {
         "candidate_id": name,
         "symbol": symbol,
-        "side": "buy",
+        "side": side,
+        "lane": lane,
+        "mechanism": mechanism,
+        "horizon_s": horizon,
         "thesis_key": thesis,
         "p_captured_win": p_capture,
         "expected_net_ev": ev,
@@ -105,3 +109,43 @@ def test_allocator_returns_the_exact_frozen_object_it_ranked():
     assert isinstance(ranked[0], FrozenOpportunity)
     assert selected[0] is ranked[0]
     assert selected[0]["candidate_id"] == "same-object"
+
+
+def test_complete_variant_pool_reaches_one_global_ranking():
+    candidates = [
+        _candidate("eur-buy", symbol="EURUSD", thesis="eur-buy", p_capture=0.61,
+                   ev=0.01, side="buy", mechanism="momentum", horizon=3),
+        _candidate("eur-sell", symbol="EURUSD", thesis="eur-sell", p_capture=0.55,
+                   ev=0.02, side="sell", mechanism="reversal", horizon=8),
+        _candidate("gbp-buy", symbol="GBPUSD", thesis="gbp-buy", p_capture=0.48,
+                   ev=0.03, side="buy", mechanism="breakout", horizon=5),
+        _candidate("gbp-sell", symbol="GBPUSD", thesis="gbp-sell", p_capture=0.68,
+                   ev=0.01, side="sell", mechanism="snapback", horizon=10),
+    ]
+
+    ranked, selected = rank_and_allocate(candidates, max_positions=1)
+
+    assert {row["candidate_id"] for row in ranked} == {
+        "eur-buy", "eur-sell", "gbp-buy", "gbp-sell",
+    }
+    assert selected[0]["candidate_id"] == "gbp-sell"
+    assert selected[0]["side"] == "sell"
+
+
+def test_validated_lane_is_rankable_and_exploration_is_fallback():
+    validated = _candidate(
+        "validated", symbol="EURUSD", thesis="validated", p_capture=0.80,
+        ev=0.10, lane="validated",
+    )
+    exploration = _candidate(
+        "exploration", symbol="GBPUSD", thesis="exploration", p_capture=0.70,
+        ev=0.20, lane="exploration",
+    )
+
+    ranked, selected = rank_and_allocate([exploration, validated], max_positions=1)
+
+    assert ranked[0]["candidate_id"] == "validated"
+    assert selected[0]["lane"] == "validated"
+
+    _, fallback = rank_and_allocate([exploration], max_positions=1)
+    assert fallback[0]["candidate_id"] == "exploration"

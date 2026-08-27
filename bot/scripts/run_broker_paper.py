@@ -235,10 +235,17 @@ def frozen_opportunity_from_decision(
     journal = dict(getattr(decision, "journal", {}) or {})
     economics = journal.get("exploration_economics")
     economics = dict(economics) if isinstance(economics, dict) else {}
+    prediction = journal.get("short_horizon_prediction")
+    prediction = dict(prediction) if isinstance(prediction, dict) else {}
     authorization = journal.get("capture_authorization")
     authorization = dict(authorization) if isinstance(authorization, dict) else {}
+    exploration = bool(journal.get("exploration"))
     variant_id = str(journal.get("variant_id") or journal.get("hypothesis_id") or "")
-    horizon = journal.get("search_horizon_s") or journal.get("max_hold_s")
+    horizon = (
+        journal.get("search_horizon_s")
+        or prediction.get("decision_horizon_s")
+        or journal.get("max_hold_s")
+    )
     try:
         horizon = int(horizon) if horizon is not None else None
     except (TypeError, ValueError):
@@ -248,6 +255,16 @@ def frozen_opportunity_from_decision(
         expected_ev = economics.get("econ_expected_net_usd")
     authority_probability = authorization.get("probability")
     authority_lcb = authorization.get("lower_95")
+    capture_probability = (
+        authority_probability if exploration else prediction.get("p_captured_win")
+    )
+    if capture_probability is None and not exploration:
+        capture_probability = prediction.get("probability")
+    capture_lcb = (
+        authority_lcb if exploration else prediction.get("p_captured_win_lcb95")
+    )
+    if capture_lcb is None and not exploration:
+        capture_lcb = prediction.get("probability_lcb95")
     candidate_id = f"{scan_id}:{variant_id}" if variant_id else scan_id
     return freeze_opportunity({
         "candidate_id": candidate_id,
@@ -255,6 +272,7 @@ def frozen_opportunity_from_decision(
         "bar_time": str(bar_time),
         "symbol": str(symbol).upper(),
         "side": str(getattr(decision, "side", "") or "").lower(),
+        "lane": "exploration" if exploration else "validated",
         "mechanism": str(journal.get("setup_family") or journal.get("micro_mechanism") or ""),
         "variant_id": variant_id,
         "thesis_key": str(journal.get("thesis_key") or candidate_id),
@@ -266,18 +284,26 @@ def frozen_opportunity_from_decision(
         "bid": float(bid),
         "ask": float(ask),
         "spread": max(0.0, float(ask) - float(bid)),
-        "p_captured_win": authority_probability,
-        "p_captured_win_lcb95": authority_lcb,
+        "p_captured_win": capture_probability,
+        "p_captured_win_lcb95": capture_lcb,
         "authority_probability": authority_probability,
         "authority_capture_lcb95": authority_lcb,
         "authority_expected_net_ev": expected_ev,
         "expected_net_ev": expected_ev,
-        "expected_net_ev_lcb95": economics.get("econ_expected_net_lcb95"),
+        "expected_net_ev_lcb95": (
+            economics.get("econ_expected_net_lcb95")
+            if exploration else prediction.get("expected_net_pnl_lcb95")
+        ),
         "marginal_risk_usd": economics.get("econ_expected_loss_usd"),
         "portfolio_ok": True,
         "shadow_model_probability": journal.get("shadow_model_probability"),
         "authority_evidence_source": authorization.get("evidence_source"),
         "authority_evidence_n": authorization.get("observations"),
+        "uncertainty": prediction.get("uncertainty"),
+        "expected_time_to_green_s": prediction.get("expected_time_to_green_s"),
+        "tail_loss_probability": prediction.get("tail_loss_probability"),
+        "fast_winner_similarity": journal.get("fast_winner_similarity", 0.0),
+        "fast_loser_similarity": journal.get("fast_loser_similarity", 0.0),
         "decision_journal": journal,
     })
 
