@@ -211,6 +211,22 @@ def _engine(api: FakeMT5, **cfg) -> MT5Engine:
     return MT5Engine(base, api=api)
 
 
+def test_server_offset_does_not_absorb_stale_tick_age(monkeypatch):
+    """A stale server-stamped tick must not become the cached clock offset."""
+    import aegis.engines.mt5 as mt5_mod
+
+    now = 1_700_000_000.0
+    monkeypatch.setattr(mt5_mod.time, "time", lambda: now)
+    api = FakeMT5()
+    # The broker clock is UTC+3, but this sample is 35 seconds old.
+    api.tick.time = int(now + 10_800 - 35)
+    eng = _engine(api)
+    eng._connected = True
+
+    assert eng._server_utc_offset() == 10_800
+    assert eng.quote("EURUSD").time.timestamp() == now - 35
+
+
 def test_factory_mt5():
     eng = create_engine({"engine": "mt5", "allow_live": False})
     assert isinstance(eng, MT5Engine)

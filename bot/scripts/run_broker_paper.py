@@ -268,6 +268,7 @@ def frozen_opportunity_from_decision(
     candidate_id = f"{scan_id}:{variant_id}" if variant_id else scan_id
     return freeze_opportunity({
         "candidate_id": candidate_id,
+        "candidate_created_at": time.time(),
         "scan_id": str(scan_id),
         "bar_time": str(bar_time),
         "symbol": str(symbol).upper(),
@@ -470,6 +471,38 @@ def exploration_order_risk_check(
             "max_lots": round(max_lots, 8),
         }
     return {"allowed": True, "reason": "ok", "max_lots": round(max_lots, 8)}
+
+
+def resize_order_quantity_to_risk(
+    *,
+    requested_quantity: float,
+    max_lots: float,
+    volume_min: float,
+    volume_step: float,
+) -> float | None:
+    """Reduce a revalidated order to the broker step without exceeding risk."""
+    try:
+        requested = float(requested_quantity)
+        maximum = float(max_lots)
+        minimum = float(volume_min)
+        step = float(volume_step)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if (
+        not all(math.isfinite(value) for value in (requested, maximum, minimum, step))
+        or requested <= 0
+        or maximum <= 0
+        or minimum <= 0
+        or step <= 0
+        or maximum + 1e-12 < minimum
+    ):
+        return None
+    candidate = min(requested, maximum)
+    steps = math.floor((candidate + 1e-12) / step)
+    resized = round(steps * step, 8)
+    if resized + 1e-12 < minimum:
+        return None
+    return resized
 
 
 def order_margin_for_send(
@@ -677,7 +710,21 @@ def write_runner_heartbeat(
     if extra:
         payload.update(extra)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload), encoding="utf-8")
+    _write_text_atomically(path, json.dumps(payload))
+
+
+def _write_text_atomically(path: Path, text: str) -> None:
+    """Replace a shared runtime report without exposing a partial/truncated file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        temporary.write_text(str(text), encoding="utf-8")
+        os.replace(str(temporary), str(path))
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def normalize_protective_stops(
@@ -717,6 +764,79 @@ def normalize_protective_stops(
     return sl_out, tp_out
 
 
+def validate_virtual_strategy_geometry(
+    *,
+    side: str,
+    entry: float,
+    stop: float | None,
+    target: float | None,
+) -> tuple[bool, str]:
+    """Validate controller-owned strategy geometry without broker distances."""
+    try:
+        entry_f = float(entry)
+        stop_f = None if stop is None else float(stop)
+        target_f = None if target is None else float(target)
+    except (TypeError, ValueError, OverflowError):
+        return False, "virtual_geometry_non_numeric"
+    if not math.isfinite(entry_f) or entry_f <= 0:
+        return False, "virtual_entry_invalid"
+    if stop_f is None or not math.isfinite(stop_f) or stop_f <= 0:
+        return False, "virtual_stop_invalid"
+    side_l = str(side or "").lower()
+    if side_l == "buy" and stop_f >= entry_f:
+        return False, "virtual_buy_stop_not_below_entry"
+    if side_l == "sell" and stop_f <= entry_f:
+        return False, "virtual_sell_stop_not_above_entry"
+    if target_f is not None:
+        if not math.isfinite(target_f) or target_f <= 0:
+            return False, "virtual_target_invalid"
+        if side_l == "buy" and target_f <= entry_f:
+            return False, "virtual_buy_target_not_above_entry"
+        if side_l == "sell" and target_f >= entry_f:
+            return False, "virtual_sell_target_not_below_entry"
+    if side_l not in {"buy", "sell"}:
+        return False, "virtual_side_invalid"
+    return True, ""
+
+
+def reprice_frozen_virtual_geometry(
+    *,
+    side: str,
+    discovery_entry: float,
+    discovery_stop: float | None,
+    discovery_target: float | None,
+    fresh_entry: float,
+) -> tuple[float, float | None] | None:
+    """Reprice the same strategy geometry from a fresh executable entry.
+
+    The side, mechanism, horizon, and thesis identity remain frozen. Only the
+    quote-relative virtual levels move with the fresh entry; broker minimum
+    stop-distance normalization is deliberately not applied here.
+    """
+    valid, _ = validate_virtual_strategy_geometry(
+        side=side,
+        entry=discovery_entry,
+        stop=discovery_stop,
+        target=discovery_target,
+    )
+    if not valid:
+        return None
+    try:
+        fresh = float(fresh_entry)
+        stop = fresh + (float(discovery_stop) - float(discovery_entry))
+        target = (
+            None
+            if discovery_target is None
+            else fresh + (float(discovery_target) - float(discovery_entry))
+        )
+    except (TypeError, ValueError, OverflowError):
+        return None
+    valid, _ = validate_virtual_strategy_geometry(
+        side=side, entry=fresh, stop=stop, target=target
+    )
+    return (stop, target) if valid else None
+
+
 def emergency_broker_stop(
     *,
     symbol: str,
@@ -728,6 +848,8 @@ def emergency_broker_stop(
     max_risk_usd: float,
     width_multiple: float = 4.0,
     clamp_to_risk: bool = False,
+    market_bid: float | None = None,
+    market_ask: float | None = None,
 ) -> float | None:
     """Return a wide catastrophe stop without changing virtual strategy geometry.
 
@@ -757,6 +879,17 @@ def emergency_broker_stop(
     if not math.isfinite(virtual_distance) or virtual_distance <= 0:
         return None
     minimum_distance = max(point * 2.0, point * float(stops_level))
+    side_l = str(side or "").lower()
+    try:
+        bid = None if market_bid is None else float(market_bid)
+        ask = None if market_ask is None else float(market_ask)
+        if bid is not None and ask is not None and bid > 0 and ask >= bid:
+            if side_l == "buy":
+                minimum_distance = max(minimum_distance, entry_price - bid + point)
+            elif side_l == "sell":
+                minimum_distance = max(minimum_distance, ask - entry_price + point)
+    except (TypeError, ValueError, OverflowError):
+        return None
     desired_distance = max(virtual_distance * width, minimum_distance)
     usd_per_price = contract.tick_value / contract.tick_size
     allowed_distance = risk_cap / (usd_per_price * lots) if usd_per_price > 0 else 0.0
@@ -767,7 +900,6 @@ def emergency_broker_stop(
         # even when a 4R emergency backstop would exceed the same approved risk
         # cap. Keep the broker protection, but never exceed that cap.
         desired_distance = allowed_distance
-    side_l = str(side or "").lower()
     if side_l == "buy":
         return entry_price - desired_distance
     if side_l == "sell":
@@ -1575,10 +1707,15 @@ def main() -> None:
     execution_status_counts: dict[str, int] = {}
     submitted_count = 0
     fill_count = 0
+    hot_path_discovery_to_send_ms: list[float] = []
+    oms_reject_reasons: dict[str, int] = {}
     quote_refresh_counts: dict[str, int] = {
         "stale_observed_at_send": 0,
         "fresh_quote_recovered": 0,
         "candidate_invalidated_after_refresh": 0,
+        "virtual_geometry_reject": 0,
+        "broker_geometry_reject": 0,
+        "risk_resized": 0,
         "order_sent_after_refresh": 0,
         "margin_precheck_skip": 0,
         "min_lot_precheck_skip": 0,
@@ -1989,6 +2126,23 @@ def main() -> None:
             scan_id = firehose_scan_id(sym, bar_time)
 
             q = eng.quote(sym)
+            fresh_quote_at = time.time()
+            candidate_created_at = fresh_quote_at
+            global_rank_started_at = 0.0
+            global_rank_finished_at = 0.0
+            if frozen_opportunity is not None:
+                try:
+                    candidate_created_at = float(
+                        frozen_opportunity.get("candidate_created_at") or fresh_quote_at
+                    )
+                    global_rank_started_at = float(
+                        frozen_opportunity.get("global_rank_started_at") or 0.0
+                    )
+                    global_rank_finished_at = float(
+                        frozen_opportunity.get("global_rank_finished_at") or 0.0
+                    )
+                except (TypeError, ValueError, OverflowError):
+                    candidate_created_at = fresh_quote_at
             if selected_execution:
                 global_opportunity_counts["GLOBAL_REVALIDATED"] += 1
             # Quote already recorded in polling loop; use current quote for this evaluation
@@ -2025,6 +2179,7 @@ def main() -> None:
                         {
                             "event": "quote_stale",
                             "symbol": sym,
+                            "candidate_id": scan_id,
                             "age_s": age,
                             "max_s": max_age,
                             "bar": str(bar_time),
@@ -2042,6 +2197,7 @@ def main() -> None:
                         {
                             "event": "quote_future",
                             "symbol": sym,
+                            "candidate_id": scan_id,
                             "skew_s": skew,
                             "max_s": max_skew,
                             "bar": str(bar_time),
@@ -2550,74 +2706,21 @@ def main() -> None:
                     spec_map = eng.symbol_spec(sym)
                 except Exception:
                     spec_map = None
-                normalized_sl, normalized_tp = normalize_protective_stops(
-                    side=sig.side,
-                    entry=entry,
-                    sl=sl,
-                    tp=tp,
-                    spec=spec_map,
-                    fallback_step=pip,
-                )
-                if frozen_geometry:
-                    # Global allocation froze the candidate's geometry. A
-                    # fresh quote may invalidate it, but may not silently
-                    # move its stop/target into a different opportunity.
-                    if (
-                        (sl is not None and normalized_sl != sl)
-                        or (tp is not None and normalized_tp != tp)
-                    ):
-                        quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
-                        if selected_execution:
-                            global_opportunity_counts["GLOBAL_INVALIDATED_ON_REFRESH"] += 1
-                        append_journal(
-                            journal,
-                            {
-                                "event": "frozen_candidate_invalidated",
-                                "symbol": sym,
-                                "reason": "geometry_changed_on_quote_revalidation",
-                                "entry": entry,
-                                "stop": sl,
-                                "target": tp,
-                                "bar": str(bar_time),
-                            },
-                        )
-                        return
-                else:
-                    sl, tp = normalized_sl, normalized_tp
+                if not intelligent_mode:
+                    sl, tp = normalize_protective_stops(
+                        side=sig.side,
+                        entry=entry,
+                        sl=sl,
+                        tp=tp,
+                        spec=spec_map,
+                        fallback_step=pip,
+                    )
             broker_sl = None
             broker_tp = None
-            if intelligent_mode:
-                risk_cap = float(
-                    cfg.get("exploration_max_risk_per_trade_usd", 0.15) or 0.15
-                )
-                broker_sl = emergency_broker_stop(
-                    symbol=sym,
-                    side=sig.side,
-                    entry=entry,
-                    virtual_stop=sl,
-                    quantity=order_qty,
-                    spec=spec_map,
-                    max_risk_usd=risk_cap,
-                    clamp_to_risk=bool(
-                        brain_decision is not None
-                        and str(
-                            brain_decision.journal.get("authority_type") or ""
-                        ).upper() == "FORCED_DEMO_EXPLORATION"
-                    ),
-                )
-                if broker_sl is None:
-                    append_journal(
-                        journal,
-                        {
-                            "event": "emergency_stop_skip",
-                            "symbol": sym,
-                            "reason": "wide_emergency_stop_exceeds_per_trade_risk_or_missing_geometry",
-                            "virtual_stop": sl,
-                            "risk_cap_usd": risk_cap,
-                            "bar": str(bar_time),
-                        },
-                    )
-                    return
+            # The intelligent emergency stop is deliberately deferred until
+            # after the one allowed fresh-tick refresh and any risk
+            # down-sizing. Computing it from the discovery quote could reject
+            # a candidate before its same-identity geometry is repriced.
             req = OrderRequest(
                 symbol=sym,
                 side=sig.side,
@@ -2636,15 +2739,20 @@ def main() -> None:
                     else f"aegis_{sig.reason}"[:40]
                 ),
             )
-            oms_ok, oms_why = oms_allows(
-                req,
-                q,
-                cfg,
-                open_count=len(eng.positions()),
-                check_quote_age=False,
+            oms_ok, oms_why = (
+                (True, "")
+                if intelligent_mode
+                else oms_allows(
+                    req,
+                    q,
+                    cfg,
+                    open_count=len(eng.positions()),
+                    check_quote_age=False,
+                )
             )
             if not oms_ok:
                 t2t.note_reject(oms_why)
+                oms_reject_reasons[oms_why] = oms_reject_reasons.get(oms_why, 0) + 1
                 append_journal(
                     journal,
                     {
@@ -2872,12 +2980,114 @@ def main() -> None:
                     return
                 quote_refresh_counts["fresh_quote_recovered"] += 1
                 latency.quote_ts = getattr(q, "time", 0.0) or time.time()
+                fresh_quote_at = time.time()
+            entry = float(q.ask if sig.side == "buy" else q.bid)
+            if intelligent_mode:
+                if frozen_geometry:
+                    repriced = reprice_frozen_virtual_geometry(
+                        side=sig.side,
+                        discovery_entry=float(frozen_opportunity.get("entry")),
+                        discovery_stop=frozen_opportunity.get("stop"),
+                        discovery_target=frozen_opportunity.get("target"),
+                        fresh_entry=entry,
+                    )
+                    if repriced is None:
+                        quote_refresh_counts["virtual_geometry_reject"] += 1
+                        if selected_execution:
+                            global_opportunity_counts["GLOBAL_INVALIDATED_ON_REFRESH"] += 1
+                        append_journal(
+                            journal,
+                            {
+                                "event": "virtual_geometry_reject",
+                                "symbol": sym,
+                                "candidate_id": frozen_opportunity.get("candidate_id"),
+                                "reason": "same_identity_geometry_invalid_after_reprice",
+                                "entry": entry,
+                                "stop": frozen_opportunity.get("stop"),
+                                "target": frozen_opportunity.get("target"),
+                                "bar": str(bar_time),
+                            },
+                        )
+                        return
+                    sl, tp = repriced
+                virtual_ok, virtual_reason = validate_virtual_strategy_geometry(
+                    side=sig.side, entry=entry, stop=sl, target=tp
+                )
+                if not virtual_ok:
+                    quote_refresh_counts["virtual_geometry_reject"] += 1
+                    append_journal(
+                        journal,
+                        {
+                            "event": "virtual_geometry_reject",
+                            "symbol": sym,
+                            "candidate_id": (
+                                frozen_opportunity.get("candidate_id")
+                                if frozen_opportunity is not None else None
+                            ),
+                            "reason": virtual_reason,
+                            "entry": entry,
+                            "stop": sl,
+                            "target": tp,
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
+                broker_sl = emergency_broker_stop(
+                    symbol=sym,
+                    side=sig.side,
+                    entry=entry,
+                    virtual_stop=sl,
+                    quantity=order_qty,
+                    spec=spec_map,
+                    max_risk_usd=float(
+                        cfg.get("exploration_max_risk_per_trade_usd", 0.15) or 0.15
+                    ),
+                    clamp_to_risk=bool(
+                        brain_decision is not None
+                        and str(
+                            brain_decision.journal.get("authority_type") or ""
+                        ).upper() == "FORCED_DEMO_EXPLORATION"
+                    ),
+                    market_bid=float(q.bid),
+                    market_ask=float(q.ask),
+                )
+                if broker_sl is None:
+                    quote_refresh_counts["broker_geometry_reject"] += 1
+                    append_journal(
+                        journal,
+                        {
+                            "event": "broker_geometry_reject",
+                            "symbol": sym,
+                            "candidate_id": (
+                                frozen_opportunity.get("candidate_id")
+                                if frozen_opportunity is not None else None
+                            ),
+                            "reason": "emergency_stop_exceeds_risk_or_broker_geometry",
+                            "entry": entry,
+                            "virtual_stop": sl,
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
+                # The request was originally built on the discovery quote.
+                # Replace only quote-relative price/quantity fields; identity
+                # remains frozen and virtual levels stay controller-owned.
+                req = replace(
+                    req,
+                    quantity=float(order_qty),
+                    stop_loss=sl,
+                    take_profit=tp,
+                    broker_stop_loss=broker_sl,
+                    broker_take_profit=broker_tp,
+                )
             # --- Margin / min-lot pre-checks: 89% of historical order failures
             # were 10019 No money. Check before hitting the broker.
             try:
                 spec_pre = eng.symbol_spec(sym)
             except Exception:
                 spec_pre = None
+            vmin = float((spec_pre or {}).get("volume_min", 0.01) or 0.01)
+            vstep = float((spec_pre or {}).get("volume_step", 0.01) or 0.01)
             if (
                 brain_decision is not None
                 and _terminal == "EXPLORATION_ELIGIBLE"
@@ -2892,14 +3102,39 @@ def main() -> None:
                     spec=spec_pre,
                 )
                 if not bool(risk_check["allowed"]):
-                    quote_refresh_counts["risk_budget_precheck_skip"] += 1
+                    resized = resize_order_quantity_to_risk(
+                        requested_quantity=float(order_qty),
+                        max_lots=float(risk_check.get("max_lots") or 0.0),
+                        volume_min=vmin,
+                        volume_step=vstep,
+                    )
+                    if resized is None or resized >= float(order_qty) - 1e-12:
+                        quote_refresh_counts["risk_budget_precheck_skip"] += 1
+                        append_journal(
+                            journal,
+                            {
+                                "event": "sizing_skip",
+                                "reason": str(risk_check["reason"]),
+                                "symbol": sym,
+                                "qty": float(order_qty),
+                                "max_lots": risk_check.get("max_lots"),
+                                "risk_budget_usd": float(
+                                    cfg.get("exploration_max_risk_per_trade_usd", 0.15) or 0.15
+                                ),
+                                "bar": str(bar_time),
+                            },
+                        )
+                        return
+                    original_qty = float(order_qty)
+                    order_qty = float(resized)
+                    quote_refresh_counts["risk_resized"] += 1
                     append_journal(
                         journal,
                         {
-                            "event": "sizing_skip",
-                            "reason": str(risk_check["reason"]),
+                            "event": "sizing_resize",
                             "symbol": sym,
-                            "qty": float(order_qty),
+                            "requested_qty": original_qty,
+                            "resized_qty": order_qty,
                             "max_lots": risk_check.get("max_lots"),
                             "risk_budget_usd": float(
                                 cfg.get("exploration_max_risk_per_trade_usd", 0.15) or 0.15
@@ -2907,8 +3142,41 @@ def main() -> None:
                             "bar": str(bar_time),
                         },
                     )
-                    return
-            vmin = float((spec_pre or {}).get("volume_min", 0.0) or 0.0)
+                    broker_sl = emergency_broker_stop(
+                        symbol=sym,
+                        side=sig.side,
+                        entry=entry,
+                        virtual_stop=sl,
+                        quantity=order_qty,
+                        spec=spec_map,
+                        max_risk_usd=float(
+                            cfg.get("exploration_max_risk_per_trade_usd", 0.15) or 0.15
+                        ),
+                        clamp_to_risk=True,
+                        market_bid=float(q.bid),
+                        market_ask=float(q.ask),
+                    )
+                    if broker_sl is None:
+                        quote_refresh_counts["broker_geometry_reject"] += 1
+                        append_journal(
+                            journal,
+                            {
+                                "event": "broker_geometry_reject",
+                                "symbol": sym,
+                                "reason": "resized_quantity_still_missing_valid_emergency_stop",
+                                "qty": order_qty,
+                                "bar": str(bar_time),
+                            },
+                        )
+                        return
+                    req = replace(
+                        req,
+                        quantity=order_qty,
+                        stop_loss=sl,
+                        take_profit=tp,
+                        broker_stop_loss=broker_sl,
+                        broker_take_profit=broker_tp,
+                    )
             if not min_lot_ok(float(order_qty), vmin):
                 quote_refresh_counts["min_lot_precheck_skip"] += 1
                 append_journal(
@@ -2958,6 +3226,33 @@ def main() -> None:
                             "funds": round(funds, 2),
                             "qty": order_qty,
                             "source": margin_source,
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
+            if intelligent_mode:
+                oms_ok, oms_why = oms_allows(
+                    req,
+                    q,
+                    cfg,
+                    open_count=len(eng.positions()),
+                    check_quote_age=False,
+                )
+                if not oms_ok:
+                    quote_refresh_counts["broker_geometry_reject"] += 1
+                    t2t.note_reject(oms_why)
+                    oms_reject_reasons[oms_why] = oms_reject_reasons.get(oms_why, 0) + 1
+                    append_journal(
+                        journal,
+                        {
+                            "event": "oms_reject",
+                            "execution_stage": "fresh_revalidation",
+                            "reason": oms_why,
+                            "symbol": sym,
+                            "side": sig.side,
+                            "qty": order_qty,
+                            "sl": req.broker_stop_loss,
+                            "tp": req.broker_take_profit,
                             "bar": str(bar_time),
                         },
                     )
@@ -3099,7 +3394,40 @@ def main() -> None:
                         "filled": False,
                     },
                 )
-            latency.request_ts = time.time()
+            order_send_at = time.time()
+            latency.request_ts = order_send_at
+            if frozen_opportunity is not None and candidate_created_at > 0:
+                hot_path_discovery_to_send_ms.append(
+                    max(0.0, (order_send_at - candidate_created_at) * 1000.0)
+                )
+                if len(hot_path_discovery_to_send_ms) > 256:
+                    del hot_path_discovery_to_send_ms[:-256]
+                append_journal(
+                    journal,
+                    {
+                        "event": "firehose_hot_path_timing",
+                        "candidate_id": frozen_opportunity.get("candidate_id"),
+                        "candidate_created_at": candidate_created_at,
+                        "global_rank_started_at": global_rank_started_at,
+                        "global_rank_finished_at": global_rank_finished_at,
+                        "fresh_quote_at": fresh_quote_at,
+                        "order_send_at": order_send_at,
+                        "discovery_to_rank_ms": (
+                            max(0.0, (global_rank_finished_at - candidate_created_at) * 1000.0)
+                            if global_rank_finished_at > 0 else None
+                        ),
+                        "rank_to_refresh_ms": (
+                            max(0.0, (fresh_quote_at - global_rank_finished_at) * 1000.0)
+                            if global_rank_finished_at > 0 else None
+                        ),
+                        "refresh_to_send_ms": max(
+                            0.0, (order_send_at - fresh_quote_at) * 1000.0
+                        ),
+                        "candidate_age_at_send_ms": max(
+                            0.0, (order_send_at - candidate_created_at) * 1000.0
+                        ),
+                    },
+                )
             submitted_count += 1
             record_funnel_execution(
                 observed_funnel_counts, submitted=True, filled=False
@@ -3536,6 +3864,18 @@ def main() -> None:
                 if execution_status_counts:
                     extra_hb["execution_status"] = dict(execution_status_counts)
                 extra_hb["quote_refresh"] = dict(quote_refresh_counts)
+                extra_hb["oms_rejects_by_reason"] = dict(oms_reject_reasons)
+                _hot_path = sorted(hot_path_discovery_to_send_ms)
+                extra_hb["hot_path"] = {
+                    "candidate_discovery_to_send_p50_ms": (
+                        round(_hot_path[len(_hot_path) // 2], 3) if _hot_path else None
+                    ),
+                    "candidate_discovery_to_send_p95_ms": (
+                        round(_hot_path[int(0.95 * (len(_hot_path) - 1))], 3)
+                        if _hot_path else None
+                    ),
+                    "n": len(_hot_path),
+                }
                 extra_hb["fast_exit_errors"] = fast_exit_error_count
                 extra_hb["short_horizon_model"] = short_horizon_predictor.snapshot()
                 extra_hb["trade_management"] = {
@@ -3830,6 +4170,34 @@ def main() -> None:
                     "FIRES": int(submitted_count),
                     "SUBMITTED": int(submitted_count),
                     "FILLS": int(fill_count),
+                    "FRESH_REVALIDATION_ATTEMPTS": int(
+                        global_opportunity_counts.get("GLOBAL_REVALIDATED", 0) or 0
+                    ),
+                    "VIRTUAL_GEOMETRY_REJECTS": int(
+                        quote_refresh_counts.get("virtual_geometry_reject", 0) or 0
+                    ),
+                    "BROKER_GEOMETRY_REJECTS": int(
+                        quote_refresh_counts.get("broker_geometry_reject", 0) or 0
+                    ),
+                    "STALE_BEFORE_REFRESH": int(
+                        quote_refresh_counts.get("stale_observed_at_send", 0) or 0
+                    ),
+                    "FRESH_QUOTES_RECOVERED": int(
+                        quote_refresh_counts.get("fresh_quote_recovered", 0) or 0
+                    ),
+                    "RISK_RESIZED": int(
+                        quote_refresh_counts.get("risk_resized", 0) or 0
+                    ),
+                    "RISK_HARD_BLOCKED": int(
+                        quote_refresh_counts.get("risk_budget_precheck_skip", 0) or 0
+                    ),
+                    "OMS_REJECTS_BY_REASON": dict(oms_reject_reasons),
+                    "CANDIDATE_DISCOVERY_TO_SEND_P50_MS": (
+                        extra_hb["hot_path"]["candidate_discovery_to_send_p50_ms"]
+                    ),
+                    "CANDIDATE_DISCOVERY_TO_SEND_P95_MS": (
+                        extra_hb["hot_path"]["candidate_discovery_to_send_p95_ms"]
+                    ),
                     "OPEN_TICKETS": len(eng.positions()),
                     **global_opportunity_counts,
                     "GREEN_WITHIN_3S": int(_turnover.get("green_within_3s", 0) or 0),
@@ -4647,6 +5015,7 @@ def main() -> None:
                     _per_trade_budget = float(
                         cfg.get("exploration_max_risk_per_trade_usd", 0.0) or 0.0
                     )
+                    global_rank_started_at = time.time()
                     ranked_opportunities, selected_opportunities = rank_and_allocate(
                         deferred_opportunities,
                         max_positions=_remaining_capacity,
@@ -4659,6 +5028,15 @@ def main() -> None:
                             if mem.tickets
                         ) if intelligent_brain is not None else (),
                     )
+                    global_rank_finished_at = time.time()
+                    selected_opportunities = [
+                        freeze_opportunity({
+                            **row.to_dict(),
+                            "global_rank_started_at": global_rank_started_at,
+                            "global_rank_finished_at": global_rank_finished_at,
+                        })
+                        for row in selected_opportunities
+                    ]
                     global_opportunity_counts["GLOBAL_RANKED"] += len(ranked_opportunities)
                     global_opportunity_counts["GLOBAL_SELECTED"] += len(selected_opportunities)
                     append_journal(

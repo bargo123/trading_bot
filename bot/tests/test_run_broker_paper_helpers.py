@@ -20,6 +20,10 @@ from scripts.run_broker_paper import (
     merge_firehose_funnel_counts,
     normalize_protective_stops,
     emergency_broker_stop,
+    reprice_frozen_virtual_geometry,
+    validate_virtual_strategy_geometry,
+    resize_order_quantity_to_risk,
+    _write_text_atomically,
     order_margin_for_send,
     persist_confirmed_firehose_basket,
     record_confirmed_firehose_open,
@@ -37,6 +41,16 @@ from scripts.run_broker_paper import (
     legacy_normal_exit_enabled,
 )
 from aegis.intel.send_guard import candidate_spread_limit, refresh_verdict
+
+
+def test_heartbeat_atomic_writer_replaces_target_without_temp_file(tmp_path):
+    target = tmp_path / "bot_heartbeat.json"
+    target.write_text("old", encoding="utf-8")
+
+    _write_text_atomically(target, '{"status":"running"}')
+
+    assert target.read_text(encoding="utf-8") == '{"status":"running"}'
+    assert list(tmp_path.glob(".bot_heartbeat.json.*.tmp")) == []
 
 
 def test_intelligent_firehose_has_only_trade_controller_normal_exit_authority():
@@ -97,6 +111,77 @@ def test_forced_demo_emergency_stop_clamps_to_existing_risk_budget():
     )
 
     assert stop == pytest.approx(1.09985)
+
+
+def test_emergency_broker_stop_clears_the_executable_liquidation_side():
+    spec = {
+        "name": "EURUSD",
+        "trade_tick_size": 0.00001,
+        "trade_tick_value": 1.0,
+        "volume_min": 0.01,
+        "volume_step": 0.01,
+        "volume_max": 100.0,
+        "point": 0.00001,
+        "trade_stops_level": 0,
+        "trade_freeze_level": 0,
+        "trade_contract_size": 100000.0,
+    }
+
+    buy_stop = emergency_broker_stop(
+        symbol="EURUSD", side="buy", entry=1.10020,
+        virtual_stop=1.10019, quantity=0.01, spec=spec,
+        max_risk_usd=0.30, clamp_to_risk=True,
+        market_bid=1.10000, market_ask=1.10020,
+    )
+    sell_stop = emergency_broker_stop(
+        symbol="EURUSD", side="sell", entry=1.10000,
+        virtual_stop=1.10001, quantity=0.01, spec=spec,
+        max_risk_usd=0.30, clamp_to_risk=True,
+        market_bid=1.10000, market_ask=1.10020,
+    )
+
+    assert buy_stop is not None and buy_stop < 1.10000
+    assert sell_stop is not None and sell_stop > 1.10020
+
+
+def test_frozen_virtual_geometry_reprices_same_identity_on_fresh_quote():
+    repriced = reprice_frozen_virtual_geometry(
+        side="buy",
+        discovery_entry=1.10020,
+        discovery_stop=1.09990,
+        discovery_target=1.10070,
+        fresh_entry=1.10035,
+    )
+
+    assert repriced == pytest.approx((1.10005, 1.10085))
+    assert validate_virtual_strategy_geometry(
+        side="buy", entry=1.10035, stop=repriced[0], target=repriced[1]
+    ) == (True, "")
+
+
+def test_virtual_geometry_validation_does_not_apply_broker_minimum_distance():
+    ok, reason = validate_virtual_strategy_geometry(
+        side="sell", entry=1.10000, stop=1.10002, target=1.09999
+    )
+    assert ok, reason
+
+
+def test_risk_revalidation_resizes_down_to_broker_step():
+    assert resize_order_quantity_to_risk(
+        requested_quantity=0.03,
+        max_lots=0.02,
+        volume_min=0.01,
+        volume_step=0.01,
+    ) == pytest.approx(0.02)
+
+
+def test_risk_revalidation_rejects_when_minimum_lot_still_exceeds_budget():
+    assert resize_order_quantity_to_risk(
+        requested_quantity=0.03,
+        max_lots=0.005,
+        volume_min=0.01,
+        volume_step=0.01,
+    ) is None
 
 
 def test_frozen_opportunity_preserves_the_decision_identity():

@@ -12,8 +12,9 @@ from typing import Any, Iterable
 class FrozenOpportunity(Mapping[str, Any]):
     """Immutable point-in-time opportunity selected by the global allocator.
 
-    The runner may revalidate the quote used for this object, but it must not
-    regenerate or silently replace the side, mechanism, horizon, or geometry.
+    The runner may revalidate the quote used for this object and reprice the
+    virtual levels quote-relatively, but it must not replace the side,
+    mechanism, horizon, or thesis identity.
     """
 
     values: Mapping[str, Any]

@@ -68,6 +68,11 @@ _BARS_PER_DAY = {
     "d1": 1,
 }
 
+# MetaQuotes server clocks are normally aligned to a timezone boundary.  A
+# tick used to estimate that boundary can itself be stale, so retain the
+# boundary rather than caching ``timezone offset - tick age`` as the offset.
+_SERVER_OFFSET_QUANTUM_S = 15 * 60
+
 
 class MT5Engine(BrokerEngine):
     """Talks to a running MT5 terminal. Demo/contest only unless allow_live is set."""
@@ -140,7 +145,9 @@ class MT5Engine(BrokerEngine):
             self._offset_samples.append(offset)
             if len(self._offset_samples) >= 3:
                 median = sorted(self._offset_samples)[len(self._offset_samples) // 2]
-                self._server_utc_offset_s = round(median)
+                self._server_utc_offset_s = round(
+                    median / _SERVER_OFFSET_QUANTUM_S
+                ) * _SERVER_OFFSET_QUANTUM_S
                 self._offset_samples = []
                 logger.info("MT5 server->UTC offset detected: %+.0fs", self._server_utc_offset_s)
                 return self._server_utc_offset_s

@@ -178,8 +178,16 @@ def oms_allows(
         max_skew = float(cfg.get("max_quote_future_skew_s", max_age) or 0.0)
         if max_skew > 0 and quote_future_skew_s(quote, now) > max_skew:
             return False, "future_quote"
-    sl = req.stop_loss
-    tp = req.take_profit
+    # Intelligent Firehose orders carry virtual strategy geometry alongside
+    # optional emergency broker protection. If either broker-side override is
+    # explicit, validate only those levels here; the virtual levels belong to
+    # TradeController and must not be subjected to MT5 stop-distance checks.
+    # Legacy requests without overrides retain the historical behavior.
+    has_broker_geometry = (
+        req.broker_stop_loss is not None or req.broker_take_profit is not None
+    )
+    sl = req.broker_stop_loss if has_broker_geometry else req.stop_loss
+    tp = req.broker_take_profit if has_broker_geometry else req.take_profit
     if sl is not None:
         sl_f = float(sl)
         if side == "buy" and sl_f >= bid - 1e-12:

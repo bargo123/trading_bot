@@ -70,6 +70,35 @@ def test_oms_sell_stops_must_be_above_ask():
     assert oms_allows(good, q, cfg, now=now)[0] is True
 
 
+def test_oms_uses_explicit_broker_geometry_not_virtual_strategy_levels():
+    cfg = {"oms_pretrade": True, "max_quote_age_s": 5.0}
+    q, now = _q()
+    # The virtual target is intentionally below the executable ask; it is
+    # controller-owned and must not be treated as an MT5 TP. The emergency
+    # broker stop is valid for the BUY and is the only level OMS should check.
+    req = _req(
+        stop_loss=1.10050,
+        take_profit=1.09990,
+        broker_stop_loss=1.09960,
+        broker_take_profit=None,
+    )
+    ok, reason = oms_allows(req, q, cfg, now=now)
+    assert ok, reason
+
+
+def test_oms_still_rejects_invalid_explicit_broker_geometry():
+    cfg = {"oms_pretrade": True, "max_quote_age_s": 5.0}
+    q, now = _q()
+    req = _req(
+        stop_loss=1.09900,
+        take_profit=1.10100,
+        broker_stop_loss=1.10050,
+    )
+    ok, reason = oms_allows(req, q, cfg, now=now)
+    assert not ok
+    assert reason == "stops"
+
+
 def test_quote_age_and_tick_to_trade_snapshot():
     q, now = _q(age_s=1.25)
     age = quote_age_s(q, now)
