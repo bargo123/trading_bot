@@ -149,3 +149,24 @@ def test_validated_lane_is_rankable_and_exploration_is_fallback():
 
     _, fallback = rank_and_allocate([exploration], max_positions=1)
     assert fallback[0]["candidate_id"] == "exploration"
+
+
+def test_forced_demo_lane_is_rankable_without_probability_or_positive_ev():
+    forced = _candidate(
+        "forced", symbol="EURUSD", thesis="forced", p_capture=0.70, ev=0.10,
+        lane="FORCED_DEMO_EXPLORATION",
+    )
+    forced.update({
+        "p_captured_win": None,
+        "expected_net_ev": None,
+        "expected_net_ev_lcb95": None,
+        "authority_type": "FORCED_DEMO_EXPLORATION",
+        "calibration_status": "UNCALIBRATED",
+        "selection_score": 0.42,
+    })
+
+    ranked, selected = rank_and_allocate([forced], max_positions=1)
+
+    assert len(ranked) == 1
+    assert selected[0]["candidate_id"] == "forced"
+    assert selected[0]["p_captured_win"] is None

@@ -72,15 +72,29 @@ def rank_and_allocate(
 ) -> tuple[list[FrozenOpportunity], list[FrozenOpportunity]]:
     """Rank all valid opportunities, then allocate independent theses.
 
-    Capture probability is the primary ordering dimension. Candidates still need
-    positive after-cost EV and an explicit portfolio pass; this helper does not
-    relax either gate. Duplicate thesis identities are never counted as separate
-    opportunities.
+    Validated/calibrated candidates are ranked by measured capture probability.
+    The explicitly marked forced DEMO lane is ranked by its comparative search
+    score and may have null probability/EV; it is still subject to the runner's
+    fresh-quote, risk, margin, portfolio, and broker gates. Duplicate thesis
+    identities are never counted as separate opportunities.
     """
     ranked: list[FrozenOpportunity] = []
     for candidate in candidates:
         row = freeze_opportunity(candidate)
         if row.get("portfolio_ok") is False:
+            continue
+        lane = str(row.get("lane") or "").lower()
+        forced_demo = lane in {
+            "forced_demo_exploration",
+            "forced_demo",
+        } or str(row.get("authority_type") or "").upper() == "FORCED_DEMO_EXPLORATION"
+        if forced_demo:
+            if row.get("execution_hard_block") is True:
+                continue
+            score = _number(row, "selection_score", "comparative_score", default=float("nan"))
+            if not math.isfinite(score):
+                continue
+            ranked.append(row)
             continue
         p_capture = _number(row, "p_captured_win", "p_capture", default=float("nan"))
         expected_ev = _number(row, "expected_net_ev", "expected_net_value_usd", default=float("nan"))
@@ -90,8 +104,20 @@ def rank_and_allocate(
             continue
         ranked.append(row)
 
-    ranked.sort(
-        key=lambda row: (
+    def _rank_key(row: FrozenOpportunity) -> tuple[Any, ...]:
+        lane = str(row.get("lane") or "").lower()
+        forced_demo = lane in {"forced_demo_exploration", "forced_demo"} or str(
+            row.get("authority_type") or ""
+        ).upper() == "FORCED_DEMO_EXPLORATION"
+        if forced_demo:
+            return (
+                2,
+                -_number(row, "selection_score", "comparative_score", default=float("-inf")),
+                _number(row, "fast_loser_similarity"),
+                str(row.get("candidate_id") or row.get("thesis_key") or ""),
+            )
+        return (
+            0 if lane == "validated" else 1,
             -_number(
                 row,
                 "p_captured_win_lcb95",
@@ -99,7 +125,6 @@ def rank_and_allocate(
                 "p_captured_win",
             ),
             -_number(row, "p_captured_win", default=float("-inf")),
-            -int(str(row.get("lane") or "").lower() == "validated"),
             _number(row, "uncertainty", default=float("inf")),
             _number(row, "fast_loser_similarity"),
             _number(row, "tail_loss_probability"),
@@ -109,7 +134,8 @@ def rank_and_allocate(
             -_number(row, "expected_net_ev"),
             str(row.get("candidate_id") or row.get("thesis_key") or ""),
         )
-    )
+
+    ranked.sort(key=_rank_key)
 
     selected: list[FrozenOpportunity] = []
     used_theses = {str(value) for value in occupied_theses if str(value)}

@@ -272,7 +272,10 @@ def frozen_opportunity_from_decision(
         "bar_time": str(bar_time),
         "symbol": str(symbol).upper(),
         "side": str(getattr(decision, "side", "") or "").lower(),
-        "lane": "exploration" if exploration else "validated",
+        "lane": str(
+            journal.get("exploration_lane")
+            or ("exploration" if exploration else "validated")
+        ),
         "mechanism": str(journal.get("setup_family") or journal.get("micro_mechanism") or ""),
         "variant_id": variant_id,
         "thesis_key": str(journal.get("thesis_key") or candidate_id),
@@ -286,6 +289,10 @@ def frozen_opportunity_from_decision(
         "spread": max(0.0, float(ask) - float(bid)),
         "p_captured_win": capture_probability,
         "p_captured_win_lcb95": capture_lcb,
+        "authority_type": journal.get("authority_type"),
+        "calibration_status": journal.get("calibration_status"),
+        "selection_score": journal.get("selection_score"),
+        "selection_score_type": journal.get("selection_score_type"),
         "authority_probability": authority_probability,
         "authority_capture_lcb95": authority_lcb,
         "authority_expected_net_ev": expected_ev,

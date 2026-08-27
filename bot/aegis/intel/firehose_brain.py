@@ -19,7 +19,7 @@ from aegis.intel.analogue_store import (
     is_executable_capture_provenance,
     is_measured_provenance,
 )
-from aegis.intel.capture_calibration import authorize_capture_probability
+from aegis.intel.capture_calibration import CaptureAuthorization, authorize_capture_probability
 from aegis.intel.exploration import (
     ExperimentStore,
     ExplorationLimits,
@@ -103,6 +103,86 @@ def _shadow_probe_is_hard_economic_rejection(
         }
         or str(economics_reason or "") in _EXPLORATION_HARD_ECONOMIC_REASONS
     )
+
+
+def _forced_demo_exploration_enabled(cfg: Mapping[str, Any]) -> bool:
+    """Return whether the explicitly governed MT5 DEMO fallback is enabled."""
+    return (
+        str(cfg.get("engine") or "").lower() in {"mt5", "metatrader5"}
+        and str(cfg.get("mode") or "").lower() == "mt5_demo"
+        and cfg.get("allow_live") is False
+        and cfg.get("paper_trading_enabled") is True
+        and cfg.get("dry_run") is False
+        and bool(cfg.get("intelligent_exploration_enabled", True))
+    )
+
+
+_FORCED_DEMO_HARD_REASONS = frozenset({
+    "RISK_GRANULARITY_BLOCKED",
+    "INVALID_GEOMETRY",
+    "TAIL_RISK_FAILURE",
+    "NO_POSITION_SIZE",
+    "UNKNOWN_SIDE",
+    "NO_STRUCTURAL_INVALIDATION",
+    "INVALIDATION_NOT_BELOW_ENTRY",
+    "INVALIDATION_NOT_ABOVE_ENTRY",
+    "NO_INVALIDATION_DISTANCE",
+    "CONTRACT_VALUE_UNAVAILABLE",
+    "NO_STRUCTURAL_TARGET",
+    "TARGET_NOT_ABOVE_ENTRY",
+    "TARGET_NOT_BELOW_ENTRY",
+})
+
+
+def _forced_demo_hard_reasons(reasons: Sequence[str]) -> list[str]:
+    """Separate execution/safety impossibility from quality penalties."""
+    hard: list[str] = []
+    for reason in reasons:
+        token = str(reason or "").split(":", 1)[-1].upper()
+        if token in _FORCED_DEMO_HARD_REASONS:
+            hard.append(str(reason))
+    return hard
+
+
+def _forced_demo_score(
+    candidate: Any, economics_check: Mapping[str, Any], memory_summary: Mapping[str, Any],
+    quality_reasons: Sequence[str],
+) -> float:
+    """Comparative search score; deliberately not a probability or EV label."""
+    dollar_score = False
+    try:
+        expected_win = float(economics_check.get("expected_win_usd"))
+        expected_loss = float(economics_check.get("expected_loss_usd"))
+        cost = float(economics_check.get("cost_usd"))
+        if all(math.isfinite(value) for value in (expected_win, expected_loss, cost)) and expected_loss > 0:
+            net_after_cost = expected_win - cost
+            base_score = net_after_cost / expected_loss
+            dollar_score = True
+        else:
+            raise ValueError
+    except (TypeError, ValueError, OverflowError):
+        try:
+            net_target_pips = float(economics_check.get("net_target_pips") or 0.0)
+        except (TypeError, ValueError, OverflowError):
+            net_target_pips = 0.0
+        base_score = net_target_pips
+    try:
+        stop_pips = max(float(getattr(candidate, "stop_pips", 0.0) or 0.0), 0.5)
+    except (TypeError, ValueError, OverflowError):
+        stop_pips = 0.5
+    try:
+        winner_similarity = float(memory_summary.get("winner_similarity", 0.0) or 0.0)
+    except (TypeError, ValueError, OverflowError):
+        winner_similarity = 0.0
+    try:
+        loser_similarity = float(memory_summary.get("loser_similarity", 0.0) or 0.0)
+    except (TypeError, ValueError, OverflowError):
+        loser_similarity = 0.0
+    score = base_score if dollar_score else base_score / stop_pips
+    score += 0.25 * winner_similarity
+    score -= 0.75 * loser_similarity
+    score -= 0.05 * len(tuple(quality_reasons))
+    return round(score, 8) if math.isfinite(score) else float("-inf")
 
 
 @dataclass
@@ -731,6 +811,7 @@ class IntelligentFirehoseBrain:
             "best_buy_score": None,
             "best_sell_score": None,
             "best_available": {},
+            "best_score_type": None,
             "why_no_order": None,
         }
         self._seen_hypotheses: dict[str, float] = {}
@@ -787,11 +868,13 @@ class IntelligentFirehoseBrain:
             "best_buy_score": None,
             "best_sell_score": None,
             "best_available": {},
+            "best_score_type": None,
             "why_no_order": None,
         }
 
     def _record_search_score(
         self, candidate: Any, expected_net_value_usd: float | None, *, available: bool = False,
+        score_type: str = "expected_net_ev",
     ) -> None:
         """Record comparable candidate scores without changing any gate."""
         try:
@@ -800,6 +883,7 @@ class IntelligentFirehoseBrain:
             return
         if not math.isfinite(score):
             return
+        self._search_telemetry["best_score_type"] = str(score_type)
         side = str(getattr(candidate, "side", "") or "").lower()
         if side in {"buy", "sell"}:
             key = f"best_{side}_score"
@@ -815,6 +899,7 @@ class IntelligentFirehoseBrain:
                     "horizon_s": int(getattr(candidate, "max_hold_s", 0) or 0),
                     "mechanism": str(getattr(candidate, "family", "") or ""),
                     "score": score,
+                    "score_type": str(score_type),
                 }
 
     def _search_horizons(self) -> tuple[int, ...]:
@@ -1101,12 +1186,17 @@ class IntelligentFirehoseBrain:
             self.counts["candidates"] = int(self.counts.get("candidates", 0)) + 1
             self._note_stage("candidate")
 
+        forced_demo_lane = _forced_demo_exploration_enabled(self.cfg)
+        forced_state_quality: list[str] = []
         failed = self.experiments.has_failed_identity(
             strategy_family=setup, symbol=symbol, side=side,
             regime=regime, session=session,
         )
         if failed is not None:
-            return None, f"known_failed_hypothesis:{failed.get('hypothesis_id', '')[:16]}"
+            reason = f"known_failed_hypothesis:{failed.get('hypothesis_id', '')[:16]}"
+            if not forced_demo_lane:
+                return None, reason
+            forced_state_quality.append(reason)
 
         # NEGATIVE_STATE_EV: measured analogue evidence against this state is
         # a HARD rejection - economics never returns through exploration.
@@ -1114,7 +1204,9 @@ class IntelligentFirehoseBrain:
         if ev_obj is not None and getattr(ev_obj, "eligible", False):
             exp_val = getattr(ev_obj, "expectancy", None)
             if exp_val is not None and float(exp_val) <= 0:
-                return None, "state_ev_not_positive"
+                if not forced_demo_lane:
+                    return None, "state_ev_not_positive"
+                forced_state_quality.append("state_ev_not_positive")
         # Self-hedge audit (spec J, audited fix): opposing exposure on the
         # same symbol requires INDEPENDENT mechanism evidence - different
         # family AND different polarity/mechanism class. Same family is
@@ -1328,7 +1420,8 @@ class IntelligentFirehoseBrain:
 
         # Evaluate economics INDEPENDENTLY for every side/mechanism/horizon
         # variant. The candidate owns its geometry before any gate is scored.
-        viable: list[tuple[Any, dict[str, Any], TradeEconomics, Any, Any, float | None, dict[str, Any]]] = []
+        viable: list[tuple[Any, dict[str, Any], TradeEconomics, Any, Any, float | None, dict[str, Any], list[str]]] = []
+        forced_pool: list[dict[str, Any]] = []
         all_rejections: list[str] = []
         candidate_model_rejections: list[dict[str, str]] = []
         spec = symbol_spec or {}
@@ -1437,9 +1530,13 @@ class IntelligentFirehoseBrain:
             # probability that authorizes an exploration order. Exploration
             # authority comes only from measured analogue capture evidence.
             p_green = authority_probability
+            quality_reasons = list(forced_state_quality)
+            if model_gate_reason is not None:
+                quality_reasons.append(model_gate_reason)
             if not econ["allowed"]:
                 reasons = [str(reason) for reason in econ.get("rejections", [])]
                 all_rejections.extend(reasons)
+                quality_reasons.extend(reasons)
                 candidate_evaluations.append(self._record_search_evaluation(
                     candidate=mc,
                     reasons=reasons,
@@ -1447,7 +1544,8 @@ class IntelligentFirehoseBrain:
                     near_eligible=bool(econ.get("near_eligible", False)),
                     p_green=p_green,
                 ))
-                continue
+                if _forced_demo_hard_reasons(reasons) or not forced_demo_lane:
+                    continue
 
             sizing_preview = risk_lots_for_exploration(
                 max_risk_usd=self._exploration_limits.max_risk_per_trade_usd,
@@ -1519,6 +1617,7 @@ class IntelligentFirehoseBrain:
             if not candidate_econ.acceptable:
                 reason = str(candidate_econ.reason or "net_ev_rejected")
                 all_rejections.append(reason)
+                quality_reasons.append(reason)
                 distance = dict(econ.get("distance_to_eligibility") or {})
                 if candidate_econ.expected_net_value_usd is not None:
                     distance["net_ev_deficit_usd"] = round(max(
@@ -1532,7 +1631,8 @@ class IntelligentFirehoseBrain:
                     p_green=p_green,
                     expected_net_value_usd=candidate_econ.expected_net_value_usd,
                 ))
-                continue
+                if not forced_demo_lane or _forced_demo_hard_reasons([reason]):
+                    continue
             authority_observations = int(
                 getattr(candidate_evidence, "analogue_n", 0) or 0
             ) if measured_candidate_evidence else 0
@@ -1550,6 +1650,7 @@ class IntelligentFirehoseBrain:
             if not capture_authorization.authorized:
                 reason = capture_authorization.reason
                 all_rejections.append(reason)
+                quality_reasons.append(reason)
                 distance = dict(econ.get("distance_to_eligibility") or {})
                 distance["capture_probability_deficit"] = capture_authorization.distance_to_pass
                 distance["capture_probability_lcb95"] = capture_authorization.lower_95
@@ -1562,7 +1663,8 @@ class IntelligentFirehoseBrain:
                     p_green=authority_probability,
                     expected_net_value_usd=candidate_econ.expected_net_value_usd,
                 ))
-                continue
+                if not forced_demo_lane:
+                    continue
             memory_features = {
                 "symbol": mc.symbol,
                 "side": mc.side,
@@ -1587,6 +1689,7 @@ class IntelligentFirehoseBrain:
             if self.outcome_memory.should_suppress(memory_features):
                 reason = "fast_loser_state_suppressed"
                 all_rejections.append(reason)
+                quality_reasons.append(reason)
                 self.counts["memory_suppression"] = int(
                     self.counts.get("memory_suppression", 0)
                 ) + 1
@@ -1598,14 +1701,71 @@ class IntelligentFirehoseBrain:
                     p_green=candidate_econ.p_win,
                     expected_net_value_usd=candidate_econ.expected_net_value_usd,
                 ))
+                if not forced_demo_lane:
+                    continue
+            if forced_demo_lane and (
+                not candidate_econ.acceptable or not capture_authorization.authorized
+                or quality_reasons
+            ):
+                forced_score = _forced_demo_score(
+                    mc,
+                    {
+                        **econ,
+                        "expected_win_usd": candidate_econ.expected_win_usd,
+                        "expected_loss_usd": candidate_econ.expected_loss_usd,
+                        "cost_usd": candidate_econ.cost_usd,
+                    },
+                    memory_summary, quality_reasons,
+                )
+                self._record_search_score(
+                    mc, forced_score, score_type="forced_demo_comparative",
+                )
+                forced_pool.append({
+                    "candidate": mc,
+                    "sizing": sizing_preview,
+                    "economics": candidate_econ,
+                    "evidence": candidate_evidence,
+                    "memory": memory_summary,
+                    "shadow_probability": shadow_model_probability,
+                    "quality_reasons": list(quality_reasons),
+                    "score": forced_score,
+                })
                 continue
             self._record_search_score(
                 mc, candidate_econ.expected_net_value_usd, available=True,
             )
             viable.append((
                 mc, sizing_preview, candidate_econ, candidate_evidence,
-                capture_authorization, shadow_model_probability, memory_summary,
+                capture_authorization, shadow_model_probability, memory_summary, [],
             ))
+        forced_mode = False
+        if not viable and forced_pool:
+            forced_mode = True
+            forced_pool.sort(key=lambda item: (
+                -float(item["score"]),
+                float(item["memory"].get("loser_similarity", 0.0)),
+                str(getattr(item["candidate"], "variant_id", "")),
+            ))
+            for item in forced_pool:
+                forced_candidate = item["candidate"]
+                forced_econ = item["economics"]
+                forced_auth = CaptureAuthorization(
+                    authorized=False,
+                    reason="forced_demo_exploration_uncalibrated",
+                    probability=None,
+                    lower_95=None,
+                    required_probability=forced_econ.breakeven_win_rate,
+                    observations=0,
+                    successes=0,
+                    evidence_source="forced_demo_exploration",
+                    provenance=str(getattr(item["evidence"], "provenance", "unknown")),
+                    distance_to_pass=None,
+                )
+                viable.append((
+                    forced_candidate, item["sizing"], forced_econ,
+                    item["evidence"], forced_auth, item["shadow_probability"],
+                    item["memory"], item["quality_reasons"],
+                ))
         if not viable:
             self._last_exploration_micro_diagnostics = {
                 **self._last_exploration_micro_diagnostics,
@@ -1615,22 +1775,33 @@ class IntelligentFirehoseBrain:
             }
             return None, f"exploration_economics_rejected:{all_rejections[0] if all_rejections else 'unknown'}"
 
-        # Rank win-rate confidence first. Positive captured EV remains a hard
-        # gate; raw EV is only a later tie-breaker after the calibrated Wilson
-        # lower bound and loser/tail evidence.
-        viable.sort(key=lambda item: (
-            -(float(item[4].lower_95)
-              if item[4].lower_95 is not None else float("-inf")),
-            -(float(item[4].probability)
-              if item[4].probability is not None else float("-inf")),
-            float(item[6].get("loser_similarity", 0.0)),
-            float(item[2].expected_net_value_usd)
-            if item[2].expected_net_value_usd is not None else float("-inf"),
-            -item[0].payoff,
-        ))
+        # Calibrated candidates rank by measured capture confidence. Forced
+        # DEMO candidates rank only by comparative executable geometry and
+        # loser/winner memory; they never acquire a fabricated probability.
+        if forced_mode:
+            viable.sort(key=lambda item: (
+                -_forced_demo_score(
+                    item[0], {"net_target_pips": item[0].net_target_pips},
+                    item[6], item[7],
+                ),
+                float(item[6].get("loser_similarity", 0.0)),
+                str(getattr(item[0], "variant_id", "")),
+            ))
+        else:
+            viable.sort(key=lambda item: (
+                -(float(item[4].lower_95)
+                  if item[4].lower_95 is not None else float("-inf")),
+                -(float(item[4].probability)
+                  if item[4].probability is not None else float("-inf")),
+                float(item[6].get("loser_similarity", 0.0)),
+                float(item[2].expected_net_value_usd)
+                if item[2].expected_net_value_usd is not None else float("-inf"),
+                -item[0].payoff,
+            ))
         (
             mc, sizing_preview, exploration_econ, candidate_evidence,
             capture_authorization, shadow_model_probability, memory_summary,
+            selected_quality_reasons,
         ) = viable[0]
         self._search_telemetry["best_available"] = {
             "symbol": str(getattr(mc, "symbol", "") or "").upper(),
@@ -1638,9 +1809,21 @@ class IntelligentFirehoseBrain:
             "horizon_s": int(getattr(mc, "max_hold_s", 0) or 0),
             "mechanism": str(getattr(mc, "family", "") or ""),
             "score": (
-                None if exploration_econ.expected_net_value_usd is None
-                else float(exploration_econ.expected_net_value_usd)
+                _forced_demo_score(
+                    mc,
+                    {
+                        "net_target_pips": mc.net_target_pips,
+                        "expected_win_usd": exploration_econ.expected_win_usd,
+                        "expected_loss_usd": exploration_econ.expected_loss_usd,
+                        "cost_usd": exploration_econ.cost_usd,
+                    },
+                    memory_summary, selected_quality_reasons,
+                ) if forced_mode else (
+                    None if exploration_econ.expected_net_value_usd is None
+                    else float(exploration_econ.expected_net_value_usd)
+                )
             ),
+            "score_type": "forced_demo_comparative" if forced_mode else "expected_net_ev",
         }
         self._last_exploration_micro_diagnostics = {
             **self._last_exploration_micro_diagnostics,
@@ -1653,25 +1836,31 @@ class IntelligentFirehoseBrain:
         # Structural payoff/spread checks apply to the FINAL candidate's
         # own geometry, not the legacy structural geometry.
         if mc.target_pips / max(mc.stop_pips, 0.1) < 0.25:
-            candidate_evaluations.append(self._record_search_evaluation(
-                candidate=mc,
-                reasons=["DESTRUCTIVE_PAYOFF"],
-                distance={"payoff_deficit": round(
-                    max(0.0, 0.25 - mc.target_pips / max(mc.stop_pips, 0.1)), 4
-                )},
-            ))
-            self._last_exploration_micro_diagnostics["candidate_evaluations"] = candidate_evaluations
-            return None, "exploration_destructive_payoff"
+            if forced_mode:
+                selected_quality_reasons.append("DESTRUCTIVE_PAYOFF")
+            else:
+                candidate_evaluations.append(self._record_search_evaluation(
+                    candidate=mc,
+                    reasons=["DESTRUCTIVE_PAYOFF"],
+                    distance={"payoff_deficit": round(
+                        max(0.0, 0.25 - mc.target_pips / max(mc.stop_pips, 0.1)), 4
+                    )},
+                ))
+                self._last_exploration_micro_diagnostics["candidate_evaluations"] = candidate_evaluations
+                return None, "exploration_destructive_payoff"
         if spread_price is not None and mc.target_pips <= 2.0 * float(spread_price) / max(pip, 1e-10):
-            candidate_evaluations.append(self._record_search_evaluation(
-                candidate=mc,
-                reasons=["SPREAD_FAILURE"],
-                distance={"spread_excess_pips": round(
-                    max(0.0, float(spread_price) / max(pip, 1e-10) * 2.0 - mc.target_pips), 4
-                )},
-            ))
-            self._last_exploration_micro_diagnostics["candidate_evaluations"] = candidate_evaluations
-            return None, "exploration_spread_failure"
+            if forced_mode:
+                selected_quality_reasons.append("SPREAD_FAILURE")
+            else:
+                candidate_evaluations.append(self._record_search_evaluation(
+                    candidate=mc,
+                    reasons=["SPREAD_FAILURE"],
+                    distance={"spread_excess_pips": round(
+                        max(0.0, float(spread_price) / max(pip, 1e-10) * 2.0 - mc.target_pips), 4
+                    )},
+                ))
+                self._last_exploration_micro_diagnostics["candidate_evaluations"] = candidate_evaluations
+                return None, "exploration_spread_failure"
 
         # FINAL CANDIDATE OWNS ALL EXECUTION IDENTITY.
         side = mc.side          # may differ from legacy hint!
@@ -1744,22 +1933,36 @@ class IntelligentFirehoseBrain:
             evidence=candidate_evidence,
             p_win=selected_p_win,
         )
-        if not exploration_econ.acceptable:
+        if not exploration_econ.acceptable and not forced_mode:
             return None, (
                 "exploration_economics_rejected:"
                 f"{exploration_econ.reason}"
             )
-        capture_authorization = authorize_capture_probability(
-            successes=int(getattr(candidate_evidence, "analogue_n", 0) or 0)
-            - int(getattr(candidate_evidence, "analogue_n_losses", 0) or 0),
-            observations=int(getattr(candidate_evidence, "analogue_n", 0) or 0),
-            breakeven_probability=exploration_econ.breakeven_win_rate,
-            evidence_source="measured_analogue_capture",
-            provenance=str(getattr(candidate_evidence, "provenance", "unknown")),
-            min_observations=int(self.cfg.get("intelligent_min_analogues", 20) or 20),
-        )
-        if not capture_authorization.authorized:
-            return None, f"exploration_economics_rejected:{capture_authorization.reason}"
+        if forced_mode:
+            capture_authorization = CaptureAuthorization(
+                authorized=False,
+                reason="forced_demo_exploration_uncalibrated",
+                probability=None,
+                lower_95=None,
+                required_probability=exploration_econ.breakeven_win_rate,
+                observations=0,
+                successes=0,
+                evidence_source="forced_demo_exploration",
+                provenance=str(getattr(candidate_evidence, "provenance", "unknown")),
+                distance_to_pass=None,
+            )
+        else:
+            capture_authorization = authorize_capture_probability(
+                successes=int(getattr(candidate_evidence, "analogue_n", 0) or 0)
+                - int(getattr(candidate_evidence, "analogue_n_losses", 0) or 0),
+                observations=int(getattr(candidate_evidence, "analogue_n", 0) or 0),
+                breakeven_probability=exploration_econ.breakeven_win_rate,
+                evidence_source="measured_analogue_capture",
+                provenance=str(getattr(candidate_evidence, "provenance", "unknown")),
+                min_observations=int(self.cfg.get("intelligent_min_analogues", 20) or 20),
+            )
+            if not capture_authorization.authorized:
+                return None, f"exploration_economics_rejected:{capture_authorization.reason}"
 
         exp_open_total, exp_open_symbol = self.exploration_open_counts(symbol)
         ok, reason = check_exploration_limits(
@@ -1842,8 +2045,13 @@ class IntelligentFirehoseBrain:
                 )
         selected_side_reason = (
             f"selected {side} {mc.family} at {mc.max_hold_s}s with "
-            f"captured-win probability {float(selected_p_win or 0.0):.3f} "
-            "and positive executable net EV"
+            + (
+                f"forced DEMO comparative score {self._search_telemetry['best_available'].get('score')} "
+                "for minimum-risk evidence collection"
+                if forced_mode else
+                f"captured-win probability {float(selected_p_win or 0.0):.3f} "
+                "and positive executable net EV"
+            )
         )
         journal = {
             "brain": "intelligent_firehose",
@@ -1858,7 +2066,12 @@ class IntelligentFirehoseBrain:
             # validated-model status or its symbol allowlist; it earns a fire
             # only through the independent candidate, cost, geometry, risk,
             # and measured-evidence gates above.
-            "exploration_authority": "SAFE_TO_LEARN_ON_DEMO",
+            "exploration_authority": (
+                "FORCED_DEMO_EXPLORATION" if forced_mode else "SAFE_TO_LEARN_ON_DEMO"
+            ),
+            "exploration_lane": (
+                "FORCED_DEMO_EXPLORATION" if forced_mode else "CALIBRATED_EXPLORATION"
+            ),
             "validated_artifact_required": False,
             "validated_symbol_allowlist_required": False,
             "evidence_provenance": str(getattr(candidate_evidence, "provenance", "unknown")),
@@ -1875,11 +2088,19 @@ class IntelligentFirehoseBrain:
             "book_logic": book_logic,
             "exploration_economics": exploration_econ.journal(),
             "capture_authorization": capture_authorization.as_dict(),
-            "authority_type": "measured_analogue_capture",
-            "authority_probability": capture_authorization.probability,
-            "authority_capture_lcb95": capture_authorization.lower_95,
+            "authority_type": (
+                "FORCED_DEMO_EXPLORATION" if forced_mode else "measured_analogue_capture"
+            ),
+            "authority_probability": None if forced_mode else capture_authorization.probability,
+            "authority_capture_lcb95": None if forced_mode else capture_authorization.lower_95,
             "authority_observations": capture_authorization.observations,
             "authority_expected_net_ev": exploration_econ.expected_net_value_usd,
+            "p_captured_win": None if forced_mode else capture_authorization.probability,
+            "p_captured_win_lcb95": None if forced_mode else capture_authorization.lower_95,
+            "calibration_status": "UNCALIBRATED" if forced_mode else "CALIBRATED",
+            "selection_score": self._search_telemetry["best_available"].get("score"),
+            "selection_score_type": self._search_telemetry["best_available"].get("score_type"),
+            "forced_quality_penalties": list(selected_quality_reasons),
             "shadow_model_probability": shadow_model_probability,
             "decision_authority": "buy_sell_abstain",
             "why_buy": (
@@ -1897,6 +2118,7 @@ class IntelligentFirehoseBrain:
         for (
             option_mc, option_sizing, option_econ, option_evidence,
             option_auth, option_shadow_p, option_memory_summary,
+            option_quality_reasons,
         ) in viable:
             option_variant = str(
                 getattr(option_mc, "variant_id", "")
@@ -1925,11 +2147,34 @@ class IntelligentFirehoseBrain:
                 "evidence_n": int(getattr(option_evidence, "analogue_n", 0) or 0),
                 "exploration_economics": option_econ.journal(),
                 "capture_authorization": option_auth.as_dict(),
-                "authority_type": "measured_analogue_capture",
-                "authority_probability": option_auth.probability,
-                "authority_capture_lcb95": option_auth.lower_95,
+                "authority_type": (
+                    "FORCED_DEMO_EXPLORATION" if forced_mode else "measured_analogue_capture"
+                ),
+                "authority_probability": None if forced_mode else option_auth.probability,
+                "authority_capture_lcb95": None if forced_mode else option_auth.lower_95,
                 "authority_observations": option_auth.observations,
                 "authority_expected_net_ev": option_econ.expected_net_value_usd,
+                "p_captured_win": None if forced_mode else option_auth.probability,
+                "p_captured_win_lcb95": None if forced_mode else option_auth.lower_95,
+                "calibration_status": "UNCALIBRATED" if forced_mode else "CALIBRATED",
+                "selection_score": (
+                    _forced_demo_score(
+                        option_mc,
+                        {
+                            "net_target_pips": option_mc.net_target_pips,
+                            "expected_win_usd": option_econ.expected_win_usd,
+                            "expected_loss_usd": option_econ.expected_loss_usd,
+                            "cost_usd": option_econ.cost_usd,
+                        },
+                        option_memory_summary, option_quality_reasons,
+                    ) if forced_mode else option_econ.expected_net_value_usd
+                ),
+                "selection_score_type": (
+                    "forced_demo_comparative" if forced_mode else "expected_net_ev"
+                ),
+                "exploration_lane": (
+                    "FORCED_DEMO_EXPLORATION" if forced_mode else "CALIBRATED_EXPLORATION"
+                ),
                 "shadow_model_probability": option_shadow_p,
                 "fast_winner_similarity": option_memory_summary.get("winner_similarity", 0.0),
                 "fast_loser_similarity": option_memory_summary.get("loser_similarity", 0.0),
@@ -1953,10 +2198,10 @@ class IntelligentFirehoseBrain:
                 "stop": float(option_mc.invalidation),
                 "target": float(option_mc.target),
                 "quantity": float(option_sizing.get("lots") or 0.0),
-                "p_captured_win": option_auth.probability,
-                "p_captured_win_lcb95": option_auth.lower_95,
-                "authority_probability": option_auth.probability,
-                "authority_capture_lcb95": option_auth.lower_95,
+                "p_captured_win": None if forced_mode else option_auth.probability,
+                "p_captured_win_lcb95": None if forced_mode else option_auth.lower_95,
+                "authority_probability": None if forced_mode else option_auth.probability,
+                "authority_capture_lcb95": None if forced_mode else option_auth.lower_95,
                 "authority_expected_net_ev": option_econ.expected_net_value_usd,
                 "expected_net_ev": option_econ.expected_net_value_usd,
                 "marginal_risk_usd": option_econ.expected_loss_usd,
@@ -1967,6 +2212,20 @@ class IntelligentFirehoseBrain:
                 "fast_loser_similarity": option_memory_summary.get("loser_similarity", 0.0),
                 "portfolio_ok": True,
                 "decision_journal": option_journal,
+                "lane": "FORCED_DEMO_EXPLORATION" if forced_mode else "CALIBRATED_EXPLORATION",
+                "selection_score": (
+                    _forced_demo_score(
+                        option_mc,
+                        {
+                            "net_target_pips": option_mc.net_target_pips,
+                            "expected_win_usd": option_econ.expected_win_usd,
+                            "expected_loss_usd": option_econ.expected_loss_usd,
+                            "cost_usd": option_econ.cost_usd,
+                        },
+                        option_memory_summary, option_quality_reasons,
+                    ) if forced_mode else option_econ.expected_net_value_usd
+                ),
+                "calibration_status": "UNCALIBRATED" if forced_mode else "CALIBRATED",
             })
         journal["viable_candidates"] = viable_candidate_rows
         # Every candidate exposed to the global allocator has a durable
@@ -2003,7 +2262,9 @@ class IntelligentFirehoseBrain:
             sl=invalidation,
             tp=target,
             quantity=lots,
-            expected_net_value=exploration_econ.expected_net_value_usd,
+            expected_net_value=(
+                None if forced_mode else exploration_econ.expected_net_value_usd
+            ),
             information_id=info_id,
             analogue_n=capture_authorization.observations,
             close_clips=0,
@@ -2122,6 +2383,7 @@ class IntelligentFirehoseBrain:
             ),
             "BEST_BUY_SCORE": self._search_telemetry.get("best_buy_score"),
             "BEST_SELL_SCORE": self._search_telemetry.get("best_sell_score"),
+            "BEST_SCORE_TYPE": self._search_telemetry.get("best_score_type"),
             "BEST_AVAILABLE_SYMBOL": (
                 self._search_telemetry.get("best_available", {}).get("symbol")
             ),
@@ -2365,15 +2627,25 @@ class IntelligentFirehoseBrain:
         if spread_price is not None:
             spread_pips = abs(float(spread_price)) / max(float(pip), 1e-12)
             if measured_spread is None:
-                self._note_skip("spread_policy_no_measured_evidence")
-                self._search_telemetry["why_no_order"] = "spread_policy_no_measured_evidence"
-                self.counts["skip"] += 1
-                return DemoDecision("skip", "spread_policy_no_measured_evidence", side=side)
-            if not measured_spread.allows(spread_pips):
-                self._note_skip("spread_above_measured_session_limit")
-                self._search_telemetry["why_no_order"] = "spread_above_measured_session_limit"
-                self.counts["skip"] += 1
-                return DemoDecision("skip", "spread_above_measured_session_limit", side=side)
+                if _forced_demo_exploration_enabled(self.cfg):
+                    self.counts["forced_spread_quality"] = int(
+                        self.counts.get("forced_spread_quality", 0)
+                    ) + 1
+                else:
+                    self._note_skip("spread_policy_no_measured_evidence")
+                    self._search_telemetry["why_no_order"] = "spread_policy_no_measured_evidence"
+                    self.counts["skip"] += 1
+                    return DemoDecision("skip", "spread_policy_no_measured_evidence", side=side)
+            if measured_spread is not None and not measured_spread.allows(spread_pips):
+                if _forced_demo_exploration_enabled(self.cfg):
+                    self.counts["forced_spread_quality"] = int(
+                        self.counts.get("forced_spread_quality", 0)
+                    ) + 1
+                else:
+                    self._note_skip("spread_above_measured_session_limit")
+                    self._search_telemetry["why_no_order"] = "spread_above_measured_session_limit"
+                    self.counts["skip"] += 1
+                    return DemoDecision("skip", "spread_above_measured_session_limit", side=side)
         self.regime_by_symbol[str(symbol).upper()] = str(
             signature.get("regime") or ""
         )
@@ -2768,6 +3040,11 @@ class IntelligentFirehoseBrain:
                 or str(fire.reason or "").startswith("shadow:")
             )
         )
+        if _forced_demo_exploration_enabled(self.cfg) and fire.action == "skip":
+            # In the governed DEMO lane, model/economics abstention is a
+            # candidate-quality penalty. _maybe_explore still enforces hard
+            # quote, geometry, risk, portfolio, and broker constraints.
+            exploration_classified = True
         if (
             exploration_shadow_model_probe
             and fire.action == "skip"

@@ -162,6 +162,49 @@ def test_validated_frozen_opportunity_enters_global_pool_with_model_probability(
     assert selected[0]["horizon_s"] == 5
 
 
+def test_forced_demo_frozen_opportunity_reaches_global_allocator_without_p_capture():
+    from aegis.intel.firehose_brain import DemoDecision
+    from aegis.intel.opportunity_engine import rank_and_allocate
+
+    decision = DemoDecision(
+        "fire", "exploration_hypothesis_test", side="buy",
+        sl=1.0999, tp=1.1007, quantity=0.01, expected_net_value=None,
+        journal={
+            "exploration": True,
+            "exploration_lane": "FORCED_DEMO_EXPLORATION",
+            "authority_type": "FORCED_DEMO_EXPLORATION",
+            "calibration_status": "UNCALIBRATED",
+            "selection_score": 0.42,
+            "selection_score_type": "forced_demo_comparative",
+            "setup_family": "forced_test",
+            "variant_id": "forced_test:buy:3s",
+            "search_horizon_s": 3,
+            "capture_authorization": {
+                "probability": None, "lower_95": None,
+                "observations": 0, "evidence_source": "forced_demo_exploration",
+            },
+            "exploration_economics": {
+                "econ_expected_net_usd": None,
+                "econ_expected_loss_usd": 0.10,
+            },
+        },
+    )
+
+    frozen = frozen_opportunity_from_decision(
+        decision=decision, symbol="EURUSD", scan_id="scan-f",
+        bar_time="2026-08-27T00:00:00+00:00", bid=1.1000, ask=1.1002,
+        stop=1.0999, target=1.1007, quantity=0.01,
+    )
+    ranked, selected = rank_and_allocate([frozen], max_positions=1)
+
+    assert len(ranked) == 1
+    assert selected[0] is ranked[0]
+    assert selected[0]["lane"] == "FORCED_DEMO_EXPLORATION"
+    assert selected[0]["p_captured_win"] is None
+    assert selected[0]["authority_type"] == "FORCED_DEMO_EXPLORATION"
+    assert selected[0]["selection_score"] == 0.42
+
+
 def test_risk_halt_records_one_terminal_funnel_row_without_order_intent():
     row = firehose_funnel_risk_row(
         scan_id="scan_123",

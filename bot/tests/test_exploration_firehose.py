@@ -1501,3 +1501,130 @@ def build_kb(books: Path, out: Path) -> dict:
     from aegis.research.book_knowledge import build_knowledge_base
 
     return build_knowledge_base(books, out)
+
+
+def _forced_demo_cfg(tmp_path):
+    return {
+        "engine": "mt5",
+        "mode": "mt5_demo",
+        "allow_live": False,
+        "paper_trading_enabled": True,
+        "dry_run": False,
+        "intelligent_exploration_enabled": True,
+        "exploration_max_risk_per_trade_usd": 0.15,
+        "intelligent_min_analogues": 20,
+        "intelligent_min_similarity": 0.5,
+        "intelligent_min_payoff_ratio": 1.0,
+        "analogue_index_path": str(tmp_path / "analogue_index.json"),
+        "exploration_experiments_path": str(tmp_path / "experiments.json"),
+        "outcome_memory_path": str(tmp_path / "outcome_memory.json"),
+    }
+
+
+def _forced_candidate(*, side="buy", target_pips=5.0, stop_pips=1.0,
+                      spread_pips=0.2):
+    from aegis.intel.fast_firehose import FirehoseLane, MicroCandidate
+
+    entry = 1.1002 if side == "buy" else 1.1000
+    sign = 1.0 if side == "buy" else -1.0
+    return MicroCandidate(
+        hypothesis_id=f"forced-{side}-{target_pips}-{spread_pips}",
+        family="forced_test_mechanism",
+        symbol="EURUSD",
+        side=side,
+        entry_price=entry,
+        invalidation=entry - sign * stop_pips * 0.0001,
+        target=entry + sign * target_pips * 0.0001,
+        max_hold_s=3,
+        required_regime="range",
+        required_session="asia",
+        spread_pips=spread_pips,
+        stop_pips=stop_pips,
+        target_pips=target_pips,
+        risk_usd_min_lot=0.10,
+        lane=FirehoseLane.BROKER_MICRO,
+        mechanism="forced-test",
+        variant_id=f"forced_test_mechanism:{side}:3s",
+    )
+
+
+def _run_forced_demo_brain(tmp_path, monkeypatch, candidates):
+    from aegis.intel.fast_firehose import FastMarketContext
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "records": []}), encoding="utf-8")
+    monkeypatch.setattr(
+        "aegis.intel.fast_firehose.generate_runtime_search_candidates",
+        lambda *args, **kwargs: list(candidates),
+    )
+    monkeypatch.setattr(
+        "aegis.intel.fast_firehose.diagnose_micro_candidates",
+        lambda ctx: ([], {}),
+    )
+    brain = IntelligentFirehoseBrain(_forced_demo_cfg(tmp_path))
+    ctx = FastMarketContext(
+        symbol="EURUSD", bid=1.1000, ask=1.1002, spread_pips=2.0,
+        m1_close=1.1001, m1_low=1.0999, m1_high=1.1003, m1_atr=0.0001,
+        m5_compression=0.2, session="asia", regime="range",
+    )
+    row = pd.Series({
+        "open": 1.1000, "high": 1.1003, "low": 1.0999,
+        "close": 1.1001, "volume": 100,
+    })
+    completed = pd.DataFrame({
+        "open": [1.1000] * 5, "high": [1.1002] * 5,
+        "low": [1.0999] * 5, "close": [1.1001] * 5,
+        "volume": [100] * 5,
+    })
+    return brain._maybe_explore(
+        symbol="EURUSD", side="buy", setup="forced_test_mechanism",
+        signature={"regime": "range", "structure": "test", "session": "asia"},
+        entry=1.1002, invalidation=1.1001, target=1.1007, pip=0.0001,
+        info_id="forced-test", portfolio_ok=True, portfolio_reason="",
+        symbol_spec={
+            "volume_min": 0.01, "volume_step": 0.01,
+            "trade_contract_size": 100000.0,
+            "trade_tick_value": 1.0, "trade_tick_size": 0.00001,
+        },
+        question="forced demo test", volatility="stable", regime_label="range",
+        evidence=_FakeEvidence(), spread_price=0.00002,
+        actual_bid=1.1000, actual_ask=1.1002, row=row,
+        completed_m1=completed, state={"session": "asia", "regime": {"label": "range"}},
+        market_ctx=ctx,
+    )
+
+
+def test_mt5_demo_forced_lane_fires_without_probability_evidence(tmp_path, monkeypatch):
+    result, skip = _run_forced_demo_brain(
+        tmp_path, monkeypatch, [_forced_candidate()]
+    )
+
+    assert skip is None
+    assert result is not None and result.action == "fire"
+    assert result.journal["exploration_lane"] == "FORCED_DEMO_EXPLORATION"
+    assert result.journal["authority_type"] == "FORCED_DEMO_EXPLORATION"
+    assert result.journal["calibration_status"] == "UNCALIBRATED"
+    assert result.journal["p_captured_win"] is None
+    assert result.journal["p_captured_win_lcb95"] is None
+    assert result.journal["viable_candidates"]
+    assert result.journal["viable_candidates"][0]["p_captured_win"] is None
+
+
+def test_forced_lane_skips_hard_blocked_candidate_and_uses_next_safe_one(tmp_path, monkeypatch):
+    blocked = _forced_candidate(target_pips=0.1, stop_pips=1.0)
+    safe = _forced_candidate(side="sell", target_pips=5.0, stop_pips=1.0)
+    result, skip = _run_forced_demo_brain(tmp_path, monkeypatch, [blocked, safe])
+
+    assert skip is None
+    assert result is not None and result.action == "fire"
+    assert result.side == "sell"
+    assert result.journal["authority_type"] == "FORCED_DEMO_EXPLORATION"
+
+
+def test_forced_lane_is_not_available_when_every_candidate_is_hard_blocked(tmp_path, monkeypatch):
+    blocked = _forced_candidate(target_pips=0.1, stop_pips=0.1)
+    result, skip = _run_forced_demo_brain(tmp_path, monkeypatch, [blocked])
+
+    assert result is None
+    assert skip is not None
