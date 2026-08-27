@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import pytest
+
 from aegis.intel.firehose_turnover import (
     FirehoseReentryGuard,
     basket_lifecycle_trace,
@@ -155,6 +157,29 @@ def test_confirmed_basket_trace_retains_point_in_time_evidence_fields():
         confirmed=True,
         observation=_close_observation(),
     ) is None
+
+
+def test_confirmed_basket_close_trace_uses_broker_close_facts():
+    trace = basket_lifecycle_trace(
+        _basket_metadata(),
+        event="firehose_basket_close",
+        timestamp="2026-08-24T10:00:20+00:00",
+        confirmed=True,
+        observation={
+            "broker_close_facts": {
+                "confirmed": True,
+                "gross_realized_pnl_usd": 0.20,
+                "realized_net_usd": 0.16,
+                "cost_usd": 0.04,
+                "actual_close_price": 1.101,
+            },
+        },
+    )
+
+    assert trace["realized_net_usd"] == pytest.approx(0.16)
+    assert trace["cost_usd"] == pytest.approx(0.04)
+    assert trace["gross_realized_pnl_usd"] == pytest.approx(0.20)
+    assert trace["actual_close_price"] == pytest.approx(1.101)
 
 
 def test_restart_preserves_basket_ownership_for_confirmed_trace(tmp_path: Path):

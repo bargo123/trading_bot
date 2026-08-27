@@ -9,7 +9,11 @@ from pathlib import Path
 import pandas as pd
 
 from aegis.intel.analogue_store import AnalogueStore
-from aegis.intel.firehose_brain import IntelligentFirehoseBrain, _load_validated_opportunities
+from aegis.intel.firehose_brain import (
+    IntelligentFirehoseBrain,
+    _load_validated_opportunities,
+    _shadow_probe_is_hard_economic_rejection,
+)
 from aegis.intel.strategy_model import ValidatedStrategyModel, strategy_model_ready
 from aegis.intel.expected_value import payoff_metrics
 
@@ -63,6 +67,21 @@ def test_v2_permission_requires_measured_session_cost_provenance(tmp_path):
     }), encoding="utf-8")
 
     assert _load_validated_opportunities(artifact) == {}
+
+
+def test_shadow_probe_telemetry_preserves_hard_economic_rejections():
+    assert _shadow_probe_is_hard_economic_rejection(
+        fire_base="short_horizon_not_calibrated",
+        economics_reason="expected_net_value_not_positive",
+    )
+    assert _shadow_probe_is_hard_economic_rejection(
+        fire_base="short_horizon_not_calibrated",
+        economics_reason="payoff_below_floor",
+    )
+    assert not _shadow_probe_is_hard_economic_rejection(
+        fire_base="short_horizon_not_calibrated",
+        economics_reason="no_win_probability_evidence",
+    )
 
 
 def _write_canary(index_path: Path, *, symbol: str = "EURUSD") -> Path:

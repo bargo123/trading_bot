@@ -10,7 +10,9 @@ from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metad
 from aegis.sizing import ContractSpec
 from scripts.run_broker_paper import (
     confirmed_position_geometry,
+    ticket_metadata_from_pending,
     close_ticket_confirmed,
+    broker_close_evidence,
     exploration_order_risk_check,
     firehose_lifecycle_identity,
     firehose_funnel_risk_row,
@@ -25,9 +27,17 @@ from scripts.run_broker_paper import (
     remove_confirmed_firehose_basket_then_cleanup,
     firehose_decision_snapshot,
     intelligent_refresh_spread_limit,
+    meaningful_quote_change,
     video_style_signal_for_scan,
 )
 from aegis.intel.send_guard import candidate_spread_limit, refresh_verdict
+
+
+def test_meaningful_quote_change_allows_same_bar_reevaluation():
+    previous = {"bid": 1.10000, "ask": 1.10002}
+    assert meaningful_quote_change(previous, bid=1.10000, ask=1.10002, pip=0.0001) is False
+    assert meaningful_quote_change(previous, bid=1.10001, ask=1.10003, pip=0.0001) is True
+    assert meaningful_quote_change(None, bid=1.1, ask=1.1001, pip=0.0001) is True
 
 
 def test_risk_halt_records_one_terminal_funnel_row_without_order_intent():
@@ -95,6 +105,107 @@ def test_confirmed_ticket_metadata_preserves_entry_ev_for_remaining_ev_policy():
 
     assert restored.entry_ev == 0.12
     assert restored.decision_snapshot == {"why": "WHY_BUY", "ranking": ["buy"]}
+
+
+def test_pending_ticket_metadata_survives_restart_before_fill(tmp_path):
+    store = TicketMetadataStore(tmp_path / "tickets.json")
+    assert store.begin_pending_order(
+        "EXP-hyp-1",
+        {
+            "hypothesis_id": "hyp-1",
+            "symbol": "EURUSD",
+            "side": "buy",
+            "selected_horizon_s": 5,
+            "entry_price": 1.1,
+        },
+    )
+
+    restarted = TicketMetadataStore(tmp_path / "tickets.json")
+    assert restarted.pending_order("EXP-hyp-1") == {
+        "hypothesis_id": "hyp-1",
+        "symbol": "EURUSD",
+        "side": "buy",
+        "selected_horizon_s": 5,
+        "entry_price": 1.1,
+    }
+
+
+def test_pending_ticket_metadata_is_rebound_to_broker_ticket_after_restart():
+    metadata = ticket_metadata_from_pending(
+        ticket="T-RESTORED",
+        pending={
+            "hypothesis_id": "hyp-1",
+            "thesis_key": "EURUSD|buy|micro|trend|london",
+            "strategy_family": "micro",
+            "expected_mechanism": "continuation",
+            "side": "buy",
+            "target_price": 1.102,
+            "max_hold_s": 5,
+            "selected_horizon_s": 5,
+            "regime": "trend",
+            "session": "london",
+            "information_id": "info-1",
+            "model_artifact": {"status": "SHADOW_ONLY"},
+            "prediction_snapshot": {"probability": 0.8},
+            "p_captured_win": 0.8,
+            "decision_snapshot": {"why": "WHY_BUY"},
+        },
+        position=PositionSnapshot(
+            symbol="EURUSD", side="buy", quantity=0.01, avg_price=1.1002,
+            stop_loss=1.0992, ticket="T-RESTORED",
+        ),
+    )
+
+    assert metadata is not None
+    assert metadata.ticket == "T-RESTORED"
+    assert metadata.entry_price == pytest.approx(1.1002)
+    assert metadata.stop_loss == pytest.approx(1.0992)
+    assert metadata.selected_horizon_s == 5
+    assert metadata.prediction_snapshot == {"probability": 0.8}
+
+
+def test_ticket_metadata_carries_execution_lifecycle_snapshot(tmp_path):
+    store = TicketMetadataStore(tmp_path / "tickets.json")
+    metadata = create_ticket_metadata(
+        ticket="T-LIFE",
+        hypothesis_id="hyp-life",
+        thesis_key="thesis-life",
+        strategy_family="micro_momentum",
+        expected_mechanism="continuation",
+        side="buy",
+        entry_price=1.1,
+        stop_loss=1.099,
+        target_price=1.102,
+        max_hold_s=5,
+        regime="trend",
+        session="london",
+        symbol="EURUSD",
+        selected_horizon_s=5,
+        model_artifact={"version": "v1", "status": "SHADOW_ONLY"},
+        prediction_snapshot={"probability": 0.8},
+        feature_snapshot={"return_5s": 0.0001},
+        p_captured_win=0.8,
+        expected_net_pnl=0.04,
+        expected_net_pnl_lcb95=0.01,
+        expected_mfe=0.06,
+        expected_mae=-0.02,
+        expected_time_to_green_s=2.0,
+        tail_loss_probability=0.1,
+        spread_assumption=0.0001,
+        slippage_assumption=0.00002,
+        commission_assumption=0.01,
+        decision_reasons=["captured_exit_replay_positive"],
+        sell_rejection_reason="lower_captured_probability",
+        abstain_reason="none",
+    )
+
+    assert store.add(metadata)
+    restored = TicketMetadataStore(tmp_path / "tickets.json").get("T-LIFE")
+    assert restored is not None
+    assert restored.selected_horizon_s == 5
+    assert restored.p_captured_win == pytest.approx(0.8)
+    assert restored.model_artifact == {"version": "v1", "status": "SHADOW_ONLY"}
+    assert restored.decision_reasons == ["captured_exit_replay_positive"]
 
 
 def test_order_margin_for_send_uses_broker_native_calculator_for_cross_currency_pair():
@@ -290,6 +401,28 @@ def test_close_ticket_confirmed_accepts_absent_exact_ticket():
     ]
 
     assert close_ticket_confirmed(positions, "T1") is True
+
+
+def test_broker_close_evidence_is_authoritative_and_fail_closed():
+    facts = broker_close_evidence(
+        [
+            {
+                "ticket": "D1", "order": "O1", "position_id": "T1",
+                "symbol": "EURUSD", "entry": 1, "profit": 0.20,
+                "commission": -0.02, "swap": -0.01, "fee": -0.01,
+                "qty": 0.01, "price": 1.101, "time": "2026-08-25T10:00:01Z",
+            }
+        ],
+        ticket="T1",
+    )
+
+    assert facts["status"] == "BROKER_CONFIRMED"
+    assert facts["realized_net_usd"] == pytest.approx(0.16)
+    assert facts["cost_usd"] == pytest.approx(0.04)
+    assert broker_close_evidence([], ticket="T1") == {
+        "status": "INCOMPLETE_BROKER_EVIDENCE",
+        "reason": "exact_exit_deal_not_available",
+    }
 
 
 def _contract(symbol: str) -> dict[str, float | str]:

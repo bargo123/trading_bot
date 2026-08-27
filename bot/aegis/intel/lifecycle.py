@@ -7,7 +7,11 @@ from typing import Any, Mapping, Sequence
 
 from aegis.engines import PositionSnapshot
 from aegis.portfolio_risk import portfolio_exposure, portfolio_pretrade_decision
-from aegis.reconcile import ReconcileCursor, reconcile_new_deals
+from aegis.reconcile import (
+    ReconcileCursor,
+    aggregate_confirmed_exit_deals,
+    reconcile_new_deals,
+)
 
 
 def new_cursor() -> ReconcileCursor:

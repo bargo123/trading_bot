@@ -58,6 +58,23 @@ class TicketMetadata:
     cost_evidence: dict[str, Any] | None = None
     entry_ev: float | None = None
     decision_snapshot: dict[str, Any] | None = None
+    selected_horizon_s: int | None = None
+    model_artifact: dict[str, Any] | None = None
+    prediction_snapshot: dict[str, Any] | None = None
+    feature_snapshot: dict[str, Any] | None = None
+    p_captured_win: float | None = None
+    expected_net_pnl: float | None = None
+    expected_net_pnl_lcb95: float | None = None
+    expected_mfe: float | None = None
+    expected_mae: float | None = None
+    expected_time_to_green_s: float | None = None
+    tail_loss_probability: float | None = None
+    spread_assumption: float | None = None
+    slippage_assumption: float | None = None
+    commission_assumption: float | None = None
+    decision_reasons: list[str] | None = None
+    sell_rejection_reason: str | None = None
+    abstain_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -76,6 +93,7 @@ class TicketMetadataStore:
         self._store: dict[str, TicketMetadata] = {}
         self._pending_cleanup: dict[str, dict[str, Any]] = {}
         self._pending_basket_cleanup: dict[str, dict[str, str]] = {}
+        self._pending_orders: dict[str, dict[str, Any]] = {}
         self._load()
 
     def _load(self) -> None:
@@ -88,6 +106,7 @@ class TicketMetadataStore:
             tickets = data.get("tickets") if isinstance(data.get("tickets"), dict) else data
             pending = data.get("pending_cleanup", {}) if tickets is not data else {}
             pending_basket = data.get("pending_basket_cleanup", {}) if tickets is not data else {}
+            pending_orders = data.get("pending_orders", {}) if tickets is not data else {}
             for ticket, meta in tickets.items():
                 if isinstance(meta, dict):
                     self._store[ticket] = TicketMetadata.from_dict(meta)
@@ -102,6 +121,12 @@ class TicketMetadataStore:
                     str(ticket): marker
                     for ticket, cleanup in pending_basket.items()
                     if (marker := self._pending_basket_cleanup_marker(ticket, cleanup)) is not None
+                }
+            if isinstance(pending_orders, dict):
+                self._pending_orders = {
+                    str(tag): dict(metadata)
+                    for tag, metadata in pending_orders.items()
+                    if isinstance(metadata, dict) and str(tag).strip()
                 }
         except (OSError, json.JSONDecodeError, TypeError, ValueError):
             pass
@@ -124,6 +149,7 @@ class TicketMetadataStore:
                 "tickets": {t: m.to_dict() for t, m in self._store.items()},
                 "pending_cleanup": self._pending_cleanup,
                 "pending_basket_cleanup": self._pending_basket_cleanup,
+                "pending_orders": self._pending_orders,
             }
             with tempfile.NamedTemporaryFile(
                 mode="w", encoding="utf-8", dir=self.persist_path.parent,
@@ -241,6 +267,38 @@ class TicketMetadataStore:
     def pending_basket_cleanups(self) -> dict[str, dict[str, str]]:
         return {ticket: dict(marker) for ticket, marker in self._pending_basket_cleanup.items()}
 
+    def begin_pending_order(self, client_tag: str, metadata: dict[str, Any]) -> bool:
+        """Persist entry identity before submitting a broker mutation."""
+        tag = str(client_tag or "").strip()
+        if not tag or not isinstance(metadata, dict):
+            return False
+        previous = self._pending_orders.get(tag)
+        self._pending_orders[tag] = dict(metadata)
+        if self._save():
+            return True
+        if previous is None:
+            self._pending_orders.pop(tag, None)
+        else:
+            self._pending_orders[tag] = previous
+        return False
+
+    def pending_order(self, client_tag: str) -> dict[str, Any] | None:
+        metadata = self._pending_orders.get(str(client_tag or "").strip())
+        return dict(metadata) if metadata is not None else None
+
+    def clear_pending_order(self, client_tag: str) -> bool:
+        tag = str(client_tag or "").strip()
+        previous = self._pending_orders.pop(tag, None)
+        if previous is None:
+            return False
+        if self._save():
+            return True
+        self._pending_orders[tag] = previous
+        return False
+
+    def pending_orders(self) -> dict[str, dict[str, Any]]:
+        return {tag: dict(metadata) for tag, metadata in self._pending_orders.items()}
+
     def get_by_hypothesis(self, hypothesis_id: str) -> list[TicketMetadata]:
         """Get all tickets for a hypothesis."""
         return [m for m in self._store.values()
@@ -309,6 +367,23 @@ def create_ticket_metadata(
     cost_evidence: dict[str, Any] | None = None,
     entry_ev: float | None = None,
     decision_snapshot: dict[str, Any] | None = None,
+    selected_horizon_s: int | None = None,
+    model_artifact: dict[str, Any] | None = None,
+    prediction_snapshot: dict[str, Any] | None = None,
+    feature_snapshot: dict[str, Any] | None = None,
+    p_captured_win: float | None = None,
+    expected_net_pnl: float | None = None,
+    expected_net_pnl_lcb95: float | None = None,
+    expected_mfe: float | None = None,
+    expected_mae: float | None = None,
+    expected_time_to_green_s: float | None = None,
+    tail_loss_probability: float | None = None,
+    spread_assumption: float | None = None,
+    slippage_assumption: float | None = None,
+    commission_assumption: float | None = None,
+    decision_reasons: list[str] | None = None,
+    sell_rejection_reason: str | None = None,
+    abstain_reason: str | None = None,
 ) -> TicketMetadata:
     """Create ticket metadata with current timestamp."""
     return TicketMetadata(
@@ -337,4 +412,39 @@ def create_ticket_metadata(
         decision_snapshot=(
             dict(decision_snapshot) if decision_snapshot is not None else None
         ),
+        selected_horizon_s=(
+            int(selected_horizon_s) if selected_horizon_s is not None else None
+        ),
+        model_artifact=dict(model_artifact) if model_artifact is not None else None,
+        prediction_snapshot=(
+            dict(prediction_snapshot) if prediction_snapshot is not None else None
+        ),
+        feature_snapshot=dict(feature_snapshot) if feature_snapshot is not None else None,
+        p_captured_win=float(p_captured_win) if p_captured_win is not None else None,
+        expected_net_pnl=float(expected_net_pnl) if expected_net_pnl is not None else None,
+        expected_net_pnl_lcb95=(
+            float(expected_net_pnl_lcb95)
+            if expected_net_pnl_lcb95 is not None else None
+        ),
+        expected_mfe=float(expected_mfe) if expected_mfe is not None else None,
+        expected_mae=float(expected_mae) if expected_mae is not None else None,
+        expected_time_to_green_s=(
+            float(expected_time_to_green_s)
+            if expected_time_to_green_s is not None else None
+        ),
+        tail_loss_probability=(
+            float(tail_loss_probability) if tail_loss_probability is not None else None
+        ),
+        spread_assumption=(
+            float(spread_assumption) if spread_assumption is not None else None
+        ),
+        slippage_assumption=(
+            float(slippage_assumption) if slippage_assumption is not None else None
+        ),
+        commission_assumption=(
+            float(commission_assumption) if commission_assumption is not None else None
+        ),
+        decision_reasons=(list(decision_reasons) if decision_reasons is not None else None),
+        sell_rejection_reason=sell_rejection_reason,
+        abstain_reason=abstain_reason,
     )

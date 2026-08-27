@@ -22,6 +22,7 @@ from aegis.intel.exploration import (
 )
 from aegis.intel.knowledge_runtime import load_knowledge_rows, match_knowledge
 from aegis.intel.lifecycle import exposure_snapshot, pretrade_ok
+from aegis.intel.outcome_memory import OutcomeMemoryStore
 from aegis.intel.paths import INTEL_DIR, resolve_bot_path
 from aegis.intel.state_runtime import build_runtime_state, runtime_signature
 from aegis.intel.strategy_model import (
@@ -74,6 +75,34 @@ def thesis_key(symbol: str, side: str | None, setup_family: str,
         str(setup_family or "").lower(), str(regime or "").lower(),
         str(session or "").lower(),
     ])
+
+
+_EXPLORATION_HARD_ECONOMIC_REASONS = frozenset({
+    "expected_net_value_not_positive",
+    "payoff_below_floor",
+})
+
+# Exploration is an information-buying lane, but a large payoff must not turn a
+# sub-majority captured-win estimate into an apparently attractive trade.  The
+# floor is deliberately a minimum majority floor; a researched/calibrated config
+# may raise it, while the economics gate still requires positive net EV.
+DEFAULT_EXPLORATION_CAPTURE_PROBABILITY_FLOOR = 0.50
+
+
+def _shadow_probe_is_hard_economic_rejection(
+    *, fire_base: str, economics_reason: str | None,
+) -> bool:
+    """Keep real economic vetoes out of shadow-routing rejection telemetry."""
+    return (
+        fire_base in {
+            "trade_economics",
+            "state_ev_not_positive",
+            "destructive_payoff",
+            "payoff_worse_than_cost",
+            "sizing",
+        }
+        or str(economics_reason or "") in _EXPLORATION_HARD_ECONOMIC_REASONS
+    )
 
 
 @dataclass
@@ -698,6 +727,12 @@ class IntelligentFirehoseBrain:
             "demo_canary_fire": [], "champion_fire": [],
         }
         self.memory = DemoBrainState()
+        self.outcome_memory = OutcomeMemoryStore(
+            resolve_bot_path(
+                cfg.get("outcome_memory_path"),
+                INTEL_DIR / "outcome_memory.json",
+            )
+        )
         # Current regime label per symbol (consumed by runner profit-management
         # pre-pass for regime_change policy).
         self.regime_by_symbol: dict[str, str] = {}
@@ -1400,6 +1435,54 @@ class IntelligentFirehoseBrain:
                     expected_net_value_usd=candidate_econ.expected_net_value_usd,
                 ))
                 continue
+            memory_features = {
+                "symbol": mc.symbol,
+                "side": mc.side,
+                "mechanism": mc.family,
+                "horizon_s": mc.max_hold_s,
+                "session": session,
+                "regime": regime,
+                "volatility": volatility,
+            }
+            if self.outcome_memory.should_suppress(memory_features):
+                reason = "fast_loser_state_suppressed"
+                all_rejections.append(reason)
+                candidate_evaluations.append(self._record_search_evaluation(
+                    candidate=mc,
+                    reasons=[reason],
+                    distance={"loser_memory_similarity_threshold": 0.75},
+                    near_eligible=False,
+                    p_green=candidate_econ.p_win,
+                    expected_net_value_usd=candidate_econ.expected_net_value_usd,
+                ))
+                continue
+            capture_floor = float(
+                self.cfg.get(
+                    "intelligent_exploration_min_capture_probability",
+                    DEFAULT_EXPLORATION_CAPTURE_PROBABILITY_FLOOR,
+                )
+                or DEFAULT_EXPLORATION_CAPTURE_PROBABILITY_FLOOR
+            )
+            if (
+                candidate_econ.p_win is None
+                or candidate_econ.p_win + 1e-12 < capture_floor
+            ):
+                reason = "exploration_capture_probability_below_floor"
+                all_rejections.append(reason)
+                distance = dict(econ.get("distance_to_eligibility") or {})
+                distance["capture_probability_deficit"] = round(
+                    max(0.0, capture_floor - float(candidate_econ.p_win or 0.0)),
+                    6,
+                )
+                candidate_evaluations.append(self._record_search_evaluation(
+                    candidate=mc,
+                    reasons=[reason],
+                    distance=distance,
+                    near_eligible=False,
+                    p_green=candidate_econ.p_win,
+                    expected_net_value_usd=candidate_econ.expected_net_value_usd,
+                ))
+                continue
             viable.append((mc, sizing_preview, candidate_econ, candidate_evidence))
         if not viable:
             self._last_exploration_micro_diagnostics = {
@@ -1596,6 +1679,18 @@ class IntelligentFirehoseBrain:
         # Reservation happens in the RUNNER after the pre-send guard passes,
         # not here — otherwise the guard sees its own decision as a conflict.
         self.counts["exploration_eligible"] = int(self.counts.get("exploration_eligible", 0)) + 1
+        rejected_by_side: dict[str, list[str]] = {"buy": [], "sell": []}
+        for evaluation in candidate_evaluations:
+            candidate_side = str(evaluation.get("side") or "").lower()
+            if candidate_side in rejected_by_side:
+                rejected_by_side[candidate_side].extend(
+                    str(value) for value in evaluation.get("reasons") or []
+                )
+        selected_side_reason = (
+            f"selected {side} {mc.family} at {mc.max_hold_s}s with "
+            f"captured-win probability {float(selected_p_win or 0.0):.3f} "
+            "and positive executable net EV"
+        )
         journal = {
             "brain": "intelligent_firehose",
             "action": "fire",
@@ -1625,6 +1720,16 @@ class IntelligentFirehoseBrain:
             "exit_plan": exit_plan,
             "book_logic": book_logic,
             "exploration_economics": exploration_econ.journal(),
+            "decision_authority": "buy_sell_abstain",
+            "why_buy": (
+                selected_side_reason if side == "buy"
+                else "; ".join(rejected_by_side["buy"]) or "buy variant not supported"
+            ),
+            "why_sell": (
+                selected_side_reason if side == "sell"
+                else "; ".join(rejected_by_side["sell"]) or "sell variant not supported"
+            ),
+            "why_not_abstain": selected_side_reason,
             **self._last_exploration_micro_diagnostics,
         }
         decision = DemoDecision(
@@ -1829,6 +1934,7 @@ class IntelligentFirehoseBrain:
             "analogue_index_path": str(self.index_path),
             "knowledge_rows": len(self.knowledge_rows),
             "knowledge_table_path": str(self.knowledge_path),
+            "outcome_memory": self.outcome_memory.snapshot(),
             "champion": None if self.strategy is None else self.strategy.strategy_id,
             "validated_states": len(self.validated_states),
             "validated_opportunities": len(self.validated_opportunities),
@@ -2367,7 +2473,10 @@ class IntelligentFirehoseBrain:
             exploration_shadow_model_probe
             and fire.action == "skip"
             and not exploration_classified
-            and fire_base not in _HARD_REJECT_BASES
+            and not _shadow_probe_is_hard_economic_rejection(
+                fire_base=fire_base,
+                economics_reason=str(econ.reason or ""),
+            )
         ):
             # Non-hard classification failures are the only cases where the
             # shadow artifact itself could still be blocking exploration.

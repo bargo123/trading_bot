@@ -70,6 +70,54 @@ class MissingLiquidationMarkError(Exception):
         super().__init__(f"Missing liquidation mark for {side.upper()} on {symbol}: required {'BID' if side == 'buy' else 'ASK'} unavailable")
 
 
+_FAST_EXIT_TO_CONTROLLER_ACTION = {
+    "TAKE": "EXIT",
+    "QUICK_TAKE": "EXIT",
+    "SCRATCH": "EXIT",
+    "ABORT": "EXIT",
+    "TIME_EXIT": "EXIT",
+}
+
+
+def unified_trade_controller_decision(
+    profit_manager_verdict: Mapping[str, Any],
+    fast_verdict: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Select one canonical per-ticket action from the two evidence adapters.
+
+    ProfitManager and FastExit provide independent evidence, but the runner must
+    have one decision owner. Any explicit PM exit is preserved; otherwise a
+    terminal FastExit action becomes the canonical EXIT. Non-terminal LOCK/HOLD
+    decisions are retained with both explanations so a HOLD is auditable.
+    """
+    pm = dict(profit_manager_verdict or {})
+    fast = dict(fast_verdict or {})
+    pm_action = str(pm.get("action") or "HOLD").upper()
+    fast_action = str(fast.get("action") or "HOLD").upper()
+
+    if pm_action == "EXIT":
+        return pm
+    if fast_action in _FAST_EXIT_TO_CONTROLLER_ACTION:
+        return {
+            "action": "EXIT",
+            "reason": f"fast_{fast_action.lower()}:{fast.get('reason') or 'requested'}",
+            "why": str(fast.get("why") or "fast exit evidence"),
+            "policy": f"fast_{fast.get('policy') or fast.get('reason') or fast_action.lower()}",
+        }
+    if pm_action != "HOLD":
+        return pm
+    if fast_action != "HOLD":
+        return fast
+    return {
+        "action": "HOLD",
+        "reason": pm.get("reason") or fast.get("reason") or "controller_hold",
+        "why": "; ".join(
+            value for value in (pm.get("why"), fast.get("why")) if value
+        ) or "no exit evidence",
+        "policy": pm.get("policy") or fast.get("policy"),
+    }
+
+
 def combine_existing_exit_with_policy(
     existing: Mapping[str, Any], policy: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -149,9 +197,10 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     _tgt_px = _ticket_meta.target_price if _ticket_meta else None
     _video_fallback = int(ctx.config.get("_video_style_max_hold_s") or 0)
     if _ticket_meta:
+        # Fresh ticket metadata carries the selected search horizon.  Video
+        # mode must not replace a 5/8/10s decision with an arbitrary blanket
+        # cap after the fill.
         _max_hold_s = int(_ticket_meta.max_hold_s)
-        if _video_fallback > 0:
-            _max_hold_s = min(_max_hold_s, _video_fallback)
     else:
         _max_hold_s = _video_fallback or 120
 

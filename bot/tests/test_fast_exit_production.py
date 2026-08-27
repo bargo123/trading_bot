@@ -14,6 +14,7 @@ from aegis.intel.fast_exit_runner import (
     FastExitContext, build_harvest_input, combine_existing_exit_with_policy, evaluate_fast_exit,
     estimate_remaining_ev, firehose_exit_trace, pip_size_for, spread_r_from_geometry,
     REMAINING_EV_EXIT_POLICY_ID,
+    unified_trade_controller_decision,
 )
 from aegis.intel.quote_buffer import QuoteBuffer
 from aegis.intel.broker_math import BrokerSymbolSpec
@@ -393,7 +394,7 @@ class TestFastExitProductionHelper:
         assert verdict["action"] == "SCRATCH"
         assert verdict["reason"] == "time_decay_no_progress"
 
-    def test_video_style_cap_overrides_stale_long_ticket_metadata(self):
+    def test_video_style_does_not_override_selected_ticket_horizon(self):
         meta = create_ticket_metadata(
             ticket="T_VIDEO_STALE_HORIZON",
             hypothesis_id="hyp_123",
@@ -424,8 +425,8 @@ class TestFastExitProductionHelper:
 
         verdict = evaluate_fast_exit(ctx)
 
-        assert verdict["action"] == "SCRATCH"
-        assert verdict["reason"] == "time_decay_no_progress"
+        assert verdict["action"] == "HOLD"
+        assert verdict["reason"] == "fast_hold_justified"
 
     def test_metadata_without_target_uses_confirmed_fallback_target(self):
         """Metadata tickets derive their own fallback target instead of using legacy experiments."""
@@ -782,6 +783,36 @@ def test_missing_runtime_policy_does_not_replace_existing_hold():
         "policy_action": "NO_EVIDENCE",
         "policy_reason": "missing_validated_policy_artifact",
     }
+
+
+def test_unified_trade_controller_preserves_strongest_exit_owner():
+    pm_exit = {"action": "EXIT", "reason": "pm_remaining_ev", "why": "pm evidence"}
+    fast_hold = {"action": "HOLD", "reason": "fast_hold_justified", "why": "fast evidence"}
+    assert unified_trade_controller_decision(pm_exit, fast_hold) == pm_exit
+
+    pm_hold = {"action": "HOLD", "reason": "pm_hold_justified", "why": "pm evidence"}
+    fast_scratch = {
+        "action": "SCRATCH", "reason": "loss_fraction_scratch",
+        "why": "fast evidence", "policy": "loss_fraction_scratch",
+    }
+    selected = unified_trade_controller_decision(pm_hold, fast_scratch)
+    assert selected["action"] == "EXIT"
+    assert selected["reason"] == "fast_scratch:loss_fraction_scratch"
+
+
+def test_unified_trade_controller_keeps_lock_and_explains_hold():
+    pm_lock = {
+        "action": "LOCK", "reason": "pm_breakeven_lock",
+        "why": "pm evidence", "policy": "breakeven_lock",
+    }
+    fast_hold = {"action": "HOLD", "reason": "fast_hold_justified", "why": "fast evidence"}
+    assert unified_trade_controller_decision(pm_lock, fast_hold) == pm_lock
+
+    pm_hold = {"action": "HOLD", "reason": "pm_hold_justified", "why": "pm evidence"}
+    selected = unified_trade_controller_decision(pm_hold, fast_hold)
+    assert selected["action"] == "HOLD"
+    assert "pm evidence" in selected["why"]
+    assert "fast evidence" in selected["why"]
 
 
 if __name__ == "__main__":

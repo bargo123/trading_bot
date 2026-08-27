@@ -217,6 +217,79 @@ class ReconciledDeal:
         return self.entry in {0, 2}
 
 
+def aggregate_confirmed_exit_deals(
+    deals: Sequence[Mapping[str, Any]], *, position_id: str,
+) -> dict[str, Any] | None:
+    """Aggregate broker-confirmed exit economics for one exact position.
+
+    MT5 can close one position with multiple exit deals. A floating mark is
+    not a realized outcome, so callers must use this aggregate (or explicitly
+    record incomplete evidence) before training or reporting a close.
+    """
+    wanted = str(position_id or "").strip()
+    if not wanted or wanted == "0":
+        return None
+    exits: list[Mapping[str, Any]] = []
+    for row in deals:
+        if not isinstance(row, Mapping):
+            continue
+        row_position = str(row.get("position_id") or row.get("position") or "").strip()
+        if row_position != wanted:
+            continue
+        try:
+            entry = int(row.get("entry"))
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if entry in {1, 2, 3}:
+            exits.append(row)
+    if not exits:
+        return None
+
+    try:
+        gross = sum(float(row.get("profit") or 0.0) for row in exits)
+        commission = sum(float(row.get("commission") or 0.0) for row in exits)
+        swap = sum(float(row.get("swap") or 0.0) for row in exits)
+        fee = sum(float(row.get("fee") or 0.0) for row in exits)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    values = (gross, commission, swap, fee)
+    if not all(isfinite(value) for value in values):
+        return None
+
+    quantities: list[tuple[float, float]] = []
+    for row in exits:
+        try:
+            quantity = float(row.get("qty") or row.get("volume") or 0.0)
+            price = float(row.get("price") or 0.0)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if quantity > 0.0 and price > 0.0 and isfinite(quantity) and isfinite(price):
+            quantities.append((quantity, price))
+    close_price = None
+    if quantities and len(quantities) == len(exits):
+        total_quantity = sum(quantity for quantity, _ in quantities)
+        if total_quantity > 0.0:
+            close_price = sum(quantity * price for quantity, price in quantities) / total_quantity
+
+    ordered = sorted(exits, key=lambda row: str(row.get("time") or ""))
+    net = gross + commission + swap + fee
+    return {
+        "confirmed": True,
+        "position_id": wanted,
+        "deal_tickets": [str(row.get("ticket") or "") for row in ordered],
+        "gross_realized_pnl_usd": gross,
+        "commission_usd": commission,
+        "swap_usd": swap,
+        "fee_usd": fee,
+        "cost_usd": gross - net,
+        "realized_net_usd": net,
+        "actual_close_price": close_price,
+        "close_timestamp": str(ordered[-1].get("time") or "") if ordered else "",
+        "entry_slippage_usd": None,
+        "exit_slippage_usd": None,
+    }
+
+
 def close_reason(comment: str, reason: Any = None) -> str:
     try:
         broker_reason = int(reason)

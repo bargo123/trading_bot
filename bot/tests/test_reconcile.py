@@ -6,7 +6,91 @@ from pathlib import Path
 
 import pytest
 
-from aegis.reconcile import ReconcileCursor, reconcile_new_deals
+from aegis.reconcile import (
+    ReconcileCursor,
+    aggregate_confirmed_exit_deals,
+    reconcile_new_deals,
+)
+
+
+def test_aggregate_confirmed_exit_deals_uses_exact_position_and_broker_costs():
+    facts = aggregate_confirmed_exit_deals(
+        [
+            {
+                "ticket": "entry-deal",
+                "order": "entry-order",
+                "position_id": "P1",
+                "symbol": "EURUSD",
+                "entry": 0,
+                "profit": 0.0,
+                "commission": -0.01,
+                "swap": 0.0,
+                "fee": -0.002,
+                "price": 1.1000,
+                "qty": 0.01,
+                "time": "2026-08-14T10:00:00Z",
+            },
+            {
+                "ticket": "exit-deal-1",
+                "order": "exit-order-1",
+                "position_id": "P1",
+                "symbol": "EURUSD",
+                "entry": 1,
+                "profit": 0.12,
+                "commission": -0.02,
+                "swap": -0.01,
+                "fee": -0.003,
+                "price": 1.1010,
+                "qty": 0.006,
+                "time": "2026-08-14T10:00:01Z",
+            },
+            {
+                "ticket": "exit-deal-2",
+                "order": "exit-order-2",
+                "position_id": "P1",
+                "symbol": "EURUSD",
+                "entry": 1,
+                "profit": 0.03,
+                "commission": -0.01,
+                "swap": 0.0,
+                "fee": -0.002,
+                "price": 1.1012,
+                "qty": 0.004,
+                "time": "2026-08-14T10:00:02Z",
+            },
+            {
+                "ticket": "other-exit",
+                "order": "other-order",
+                "position_id": "P2",
+                "symbol": "EURUSD",
+                "entry": 1,
+                "profit": 99.0,
+                "commission": 0.0,
+                "swap": 0.0,
+                "fee": 0.0,
+                "price": 2.0,
+                "qty": 1.0,
+                "time": "2026-08-14T10:00:03Z",
+            },
+        ],
+        position_id="P1",
+    )
+
+    assert facts is not None
+    assert facts["position_id"] == "P1"
+    assert facts["deal_tickets"] == ["exit-deal-1", "exit-deal-2"]
+    assert facts["gross_realized_pnl_usd"] == pytest.approx(0.15)
+    assert facts["cost_usd"] == pytest.approx(0.045)
+    assert facts["realized_net_usd"] == pytest.approx(0.105)
+    assert facts["actual_close_price"] == pytest.approx(1.10108)
+    assert facts["confirmed"] is True
+
+
+def test_aggregate_confirmed_exit_deals_is_fail_closed_without_exact_exit():
+    assert aggregate_confirmed_exit_deals(
+        [{"position_id": "P1", "entry": 0, "profit": 0.0}],
+        position_id="P1",
+    ) is None
 
 
 def test_reconcile_emits_native_tp_once_with_realized_net_pnl():

@@ -13,7 +13,7 @@ import time
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Mapping, Optional
 
 import pandas as pd
 
@@ -66,8 +66,12 @@ from aegis.intel.firehose_runtime_evidence import (  # noqa: E402
     attach_runtime_evidence,
     build_runtime_snapshot,
 )
-from aegis.intel.ticket_metadata import firehose_lifecycle_identity  # noqa: E402
+from aegis.intel.ticket_metadata import (  # noqa: E402
+    create_ticket_metadata,
+    firehose_lifecycle_identity,
+)
 from aegis.intel.send_guard import candidate_spread_limit  # noqa: E402
+from aegis.intel.lifecycle import aggregate_confirmed_exit_deals  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -207,6 +211,85 @@ def firehose_decision_snapshot(
     }
 
 
+def pending_order_lifecycle_metadata(
+    *, decision, snapshot: dict[str, object], symbol: str, side: str,
+    entry: float, stop: float | None, target: float | None, client_tag: str,
+    config: dict,
+) -> dict[str, object]:
+    """Serialize point-in-time entry identity before broker mutation."""
+    journal = dict(getattr(decision, "journal", {}) or {})
+    prediction = snapshot.get("prediction")
+    prediction = dict(prediction) if isinstance(prediction, dict) else {}
+    model = snapshot.get("model")
+    model = dict(model) if isinstance(model, dict) else {}
+    economics = snapshot.get("economics")
+    economics = dict(economics) if isinstance(economics, dict) else {}
+    selected_horizon = (
+        journal.get("search_horizon_s")
+        or prediction.get("decision_horizon_s")
+        or journal.get("max_hold_s")
+    )
+    try:
+        selected_horizon = int(selected_horizon) if selected_horizon is not None else None
+    except (TypeError, ValueError):
+        selected_horizon = None
+    return {
+        "client_tag": str(client_tag),
+        "symbol": str(symbol).upper(),
+        "side": str(side).lower(),
+        "hypothesis_id": journal.get("hypothesis_id"),
+        "thesis_key": journal.get("thesis_key"),
+        "strategy_family": journal.get("setup_family"),
+        "expected_mechanism": journal.get("micro_mechanism") or journal.get("setup_family"),
+        "selected_horizon_s": selected_horizon,
+        "max_hold_s": selected_horizon,
+        "entry_price": float(entry),
+        "stop_loss": float(stop) if stop is not None else None,
+        "target_price": float(target) if target is not None else None,
+        "regime": journal.get("regime"),
+        "session": journal.get("session"),
+        "information_id": getattr(decision, "information_id", None),
+        "decision_snapshot": dict(snapshot),
+        "model_artifact": model,
+        "prediction_snapshot": prediction,
+        "feature_snapshot": prediction.get("feature_snapshot"),
+        "p_captured_win": prediction.get("probability") or economics.get("p_win"),
+        "expected_net_pnl": prediction.get("expected_net_pnl"),
+        "expected_net_pnl_lcb95": prediction.get("expected_net_pnl_lcb95"),
+        "expected_mfe": prediction.get("expected_mfe"),
+        "expected_mae": prediction.get("expected_mae"),
+        "expected_time_to_green_s": prediction.get("expected_time_to_green_s"),
+        "tail_loss_probability": prediction.get("tail_loss_probability"),
+        "spread_assumption": snapshot.get("risk", {}).get("spread") if isinstance(snapshot.get("risk"), dict) else None,
+        "slippage_assumption": config.get("slippage_bps"),
+        "commission_assumption": config.get("commission_round_trip_usd"),
+        "decision_reasons": [
+            str(value) for value in (
+                getattr(decision, "reason", None),
+                journal.get("exploration_authority"),
+            ) if value
+        ],
+        "sell_rejection_reason": journal.get("sell_rejection_reason"),
+        "abstain_reason": prediction.get("abstain_reason"),
+        "basket_metadata": {
+            "basket_id": f"firehose-pending-{client_tag}",
+            "hypothesis_id": journal.get("hypothesis_id"),
+            "family": journal.get("setup_family") or journal.get("micro_mechanism"),
+            "symbol": str(symbol).upper(),
+            "side": str(side).lower(),
+            "trigger_id": str(getattr(decision, "information_id", "") or "pending"),
+            "risk_budget": float(config.get("exploration_max_risk_per_trade_usd", 0.15) or 0.15),
+            "clip_cap": 1,
+            "regime": journal.get("regime"),
+            "session": journal.get("session"),
+            "cost_evidence": {
+                "spread_price": float(snapshot.get("risk", {}).get("spread") or 0.0)
+                if isinstance(snapshot.get("risk"), dict) else 0.0,
+            },
+        },
+    }
+
+
 def exploration_order_risk_check(
     *,
     order_qty: float,
@@ -328,6 +411,27 @@ def firehose_scan_id(symbol: str, bar: object) -> str:
     """Stable identity for one symbol/completed-bar evaluation."""
     payload = f"firehose-scan|{str(symbol).upper()}|{bar}"
     return "scan_" + hashlib.sha256(payload.encode()).hexdigest()[:20]
+
+
+def meaningful_quote_change(
+    previous: Mapping[str, float] | None,
+    *,
+    bid: float,
+    ask: float,
+    pip: float,
+    fraction_of_pip: float = 0.1,
+) -> bool:
+    """Whether a fresh executable quote warrants same-bar reevaluation."""
+    if previous is None:
+        return True
+    try:
+        threshold = max(abs(float(pip)) * float(fraction_of_pip), 1e-12)
+        return (
+            abs(float(bid) - float(previous["bid"])) >= threshold
+            or abs(float(ask) - float(previous["ask"])) >= threshold
+        )
+    except (KeyError, TypeError, ValueError):
+        return True
 
 
 def funnel_terminal_for_reason(reason: object) -> str:
@@ -562,6 +666,74 @@ def confirmed_position_geometry(position) -> dict[str, float | str]:
     if entry_price <= 0 or stop_loss <= 0 or volume <= 0:
         return {"status": "NO_EVIDENCE", "reason": "missing_confirmed_geometry"}
     return {"entry_price": entry_price, "stop_loss": stop_loss, "volume": volume}
+
+
+def ticket_metadata_from_pending(
+    *, ticket: str, pending: dict[str, object], position,
+):
+    """Rebind pre-send identity to a broker-confirmed position after restart."""
+    geometry = confirmed_position_geometry(position)
+    if geometry.get("status") == "NO_EVIDENCE":
+        return None
+    required = (
+        pending.get("hypothesis_id"), pending.get("thesis_key"),
+        pending.get("strategy_family"), pending.get("expected_mechanism"),
+        pending.get("side"), pending.get("symbol") or getattr(position, "symbol", ""),
+    )
+    if any(not str(value or "").strip() for value in required):
+        return None
+    try:
+        max_hold_s = int(
+            pending.get("selected_horizon_s")
+            or pending.get("max_hold_s")
+            or 120
+        )
+    except (TypeError, ValueError):
+        return None
+    return create_ticket_metadata(
+        ticket=str(ticket),
+        hypothesis_id=str(pending["hypothesis_id"]),
+        thesis_key=str(pending["thesis_key"]),
+        strategy_family=str(pending["strategy_family"]),
+        expected_mechanism=str(pending["expected_mechanism"]),
+        side=str(pending["side"]),
+        entry_price=float(geometry["entry_price"]),
+        stop_loss=float(geometry["stop_loss"]),
+        target_price=pending.get("target_price"),
+        max_hold_s=max_hold_s,
+        regime=str(pending.get("regime") or ""),
+        session=str(pending.get("session") or ""),
+        information_id=(
+            str(pending["information_id"])
+            if pending.get("information_id") is not None else None
+        ),
+        symbol=str(pending.get("symbol") or getattr(position, "symbol", "")),
+        entry_geometry={
+            "entry_price": float(geometry["entry_price"]),
+            "stop_loss": float(geometry["stop_loss"]),
+        },
+        initial_risk=pending.get("initial_risk"),
+        cost_evidence=pending.get("cost_evidence"),
+        entry_ev=pending.get("entry_ev"),
+        decision_snapshot=pending.get("decision_snapshot"),
+        selected_horizon_s=max_hold_s,
+        model_artifact=pending.get("model_artifact"),
+        prediction_snapshot=pending.get("prediction_snapshot"),
+        feature_snapshot=pending.get("feature_snapshot"),
+        p_captured_win=pending.get("p_captured_win"),
+        expected_net_pnl=pending.get("expected_net_pnl"),
+        expected_net_pnl_lcb95=pending.get("expected_net_pnl_lcb95"),
+        expected_mfe=pending.get("expected_mfe"),
+        expected_mae=pending.get("expected_mae"),
+        expected_time_to_green_s=pending.get("expected_time_to_green_s"),
+        tail_loss_probability=pending.get("tail_loss_probability"),
+        spread_assumption=pending.get("spread_assumption"),
+        slippage_assumption=pending.get("slippage_assumption"),
+        commission_assumption=pending.get("commission_assumption"),
+        decision_reasons=pending.get("decision_reasons"),
+        sell_rejection_reason=pending.get("sell_rejection_reason"),
+        abstain_reason=pending.get("abstain_reason"),
+    )
 
 
 def record_confirmed_firehose_open(
@@ -898,6 +1070,17 @@ def close_ticket_confirmed(positions, ticket: str) -> bool:
     )
 
 
+def broker_close_evidence(deals, *, ticket: str) -> dict[str, object]:
+    """Return exact broker close facts, never substituting floating PnL."""
+    facts = aggregate_confirmed_exit_deals(deals, position_id=str(ticket))
+    if facts is None:
+        return {
+            "status": "INCOMPLETE_BROKER_EVIDENCE",
+            "reason": "exact_exit_deal_not_available",
+        }
+    return {"status": "BROKER_CONFIRMED", **facts}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Aegis broker-engine paper runner")
     parser.add_argument("--config", default=str(ROOT / "config_ib_paper_eurusd.yaml"))
@@ -914,9 +1097,9 @@ def main() -> None:
     stop_file = ROOT / "reports" / "FIREHOSE_STOP"
     video_style_mode = bool(args.video_style)
     if video_style_mode:
-        # Research/video behavior is seconds-first even when a restart finds
-        # an older ticket without exact metadata.
-        cfg["_video_style_max_hold_s"] = int(cfg.get("video_style_max_hold_s") or 45)
+        # Video-style behavior selects a candidate horizon; it must not
+        # replace that identity with a blanket hold override.
+        cfg.pop("_video_style_max_hold_s", None)
     engine_name = str(cfg.get("engine", "")).lower()
     if engine_name == "mt5":
         from aegis.paper_control import paper_execution_enabled
@@ -948,6 +1131,8 @@ def main() -> None:
     symbols = configured_symbols(cfg)
     qty = float(cfg.get("order_quantity", 0.01 if engine_name == "mt5" else 20000))
     last_bar_time: dict[str, pd.Timestamp] = {}
+    last_quote_state: dict[str, dict[str, float]] = {}
+    deferred_opportunities: list[dict[str, Any]] = []
     hr = None
     position_opened_at: dict[str, float] = {}
     last_entry_at: dict[str, float] = {}
@@ -1021,9 +1206,11 @@ def main() -> None:
     from aegis.intel.fast_firehose import FastExitStateMachine, FastExitConfig
     from aegis.intel.fast_exit_runner import (
         FastExitContext, evaluate_fast_exit, firehose_exit_trace,
+        unified_trade_controller_decision,
         MissingLiquidationMarkError, spread_r_from_geometry,
         REMAINING_EV_EXIT_POLICY_ID, estimate_remaining_ev,
     )
+    from aegis.intel.opportunity_engine import rank_and_allocate
 
     fast_exit_sm = FastExitStateMachine()
     last_inventory_journal: dict[str, float] = {"ts": 0.0}
@@ -1134,6 +1321,48 @@ def main() -> None:
             for pos in leftover:
                 position_opened_at.setdefault(pos.symbol, now_s)
                 last_entry_at.setdefault(pos.symbol, now_s)
+                ticket = str(getattr(pos, "ticket", "") or "")
+                if ticket_metadata_store.get(ticket) is None:
+                    comment = str(getattr(pos, "comment", "") or "")
+                    pending_tag = comment if ticket_metadata_store.pending_order(comment) else None
+                    pending = ticket_metadata_store.pending_order(comment)
+                    if pending is None:
+                        for tag, candidate in ticket_metadata_store.pending_orders().items():
+                            if tag and (tag == comment or tag in comment or comment in tag):
+                                pending_tag, pending = tag, candidate
+                                break
+                    if pending is not None and pending_tag is not None:
+                        restored_meta = ticket_metadata_from_pending(
+                            ticket=ticket, pending=pending, position=pos
+                        )
+                        basket_metadata = pending.get("basket_metadata")
+                        if restored_meta is not None and isinstance(basket_metadata, dict):
+                            try:
+                                restored_contract = eng.symbol_spec(pos.symbol)
+                            except (AttributeError, OSError, TypeError, ValueError):
+                                restored_contract = None
+                            restored = record_confirmed_firehose_open(
+                                root=ROOT,
+                                metadata_store=ticket_metadata_store,
+                                metrics=firehose_turnover,
+                                journal=journal,
+                                ticket_id=ticket,
+                                position=pos,
+                                basket_metadata=basket_metadata,
+                                ticket_metadata=restored_meta,
+                                opened_at=float(getattr(pos, "opened_ts", 0) or now_s),
+                                slot_capacity=max_positions,
+                                contract=restored_contract,
+                                decision_reasons=list(pending.get("decision_reasons") or []),
+                                expected_net_value=pending.get("entry_ev"),
+                                decision_snapshot=pending.get("decision_snapshot"),
+                            )
+                            if restored.get("status") == "PERSISTED":
+                                ticket_metadata_store.clear_pending_order(pending_tag)
+                                logger.info(
+                                    "Restored exact pending lifecycle ticket=%s horizon=%s",
+                                    ticket, restored_meta.selected_horizon_s,
+                                )
             append_journal(
                 journal,
                 {
@@ -1310,7 +1539,14 @@ def main() -> None:
             )
             return OrderResult(ok=False, message="no close_ticket; mixed book left intact")
 
-        def maybe_enter(sym: str, equity: float, open_count: int) -> None:
+        def maybe_enter(
+            sym: str,
+            equity: float,
+            open_count: int,
+            *,
+            collect_only: bool = False,
+            selected_execution: bool = False,
+        ) -> None:
             nonlocal day_trades, day_stamp, last_halt_journal, close_block_until
             nonlocal margin_block_until
             nonlocal submitted_count, fill_count
@@ -1336,9 +1572,6 @@ def main() -> None:
             row = frame.iloc[-2]
             bar_time = pd.Timestamp(row["time"])
             scan_id = firehose_scan_id(sym, bar_time)
-            prev = last_bar_time.get(sym)
-            if prev is not None and bar_time <= prev:
-                return
 
             q = eng.quote(sym)
             # Quote already recorded in polling loop; use current quote for this evaluation
@@ -1348,6 +1581,18 @@ def main() -> None:
             mid = (float(q.bid) + float(q.ask)) / 2.0 if q.bid and q.ask else 0.0
             live_bps = (live_spread / mid * 10000.0) if mid > 0 else 0.0
             pip = pip_size_for(sym, cfg)
+            prev = last_bar_time.get(sym)
+            if (
+                not selected_execution
+                and prev is not None
+                and bar_time <= prev
+                and not meaningful_quote_change(
+                    last_quote_state.get(sym),
+                    bid=float(q.bid), ask=float(q.ask), pip=pip,
+                )
+            ):
+                return
+            last_quote_state[sym] = {"bid": float(q.bid), "ask": float(q.ask)}
             loop_cfg = dict(prep_cfg)
             loop_cfg["spread_bps"] = max(live_bps, float(cfg.get("spread_bps_floor", 0.2) or 0.0))
             loop_cfg["firehose_pip_size"] = pip
@@ -1623,41 +1868,20 @@ def main() -> None:
                             )
                             if res.ok:
                                 closed += 1
-                                # Sequential learning: exploration closes
-                                # update their experiment's evidence.
-                                exp_hyp = str(decision.journal.get("hypothesis_id") or "")
-                                if (
-                                    decision.journal.get("exploration")
-                                    and exp_hyp
-                                    and intelligent_brain is not None
-                                ):
-                                    try:
-                                        intelligent_brain.record_exploration_close(
-                                            hypothesis_id=exp_hyp,
-                                            pnl=float(pos.unrealized_pnl),
-                                            session=str(decision.journal.get("session") or ""),
-                                            regime=str(decision.journal.get("regime") or ""),
-                                        )
-                                    except Exception:
-                                        pass
-                                try:
-                                    from aegis.intel.outcome_log import append_outcome
-
-                                    append_outcome(
-                                        {
-                                            "event_type": "position_exit",
-                                            "is_exit": True,
-                                            "symbol": sym,
-                                            "side": pos.side,
-                                            "pnl": float(pos.unrealized_pnl),
-                                            "reason": decision.reason,
-                                            "action": decision.action,
-                                            "information_id": decision.information_id,
-                                            "analogue_n": decision.analogue_n,
-                                        }
-                                    )
-                                except Exception:
-                                    pass
+                                # Broker confirmation and realized economics
+                                # arrive through the deal reconciliation loop;
+                                # the floating mark here is diagnostic only.
+                                append_journal(
+                                    journal,
+                                    {
+                                        "event": "close_requested",
+                                        "ticket": ticket,
+                                        "symbol": sym,
+                                        "floating_pnl_at_request": float(pos.unrealized_pnl),
+                                        "broker_confirmed": False,
+                                        "reason": decision.reason,
+                                    },
+                                )
                     leftover = eng.positions(sym)
                     intelligent_brain.memory.apply(
                         sym,
@@ -2197,6 +2421,68 @@ def main() -> None:
                     return
             # Reserve only after every pre-send guard passes. A rejected
             # candidate must not consume an exploration slot for 180 seconds.
+            if collect_only:
+                if brain_decision is None or brain_decision.action not in {"fire", "scale"}:
+                    return
+                decision_journal = dict(brain_decision.journal)
+                prediction_journal = decision_journal.get("short_horizon_prediction") or {}
+                economics_journal = (
+                    decision_journal.get("exploration_economics")
+                    or decision_journal
+                )
+                deferred_opportunities.append({
+                    "candidate_id": scan_id,
+                    "symbol": sym,
+                    "side": sig.side,
+                    "thesis_key": decision_journal.get("thesis_key") or scan_id,
+                    "p_captured_win": decision_journal.get("econ_p_win")
+                    if decision_journal.get("econ_p_win") is not None
+                    else economics_journal.get("econ_p_win")
+                    if economics_journal.get("econ_p_win") is not None
+                    else prediction_journal.get("probability"),
+                    "expected_net_ev": (
+                        brain_decision.expected_net_value
+                        if brain_decision.expected_net_value is not None
+                        else economics_journal.get("econ_expected_net_usd")
+                    ),
+                    "expected_net_ev_lcb95": prediction_journal.get(
+                        "expected_net_pnl_lcb95"
+                    ),
+                    "tail_loss_probability": prediction_journal.get(
+                        "tail_loss_probability"
+                    ),
+                    "expected_time_to_green_s": prediction_journal.get(
+                        "expected_time_to_green_s"
+                    ),
+                    "fast_winner_similarity": decision_journal.get(
+                        "fast_winner_similarity", 0.0
+                    ),
+                    "fast_loser_similarity": decision_journal.get(
+                        "fast_loser_similarity", 0.0
+                    ),
+                    "marginal_risk_usd": decision_journal.get(
+                        "econ_expected_loss_usd",
+                        economics_journal.get(
+                            "econ_expected_loss_usd",
+                            cfg.get("exploration_max_risk_per_trade_usd", 0.15),
+                        ),
+                    ),
+                    "portfolio_ok": True,
+                })
+                append_journal(
+                    journal,
+                    {
+                        "event": "global_opportunity_discovered",
+                        "scan_id": scan_id,
+                        "symbol": sym,
+                        "side": sig.side,
+                        "expected_net_ev": brain_decision.expected_net_value,
+                        "p_captured_win": deferred_opportunities[-1].get(
+                            "p_captured_win"
+                        ),
+                    },
+                )
+                return
             if brain_decision is not None and brain_decision.journal.get("exploration"):
                 _thesis_key = str(brain_decision.journal.get("thesis_key") or "")
                 if _thesis_key:
@@ -2207,6 +2493,46 @@ def main() -> None:
                         _mem.symbol = sym.upper()
                         _mem.side = brain_decision.side
                         _mem.setup_family = str(brain_decision.journal.get("setup_family") or "")
+            pending_snapshot = firehose_decision_snapshot(
+                decision=brain_decision,
+                symbol=sym,
+                scan_id=scan_id,
+                bar_time=bar_time,
+                side=sig.side,
+                qty=order_qty,
+                entry=float(q.ask if sig.side == "buy" else q.bid),
+                stop=req.stop_loss,
+                target=req.take_profit,
+                spread=live_spread,
+                quote_age=quote_age_s(q),
+            )
+            if brain_decision is not None and send_orders:
+                pending_metadata = pending_order_lifecycle_metadata(
+                    decision=brain_decision,
+                    snapshot=pending_snapshot,
+                    symbol=sym,
+                    side=sig.side,
+                    entry=float(q.ask if sig.side == "buy" else q.bid),
+                    stop=req.stop_loss,
+                    target=req.take_profit,
+                    client_tag=client_tag,
+                    config=cfg,
+                )
+                if not ticket_metadata_store.begin_pending_order(
+                    client_tag, pending_metadata
+                ):
+                    append_journal(
+                        journal,
+                        {
+                            "event": "order_blocked",
+                            "symbol": sym,
+                            "side": sig.side,
+                            "reason": "pending_lifecycle_persistence_failed",
+                            "client_tag": client_tag,
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
             if brain_decision is not None:
                 append_journal(
                     journal,
@@ -2269,6 +2595,8 @@ def main() -> None:
             # (e.g. 10016 invalid stops from a stale quote) are safe to retry.
             if status == "TIMEOUT":
                 fire_retry_guard.mark_sent(sym, client_tag, time.time())
+            elif status not in {"POSITION_CONFIRMED", "DEAL_EXECUTED", "ORDER_ACCEPTED"}:
+                ticket_metadata_store.clear_pending_order(client_tag)
             t2t_ms = (time.perf_counter() - t0) * 1000.0
             t2t.record_ms(t2t_ms)
             intel_q = None
@@ -2371,13 +2699,29 @@ def main() -> None:
                                             or (q.ask if side == "buy" else q.bid))
                         stop_loss = float(brain_decision.sl) if brain_decision.sl is not None else 0.0
                         target_price = brain_decision.tp
-                        if video_style_mode:
-                            max_hold_s = int(cfg.get("_video_style_max_hold_s") or 45)
-                        else:
-                            max_hold_s = int(brain_decision.journal.get("max_hold_s") or 120)
                         regime = str(brain_decision.journal.get("regime") or "")
                         session = str(brain_decision.journal.get("session") or "")
                         information_id = brain_decision.information_id
+                        prediction_snapshot = decision_snapshot.get("prediction")
+                        prediction_snapshot = (
+                            dict(prediction_snapshot)
+                            if isinstance(prediction_snapshot, dict) else {}
+                        )
+                        model_artifact = decision_snapshot.get("model")
+                        model_artifact = (
+                            dict(model_artifact)
+                            if isinstance(model_artifact, dict) else {}
+                        )
+                        selected_horizon = (
+                            brain_decision.journal.get("search_horizon_s")
+                            or prediction_snapshot.get("decision_horizon_s")
+                            or brain_decision.journal.get("max_hold_s")
+                        )
+                        try:
+                            selected_horizon = int(selected_horizon)
+                        except (TypeError, ValueError):
+                            selected_horizon = int(brain_decision.journal.get("max_hold_s") or 120)
+                        max_hold_s = selected_horizon
                         for tk in new_tickets:
                             position = next(
                                 (item for item in eng.positions(sym) if str(getattr(item, "ticket", "")) == tk),
@@ -2405,12 +2749,32 @@ def main() -> None:
                                 symbol=sym,
                                 entry_ev=brain_decision.expected_net_value,
                                 decision_snapshot=decision_snapshot,
+                                selected_horizon_s=selected_horizon,
+                                model_artifact=model_artifact,
+                                prediction_snapshot=prediction_snapshot,
+                                feature_snapshot=prediction_snapshot.get("feature_snapshot"),
+                                p_captured_win=prediction_snapshot.get("probability"),
+                                expected_net_pnl=prediction_snapshot.get("expected_net_pnl"),
+                                expected_net_pnl_lcb95=prediction_snapshot.get("expected_net_pnl_lcb95"),
+                                expected_mfe=prediction_snapshot.get("expected_mfe"),
+                                expected_mae=prediction_snapshot.get("expected_mae"),
+                                expected_time_to_green_s=prediction_snapshot.get("expected_time_to_green_s"),
+                                tail_loss_probability=prediction_snapshot.get("tail_loss_probability"),
+                                spread_assumption=(
+                                    decision_snapshot.get("risk", {}).get("spread")
+                                    if isinstance(decision_snapshot.get("risk"), dict) else None
+                                ),
+                                slippage_assumption=cfg.get("slippage_bps"),
+                                commission_assumption=cfg.get("commission_round_trip_usd"),
+                                decision_reasons=[str(brain_decision.reason)],
+                                sell_rejection_reason=prediction_snapshot.get("sell_rejection_reason"),
+                                abstain_reason=prediction_snapshot.get("abstain_reason"),
                             )
                             try:
                                 contract = eng.symbol_spec(sym)
                             except (AttributeError, OSError, TypeError, ValueError):
                                 contract = None
-                            record_confirmed_firehose_open(
+                            open_record = record_confirmed_firehose_open(
                                 root=ROOT,
                                 metadata_store=ticket_metadata_store,
                                 metrics=firehose_turnover,
@@ -2438,6 +2802,8 @@ def main() -> None:
                                 expected_net_value=brain_decision.expected_net_value,
                                 decision_snapshot=decision_snapshot,
                             )
+                            if open_record.get("status") == "PERSISTED":
+                                ticket_metadata_store.clear_pending_order(client_tag)
                     intelligent_brain.memory.apply(
                         sym,
                         brain_decision.action,
@@ -2557,6 +2923,7 @@ def main() -> None:
                 )
                 # Continuously sample quotes for ALL watched symbols (not just on new M1 bar)
                 now_ts = time.time()
+                deferred_opportunities.clear()
                 for sym in symbols:
                     try:
                         q = eng.quote(sym)
@@ -2644,7 +3011,17 @@ def main() -> None:
                 )
                 if hasattr(eng, "history_deals"):
                     try:
-                        for event in ingest_deals(eng.history_deals(1), deal_cursor):
+                        deal_rows = eng.history_deals(1)
+                        reconciled_events = ingest_deals(deal_rows, deal_cursor)
+                        learned_positions: set[str] = set()
+                        memory_recorded_positions: set[str] = set()
+                        for event in reconciled_events:
+                            position_id = str(
+                                event.get("position")
+                                or event.get("position_id")
+                                or event.get("ticket")
+                                or ""
+                            )
                             # Attribution map: ENTRY deals carry the original
                             # EXP comment; SL/TP exit deals get theirs overwritten
                             # by MT5 ('[sl ...]'/'[tp ...]'), so match via
@@ -2660,49 +3037,114 @@ def main() -> None:
                                     rec = intelligent_brain.find_experiment_by_tag(tag)
                                     if rec is not None:
                                         exp_store.remember_position(
-                                            str(event.get("position_id") or ""),
+                                            position_id,
                                             str(rec["hypothesis_id"]),
                                         )
                             if event.get("is_exit"):
-                                firehose_turnover.record_realized(
-                                    str(event.get("position") or event.get("ticket") or ""),
-                                    net_pnl_usd=float(event.get("pnl") or 0.0),
-                                    closed_at=(
-                                        float(event["time_msc"]) / 1000.0
-                                        if event.get("time_msc") else None
-                                    ),
-                                    exit_reason=str(event.get("close_reason") or "broker_reconciled"),
-                                )
                                 from aegis.intel.outcome_log import append_outcome
-
-                                append_outcome(
-                                    {
+                                close_facts = broker_close_evidence(
+                                    deal_rows, ticket=position_id
+                                )
+                                if close_facts.get("status") == "BROKER_CONFIRMED":
+                                    net_pnl = float(close_facts["realized_net_usd"])
+                                    firehose_turnover.record_realized(
+                                        position_id,
+                                        net_pnl_usd=net_pnl,
+                                        cost_usd=float(close_facts["cost_usd"]),
+                                        closed_at=(
+                                            float(event["time_msc"]) / 1000.0
+                                            if event.get("time_msc") else None
+                                        ),
+                                        exit_reason=str(event.get("close_reason") or "broker_reconciled"),
+                                    )
+                                    append_outcome({
                                         **event,
+                                        **close_facts,
                                         "event_type": "position_exit",
                                         "source": "reconcile",
-                                    }
-                                )
-                                if exp_store is not None:
-                                    hyp_id = exp_store.hypothesis_for_position(
-                                        str(event.get("position_id") or "")
-                                    )
-                                    if not hyp_id:
-                                        exp_rec = intelligent_brain.find_experiment_by_tag(
-                                            str(event.get("comment") or "")
-                                        )
-                                        hyp_id = (
-                                            str(exp_rec["hypothesis_id"]) if exp_rec else None
-                                        )
-                                    if hyp_id:
+                                        "pnl": net_pnl,
+                                        "evidence_status": "BROKER_CONFIRMED",
+                                    })
+                                    outcome_memory = getattr(
+                                        intelligent_brain, "outcome_memory", None
+                                    ) if intelligent_brain is not None else None
+                                    if (
+                                        outcome_memory is not None
+                                        and position_id not in memory_recorded_positions
+                                    ):
                                         try:
-                                            intelligent_brain.record_exploration_close(
-                                                hypothesis_id=hyp_id,
-                                                pnl=float(event.get("pnl") or 0.0),
-                                                session="",
-                                                regime="",
+                                            lifecycle_detail = (
+                                                firehose_turnover.close_detail(position_id)
+                                                or {}
                                             )
-                                        except Exception:
-                                            pass
+                                            lifecycle_meta = ticket_metadata_store.get(position_id)
+                                            outcome_memory.record_closed(
+                                                outcome_id=position_id,
+                                                features={
+                                                    "symbol": (
+                                                        getattr(lifecycle_meta, "symbol", None)
+                                                        or event.get("symbol")
+                                                    ),
+                                                    "side": (
+                                                        getattr(lifecycle_meta, "side", None)
+                                                        or event.get("side")
+                                                    ),
+                                                    "mechanism": getattr(
+                                                        lifecycle_meta, "strategy_family", None
+                                                    ) or event.get("family"),
+                                                    "selected_horizon_s": getattr(
+                                                        lifecycle_meta, "selected_horizon_s", None
+                                                    ) or getattr(
+                                                        lifecycle_meta, "max_hold_s", None
+                                                    ),
+                                                    "session": getattr(
+                                                        lifecycle_meta, "session", None
+                                                    ) or event.get("session"),
+                                                    "regime": getattr(
+                                                        lifecycle_meta, "regime", None
+                                                    ) or event.get("regime"),
+                                                },
+                                                realized_net_usd=net_pnl,
+                                                mfe_usd=lifecycle_detail.get("mfe_usd"),
+                                                mae_usd=lifecycle_detail.get("mae_usd"),
+                                                time_to_green_s=lifecycle_detail.get(
+                                                    "first_green_s"
+                                                ),
+                                            )
+                                            memory_recorded_positions.add(position_id)
+                                        except Exception as exc:
+                                            logger.error(
+                                                "outcome memory update failed position=%s: %s",
+                                                position_id, exc, exc_info=True,
+                                            )
+                                    if exp_store is not None and position_id not in learned_positions:
+                                        hyp_id = exp_store.hypothesis_for_position(position_id)
+                                        if not hyp_id:
+                                            exp_rec = intelligent_brain.find_experiment_by_tag(
+                                                str(event.get("comment") or "")
+                                            )
+                                            hyp_id = (
+                                                str(exp_rec["hypothesis_id"]) if exp_rec else None
+                                            )
+                                        if hyp_id:
+                                            try:
+                                                intelligent_brain.record_exploration_close(
+                                                    hypothesis_id=hyp_id,
+                                                    pnl=net_pnl,
+                                                    session="",
+                                                    regime="",
+                                                )
+                                                learned_positions.add(position_id)
+                                            except Exception:
+                                                pass
+                                else:
+                                    append_outcome({
+                                        **event,
+                                        **close_facts,
+                                        "event_type": "position_exit",
+                                        "source": "reconcile",
+                                        "evidence_status": "INCOMPLETE_BROKER_EVIDENCE",
+                                    })
                         save_cursor(deal_cursor, reconcile_cursor_path)
                     except Exception as exc:
                         logger.error(
@@ -3021,6 +3463,7 @@ def main() -> None:
                                     # unless the broker supplies them, preserving the
                                     # harvester's fail-closed evidence requirement.
                                     _spread_r = None
+                                    _spread_normal = None
                                     try:
                                         _cost_entry = (
                                             _ticket_meta.entry_price if _ticket_meta is not None else _entry_px
@@ -3035,6 +3478,11 @@ def main() -> None:
                                             _cur_bid, _cur_ask,
                                             _fast_engine_spec,
                                         )
+                                        _spread_limit = max_spread_for(_sym, cfg)
+                                        if _spread_limit > 0 and _cur_bid is not None and _cur_ask is not None:
+                                            _spread_normal = (
+                                                float(_cur_ask) - float(_cur_bid)
+                                            ) <= float(_spread_limit)
                                     except (TypeError, ValueError):
                                         pass
                                     # Determine legacy hypothesis ID for legacy ticket fallback
@@ -3071,6 +3519,7 @@ def main() -> None:
                                         remaining_ev=_rem_ev,
                                         remaining_ev_status=_rem_status,
                                         observed_spread_r=_spread_r,
+                                        spread_normal=_spread_normal,
                                         short_horizon_prediction=_current_short_prediction,
                                     )
                                     try:
@@ -3126,13 +3575,9 @@ def main() -> None:
                                         pnl_usd=trace.get("pnl_usd"),
                                     )
                                     append_journal(journal, trace)
-                                    if fast_verdict["action"] in {"TAKE", "QUICK_TAKE", "SCRATCH", "ABORT", "TIME_EXIT"}:
-                                        verdict = {
-                                            "action": "EXIT",
-                                            "reason": f"fast_{fast_verdict['action'].lower()}:{fast_verdict['reason']}",
-                                            "why": fast_verdict["why"],
-                                            "policy": f"fast_{fast_verdict['policy']}",
-                                        }
+                                    verdict = unified_trade_controller_decision(
+                                        verdict, fast_verdict
+                                    )
                                 except Exception as fast_exc:
                                     fast_exit_error_count += 1
                                     append_journal(
@@ -3147,6 +3592,15 @@ def main() -> None:
                                     )
                             if verdict["action"] == "EXIT" and hasattr(eng, "close_ticket"):
                                 res_close = eng.close_ticket(tk)
+                                try:
+                                    close_facts = broker_close_evidence(
+                                        eng.history_deals(1), ticket=tk
+                                    )
+                                except Exception:
+                                    close_facts = {
+                                        "status": "INCOMPLETE_BROKER_EVIDENCE",
+                                        "reason": "deal_history_unavailable",
+                                    }
                                 summary = profit_manager.close_summary(
                                     tk, exit_reason=verdict["reason"]
                                 )
@@ -3172,9 +3626,25 @@ def main() -> None:
                                         close_confirmed = False
                                 if close_confirmed:
                                     closed_at = time.time()
+                                    broker_confirmed = (
+                                        close_facts.get("status") == "BROKER_CONFIRMED"
+                                    )
                                     firehose_turnover.record_close(
-                                        tk, closed_at=closed_at, gross_pnl_usd=None,
-                                        net_pnl_usd=None, cost_usd=None, confirmed=True,
+                                        tk,
+                                        closed_at=closed_at,
+                                        gross_pnl_usd=(
+                                            float(close_facts["gross_realized_pnl_usd"])
+                                            if broker_confirmed else None
+                                        ),
+                                        net_pnl_usd=(
+                                            float(close_facts["realized_net_usd"])
+                                            if broker_confirmed else None
+                                        ),
+                                        cost_usd=(
+                                            float(close_facts["cost_usd"])
+                                            if broker_confirmed else None
+                                        ),
+                                        confirmed=True,
                                         exit_reason=str(verdict.get("reason") or "unknown"),
                                     )
                                     append_journal(
@@ -3185,9 +3655,24 @@ def main() -> None:
                                             "timestamp": datetime.now(timezone.utc).isoformat(),
                                             "confirmed": True,
                                             "symbol": str(getattr(pos, "symbol", "")),
-                                            "realized_net_usd": None,
-                                            "gross_pnl_usd": None,
-                                            "cost_usd": None,
+                                            "realized_net_usd": (
+                                                close_facts.get("realized_net_usd")
+                                                if broker_confirmed else None
+                                            ),
+                                            "gross_pnl_usd": (
+                                                close_facts.get("gross_realized_pnl_usd")
+                                                if broker_confirmed else None
+                                            ),
+                                            "cost_usd": (
+                                                close_facts.get("cost_usd")
+                                                if broker_confirmed else None
+                                            ),
+                                            "evidence_status": (
+                                                "BROKER_CONFIRMED"
+                                                if broker_confirmed
+                                                else "INCOMPLETE_BROKER_EVIDENCE"
+                                            ),
+                                            "broker_close_facts": close_facts,
                                             **firehose_lifecycle_identity(_ticket_meta),
                                         },
                                     )
@@ -3231,7 +3716,10 @@ def main() -> None:
                                             "mfe_usd": peak,
                                             "mae_usd": (summary or {}).get("mae_before_close"),
                                             "peak_net_profit_usd": peak,
-                                            "realized_net_usd": None,
+                                            "realized_net_usd": (
+                                                close_facts.get("realized_net_usd")
+                                                if broker_confirmed else None
+                                            ),
                                             "capture_ratio": None,
                                             "age_seconds": (summary or {}).get("duration_s"),
                                             "clips": (
@@ -3240,7 +3728,11 @@ def main() -> None:
                                             ),
                                             "decision_reasons": [str(verdict.get("reason") or "unknown")],
                                             "ev": _rem_ev,
-                                            "cost_usd": None,
+                                            "cost_usd": (
+                                                close_facts.get("cost_usd")
+                                                if broker_confirmed else None
+                                            ),
+                                            "broker_close_facts": close_facts,
                                             "turnover": 1.0,
                                             "basket_removal_status": basket_removal.get("status"),
                                         },
@@ -3260,30 +3752,11 @@ def main() -> None:
                                             "ok": True,
                                         },
                                     )
-                                if (
-                                    close_confirmed
-                                    and summary
-                                    and summary.get("hypothesis_id")
-                                    and intelligent_brain is not None
-                                ):
-                                    try:
-                                        intelligent_brain.record_exploration_close(
-                                            hypothesis_id=str(summary["hypothesis_id"]),
-                                            pnl=float(summary["realized_pnl"]),
-                                            mfe=summary.get("mfe_before_close"),
-                                            mae=summary.get("mae_before_close"),
-                                            duration_min=(
-                                                summary.get("duration_s", 0) / 60.0
-                                            ),
-                                            session=str(summary.get("session") or ""),
-                                            regime=str(summary.get("regime") or ""),
-                                            **{
-                                                k: v for k, v in summary.items()
-                                                if k.startswith(("pl_", "cf_"))
-                                            },
-                                        )
-                                    except Exception:
-                                        pass
+                                # Exploration learning is performed only by
+                                # reconciliation from broker-confirmed deal
+                                # facts. The PM summary intentionally contains
+                                # floating-at-close diagnostics, never a
+                                # training source of truth.
                             elif verdict["action"] == "LOCK":
                                 # 0.01-lot reality: protective STOP ADJUSTMENT
                                 # only - never pretend partial close exists.
@@ -3469,9 +3942,43 @@ def main() -> None:
                                     },
                                 )
                             continue
-                        maybe_enter(sym, equity, len(eng.positions()))
+                        maybe_enter(
+                            sym,
+                            equity,
+                            len(eng.positions()),
+                            collect_only=bool(cfg.get("intelligent_firehose", False)),
+                        )
                     except Exception:
                         logger.exception("Symbol loop error %s", sym)
+
+                if bool(cfg.get("intelligent_firehose", False)) and deferred_opportunities:
+                    ranked_opportunities, selected_opportunities = rank_and_allocate(
+                        deferred_opportunities,
+                        max_positions=max_positions,
+                        occupied_theses=(
+                            key for key, mem in intelligent_brain.memory.theses.items()
+                            if mem.tickets
+                        ) if intelligent_brain is not None else (),
+                    )
+                    append_journal(
+                        journal,
+                        {
+                            "event": "global_opportunity_allocation",
+                            "candidates": len(deferred_opportunities),
+                            "ranked": len(ranked_opportunities),
+                            "selected": len(selected_opportunities),
+                            "selected_ids": [
+                                row.get("candidate_id") for row in selected_opportunities
+                            ],
+                        },
+                    )
+                    for opportunity in selected_opportunities:
+                        maybe_enter(
+                            str(opportunity["symbol"]),
+                            equity,
+                            len(eng.positions()),
+                            selected_execution=True,
+                        )
 
                 if holding:
                     logger.info("Holding %s equity=%.2f", "; ".join(holding), equity)

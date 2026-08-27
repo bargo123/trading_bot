@@ -477,7 +477,12 @@ class MT5Engine(BrokerEngine):
             raise RuntimeError(f"copy_rates_from_pos failed for {name} ({self._last_error()})")
         out: list[Bar] = []
         for row in raw:
-            ts = self._quote_time_utc(row["time"] if hasattr(row, "__getitem__") else row.time)
+            # MT5 bar timestamps identify the period start.  The terminal's
+            # server-to-UTC offset can leave a non-zero second component, but
+            # completed-bar resampling requires canonical minute boundaries.
+            ts = self._quote_time_utc(
+                row["time"] if hasattr(row, "__getitem__") else row.time
+            ).replace(second=0, microsecond=0)
             out.append(
                 Bar(
                     time=ts,
@@ -560,6 +565,7 @@ class MT5Engine(BrokerEngine):
                     "profit": float(getattr(row, "profit", 0) or 0),
                     "commission": float(getattr(row, "commission", 0) or 0),
                     "swap": float(getattr(row, "swap", 0) or 0),
+                    "fee": float(getattr(row, "fee", 0) or 0),
                     "entry": int(getattr(row, "entry", 0) or 0),
                     "position_id": str(int(getattr(row, "position_id", 0) or 0) or ""),
                     "magic": int(getattr(row, "magic", 0) or 0),

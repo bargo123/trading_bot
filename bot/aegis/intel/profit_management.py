@@ -467,7 +467,10 @@ class ProfitManager:
             "side": track.side,
             "session": track.session_at_open,
             "regime": track.regime_at_open,
-            "realized_pnl": round(track.last_pnl, 4),
+            # This is the last executable floating mark, not broker-final
+            # realized PnL. Reconciliation supplies the authoritative value.
+            "floating_pnl_at_close": round(track.last_pnl, 4),
+            "realized_pnl": None,
             "mfe_before_close": round(track.mfe_usd, 4),
             "mae_before_close": round(track.mae_usd, 4),
             "giveback_from_mfe": round(max(0.0, track.mfe_usd - track.last_pnl), 4),

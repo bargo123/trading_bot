@@ -293,6 +293,13 @@ class _PositiveEvidence(_FakeEvidence):
     similarity_score = 0.8
 
 
+class _LowCaptureConfidenceEvidence(_PositiveEvidence):
+    """Positive arithmetic payoff must not rescue sub-majority capture odds."""
+
+    win_probability = 0.47
+    analogue_n_losses = 32
+
+
 def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
     from aegis.intel.firehose_brain import IntelligentFirehoseBrain
     from aegis.intel.fast_firehose import FastMarketContext, check_entry_economics
@@ -310,6 +317,7 @@ def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
         'order_quantity': 0.01, 'max_positions': 40,
         'intelligent_exploration_enabled': True,
         'exploration_max_risk_per_trade_usd': 0.15,
+        'exploration_max_daily_loss_usd': 0,
     }
     brain = IntelligentFirehoseBrain(cfg)
     ctx = FastMarketContext(
@@ -375,6 +383,72 @@ def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
         assert result is None or result.action != 'fire', (
             f"economics reject but got {result.action}: {skip}")
         # Correctly rejected - proves economics gate IS wired.
+
+    low_result, low_skip = brain._maybe_explore(
+        symbol='EURUSD', side=mc.side, setup=mc.family,
+        signature={'regime': 'range', 'structure': 'retest', 'session': 'asia',
+                   'm15_direction': 'down'},
+        entry=mc.entry_price, invalidation=mc.invalidation,
+        target=mc.target, pip=0.0001, info_id='low_confidence_info',
+        portfolio_ok=True, portfolio_reason='',
+        symbol_spec=spec, question='low confidence test',
+        volatility='stable', regime_label='range',
+        evidence=_LowCaptureConfidenceEvidence(), spread_price=0.00002,
+        actual_bid=ctx.bid, actual_ask=ctx.ask,
+        row=pd.Series({'open': 1.100005, 'high': ctx.m1_high,
+                       'low': ctx.m1_low, 'close': ctx.m1_close,
+                       'volume': 100}),
+        completed_m1=pd.DataFrame({
+            'open': [1.10] * 4 + [1.10001],
+            'high': [1.10002] * 5,
+            'low': [1.09999] * 5,
+            'close': [1.10] * 4 + [1.10001],
+            'volume': [100] * 5}),
+        state={'structure': {'M15': {'kind': 'retest',
+               'support': 1.09950, 'resistance': 1.10000}},
+               'multi_timeframe': {'M5': {'direction': 'down'},
+                                   'M15': {'direction': 'down'}},
+               'session': 'asia',
+               'regime': {'label': 'range'},
+               'volatility': {'phase': 'stable'}},
+        market_ctx=ctx,
+    )
+    assert low_result is None
+    assert low_skip == (
+        'exploration_economics_rejected:'
+        'exploration_capture_probability_below_floor'
+    )
+
+    brain.outcome_memory.should_suppress = lambda features: True
+    blocked_result, blocked_skip = brain._maybe_explore(
+        symbol='EURUSD', side=mc.side, setup=mc.family,
+        signature={'regime': 'range', 'structure': 'retest', 'session': 'asia',
+                   'm15_direction': 'down'},
+        entry=mc.entry_price, invalidation=mc.invalidation,
+        target=mc.target, pip=0.0001, info_id='loser_memory_info',
+        portfolio_ok=True, portfolio_reason='', symbol_spec=spec,
+        question='loser memory test', volatility='stable', regime_label='range',
+        evidence=_PositiveEvidence(), spread_price=0.00002,
+        actual_bid=ctx.bid, actual_ask=ctx.ask,
+        row=pd.Series({'open': 1.100005, 'high': ctx.m1_high,
+                       'low': ctx.m1_low, 'close': ctx.m1_close,
+                       'volume': 100}),
+        completed_m1=pd.DataFrame({
+            'open': [1.10] * 4 + [1.10001],
+            'high': [1.10002] * 5,
+            'low': [1.09999] * 5,
+            'close': [1.10] * 4 + [1.10001],
+            'volume': [100] * 5}),
+        state={'structure': {'M15': {'kind': 'retest',
+               'support': 1.09950, 'resistance': 1.10000}},
+               'multi_timeframe': {'M5': {'direction': 'down'},
+                                   'M15': {'direction': 'down'}},
+               'session': 'asia', 'regime': {'label': 'range'},
+               'volatility': {'phase': 'stable'}},
+        market_ctx=ctx,
+    )
+    assert blocked_result is None
+    assert blocked_skip == 'exploration_economics_rejected:fast_loser_state_suppressed'
 
 
 def _exploration_frame(n=400):
@@ -926,6 +1000,7 @@ def test_predictor_unavailable_reaches_brain_as_explicit_zero_intent(tmp_path, m
         "order_quantity": 0.01,
         "max_positions": 40,
         "exploration_max_risk_per_trade_usd": 0.15,
+        "exploration_max_daily_loss_usd": 0,
     })
     frame = _exploration_frame()
     signal = VideoStyleSignal(
@@ -1072,6 +1147,7 @@ def test_shadow_only_exploration_full_route_uses_independent_measured_evidence(t
         "order_quantity": 0.01,
         "max_positions": 40,
         "exploration_max_risk_per_trade_usd": 0.15,
+        "exploration_max_daily_loss_usd": 0,
     })
     frame = _exploration_frame()
     signal = VideoStyleSignal(

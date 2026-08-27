@@ -28,6 +28,7 @@ class TurnoverMetrics:
         self._closes: list[tuple[float, float, float | None, float | None, float | None, float | None, int | None]] = []
         self._close_details: list[dict[str, Any]] = []
         self._green_at: dict[str, float] = {}
+        self._mae: dict[str, float] = {}
         self._red_seconds: dict[str, float] = {}
         self._last_sample: dict[str, tuple[float, float]] = {}
 
@@ -39,6 +40,7 @@ class TurnoverMetrics:
         if ticket and ticket not in self._opens:
             self._opens[ticket] = (float(opened_at), slot_capacity if slot_capacity and slot_capacity > 0 else None)
             self._green_at.pop(ticket, None)
+            self._mae.pop(ticket, None)
             self._red_seconds.pop(ticket, None)
             self._last_sample.pop(ticket, None)
 
@@ -59,6 +61,8 @@ class TurnoverMetrics:
             return
         now = float(observed_at)
         pnl = float(pnl_usd)
+        if pnl < 0:
+            self._mae[ticket] = min(self._mae.get(ticket, pnl), pnl)
         prior = self._last_sample.get(ticket)
         if prior is not None and prior[1] < 0.0 and now >= prior[0]:
             self._red_seconds[ticket] = self._red_seconds.get(ticket, 0.0) + (now - prior[0])
@@ -80,9 +84,10 @@ class TurnoverMetrics:
         if not confirmed or ticket not in self._opens:
             return
         opened_at, slot_capacity = self._opens.pop(ticket)
+        peak_mfe = self._peaks.pop(ticket, None)
         self._closes.append((
             opened_at, float(closed_at), gross_pnl_usd, net_pnl_usd, cost_usd,
-            self._peaks.pop(ticket, None), slot_capacity,
+            peak_mfe, slot_capacity,
         ))
         self._close_details.append({
             "ticket": ticket,
@@ -94,8 +99,14 @@ class TurnoverMetrics:
                 if ticket in self._green_at else None
             ),
             "seconds_in_red": round(self._red_seconds.get(ticket, 0.0), 6),
+            "mfe_usd": peak_mfe,
+            "mae_usd": round(self._mae.get(ticket, 0.0), 6),
+            "gross_pnl_usd": gross_pnl_usd,
+            "net_pnl_usd": net_pnl_usd,
+            "cost_usd": cost_usd,
         })
         self._green_at.pop(ticket, None)
+        self._mae.pop(ticket, None)
         self._red_seconds.pop(ticket, None)
         self._last_sample.pop(ticket, None)
 
@@ -142,6 +153,17 @@ class TurnoverMetrics:
             return True
         return False
 
+    def close_detail(self, ticket: str) -> dict[str, Any] | None:
+        """Return the in-memory lifecycle facts for one completed ticket."""
+        for index in range(len(self._close_details) - 1, -1, -1):
+            detail = self._close_details[index]
+            if detail.get("ticket") != str(ticket):
+                continue
+            row = dict(detail)
+            row["mfe_usd"] = self._closes[index][5]
+            return row
+        return None
+
     def snapshot(self, now: float) -> dict[str, Any]:
         completed = self._closes
         details = self._close_details
@@ -183,7 +205,9 @@ class TurnoverMetrics:
                 "max_loss_usd": None, "wins_erased_by_avg_loss": None,
                 **telemetry,
                 "win_rate": None, "expectancy": None, "profit_factor": None,
-                "daily_net": None,
+                "daily_net": None, "captured_net_win_rate": None,
+                "net_pnl": None, "never_green_rate": None,
+                "green_then_loser_rate": None,
             }
         holds = sorted(closed - opened for opened, closed, _, _, _, _, _ in completed)
         p90_index = (len(holds) - 1) * 0.9
@@ -242,6 +266,23 @@ class TurnoverMetrics:
                 if losers_resolved and winners_resolved else None
             ),
             "daily_net": sum(resolved_net) if resolved_net else None,
+            "captured_net_win_rate": (
+                len(winners_resolved) / len(resolved_net) if resolved_net else None
+            ),
+            "net_pnl": sum(resolved_net) if resolved_net else None,
+            "never_green_rate": (
+                sum(detail.get("first_green_s") is None for detail in details) / len(details)
+                if details else None
+            ),
+            "green_then_loser_rate": (
+                sum(
+                    float(detail.get("net_pnl_usd")) < 0
+                    and float(detail.get("mfe_usd") or 0.0) >= 0.10
+                    for detail in details
+                    if detail.get("net_pnl_usd") is not None
+                ) / len(resolved)
+                if resolved else None
+            ),
         }
 
 
@@ -364,7 +405,13 @@ def basket_lifecycle_trace(
     ):
         return None
     values = dict(observation or {})
-    return {
+    broker_facts = values.get("broker_close_facts")
+    broker_facts = (
+        dict(broker_facts)
+        if isinstance(broker_facts, Mapping) and broker_facts.get("confirmed") is True
+        else None
+    )
+    result = {
         "event": event,
         "timestamp": timestamp,
         "confirmed": True,
@@ -382,13 +429,21 @@ def basket_lifecycle_trace(
         "mfe_usd": values.get("mfe_usd"),
         "mae_usd": values.get("mae_usd"),
         "peak_net_profit_usd": values.get("peak_net_profit_usd"),
-        "realized_net_usd": None,
-        "capture_ratio": None,
+        "realized_net_usd": (
+            broker_facts.get("realized_net_usd") if broker_facts else None
+        ),
+        "capture_ratio": (
+            float(broker_facts["realized_net_usd"]) / float(values["peak_net_profit_usd"])
+            if broker_facts
+            and values.get("peak_net_profit_usd") is not None
+            and float(values["peak_net_profit_usd"]) > 0
+            else None
+        ),
         "age_seconds": values.get("age_seconds"),
         "clips": values.get("clips", metadata.clip_sequence),
         "decision_reasons": values.get("decision_reasons", []),
         "ev": values.get("ev"),
-        "cost_usd": None,
+        "cost_usd": broker_facts.get("cost_usd") if broker_facts else None,
         "turnover": values.get("turnover"),
         "regime": metadata.regime,
         "session": metadata.session,
@@ -411,6 +466,14 @@ def basket_lifecycle_trace(
             if key in values
         },
     }
+    if broker_facts:
+        for key in (
+            "gross_realized_pnl_usd", "commission_usd", "swap_usd", "fee_usd",
+            "actual_close_price", "entry_slippage_usd", "exit_slippage_usd",
+        ):
+            if key in broker_facts:
+                result[key] = broker_facts[key]
+    return result
 
 
 def quote_fingerprint(symbol: str, side: str, bid: float, ask: float) -> str:

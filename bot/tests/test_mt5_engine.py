@@ -275,6 +275,17 @@ def test_quote_and_bars():
     assert bars[0].close == 1.105
 
 
+def test_bars_normalize_mt5_period_timestamps_to_minute_boundaries():
+    api = FakeMT5()
+    eng = _engine(api)
+    eng.connect()
+
+    bars = eng.bars("EURUSD", "1m", 1)
+
+    assert bars
+    assert all(bar.time.second == 0 and bar.time.microsecond == 0 for bar in bars)
+
+
 def test_units_quantity_refused():
     api = FakeMT5()
     eng = _engine(api)
@@ -363,6 +374,7 @@ def test_history_deals_and_orders_readonly():
             profit=0.12,
             commission=0.0,
             swap=0.0,
+            fee=-0.01,
             entry=1,
             magic=1,
             comment="out",
@@ -391,6 +403,7 @@ def test_history_deals_and_orders_readonly():
     deals = eng.history_deals(7)
     orders = eng.history_orders(7)
     assert deals[0]["profit"] == 0.12
+    assert deals[0]["fee"] == -0.01
     assert deals[0]["time"] == "2023-11-14T21:13:20+00:00"
     assert deals[0]["time_msc"] == 1_699_996_400_000
     assert orders[0]["ticket"] == "8"
