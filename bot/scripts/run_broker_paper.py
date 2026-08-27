@@ -3905,6 +3905,7 @@ def main() -> None:
                                 "why": "fast exit evidence not yet available",
                                 "policy": "safety_noop",
                             }
+                            trace: dict[str, Any] | None = None
                             # Fast exit state machine governs FAST tickets.
                             _is_fast = bool(video_style_mode)
                             _ticket_meta = ticket_metadata_store.get(tk)
@@ -4072,7 +4073,6 @@ def main() -> None:
                                         mfe_usd=trace["mfe_usd"],
                                         pnl_usd=trace.get("pnl_usd"),
                                     )
-                                    append_journal(journal, trace)
                                 except Exception as fast_exc:
                                     fast_exit_error_count += 1
                                     append_journal(
@@ -4089,6 +4089,13 @@ def main() -> None:
                                 verdict,
                                 fast_verdict,
                             )
+                            if trace is not None:
+                                trace["exit_action"] = verdict["action"]
+                                trace["exit_reason"] = verdict["reason"]
+                                trace["EXIT_ACTION"] = verdict["action"]
+                                trace["EXIT_REASON"] = verdict["reason"]
+                                trace["exit_owner"] = verdict.get("source")
+                                append_journal(journal, trace)
                             if verdict["action"] in {"HARVEST", "SCRATCH", "ABORT"} and hasattr(eng, "close_ticket"):
                                 res_close = eng.close_ticket(tk)
                                 try:

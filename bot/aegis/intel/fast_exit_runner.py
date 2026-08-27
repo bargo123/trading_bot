@@ -160,7 +160,9 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     _stop_dist_pips = abs(
         _entry_px - float(_stop_loss or 0)
     ) / max(_pip_sz, 1e-10) if _stop_loss else 10.0
-    _friction_pips, _ = initial_friction_for_context(ctx, entry_price=_entry_px, pip=_pip_sz)
+    _friction_pips, _friction_price = initial_friction_for_context(
+        ctx, entry_price=_entry_px, pip=_pip_sz
+    )
 
     # Use exact ticket metadata for target and max_hold_s (first priority)
     _tgt_px = _ticket_meta.target_price if _ticket_meta else None
@@ -226,11 +228,11 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     # giveback, regime, EV, and lock decisions keep priority.
     if (
         fast_verdict.get("action") == "HOLD"
-        and (_pnl_pips + _friction_pips) <= 0
+        and adverse_beyond_friction_pips(_pnl_pips, _friction_pips) > 1e-12
         and short_horizon_support_revoked(ctx.short_horizon_prediction)
     ):
         prediction = ctx.short_horizon_prediction or {}
-        return {
+        fast_verdict = {
             "action": "ABORT",
             "reason": "short_horizon_support_revoked",
             "why": (
@@ -242,7 +244,16 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
             "policy": "short_horizon_support_revoked",
         }
 
-    return fast_verdict
+    return attach_execution_evidence(
+        fast_verdict,
+        ctx=ctx,
+        entry_price=_entry_px,
+        liquidation_mark=_mark,
+        pip=_pip_sz,
+        expected_friction_pips=_friction_pips,
+        expected_friction_price=_friction_price,
+        broker_spec=_spec_fast,
+    )
 
 
 def build_harvest_input(ctx: FastExitContext) -> HarvestInput | None:
@@ -311,6 +322,26 @@ def firehose_exit_trace(ctx: FastExitContext, verdict: Mapping[str, Any]) -> dic
     floor_r = None
     if harvest is not None and ctx.harvest_policy is not None and mfe_r is not None:
         floor_r = mfe_r * ctx.harvest_policy.protected_mfe_fraction
+    execution = {
+        key: verdict.get(key)
+        for key in (
+            "expected_entry_friction_usd",
+            "current_executable_pnl",
+            "adverse_beyond_friction",
+            "price_movement_since_fill",
+            "price_movement_since_fill_pips",
+        "current_prediction_support",
+        "exit_action",
+        "exit_reason",
+        "EXPECTED_ENTRY_FRICTION_USD",
+        "CURRENT_EXECUTABLE_PNL",
+        "ADVERSE_BEYOND_FRICTION",
+        "PRICE_MOVEMENT_SINCE_FILL",
+        "CURRENT_PREDICTION_SUPPORT",
+        "EXIT_ACTION",
+        "EXIT_REASON",
+    )
+    }
     return {
         "event": "firehose_exit_trace",
         "ticket": ctx.ticket,
@@ -340,6 +371,7 @@ def firehose_exit_trace(ctx: FastExitContext, verdict: Mapping[str, Any]) -> dic
         "target_price": (meta.target_price if meta else None),
         "action": verdict.get("action"),
         "reason": verdict.get("reason"),
+        **execution,
         **firehose_lifecycle_identity(meta),
     }
 
@@ -407,6 +439,99 @@ def initial_friction_for_context(
         commission_price = 0.0
     price = max(0.0, spread_price + slippage_price + commission_price)
     return price / max(float(pip), 1e-12), price
+
+
+def adverse_beyond_friction_pips(pnl_pips: float, friction_pips: float) -> float:
+    """Return only adverse movement not explained by expected entry friction."""
+    return max(0.0, -(float(pnl_pips) + max(0.0, float(friction_pips))))
+
+
+def prediction_support_status(prediction: Mapping[str, Any] | None) -> str:
+    """Classify current prediction support for an exit journal."""
+    if not isinstance(prediction, Mapping):
+        return "UNAVAILABLE"
+    if bool(prediction.get("abstain")):
+        return "ABSTAIN"
+    if str(prediction.get("calibration_status") or "") != "calibrated":
+        return "UNCALIBRATED"
+    try:
+        probability = float(prediction["probability"])
+        threshold = float(prediction.get("threshold", 0.5))
+    except (KeyError, TypeError, ValueError):
+        return "INVALID"
+    if not (
+        math.isfinite(probability)
+        and math.isfinite(threshold)
+        and 0.0 <= probability <= 1.0
+        and 0.0 < threshold < 1.0
+    ):
+        return "INVALID"
+    if probability < threshold or (
+        "decision" in prediction and not bool(prediction.get("decision"))
+    ):
+        return "REVOKED"
+    return "SUPPORTED"
+
+
+def attach_execution_evidence(
+    verdict: Mapping[str, Any],
+    *,
+    ctx: FastExitContext,
+    entry_price: float,
+    liquidation_mark: float,
+    pip: float,
+    expected_friction_pips: float,
+    expected_friction_price: float,
+    broker_spec: BrokerSymbolSpec,
+) -> dict[str, Any]:
+    """Attach executable USD/price evidence without changing the decision."""
+    result = dict(verdict)
+    try:
+        unit_usd = (
+            broker_spec.usd_per_price_unit_per_lot() * float(ctx.quantity)
+        )
+        direction = 1.0 if str(ctx.side).lower() == "buy" else -1.0
+        price_move = (float(liquidation_mark) - float(entry_price)) * direction
+        current_pnl = price_move * unit_usd
+        friction_usd = max(0.0, float(expected_friction_price)) * unit_usd
+        adverse_usd = max(0.0, -current_pnl - friction_usd)
+        movement_pips = price_move / max(float(pip), 1e-12)
+        result.update({
+            "expected_initial_friction_pips": float(expected_friction_pips),
+            "adverse_excursion_beyond_expected_friction_pips": adverse_beyond_friction_pips(
+                movement_pips, expected_friction_pips
+            ),
+            "expected_entry_friction_usd": friction_usd,
+            "current_executable_pnl": current_pnl,
+            "adverse_beyond_friction": adverse_usd,
+            "price_movement_since_fill": price_move,
+            "price_movement_since_fill_pips": movement_pips,
+        })
+    except (TypeError, ValueError, ZeroDivisionError):
+        result.update({
+            "expected_initial_friction_pips": float(expected_friction_pips),
+            "adverse_excursion_beyond_expected_friction_pips": None,
+            "expected_entry_friction_usd": None,
+            "current_executable_pnl": None,
+            "adverse_beyond_friction": None,
+            "price_movement_since_fill": None,
+            "price_movement_since_fill_pips": None,
+        })
+    result["current_prediction_support"] = prediction_support_status(
+        ctx.short_horizon_prediction
+    )
+    result["exit_action"] = result.get("action")
+    result["exit_reason"] = result.get("reason")
+    result.update({
+        "EXPECTED_ENTRY_FRICTION_USD": result.get("expected_entry_friction_usd"),
+        "CURRENT_EXECUTABLE_PNL": result.get("current_executable_pnl"),
+        "ADVERSE_BEYOND_FRICTION": result.get("adverse_beyond_friction"),
+        "PRICE_MOVEMENT_SINCE_FILL": result.get("price_movement_since_fill"),
+        "CURRENT_PREDICTION_SUPPORT": result.get("current_prediction_support"),
+        "EXIT_ACTION": result.get("exit_action"),
+        "EXIT_REASON": result.get("exit_reason"),
+    })
+    return result
 
 
 def spread_r_from_geometry(

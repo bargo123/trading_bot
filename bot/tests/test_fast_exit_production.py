@@ -207,6 +207,108 @@ class TestFastExitProductionHelper:
         assert verdict["action"] == "ABORT"
         assert verdict["reason"] == "short_horizon_support_revoked"
 
+    def test_exact_opening_friction_with_revoked_support_does_not_abort(self):
+        ctx = self.create_context(
+            current_bid=1.09990,
+            current_ask=1.09992,
+            mfe_usd=0.0,
+            mae_usd=-0.10,
+            opened_ts=1000.0,
+            now_ts=1000.1,
+            short_horizon_prediction={
+                "calibration_status": "calibrated",
+                "abstain": False,
+                "decision": False,
+                "probability": 0.40,
+                "threshold": 0.60,
+            },
+        )
+        # The executable mark is exactly one pip below the fill, all of which
+        # is expected opening friction for this test.
+        ctx.expected_initial_friction_pips = 1.0
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["action"] == "HOLD"
+        assert verdict["reason"] != "short_horizon_support_revoked"
+        assert verdict["adverse_excursion_beyond_expected_friction_pips"] == pytest.approx(0.0)
+
+    def test_true_adverse_movement_can_abort_without_minimum_age(self):
+        ctx = self.create_context(
+            current_bid=1.09980,
+            current_ask=1.09982,
+            mfe_usd=0.0,
+            mae_usd=-0.20,
+            opened_ts=1000.0,
+            now_ts=1000.1,
+            short_horizon_prediction={
+                "calibration_status": "calibrated",
+                "abstain": False,
+                "decision": False,
+                "probability": 0.40,
+                "threshold": 0.60,
+            },
+        )
+        ctx.expected_initial_friction_pips = 1.0
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["action"] == "ABORT"
+        assert verdict["reason"] == "short_horizon_support_revoked"
+        assert verdict["adverse_excursion_beyond_expected_friction_pips"] == pytest.approx(1.0)
+
+    def test_commission_only_friction_cannot_scratch(self):
+        ctx = self.create_context(
+            current_bid=1.10000,
+            current_ask=1.10002,
+            mfe_usd=0.0,
+            mae_usd=0.0,
+            now_ts=1000.1,
+            config={"commission_round_trip_usd": 0.03},
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+        trace = firehose_exit_trace(ctx, verdict)
+
+        assert verdict["action"] == "HOLD"
+        assert trace["expected_entry_friction_usd"] == pytest.approx(0.03)
+        assert trace["current_executable_pnl"] == pytest.approx(0.0)
+        assert trace["adverse_beyond_friction"] == pytest.approx(0.0)
+
+    def test_exit_trace_exposes_usd_friction_and_prediction_support(self):
+        ctx = self.create_context(
+            current_bid=1.09990,
+            current_ask=1.09992,
+            mfe_usd=0.0,
+            mae_usd=-0.10,
+            now_ts=1000.1,
+            short_horizon_prediction={
+                "calibration_status": "calibrated",
+                "abstain": False,
+                "decision": False,
+                "probability": 0.40,
+                "threshold": 0.60,
+            },
+        )
+        ctx.expected_initial_friction_pips = 1.0
+        verdict = evaluate_fast_exit(ctx)
+        trace = firehose_exit_trace(ctx, verdict)
+
+        assert trace["expected_entry_friction_usd"] == pytest.approx(0.10)
+        assert trace["current_executable_pnl"] == pytest.approx(-0.10)
+        assert trace["adverse_beyond_friction"] == pytest.approx(0.0)
+        assert trace["price_movement_since_fill_pips"] == pytest.approx(-1.0)
+        assert trace["current_prediction_support"] == "REVOKED"
+        assert trace["exit_action"] == "HOLD"
+        assert trace["exit_reason"] == "fast_hold_justified"
+        assert trace["EXPECTED_ENTRY_FRICTION_USD"] == pytest.approx(0.10)
+        assert trace["CURRENT_EXECUTABLE_PNL"] == pytest.approx(-0.10)
+        assert trace["ADVERSE_BEYOND_FRICTION"] == pytest.approx(0.0)
+        assert trace["PRICE_MOVEMENT_SINCE_FILL"] == pytest.approx(-0.00010)
+        assert trace["CURRENT_PREDICTION_SUPPORT"] == "REVOKED"
+        assert trace["EXIT_ACTION"] == "HOLD"
+        assert trace["EXIT_REASON"] == "fast_hold_justified"
+
     def test_short_horizon_abstain_does_not_masquerade_as_revoke(self):
         ctx = self.create_context(
             current_bid=1.09990,
