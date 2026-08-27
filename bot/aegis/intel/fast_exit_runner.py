@@ -14,6 +14,7 @@ from aegis.intel.fast_firehose import FastExitConfig, FastExitStateMachine
 from aegis.intel.profit_harvester import HarvestInput, HarvestPolicy
 from aegis.intel.quote_buffer import QuoteBuffer
 from aegis.intel.ticket_metadata import TicketMetadata, firehose_lifecycle_identity
+from aegis.intel.trade_controller import TradeController
 
 
 # This is a separately validated point-in-time rule, not a fabricated harvest
@@ -70,52 +71,18 @@ class MissingLiquidationMarkError(Exception):
         super().__init__(f"Missing liquidation mark for {side.upper()} on {symbol}: required {'BID' if side == 'buy' else 'ASK'} unavailable")
 
 
-_FAST_EXIT_TO_CONTROLLER_ACTION = {
-    "TAKE": "EXIT",
-    "QUICK_TAKE": "EXIT",
-    "SCRATCH": "EXIT",
-    "ABORT": "EXIT",
-    "TIME_EXIT": "EXIT",
-}
-
-
 def unified_trade_controller_decision(
     profit_manager_verdict: Mapping[str, Any],
     fast_verdict: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Select one canonical per-ticket action from the two evidence adapters.
-
-    ProfitManager and FastExit provide independent evidence, but the runner must
-    have one decision owner. Any explicit PM exit is preserved; otherwise a
-    terminal FastExit action becomes the canonical EXIT. Non-terminal LOCK/HOLD
-    decisions are retained with both explanations so a HOLD is auditable.
-    """
-    pm = dict(profit_manager_verdict or {})
-    fast = dict(fast_verdict or {})
-    pm_action = str(pm.get("action") or "HOLD").upper()
-    fast_action = str(fast.get("action") or "HOLD").upper()
-
-    if pm_action == "EXIT":
-        return pm
-    if fast_action in _FAST_EXIT_TO_CONTROLLER_ACTION:
-        return {
-            "action": "EXIT",
-            "reason": f"fast_{fast_action.lower()}:{fast.get('reason') or 'requested'}",
-            "why": str(fast.get("why") or "fast exit evidence"),
-            "policy": f"fast_{fast.get('policy') or fast.get('reason') or fast_action.lower()}",
-        }
-    if pm_action != "HOLD":
-        return pm
-    if fast_action != "HOLD":
-        return fast
-    return {
-        "action": "HOLD",
-        "reason": pm.get("reason") or fast.get("reason") or "controller_hold",
-        "why": "; ".join(
-            value for value in (pm.get("why"), fast.get("why")) if value
-        ) or "no exit evidence",
-        "policy": pm.get("policy") or fast.get("policy"),
-    }
+    """Compatibility entry point backed by the single canonical controller."""
+    return TradeController().decide(
+        profit_manager_verdict,
+        fast_verdict,
+        remaining_ev=fast_verdict.get("remaining_ev") if isinstance(fast_verdict, Mapping) else None,
+        evidence_snapshot=fast_verdict.get("evidence_snapshot")
+        if isinstance(fast_verdict, Mapping) else None,
+    )
 
 
 def combine_existing_exit_with_policy(

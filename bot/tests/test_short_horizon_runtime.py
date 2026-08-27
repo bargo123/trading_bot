@@ -9,6 +9,7 @@ from aegis.intel.short_horizon_runtime import (
     resample_runtime_quotes,
     seed_quote_buffer,
 )
+from aegis.intel.quote_buffer import QuoteBuffer
 
 
 def test_short_horizon_runtime_is_fail_closed_without_artifact(tmp_path: Path):
@@ -107,6 +108,17 @@ def test_runtime_quotes_use_the_training_one_second_cadence():
     assert len(result) == 2
     assert result.iloc[0]["bid"] == 1.1001
     assert result.iloc[1]["bid"] == 1.1002
+
+
+def test_quote_buffer_exports_only_observed_quotes_for_counterfactual_replay():
+    buffer = QuoteBuffer()
+    buffer.record("EURUSD", 10.0, 1.1000, 1.1002)
+    buffer.record("EURUSD", 11.0, 1.1001, 1.1003)
+    buffer.record("EURUSD", 12.0, 1.1002, 1.1004)
+
+    assert buffer.quotes_between("EURUSD", 10.5, 11.5) == [
+        {"timestamp": 11.0, "bid": 1.1001, "ask": 1.1003}
+    ]
 
 
 def test_captured_exit_artifact_uses_captured_oos_expectancy_for_runtime_ev(tmp_path: Path):
@@ -239,6 +251,56 @@ def test_runtime_learns_distinct_net_ev_for_each_horizon(tmp_path: Path):
     assert result["by_horizon"]["3"]["probability"] != result["by_horizon"]["20"]["probability"]
     assert result["by_horizon"]["3"]["expected_net_pnl"] != result["by_horizon"]["20"]["expected_net_pnl"]
     assert result["decision_horizon_s"] == 20
+
+
+def test_runtime_exit_prediction_can_be_locked_to_ticket_horizon(tmp_path: Path):
+    class Pipeline:
+        models = [object(), object()]
+
+        def get_calibrated_ensemble_prediction(self, row, **kwargs):
+            horizon = int(float(row["horizon_s"].iloc[0]))
+            return {
+                "probability": [0.8 if horizon == 3 else 0.6],
+                "decision": [True],
+                "abstain": [False],
+                "model_agreement": [1.0],
+                "uncertainty": [0.01],
+            }
+
+    class Buffer:
+        points = [
+            SimpleNamespace(timestamp=1787659200.0, bid=1.1, ask=1.1002),
+            SimpleNamespace(timestamp=1787659201.0, bid=1.1001, ask=1.1003),
+        ]
+
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+    predictor.pipeline = Pipeline()
+    predictor.status = "ready"
+    predictor.execution_status = "SHADOW_ONLY_NO_POSITIVE_OOS"
+    predictor.metadata = {
+        "horizons_s": [3, 20],
+        "decision_horizon_s": 3,
+        "target_definition": "captured_exit_replay",
+        "threshold": 0.5,
+        "min_model_agreement": 0.6,
+        "max_uncertainty": 0.2,
+        "oos": {"sealed_by_horizon": {
+            "3": {"mean_captured_exit_return": 0.0001, "captured_exit_lcb95_return": 0.00005},
+            "20": {"mean_captured_exit_return": 0.0003, "captured_exit_lcb95_return": 0.0002},
+        }},
+    }
+
+    result = predictor.predict(
+        symbol="EURUSD",
+        quote_buffer=SimpleNamespace(buffers={"EURUSD": Buffer()}),
+        now_ts=1787659201.0,
+        side="buy",
+        horizon_s=3,
+        notional_usd=100.0,
+    )
+
+    assert set(result["by_horizon"]) == {"3"}
+    assert result["decision_horizon_s"] == 3
 
 
 def test_runtime_compares_buy_and_sell_and_selects_best_positive_side(tmp_path: Path):

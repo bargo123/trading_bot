@@ -57,6 +57,14 @@ class TicketMetadata:
     initial_risk: float | None = None
     cost_evidence: dict[str, Any] | None = None
     entry_ev: float | None = None
+    authority_type: str | None = None
+    authority_probability: float | None = None
+    authority_capture_lcb95: float | None = None
+    authority_expected_net_ev: float | None = None
+    authority_horizon_s: int | None = None
+    authority_evidence_source: str | None = None
+    authority_observations: int | None = None
+    shadow_model_probability: float | None = None
     decision_snapshot: dict[str, Any] | None = None
     selected_horizon_s: int | None = None
     model_artifact: dict[str, Any] | None = None
@@ -366,6 +374,14 @@ def create_ticket_metadata(
     initial_risk: float | None = None,
     cost_evidence: dict[str, Any] | None = None,
     entry_ev: float | None = None,
+    authority_type: str | None = None,
+    authority_probability: float | None = None,
+    authority_capture_lcb95: float | None = None,
+    authority_expected_net_ev: float | None = None,
+    authority_horizon_s: int | None = None,
+    authority_evidence_source: str | None = None,
+    authority_observations: int | None = None,
+    shadow_model_probability: float | None = None,
     decision_snapshot: dict[str, Any] | None = None,
     selected_horizon_s: int | None = None,
     model_artifact: dict[str, Any] | None = None,
@@ -409,6 +425,29 @@ def create_ticket_metadata(
         initial_risk=float(initial_risk) if initial_risk is not None else None,
         cost_evidence=dict(cost_evidence) if cost_evidence is not None else None,
         entry_ev=float(entry_ev) if entry_ev is not None else None,
+        authority_type=authority_type,
+        authority_probability=(
+            float(authority_probability) if authority_probability is not None else None
+        ),
+        authority_capture_lcb95=(
+            float(authority_capture_lcb95)
+            if authority_capture_lcb95 is not None else None
+        ),
+        authority_expected_net_ev=(
+            float(authority_expected_net_ev)
+            if authority_expected_net_ev is not None else None
+        ),
+        authority_horizon_s=(
+            int(authority_horizon_s) if authority_horizon_s is not None else None
+        ),
+        authority_evidence_source=authority_evidence_source,
+        authority_observations=(
+            int(authority_observations) if authority_observations is not None else None
+        ),
+        shadow_model_probability=(
+            float(shadow_model_probability)
+            if shadow_model_probability is not None else None
+        ),
         decision_snapshot=(
             dict(decision_snapshot) if decision_snapshot is not None else None
         ),

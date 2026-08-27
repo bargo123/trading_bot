@@ -788,7 +788,10 @@ def test_missing_runtime_policy_does_not_replace_existing_hold():
 def test_unified_trade_controller_preserves_strongest_exit_owner():
     pm_exit = {"action": "EXIT", "reason": "pm_remaining_ev", "why": "pm evidence"}
     fast_hold = {"action": "HOLD", "reason": "fast_hold_justified", "why": "fast evidence"}
-    assert unified_trade_controller_decision(pm_exit, fast_hold) == pm_exit
+    selected = unified_trade_controller_decision(pm_exit, fast_hold)
+    assert selected["action"] == "ABORT"
+    assert selected["reason"] == "pm_remaining_ev"
+    assert selected["why_exit"] == "pm evidence"
 
     pm_hold = {"action": "HOLD", "reason": "pm_hold_justified", "why": "pm evidence"}
     fast_scratch = {
@@ -796,8 +799,8 @@ def test_unified_trade_controller_preserves_strongest_exit_owner():
         "why": "fast evidence", "policy": "loss_fraction_scratch",
     }
     selected = unified_trade_controller_decision(pm_hold, fast_scratch)
-    assert selected["action"] == "EXIT"
-    assert selected["reason"] == "fast_scratch:loss_fraction_scratch"
+    assert selected["action"] == "SCRATCH"
+    assert selected["reason"] == "loss_fraction_scratch"
 
 
 def test_unified_trade_controller_keeps_lock_and_explains_hold():
@@ -806,13 +809,15 @@ def test_unified_trade_controller_keeps_lock_and_explains_hold():
         "why": "pm evidence", "policy": "breakeven_lock",
     }
     fast_hold = {"action": "HOLD", "reason": "fast_hold_justified", "why": "fast evidence"}
-    assert unified_trade_controller_decision(pm_lock, fast_hold) == pm_lock
+    selected = unified_trade_controller_decision(pm_lock, fast_hold)
+    assert selected["action"] == "LOCK"
+    assert selected["policy"] == "breakeven_lock"
 
     pm_hold = {"action": "HOLD", "reason": "pm_hold_justified", "why": "pm evidence"}
     selected = unified_trade_controller_decision(pm_hold, fast_hold)
     assert selected["action"] == "HOLD"
-    assert "pm evidence" in selected["why"]
-    assert "fast evidence" in selected["why"]
+    assert "pm evidence" in selected["why_hold"]
+    assert "fast evidence" in selected["why_hold"]
 
 
 if __name__ == "__main__":

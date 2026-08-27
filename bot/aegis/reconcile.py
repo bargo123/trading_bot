@@ -229,6 +229,7 @@ def aggregate_confirmed_exit_deals(
     wanted = str(position_id or "").strip()
     if not wanted or wanted == "0":
         return None
+    entries: list[Mapping[str, Any]] = []
     exits: list[Mapping[str, Any]] = []
     for row in deals:
         if not isinstance(row, Mapping):
@@ -240,21 +241,73 @@ def aggregate_confirmed_exit_deals(
             entry = int(row.get("entry"))
         except (TypeError, ValueError, OverflowError):
             return None
+        if entry in {0, 2}:
+            entries.append(row)
         if entry in {1, 2, 3}:
             exits.append(row)
     if not exits:
         return None
 
     try:
+        entry_commission = sum(float(row.get("commission") or 0.0) for row in entries)
+        entry_swap = sum(float(row.get("swap") or 0.0) for row in entries)
+        entry_fee = sum(float(row.get("fee") or 0.0) for row in entries)
         gross = sum(float(row.get("profit") or 0.0) for row in exits)
         commission = sum(float(row.get("commission") or 0.0) for row in exits)
         swap = sum(float(row.get("swap") or 0.0) for row in exits)
         fee = sum(float(row.get("fee") or 0.0) for row in exits)
     except (TypeError, ValueError, OverflowError):
         return None
-    values = (gross, commission, swap, fee)
+    values = (
+        entry_commission, entry_swap, entry_fee,
+        gross, commission, swap, fee,
+    )
     if not all(isfinite(value) for value in values):
         return None
+
+    def weighted_price(rows: Sequence[Mapping[str, Any]]) -> float | None:
+        quantities: list[tuple[float, float]] = []
+        for row in rows:
+            try:
+                quantity = float(row.get("qty") or row.get("volume") or 0.0)
+                price = float(row.get("price") or 0.0)
+            except (TypeError, ValueError, OverflowError):
+                return None
+            if quantity > 0.0 and price > 0.0 and isfinite(quantity) and isfinite(price):
+                quantities.append((quantity, price))
+        if quantities and len(quantities) == len(rows):
+            total_quantity = sum(quantity for quantity, _ in quantities)
+            if total_quantity > 0.0:
+                return sum(quantity * price for quantity, price in quantities) / total_quantity
+        return None
+
+    def measured_slippage(rows: Sequence[Mapping[str, Any]]) -> float | None:
+        total = 0.0
+        if not rows:
+            return None
+        for row in rows:
+            requested = row.get("requested_price")
+            if requested is None:
+                requested = row.get("request_price", row.get("decision_price"))
+            try:
+                actual = float(row.get("price"))
+                requested_price = float(requested)
+                quantity = float(row.get("qty") or row.get("volume") or 0.0)
+                unit = row.get("usd_per_price_unit")
+                if unit is None:
+                    tick_value = float(row.get("tick_value"))
+                    tick_size = float(row.get("tick_size"))
+                    unit = tick_value / tick_size * quantity if tick_size > 0 else 0.0
+                else:
+                    unit = float(unit)
+            except (TypeError, ValueError, OverflowError, ZeroDivisionError):
+                return None
+            if not all(isfinite(value) for value in (actual, requested_price, quantity, float(unit))):
+                return None
+            if quantity <= 0 or float(unit) <= 0:
+                return None
+            total += abs(actual - requested_price) * float(unit)
+        return total if isfinite(total) else None
 
     quantities: list[tuple[float, float]] = []
     for row in exits:
@@ -272,21 +325,49 @@ def aggregate_confirmed_exit_deals(
             close_price = sum(quantity * price for quantity, price in quantities) / total_quantity
 
     ordered = sorted(exits, key=lambda row: str(row.get("time") or ""))
-    net = gross + commission + swap + fee
+    entry_price = weighted_price(entries)
+    entry_slippage = measured_slippage(entries)
+    exit_slippage = measured_slippage(exits)
+    entry_quantity = None
+    if entries:
+        try:
+            entry_quantity = sum(
+                float(row.get("qty") or row.get("volume") or 0.0)
+                for row in entries
+            )
+        except (TypeError, ValueError, OverflowError):
+            entry_quantity = None
+    entry_cost = entry_commission + entry_swap + entry_fee
+    exit_cost = commission + swap + fee
+    net = gross + entry_cost + exit_cost
     return {
         "confirmed": True,
         "position_id": wanted,
+        "cost_truth_status": "complete_round_trip" if entries else "exit_only",
+        "entry_deal_tickets": [str(row.get("ticket") or "") for row in entries],
         "deal_tickets": [str(row.get("ticket") or "") for row in ordered],
+        "entry_quantity": entry_quantity,
+        "entry_price": entry_price,
         "gross_realized_pnl_usd": gross,
+        "entry_commission_usd": entry_commission,
+        "entry_swap_usd": entry_swap,
+        "entry_fee_usd": entry_fee,
+        "entry_cost_usd": -entry_cost,
         "commission_usd": commission,
         "swap_usd": swap,
         "fee_usd": fee,
+        "exit_cost_usd": -exit_cost,
         "cost_usd": gross - net,
+        "round_trip_cost_usd": -(entry_cost + exit_cost),
         "realized_net_usd": net,
         "actual_close_price": close_price,
         "close_timestamp": str(ordered[-1].get("time") or "") if ordered else "",
-        "entry_slippage_usd": None,
-        "exit_slippage_usd": None,
+        "entry_slippage_usd": entry_slippage,
+        "exit_slippage_usd": exit_slippage,
+        "slippage_evidence_status": (
+            "measured" if entry_slippage is not None or exit_slippage is not None
+            else "unavailable"
+        ),
     }
 
 

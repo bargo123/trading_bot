@@ -12,7 +12,8 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 
 from aegis.engines import PositionSnapshot
-from aegis.intel.analogue_store import AnalogueStore, is_measured_provenance
+from aegis.intel.analogue_store import AnalogueEvidence, AnalogueStore, is_measured_provenance
+from aegis.intel.capture_calibration import authorize_capture_probability
 from aegis.intel.exploration import (
     ExperimentStore,
     ExplorationLimits,
@@ -81,13 +82,6 @@ _EXPLORATION_HARD_ECONOMIC_REASONS = frozenset({
     "expected_net_value_not_positive",
     "payoff_below_floor",
 })
-
-# Exploration is an information-buying lane, but a large payoff must not turn a
-# sub-majority captured-win estimate into an apparently attractive trade.  The
-# floor is deliberately a minimum majority floor; a researched/calibrated config
-# may raise it, while the economics gate still requires positive net EV.
-DEFAULT_EXPLORATION_CAPTURE_PROBABILITY_FLOOR = 0.50
-
 
 def _shadow_probe_is_hard_economic_rejection(
     *, fire_base: str, economics_reason: str | None,
@@ -716,6 +710,7 @@ class IntelligentFirehoseBrain:
         self._last_exploration_micro_diagnostics: dict[str, Any] = {}
         self._search_horizons_seen: set[int] = set()
         self._search_mechanisms_seen: set[str] = set()
+        self._search_mechanisms_generating_seen: set[str] = set()
         self._best_rejected_candidate: dict[str, Any] = {
             "expected_net_value_usd": None,
             "p_green": None,
@@ -760,6 +755,9 @@ class IntelligentFirehoseBrain:
             "net_ev_fail": 0,
             "multi_gate_fail": 0,
             "near_eligible": 0,
+            "capture_probability_fail": 0,
+            "memory_suppression": 0,
+            "portfolio_fail": 0,
         }
 
     def _note_skip(self, reason: str) -> None:
@@ -810,6 +808,16 @@ class IntelligentFirehoseBrain:
                 or "WIN_PROBABILITY" in upper
             ):
                 self.counts["net_ev_fail"] = int(self.counts.get("net_ev_fail", 0)) + 1
+            if "CAPTURE" in upper or "BREAKEVEN" in upper:
+                self.counts["capture_probability_fail"] = int(
+                    self.counts.get("capture_probability_fail", 0)
+                ) + 1
+            if "PORTFOLIO" in upper:
+                self.counts["portfolio_fail"] = int(self.counts.get("portfolio_fail", 0)) + 1
+            if "LOSER_STATE" in upper or "MEMORY" in upper:
+                self.counts["memory_suppression"] = int(
+                    self.counts.get("memory_suppression", 0)
+                ) + 1
         if len(reason_list) > 1:
             self.counts["multi_gate_fail"] = int(self.counts.get("multi_gate_fail", 0)) + 1
         if near_eligible:
@@ -1245,6 +1253,11 @@ class IntelligentFirehoseBrain:
             self._search_mechanisms_seen.add("video_style_breakout")
             micro_diagnostics = dict(micro_diagnostics)
             micro_diagnostics["video_style_candidate"] = True
+        self._search_mechanisms_generating_seen.update(
+            str(getattr(candidate, "family", "") or "")
+            for candidate in search_cands
+            if str(getattr(candidate, "family", "") or "")
+        )
         self.counts["search_candidates_generated"] = int(
             self.counts.get("search_candidates_generated", 0)
         ) + len(search_cands)
@@ -1262,7 +1275,7 @@ class IntelligentFirehoseBrain:
 
         # Evaluate economics INDEPENDENTLY for every side/mechanism/horizon
         # variant. The candidate owns its geometry before any gate is scored.
-        viable: list[tuple[Any, dict[str, Any], TradeEconomics, Any]] = []
+        viable: list[tuple[Any, dict[str, Any], TradeEconomics, Any, Any, float | None, dict[str, Any]]] = []
         all_rejections: list[str] = []
         spec = symbol_spec or {}
         for mc in search_cands:
@@ -1288,18 +1301,24 @@ class IntelligentFirehoseBrain:
                 short_horizon_prediction,
                 side=str(mc.side), horizon_s=int(mc.max_hold_s),
             )
+            shadow_probe = bool(
+                exploration_shadow_model_probe
+                and str((short_horizon_prediction or {}).get("abstain_reason") or "")
+                == "artifact_shadow_only"
+            )
             p_green = None
-            if candidate_prediction is not None:
+            shadow_model_probability = None
+            if candidate_prediction is not None and shadow_probe:
+                try:
+                    shadow_model_probability = float(candidate_prediction.get("probability"))
+                except (TypeError, ValueError):
+                    shadow_model_probability = None
+            elif candidate_prediction is not None:
                 try:
                     p_green = float(candidate_prediction.get("probability"))
                 except (TypeError, ValueError):
                     p_green = None
             if short_horizon_prediction is not None:
-                shadow_probe = bool(
-                    exploration_shadow_model_probe
-                    and str(short_horizon_prediction.get("abstain_reason") or "")
-                    == "artifact_shadow_only"
-                )
                 if not shadow_probe:
                     if candidate_prediction is None:
                         reason = "horizon_prediction_missing"
@@ -1323,7 +1342,11 @@ class IntelligentFirehoseBrain:
                             candidate=mc, reasons=[reason], p_green=p_green,
                         ))
                         continue
-            if mc.side != side or mc.family != setup:
+            evidence_needs_horizon = (
+                isinstance(candidate_evidence, AnalogueEvidence)
+                and getattr(candidate_evidence, "horizon_s", None) != int(mc.max_hold_s)
+            )
+            if evidence_needs_horizon or mc.side != side or mc.family != setup:
                 try:
                     variant_signature = dict(signature)
                     variant_signature.update({"side": mc.side, "setup": mc.family})
@@ -1335,11 +1358,27 @@ class IntelligentFirehoseBrain:
                         pool_across_symbols=bool(
                             self.cfg.get("intelligent_pool_across_symbols", False)
                         ),
+                        horizon_s=int(mc.max_hold_s),
                     )
                 except Exception:
                     candidate_evidence = None
-            if p_green is None:
-                p_green = getattr(candidate_evidence, "win_probability", None)
+            measured_candidate_evidence = is_measured_provenance(
+                getattr(candidate_evidence, "provenance", "unknown")
+            )
+            authority_probability = None
+            if measured_candidate_evidence:
+                try:
+                    candidate_probability = float(
+                        getattr(candidate_evidence, "win_probability", None)
+                    )
+                    if 0.0 <= candidate_probability <= 1.0:
+                        authority_probability = candidate_probability
+                except (TypeError, ValueError):
+                    authority_probability = None
+            # A shadow model can classify/search a candidate, but it is never the
+            # probability that authorizes an exploration order. Exploration
+            # authority comes only from measured analogue capture evidence.
+            p_green = authority_probability
             if not econ["allowed"]:
                 reasons = [str(reason) for reason in econ.get("rejections", [])]
                 all_rejections.extend(reasons)
@@ -1435,6 +1474,36 @@ class IntelligentFirehoseBrain:
                     expected_net_value_usd=candidate_econ.expected_net_value_usd,
                 ))
                 continue
+            authority_observations = int(
+                getattr(candidate_evidence, "analogue_n", 0) or 0
+            ) if measured_candidate_evidence else 0
+            authority_losses = int(
+                getattr(candidate_evidence, "analogue_n_losses", 0) or 0
+            ) if measured_candidate_evidence else 0
+            capture_authorization = authorize_capture_probability(
+                successes=authority_observations - authority_losses,
+                observations=authority_observations,
+                breakeven_probability=candidate_econ.breakeven_win_rate,
+                evidence_source="measured_analogue_capture",
+                provenance=str(getattr(candidate_evidence, "provenance", "unknown")),
+                min_observations=int(self.cfg.get("intelligent_min_analogues", 20) or 20),
+            )
+            if not capture_authorization.authorized:
+                reason = capture_authorization.reason
+                all_rejections.append(reason)
+                distance = dict(econ.get("distance_to_eligibility") or {})
+                distance["capture_probability_deficit"] = capture_authorization.distance_to_pass
+                distance["capture_probability_lcb95"] = capture_authorization.lower_95
+                distance["capture_probability_required"] = capture_authorization.required_probability
+                candidate_evaluations.append(self._record_search_evaluation(
+                    candidate=mc,
+                    reasons=[reason],
+                    distance=distance,
+                    near_eligible=False,
+                    p_green=authority_probability,
+                    expected_net_value_usd=candidate_econ.expected_net_value_usd,
+                ))
+                continue
             memory_features = {
                 "symbol": mc.symbol,
                 "side": mc.side,
@@ -1443,10 +1512,25 @@ class IntelligentFirehoseBrain:
                 "session": session,
                 "regime": regime,
                 "volatility": volatility,
+                "structure": str(signature.get("structure") or setup),
+                "h1_direction": str(signature.get("h1_direction") or ""),
+                "m5_direction": str(signature.get("m5_direction") or ""),
+                "spread_pips": float(mc.spread_pips),
+                "stop_pips": float(mc.stop_pips),
+                "target_pips": float(mc.target_pips),
+                "momentum": getattr(ctx, "signed_tick_imbalance", None),
+                "compression": getattr(ctx, "m5_compression", None),
+                "entry_ev": candidate_econ.expected_net_value_usd,
+                "authority_probability": capture_authorization.probability,
+                "authority_capture_lcb95": capture_authorization.lower_95,
             }
+            memory_summary = self.outcome_memory.similarity_summary(memory_features)
             if self.outcome_memory.should_suppress(memory_features):
                 reason = "fast_loser_state_suppressed"
                 all_rejections.append(reason)
+                self.counts["memory_suppression"] = int(
+                    self.counts.get("memory_suppression", 0)
+                ) + 1
                 candidate_evaluations.append(self._record_search_evaluation(
                     candidate=mc,
                     reasons=[reason],
@@ -1456,34 +1540,10 @@ class IntelligentFirehoseBrain:
                     expected_net_value_usd=candidate_econ.expected_net_value_usd,
                 ))
                 continue
-            capture_floor = float(
-                self.cfg.get(
-                    "intelligent_exploration_min_capture_probability",
-                    DEFAULT_EXPLORATION_CAPTURE_PROBABILITY_FLOOR,
-                )
-                or DEFAULT_EXPLORATION_CAPTURE_PROBABILITY_FLOOR
-            )
-            if (
-                candidate_econ.p_win is None
-                or candidate_econ.p_win + 1e-12 < capture_floor
-            ):
-                reason = "exploration_capture_probability_below_floor"
-                all_rejections.append(reason)
-                distance = dict(econ.get("distance_to_eligibility") or {})
-                distance["capture_probability_deficit"] = round(
-                    max(0.0, capture_floor - float(candidate_econ.p_win or 0.0)),
-                    6,
-                )
-                candidate_evaluations.append(self._record_search_evaluation(
-                    candidate=mc,
-                    reasons=[reason],
-                    distance=distance,
-                    near_eligible=False,
-                    p_green=candidate_econ.p_win,
-                    expected_net_value_usd=candidate_econ.expected_net_value_usd,
-                ))
-                continue
-            viable.append((mc, sizing_preview, candidate_econ, candidate_evidence))
+            viable.append((
+                mc, sizing_preview, candidate_econ, candidate_evidence,
+                capture_authorization, shadow_model_probability, memory_summary,
+            ))
         if not viable:
             self._last_exploration_micro_diagnostics = {
                 **self._last_exploration_micro_diagnostics,
@@ -1499,7 +1559,10 @@ class IntelligentFirehoseBrain:
               if item[2].expected_net_value_usd is not None else float("-inf")),
             -item[0].payoff,
         ))
-        mc, sizing_preview, exploration_econ, candidate_evidence = viable[0]
+        (
+            mc, sizing_preview, exploration_econ, candidate_evidence,
+            capture_authorization, shadow_model_probability, memory_summary,
+        ) = viable[0]
         self._last_exploration_micro_diagnostics = {
             **self._last_exploration_micro_diagnostics,
             "candidate_evaluations": candidate_evaluations,
@@ -1606,6 +1669,17 @@ class IntelligentFirehoseBrain:
                 "exploration_economics_rejected:"
                 f"{exploration_econ.reason}"
             )
+        capture_authorization = authorize_capture_probability(
+            successes=int(getattr(candidate_evidence, "analogue_n", 0) or 0)
+            - int(getattr(candidate_evidence, "analogue_n_losses", 0) or 0),
+            observations=int(getattr(candidate_evidence, "analogue_n", 0) or 0),
+            breakeven_probability=exploration_econ.breakeven_win_rate,
+            evidence_source="measured_analogue_capture",
+            provenance=str(getattr(candidate_evidence, "provenance", "unknown")),
+            min_observations=int(self.cfg.get("intelligent_min_analogues", 20) or 20),
+        )
+        if not capture_authorization.authorized:
+            return None, f"exploration_economics_rejected:{capture_authorization.reason}"
 
         exp_open_total, exp_open_symbol = self.exploration_open_counts(symbol)
         ok, reason = check_exploration_limits(
@@ -1707,8 +1781,8 @@ class IntelligentFirehoseBrain:
             "exploration_authority": "SAFE_TO_LEARN_ON_DEMO",
             "validated_artifact_required": False,
             "validated_symbol_allowlist_required": False,
-            "evidence_provenance": str(getattr(evidence, "provenance", "unknown")),
-            "evidence_n": int(getattr(evidence, "analogue_n", 0) or 0),
+            "evidence_provenance": str(getattr(candidate_evidence, "provenance", "unknown")),
+            "evidence_n": int(getattr(candidate_evidence, "analogue_n", 0) or 0),
             "promotion_stage": "EXPLORATION_CANARY",
             "hypothesis_id": hyp_id,
             "experiment_created": created,
@@ -1720,6 +1794,13 @@ class IntelligentFirehoseBrain:
             "exit_plan": exit_plan,
             "book_logic": book_logic,
             "exploration_economics": exploration_econ.journal(),
+            "capture_authorization": capture_authorization.as_dict(),
+            "authority_type": "measured_analogue_capture",
+            "authority_probability": capture_authorization.probability,
+            "authority_capture_lcb95": capture_authorization.lower_95,
+            "authority_observations": capture_authorization.observations,
+            "authority_expected_net_ev": exploration_econ.expected_net_value_usd,
+            "shadow_model_probability": shadow_model_probability,
             "decision_authority": "buy_sell_abstain",
             "why_buy": (
                 selected_side_reason if side == "buy"
@@ -1732,6 +1813,108 @@ class IntelligentFirehoseBrain:
             "why_not_abstain": selected_side_reason,
             **self._last_exploration_micro_diagnostics,
         }
+        viable_candidate_rows: list[dict[str, Any]] = []
+        for (
+            option_mc, option_sizing, option_econ, option_evidence,
+            option_auth, option_shadow_p, option_memory_summary,
+        ) in viable:
+            option_variant = str(
+                getattr(option_mc, "variant_id", "")
+                or f"{option_mc.family}:{option_mc.max_hold_s}s"
+            )
+            option_hyp = exploration_hypothesis_id(
+                strategy_family=option_variant,
+                symbol=symbol,
+                side=str(option_mc.side),
+                regime=regime,
+                session=session,
+            )
+            option_thesis = thesis_key(
+                symbol, str(option_mc.side), str(option_mc.family),
+                regime=regime, session=session,
+            )
+            option_journal = dict(journal)
+            option_journal.update({
+                "setup_family": str(option_mc.family),
+                "variant_id": option_variant,
+                "search_horizon_s": int(option_mc.max_hold_s),
+                "thesis_key": option_thesis,
+                "hypothesis_id": option_hyp,
+                "sizing": dict(option_sizing),
+                "evidence_provenance": str(getattr(option_evidence, "provenance", "unknown")),
+                "evidence_n": int(getattr(option_evidence, "analogue_n", 0) or 0),
+                "exploration_economics": option_econ.journal(),
+                "capture_authorization": option_auth.as_dict(),
+                "authority_type": "measured_analogue_capture",
+                "authority_probability": option_auth.probability,
+                "authority_capture_lcb95": option_auth.lower_95,
+                "authority_observations": option_auth.observations,
+                "authority_expected_net_ev": option_econ.expected_net_value_usd,
+                "shadow_model_probability": option_shadow_p,
+                "fast_winner_similarity": option_memory_summary.get("winner_similarity", 0.0),
+                "fast_loser_similarity": option_memory_summary.get("loser_similarity", 0.0),
+                "book_logic": {
+                    **book_logic,
+                    "firehose_family": str(option_mc.family),
+                    "micro_mechanism": str(option_mc.mechanism),
+                    "lane": option_mc.lane.value,
+                },
+            })
+            viable_candidate_rows.append({
+                "candidate_id": f"{str(symbol).upper()}:{option_variant}:{option_hyp[-8:]}",
+                "hypothesis_id": option_hyp,
+                "symbol": str(symbol).upper(),
+                "side": str(option_mc.side),
+                "mechanism": str(option_mc.family),
+                "variant_id": option_variant,
+                "thesis_key": option_thesis,
+                "horizon_s": int(option_mc.max_hold_s),
+                "entry": float(option_mc.entry_price),
+                "stop": float(option_mc.invalidation),
+                "target": float(option_mc.target),
+                "quantity": float(option_sizing.get("lots") or 0.0),
+                "p_captured_win": option_auth.probability,
+                "authority_probability": option_auth.probability,
+                "authority_capture_lcb95": option_auth.lower_95,
+                "authority_expected_net_ev": option_econ.expected_net_value_usd,
+                "expected_net_ev": option_econ.expected_net_value_usd,
+                "marginal_risk_usd": option_econ.expected_loss_usd,
+                "authority_evidence_source": option_auth.evidence_source,
+                "authority_evidence_n": option_auth.observations,
+                "shadow_model_probability": option_shadow_p,
+                "fast_winner_similarity": option_memory_summary.get("winner_similarity", 0.0),
+                "fast_loser_similarity": option_memory_summary.get("loser_similarity", 0.0),
+                "portfolio_ok": True,
+                "decision_journal": option_journal,
+            })
+        journal["viable_candidates"] = viable_candidate_rows
+        # Every candidate exposed to the global allocator has a durable
+        # experiment identity, even when a different candidate wins allocation.
+        for option in viable_candidate_rows:
+            if option["hypothesis_id"] == hyp_id:
+                option["experiment_status"] = record.get("status")
+                continue
+            option_record, option_created = self.experiments.register(
+                {
+                    "hypothesis_id": option["hypothesis_id"],
+                    "strategy_family": option["variant_id"],
+                    "symbol": option["symbol"],
+                    "side": option["side"],
+                    "entry_rule": f"{option['mechanism']} {option['side']} at market",
+                    "variant_id": option["variant_id"],
+                    "search_horizon_s": option["horizon_s"],
+                    "invalidation": f"close beyond {option['stop']:.5f}",
+                    "target": f"structure target {option['target']:.5f}",
+                    "regime": regime,
+                    "session": session,
+                },
+                reason=question or "globally ranked Firehose candidate",
+                mechanism=str(option["mechanism"]),
+                provenance=str(option["authority_evidence_source"] or "measured_analogue"),
+            )
+            option["experiment_status"] = option_record.get("status")
+            option["experiment_created"] = option_created
+        self.experiments.save()
         decision = DemoDecision(
             "fire",
             "exploration_hypothesis_test",
@@ -1739,8 +1922,9 @@ class IntelligentFirehoseBrain:
             sl=invalidation,
             tp=target,
             quantity=lots,
+            expected_net_value=exploration_econ.expected_net_value_usd,
             information_id=info_id,
-            analogue_n=0,
+            analogue_n=capture_authorization.observations,
             close_clips=0,
             journal=journal,
         )
@@ -1769,6 +1953,8 @@ class IntelligentFirehoseBrain:
         self._exploration_limits = ExplorationLimits.from_cfg(self.cfg)
 
     def snapshot(self) -> dict[str, Any]:
+        from aegis.intel.fast_firehose import runtime_mechanism_specs
+
         records = len(getattr(self.analogues, "_records", []))
         model = self.strategy
         if model is None:
@@ -1836,6 +2022,9 @@ class IntelligentFirehoseBrain:
             "CANDIDATES_GENERATED": int(
                 self.counts.get("search_candidates_generated", 0)
             ),
+            "SEARCH_CANDIDATES": int(
+                self.counts.get("search_candidates_generated", 0)
+            ),
             "BUY_VARIANTS_TESTED": int(
                 self.counts.get("buy_variants_tested", 0)
             ),
@@ -1844,6 +2033,10 @@ class IntelligentFirehoseBrain:
             ),
             "HORIZONS_TESTED": len(self._search_horizons_seen),
             "MECHANISMS_TESTED": len(self._search_mechanisms_seen),
+            "MECHANISMS_AVAILABLE": len(runtime_mechanism_specs()),
+            "MECHANISMS_ACTUALLY_GENERATING_CANDIDATES": len(
+                self._search_mechanisms_generating_seen
+            ),
             "SPREAD_FAIL": int(self.counts.get("spread_fail", 0)),
             "GEOMETRY_FAIL": int(self.counts.get("geometry_fail", 0)),
             "RISK_FAIL": int(self.counts.get("risk_fail", 0)),

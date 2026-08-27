@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from aegis.intel.outcome_memory import OutcomeMemoryStore, classify_lifecycle
+import json
+
+import pytest
+
+from aegis.intel.outcome_memory import (
+    OutcomeMemoryStore,
+    classify_lifecycle,
+    replay_counterfactual,
+)
 from aegis.intel.firehose_turnover import TurnoverMetrics
 
 
@@ -104,3 +112,106 @@ def test_turnover_exposes_confirmed_lifecycle_excursions_for_learning():
     assert metrics["captured_net_win_rate"] == 1.0
     assert metrics["net_pnl"] == 0.10
     assert metrics["never_green_rate"] == 0.0
+
+
+def test_outcome_memory_exposes_rich_winner_and_loser_similarity(tmp_path):
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    base = {
+        "symbol": "EURUSD", "side": "buy", "mechanism": "pullback",
+        "horizon_s": 5, "session": "london", "regime": "trend",
+        "volatility": "normal", "structure": "retest", "momentum": 0.8,
+        "compression": 0.2, "spread_pips": 0.2, "stop_pips": 2.0,
+        "target_pips": 4.0,
+    }
+    store.record_closed(
+        outcome_id="WIN", features=base, realized_net_usd=0.12,
+        mfe_usd=0.15, mae_usd=-0.01, time_to_green_s=1.0,
+    )
+    store.record_closed(
+        outcome_id="LOSS", features={**base, "momentum": -0.8},
+        realized_net_usd=-0.12, mfe_usd=0.01, mae_usd=-0.12,
+        time_to_green_s=None,
+    )
+
+    summary = store.similarity_summary(base)
+    assert summary["winner_similarity"] > 0.8
+    assert summary["loser_similarity"] > 0.8
+    assert summary["winner_count"] == 1
+    assert summary["loser_count"] == 1
+
+
+def test_counterfactual_replay_uses_sequential_executable_quotes():
+    result = replay_counterfactual(
+        quotes=[
+            {"timestamp": 100.0, "bid": 1.1000, "ask": 1.1002},
+            {"timestamp": 101.0, "bid": 1.1008, "ask": 1.1010},
+            {"timestamp": 102.0, "bid": 1.1006, "ask": 1.1008},
+        ],
+        entry_time=100.0,
+        side="buy",
+        stop=1.0990,
+        target=1.1007,
+        horizon_s=5,
+        cost_usd=0.02,
+        usd_per_price_unit=1000.0,
+    )
+
+    assert result["status"] == "REPLAYED"
+    assert result["chosen_net_usd"] == pytest.approx(0.58)
+    assert result["abstain_net_usd"] == 0.0
+
+
+def test_counterfactual_replay_rejects_geometry_that_is_not_executable():
+    result = replay_counterfactual(
+        quotes=[{"timestamp": 100.0, "bid": 1.1000, "ask": 1.1002}],
+        entry_time=100.0,
+        side="buy",
+        stop=1.1010,
+        target=1.1020,
+        horizon_s=5,
+    )
+
+    assert result == {
+        "status": "UNAVAILABLE",
+        "reason": "counterfactual_geometry_invalid",
+    }
+
+
+def test_import_prior_autopsy_only_reconstructs_complete_rows(tmp_path):
+    report = tmp_path / "fast_trade_autopsy.json"
+    report.write_text(json.dumps({"trades": [
+        {
+            "ticket": 101, "symbol": "EURUSD", "side": "buy",
+            "pnl": -0.12, "evidence_status": "COMPLETE",
+            "hold_s": 4.0, "time_to_green_s": None,
+            "mfe_usd": 0.01, "mae_usd": -0.10,
+        },
+        {"ticket": 102, "symbol": "EURUSD", "side": "sell",
+         "pnl": -0.10, "evidence_status": "PARTIAL"},
+    ]}), encoding="utf-8")
+
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    result = store.import_prior_autopsy(report)
+
+    assert result == {"imported": 1, "skipped": 1, "unavailable": 0}
+    assert len(store.records) == 1
+    assert store.records[0]["features"]["source"] == "prior_autopsy"
+    assert store.records[0]["classification"] == "BAD_ENTRY"
+
+
+def test_sparse_prior_autopsy_loser_does_not_suppress_rich_candidate(tmp_path):
+    report = tmp_path / "fast_trade_autopsy.json"
+    report.write_text(json.dumps({"trades": [{
+        "ticket": 103, "symbol": "EURUSD", "side": "buy",
+        "pnl": -0.12, "evidence_status": "COMPLETE",
+        "hold_s": 4.0, "time_to_green_s": None,
+        "mfe_usd": 0.01, "mae_usd": -0.10,
+    }]}), encoding="utf-8")
+
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    store.import_prior_autopsy(report)
+
+    assert store.should_suppress({
+        "symbol": "EURUSD", "side": "buy", "mechanism": "pullback",
+        "horizon_s": 5, "session": "london", "regime": "trend",
+    }) is False

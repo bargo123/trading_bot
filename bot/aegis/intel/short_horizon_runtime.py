@@ -294,6 +294,7 @@ class ShortHorizonPredictor:
         notional_usd: float | None = None,
         broker_spec: Mapping[str, Any] | None = None,
         quantity: float | None = None,
+        horizon_s: int | None = None,
     ) -> dict[str, Any]:
         """Evaluate BUY and SELL independently, then select or abstain.
 
@@ -313,6 +314,7 @@ class ShortHorizonPredictor:
                     notional_usd=notional_usd,
                     broker_spec=broker_spec,
                     quantity=quantity,
+                    horizon_s=horizon_s,
                 )
             except Exception:
                 result = self._fail_closed_prediction("prediction_error")
@@ -364,6 +366,7 @@ class ShortHorizonPredictor:
         notional_usd: float | None = None,
         broker_spec: Mapping[str, Any] | None = None,
         quantity: float | None = None,
+        horizon_s: int | None = None,
     ) -> dict[str, Any] | None:
         normalized_symbol = str(symbol).upper()
         normalized_side = str(side).strip().lower()
@@ -416,7 +419,19 @@ class ShortHorizonPredictor:
                 symbol=str(symbol).upper(),
             )
             by_horizon: dict[str, dict[str, Any]] = {}
-            for horizon in self.metadata.get("horizons_s") or ():
+            configured_horizons = tuple(self.metadata.get("horizons_s") or ())
+            if horizon_s is not None:
+                try:
+                    requested_horizon = int(horizon_s)
+                except (TypeError, ValueError):
+                    return self._fail_closed_prediction("decision_horizon_invalid")
+                configured_horizons = tuple(
+                    horizon for horizon in configured_horizons
+                    if int(horizon) == requested_horizon
+                )
+                if not configured_horizons:
+                    return self._fail_closed_prediction("decision_horizon_unavailable")
+            for horizon in configured_horizons:
                 horizon_key = str(int(horizon))
                 scope_thresholds = (
                     self.metadata.get("threshold_by_symbol_horizon") or {}

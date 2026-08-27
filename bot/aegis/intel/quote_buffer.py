@@ -93,6 +93,26 @@ class QuoteBuffer:
         buf = self.buffers.get(str(symbol).upper())
         return buf.get_latest() if buf else None
 
+    def quotes_between(
+        self, symbol: str, start_ts: float, end_ts: float | None = None,
+    ) -> list[dict[str, float]]:
+        """Export observed bid/ask quotes for point-in-time replay only."""
+        buf = self.buffers.get(str(symbol).upper())
+        if buf is None:
+            return []
+        try:
+            start = float(start_ts)
+            end = float(end_ts) if end_ts is not None else float("inf")
+        except (TypeError, ValueError):
+            return []
+        if end < start:
+            return []
+        return [
+            {"timestamp": float(point.timestamp), "bid": float(point.bid), "ask": float(point.ask)}
+            for point in buf.points
+            if start <= point.timestamp <= end
+        ]
+
     def _returns_for_side(
         self,
         symbol: str,

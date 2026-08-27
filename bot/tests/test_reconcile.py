@@ -80,8 +80,14 @@ def test_aggregate_confirmed_exit_deals_uses_exact_position_and_broker_costs():
     assert facts["position_id"] == "P1"
     assert facts["deal_tickets"] == ["exit-deal-1", "exit-deal-2"]
     assert facts["gross_realized_pnl_usd"] == pytest.approx(0.15)
-    assert facts["cost_usd"] == pytest.approx(0.045)
-    assert facts["realized_net_usd"] == pytest.approx(0.105)
+    assert facts["cost_truth_status"] == "complete_round_trip"
+    assert facts["entry_deal_tickets"] == ["entry-deal"]
+    assert facts["entry_price"] == pytest.approx(1.1000)
+    assert facts["entry_commission_usd"] == pytest.approx(-0.01)
+    assert facts["entry_fee_usd"] == pytest.approx(-0.002)
+    assert facts["round_trip_cost_usd"] == pytest.approx(0.057)
+    assert facts["cost_usd"] == pytest.approx(0.057)
+    assert facts["realized_net_usd"] == pytest.approx(0.093)
     assert facts["actual_close_price"] == pytest.approx(1.10108)
     assert facts["confirmed"] is True
 
@@ -91,6 +97,55 @@ def test_aggregate_confirmed_exit_deals_is_fail_closed_without_exact_exit():
         [{"position_id": "P1", "entry": 0, "profit": 0.0}],
         position_id="P1",
     ) is None
+
+
+def test_aggregate_confirmed_exit_deals_marks_exit_only_cost_truth_explicitly():
+    facts = aggregate_confirmed_exit_deals(
+        [{
+            "ticket": "exit",
+            "position_id": "P1",
+            "entry": 1,
+            "profit": 0.10,
+            "commission": -0.02,
+            "swap": -0.01,
+            "fee": -0.003,
+            "price": 1.101,
+            "qty": 0.01,
+            "time": "2026-08-14T10:00:01Z",
+        }],
+        position_id="P1",
+    )
+
+    assert facts is not None
+    assert facts["cost_truth_status"] == "exit_only"
+    assert facts["round_trip_cost_usd"] == pytest.approx(0.033)
+    assert facts["realized_net_usd"] == pytest.approx(0.067)
+    assert facts["slippage_evidence_status"] == "unavailable"
+
+
+def test_aggregate_confirmed_exit_deals_reports_measured_round_trip_slippage():
+    facts = aggregate_confirmed_exit_deals(
+        [
+            {
+                "ticket": "entry", "position_id": "P1", "entry": 0,
+                "profit": 0.0, "price": 1.1002, "requested_price": 1.1000,
+                "qty": 0.01, "usd_per_price_unit": 1000.0,
+                "time": "2026-08-14T10:00:00Z",
+            },
+            {
+                "ticket": "exit", "position_id": "P1", "entry": 1,
+                "profit": 0.10, "price": 1.1010, "requested_price": 1.1012,
+                "qty": 0.01, "usd_per_price_unit": 1000.0,
+                "time": "2026-08-14T10:00:01Z",
+            },
+        ],
+        position_id="P1",
+    )
+
+    assert facts is not None
+    assert facts["entry_slippage_usd"] == pytest.approx(0.20)
+    assert facts["exit_slippage_usd"] == pytest.approx(0.20)
+    assert facts["slippage_evidence_status"] == "measured"
 
 
 def test_reconcile_emits_native_tp_once_with_realized_net_pnl():

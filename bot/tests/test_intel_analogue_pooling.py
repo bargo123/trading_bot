@@ -122,3 +122,31 @@ def test_pooled_evidence_keeps_measured_provenance():
     pooled = _query(_store(rows), pool_across_symbols=True)
     assert pooled.provenance == "mt5_m1"
     assert pooled.outcome_unit == "pips"
+
+
+def test_horizon_filter_keeps_capture_evidence_point_in_time_and_horizon_specific():
+    rows = []
+    for horizon in (3, 10):
+        for index in range(30):
+            rows.append(
+                {
+                    "bar_time": f"2026-01-{(index % 27) + 1:02d}T{index % 24:02d}:00:00+00:00",
+                    "symbol": "EURUSD",
+                    **STATE,
+                    "horizon_s": horizon,
+                    "outcome": 2.0 if horizon == 3 and index % 4 else -1.0,
+                }
+            )
+
+    store = _store(rows)
+    fast = _query(store, horizon_s=3)
+    slow = _query(store, horizon_s=10)
+    missing = _query(store, horizon_s=5)
+
+    assert fast.analogue_n == 30
+    assert slow.analogue_n == 30
+    assert fast.horizon_s == 3
+    assert slow.horizon_s == 10
+    assert fast.expectancy != slow.expectancy
+    assert missing.analogue_n == 0
+    assert missing.uncertainty == "no_observations"

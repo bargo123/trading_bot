@@ -35,6 +35,7 @@ class AnalogueEvidence:
     # never be mistaken for measured market history when authorising a trade.
     provenance: str = "unknown"
     outcome_unit: str = "unknown"
+    horizon_s: int | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -124,6 +125,7 @@ class AnalogueStore:
         min_similarity: float = 0.55,
         pool_across_symbols: bool = False,
         exact_state: Mapping[str, str] | None = None,
+        horizon_s: int | None = None,
     ) -> AnalogueEvidence:
         """Point-in-time analogue evidence for one state.
 
@@ -149,6 +151,12 @@ class AnalogueStore:
         matched: list[tuple[float, float]] = []
         symbol = str(signature.get("symbol") or "").upper()
         exact = dict(exact_state or {})
+        requested_horizon = None
+        if horizon_s is not None:
+            try:
+                requested_horizon = int(horizon_s)
+            except (TypeError, ValueError, OverflowError):
+                requested_horizon = -1
         for row in self._records:
             if not exact:
                 if symbol and not pool_across_symbols and str(row.get("symbol") or "").upper() != symbol:
@@ -163,6 +171,15 @@ class AnalogueStore:
                 continue
             if ts >= cutoff:
                 continue
+            if requested_horizon is not None:
+                row_horizon = row.get("horizon_s")
+                if row_horizon is None:
+                    row_horizon = row.get("max_hold_s", row.get("selected_horizon_s"))
+                try:
+                    if int(row_horizon) != requested_horizon:
+                        continue
+                except (TypeError, ValueError, OverflowError):
+                    continue
             if exact:
                 if not all(str(row.get(key) or "") == value for key, value in exact.items()):
                     continue
@@ -180,6 +197,7 @@ class AnalogueStore:
                 0, 0, None, None, None, None, None, None, None, None, None,
                 "no_observations", False, 0.0,
                 provenance=self.provenance, outcome_unit=self.outcome_unit,
+                horizon_s=(requested_horizon if requested_horizon and requested_horizon > 0 else None),
             )
         matched.sort(key=lambda item: item[0], reverse=True)
         outcomes = [value for _, value in matched]
@@ -217,4 +235,5 @@ class AnalogueStore:
             float(matched[0][0]),
             provenance=self.provenance,
             outcome_unit=self.outcome_unit,
+            horizon_s=(requested_horizon if requested_horizon and requested_horizon > 0 else None),
         )

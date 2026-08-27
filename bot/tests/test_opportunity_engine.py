@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from aegis.intel.opportunity_engine import rank_and_allocate
+import pytest
+
+from aegis.intel.opportunity_engine import FrozenOpportunity, freeze_opportunity, rank_and_allocate
 
 
 def _candidate(name, *, symbol, thesis, p_capture, ev, lcb=0.0, risk=0.10):
@@ -56,3 +58,32 @@ def test_global_allocator_never_selects_nonpositive_or_portfolio_rejected_candid
         max_positions=2,
     )
     assert selected == []
+
+
+def test_ranked_candidate_is_frozen_and_keeps_execution_identity():
+    candidate = _candidate("frozen", symbol="EURUSD", thesis="t1", p_capture=0.8, ev=0.1)
+    frozen = freeze_opportunity(candidate)
+
+    assert isinstance(frozen, FrozenOpportunity)
+    assert frozen["candidate_id"] == "frozen"
+    assert frozen["side"] == "buy"
+    assert frozen.to_dict()["expected_net_ev"] == 0.1
+    with pytest.raises(TypeError):
+        frozen["side"] = "sell"
+
+
+def test_frozen_candidate_also_freezes_nested_decision_journal():
+    frozen = freeze_opportunity({"decision_journal": {"side": "buy", "reasons": ["ev"]}})
+
+    with pytest.raises(TypeError):
+        frozen["decision_journal"]["side"] = "sell"
+    assert frozen["decision_journal"]["reasons"] == ("ev",)
+
+
+def test_allocator_returns_the_exact_frozen_object_it_ranked():
+    candidate = _candidate("same-object", symbol="EURUSD", thesis="t1", p_capture=0.8, ev=0.1)
+    ranked, selected = rank_and_allocate([candidate], max_positions=1)
+
+    assert isinstance(ranked[0], FrozenOpportunity)
+    assert selected[0] is ranked[0]
+    assert selected[0]["candidate_id"] == "same-object"

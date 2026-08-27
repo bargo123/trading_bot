@@ -72,6 +72,10 @@ from aegis.intel.ticket_metadata import (  # noqa: E402
 )
 from aegis.intel.send_guard import candidate_spread_limit  # noqa: E402
 from aegis.intel.lifecycle import aggregate_confirmed_exit_deals  # noqa: E402
+from aegis.intel.opportunity_engine import (  # noqa: E402
+    FrozenOpportunity,
+    freeze_opportunity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +215,72 @@ def firehose_decision_snapshot(
     }
 
 
+def frozen_opportunity_from_decision(
+    *,
+    decision: Any,
+    symbol: str,
+    scan_id: str,
+    bar_time: Any,
+    bid: float,
+    ask: float,
+    stop: float | None,
+    target: float | None,
+    quantity: float,
+) -> FrozenOpportunity:
+    """Freeze the exact brain-approved candidate before global allocation.
+
+    The selected object is later quote-revalidated, but no second brain pass is
+    permitted to replace its identity or geometry.
+    """
+    journal = dict(getattr(decision, "journal", {}) or {})
+    economics = journal.get("exploration_economics")
+    economics = dict(economics) if isinstance(economics, dict) else {}
+    authorization = journal.get("capture_authorization")
+    authorization = dict(authorization) if isinstance(authorization, dict) else {}
+    variant_id = str(journal.get("variant_id") or journal.get("hypothesis_id") or "")
+    horizon = journal.get("search_horizon_s") or journal.get("max_hold_s")
+    try:
+        horizon = int(horizon) if horizon is not None else None
+    except (TypeError, ValueError):
+        horizon = None
+    expected_ev = getattr(decision, "expected_net_value", None)
+    if expected_ev is None:
+        expected_ev = economics.get("econ_expected_net_usd")
+    authority_probability = authorization.get("probability")
+    authority_lcb = authorization.get("lower_95")
+    candidate_id = f"{scan_id}:{variant_id}" if variant_id else scan_id
+    return freeze_opportunity({
+        "candidate_id": candidate_id,
+        "scan_id": str(scan_id),
+        "bar_time": str(bar_time),
+        "symbol": str(symbol).upper(),
+        "side": str(getattr(decision, "side", "") or "").lower(),
+        "mechanism": str(journal.get("setup_family") or journal.get("micro_mechanism") or ""),
+        "variant_id": variant_id,
+        "thesis_key": str(journal.get("thesis_key") or candidate_id),
+        "horizon_s": horizon,
+        "entry": float(ask if str(getattr(decision, "side", "")).lower() == "buy" else bid),
+        "stop": float(stop) if stop is not None else None,
+        "target": float(target) if target is not None else None,
+        "quantity": float(quantity),
+        "bid": float(bid),
+        "ask": float(ask),
+        "spread": max(0.0, float(ask) - float(bid)),
+        "p_captured_win": authority_probability,
+        "authority_probability": authority_probability,
+        "authority_capture_lcb95": authority_lcb,
+        "authority_expected_net_ev": expected_ev,
+        "expected_net_ev": expected_ev,
+        "expected_net_ev_lcb95": economics.get("econ_expected_net_lcb95"),
+        "marginal_risk_usd": economics.get("econ_expected_loss_usd"),
+        "portfolio_ok": True,
+        "shadow_model_probability": journal.get("shadow_model_probability"),
+        "authority_evidence_source": authorization.get("evidence_source"),
+        "authority_evidence_n": authorization.get("observations"),
+        "decision_journal": journal,
+    })
+
+
 def pending_order_lifecycle_metadata(
     *, decision, snapshot: dict[str, object], symbol: str, side: str,
     entry: float, stop: float | None, target: float | None, client_tag: str,
@@ -224,6 +294,20 @@ def pending_order_lifecycle_metadata(
     model = dict(model) if isinstance(model, dict) else {}
     economics = snapshot.get("economics")
     economics = dict(economics) if isinstance(economics, dict) else {}
+    authorization = journal.get("capture_authorization")
+    authorization = dict(authorization) if isinstance(authorization, dict) else {}
+    exploration = bool(journal.get("exploration"))
+    authority_probability = authorization.get("probability")
+    authority_expected_ev = getattr(decision, "expected_net_value", None)
+    if authority_expected_ev is None:
+        authority_expected_ev = journal.get("authority_expected_net_ev")
+    if authority_expected_ev is None:
+        authority_expected_ev = economics.get("econ_expected_net_usd")
+    p_captured_win = (
+        authority_probability
+        if exploration
+        else prediction.get("probability") or economics.get("p_win")
+    )
     selected_horizon = (
         journal.get("search_horizon_s")
         or prediction.get("decision_horizon_s")
@@ -233,6 +317,9 @@ def pending_order_lifecycle_metadata(
         selected_horizon = int(selected_horizon) if selected_horizon is not None else None
     except (TypeError, ValueError):
         selected_horizon = None
+    shadow_probability = journal.get("shadow_model_probability")
+    if shadow_probability is None:
+        shadow_probability = prediction.get("probability")
     return {
         "client_tag": str(client_tag),
         "symbol": str(symbol).upper(),
@@ -249,12 +336,13 @@ def pending_order_lifecycle_metadata(
         "regime": journal.get("regime"),
         "session": journal.get("session"),
         "information_id": getattr(decision, "information_id", None),
+        "entry_ev": authority_expected_ev,
         "decision_snapshot": dict(snapshot),
         "model_artifact": model,
         "prediction_snapshot": prediction,
         "feature_snapshot": prediction.get("feature_snapshot"),
-        "p_captured_win": prediction.get("probability") or economics.get("p_win"),
-        "expected_net_pnl": prediction.get("expected_net_pnl"),
+        "p_captured_win": p_captured_win,
+        "expected_net_pnl": authority_expected_ev if exploration else prediction.get("expected_net_pnl"),
         "expected_net_pnl_lcb95": prediction.get("expected_net_pnl_lcb95"),
         "expected_mfe": prediction.get("expected_mfe"),
         "expected_mae": prediction.get("expected_mae"),
@@ -271,6 +359,14 @@ def pending_order_lifecycle_metadata(
         ],
         "sell_rejection_reason": journal.get("sell_rejection_reason"),
         "abstain_reason": prediction.get("abstain_reason"),
+        "authority_type": journal.get("authority_type") if exploration else "validated_model",
+        "authority_probability": authority_probability if exploration else prediction.get("probability"),
+        "authority_capture_lcb95": authorization.get("lower_95"),
+        "authority_expected_net_ev": authority_expected_ev,
+        "authority_horizon_s": selected_horizon,
+        "authority_evidence_source": authorization.get("evidence_source") or journal.get("evidence_provenance"),
+        "authority_observations": authorization.get("observations") or journal.get("evidence_n"),
+        "shadow_model_probability": shadow_probability,
         "basket_metadata": {
             "basket_id": f"firehose-pending-{client_tag}",
             "hypothesis_id": journal.get("hypothesis_id"),
@@ -715,6 +811,14 @@ def ticket_metadata_from_pending(
         initial_risk=pending.get("initial_risk"),
         cost_evidence=pending.get("cost_evidence"),
         entry_ev=pending.get("entry_ev"),
+        authority_type=pending.get("authority_type"),
+        authority_probability=pending.get("authority_probability"),
+        authority_capture_lcb95=pending.get("authority_capture_lcb95"),
+        authority_expected_net_ev=pending.get("authority_expected_net_ev"),
+        authority_horizon_s=pending.get("authority_horizon_s"),
+        authority_evidence_source=pending.get("authority_evidence_source"),
+        authority_observations=pending.get("authority_observations"),
+        shadow_model_probability=pending.get("shadow_model_probability"),
         decision_snapshot=pending.get("decision_snapshot"),
         selected_horizon_s=max_hold_s,
         model_artifact=pending.get("model_artifact"),
@@ -1132,7 +1236,7 @@ def main() -> None:
     qty = float(cfg.get("order_quantity", 0.01 if engine_name == "mt5" else 20000))
     last_bar_time: dict[str, pd.Timestamp] = {}
     last_quote_state: dict[str, dict[str, float]] = {}
-    deferred_opportunities: list[dict[str, Any]] = []
+    deferred_opportunities: list[FrozenOpportunity] = []
     hr = None
     position_opened_at: dict[str, float] = {}
     last_entry_at: dict[str, float] = {}
@@ -1179,6 +1283,13 @@ def main() -> None:
         "risk_budget_precheck_skip": 0,
     }
     observed_funnel_counts: dict[str, int] = {"SCANS": 0, "RISK_REJECT": 0}
+    global_opportunity_counts: dict[str, int] = {
+        "GLOBAL_CANDIDATES": 0,
+        "GLOBAL_RANKED": 0,
+        "GLOBAL_SELECTED": 0,
+        "GLOBAL_REVALIDATED": 0,
+        "GLOBAL_INVALIDATED_ON_REFRESH": 0,
+    }
     fast_exit_error_count: int = 0
     # Quote buffer for genuine sub-minute features
     from aegis.intel.quote_buffer import QuoteBuffer
@@ -1546,10 +1657,12 @@ def main() -> None:
             *,
             collect_only: bool = False,
             selected_execution: bool = False,
+            frozen_opportunity: FrozenOpportunity | None = None,
         ) -> None:
             nonlocal day_trades, day_stamp, last_halt_journal, close_block_until
             nonlocal margin_block_until
             nonlocal submitted_count, fill_count
+            nonlocal global_opportunity_counts
             brain_decision = None
             if open_attempt_blocked(time.time(), close_block_until):
                 return
@@ -1574,6 +1687,8 @@ def main() -> None:
             scan_id = firehose_scan_id(sym, bar_time)
 
             q = eng.quote(sym)
+            if selected_execution:
+                global_opportunity_counts["GLOBAL_REVALIDATED"] += 1
             # Quote already recorded in polling loop; use current quote for this evaluation
             t0 = time.perf_counter()
             now_ts = time.time()
@@ -1719,7 +1834,41 @@ def main() -> None:
                     return
 
             sig = None
-            if intelligent_mode:
+            if frozen_opportunity is not None:
+                from aegis.intel.firehose_brain import DemoDecision
+                from aegis.strategy import Signal
+
+                frozen_journal = dict(frozen_opportunity.get("decision_journal") or {})
+                frozen_journal["frozen_global_selection"] = True
+                frozen_journal["frozen_candidate_id"] = frozen_opportunity.get("candidate_id")
+                frozen_side = str(frozen_opportunity.get("side") or "").lower()
+                if frozen_side not in {"buy", "sell"}:
+                    return
+                brain_decision = DemoDecision(
+                    "fire",
+                    "frozen_global_selection",
+                    side=frozen_side,
+                    sl=frozen_opportunity.get("stop"),
+                    tp=frozen_opportunity.get("target"),
+                    quantity=frozen_opportunity.get("quantity"),
+                    expected_net_value=frozen_opportunity.get("expected_net_ev"),
+                    information_id=frozen_journal.get("information_id"),
+                    analogue_n=int(frozen_opportunity.get("authority_evidence_n") or 0),
+                    journal=frozen_journal,
+                )
+                sig = Signal(
+                    frozen_side,
+                    "intelligent_firehose",
+                    float(frozen_opportunity.get("entry")),
+                    float(frozen_opportunity.get("stop")),
+                    frozen_opportunity.get("target"),
+                    None,
+                    bar_time,
+                    "frozen_global_selection",
+                )
+                _terminal = "EXPLORATION_ELIGIBLE"
+                _micro_count = 1
+            elif intelligent_mode:
                 nonlocal intelligent_brain
                 from aegis.intel.firehose_brain import IntelligentFirehoseBrain
                 from aegis.strategy import Signal
@@ -2012,6 +2161,7 @@ def main() -> None:
 
             sl = float(sig.sl) if sig.sl is not None else None
             tp = float(sig.tp) if sig.tp is not None else None
+            frozen_geometry = frozen_opportunity is not None
             if bool(cfg.get("firehose_anchor_quote", True)) and not intelligent_mode:
                 anchored = live_firehose_stops(sig.side, q.bid, q.ask, loop_cfg, pip)
                 if anchored is None:
@@ -2075,7 +2225,7 @@ def main() -> None:
                     spec_map = eng.symbol_spec(sym)
                 except Exception:
                     spec_map = None
-                sl, tp = normalize_protective_stops(
+                normalized_sl, normalized_tp = normalize_protective_stops(
                     side=sig.side,
                     entry=entry,
                     sl=sl,
@@ -2083,6 +2233,32 @@ def main() -> None:
                     spec=spec_map,
                     fallback_step=pip,
                 )
+                if frozen_geometry:
+                    # Global allocation froze the candidate's geometry. A
+                    # fresh quote may invalidate it, but may not silently
+                    # move its stop/target into a different opportunity.
+                    if (
+                        (sl is not None and normalized_sl != sl)
+                        or (tp is not None and normalized_tp != tp)
+                    ):
+                        quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
+                        if selected_execution:
+                            global_opportunity_counts["GLOBAL_INVALIDATED_ON_REFRESH"] += 1
+                        append_journal(
+                            journal,
+                            {
+                                "event": "frozen_candidate_invalidated",
+                                "symbol": sym,
+                                "reason": "geometry_changed_on_quote_revalidation",
+                                "entry": entry,
+                                "stop": sl,
+                                "target": tp,
+                                "bar": str(bar_time),
+                            },
+                        )
+                        return
+                else:
+                    sl, tp = normalized_sl, normalized_tp
             req = OrderRequest(
                 symbol=sym,
                 side=sig.side,
@@ -2289,6 +2465,8 @@ def main() -> None:
                     q = eng.quote(sym)
                 except Exception as exc:
                     quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
+                    if selected_execution:
+                        global_opportunity_counts["GLOBAL_INVALIDATED_ON_REFRESH"] += 1
                     append_journal(
                         journal,
                         {
@@ -2314,6 +2492,8 @@ def main() -> None:
                 )
                 if not verdict.ok:
                     quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
+                    if selected_execution:
+                        global_opportunity_counts["GLOBAL_INVALIDATED_ON_REFRESH"] += 1
                     append_journal(
                         journal,
                         {
@@ -2422,6 +2602,7 @@ def main() -> None:
             # Reserve only after every pre-send guard passes. A rejected
             # candidate must not consume an exploration slot for 180 seconds.
             if collect_only:
+                deferred_before = len(deferred_opportunities)
                 if brain_decision is None or brain_decision.action not in {"fire", "scale"}:
                     return
                 decision_journal = dict(brain_decision.journal)
@@ -2430,45 +2611,49 @@ def main() -> None:
                     decision_journal.get("exploration_economics")
                     or decision_journal
                 )
-                deferred_opportunities.append({
-                    "candidate_id": scan_id,
-                    "symbol": sym,
-                    "side": sig.side,
-                    "thesis_key": decision_journal.get("thesis_key") or scan_id,
-                    "p_captured_win": decision_journal.get("econ_p_win")
-                    if decision_journal.get("econ_p_win") is not None
-                    else economics_journal.get("econ_p_win")
-                    if economics_journal.get("econ_p_win") is not None
-                    else prediction_journal.get("probability"),
-                    "expected_net_ev": (
-                        brain_decision.expected_net_value
-                        if brain_decision.expected_net_value is not None
-                        else economics_journal.get("econ_expected_net_usd")
-                    ),
-                    "expected_net_ev_lcb95": prediction_journal.get(
-                        "expected_net_pnl_lcb95"
-                    ),
-                    "tail_loss_probability": prediction_journal.get(
-                        "tail_loss_probability"
-                    ),
-                    "expected_time_to_green_s": prediction_journal.get(
-                        "expected_time_to_green_s"
-                    ),
-                    "fast_winner_similarity": decision_journal.get(
-                        "fast_winner_similarity", 0.0
-                    ),
-                    "fast_loser_similarity": decision_journal.get(
-                        "fast_loser_similarity", 0.0
-                    ),
-                    "marginal_risk_usd": decision_journal.get(
-                        "econ_expected_loss_usd",
-                        economics_journal.get(
-                            "econ_expected_loss_usd",
-                            cfg.get("exploration_max_risk_per_trade_usd", 0.15),
-                        ),
-                    ),
-                    "portfolio_ok": True,
-                })
+                viable_candidates = decision_journal.get("viable_candidates")
+                if isinstance(viable_candidates, list) and viable_candidates:
+                    for candidate_row in viable_candidates:
+                        if not isinstance(candidate_row, dict):
+                            continue
+                        candidate_journal = candidate_row.get("decision_journal")
+                        if not isinstance(candidate_journal, dict):
+                            continue
+                        candidate_decision = replace(
+                            brain_decision,
+                            side=str(candidate_row.get("side") or "").lower(),
+                            sl=candidate_row.get("stop"),
+                            tp=candidate_row.get("target"),
+                            quantity=candidate_row.get("quantity"),
+                            expected_net_value=candidate_row.get("expected_net_ev"),
+                            journal=dict(candidate_journal),
+                        )
+                        deferred_opportunities.append(frozen_opportunity_from_decision(
+                            decision=candidate_decision,
+                            symbol=str(candidate_row.get("symbol") or sym),
+                            scan_id=scan_id,
+                            bar_time=bar_time,
+                            bid=float(q.bid),
+                            ask=float(q.ask),
+                            stop=candidate_row.get("stop"),
+                            target=candidate_row.get("target"),
+                            quantity=float(candidate_row.get("quantity") or order_qty),
+                        ))
+                else:
+                    deferred_opportunities.append(frozen_opportunity_from_decision(
+                        decision=brain_decision,
+                        symbol=sym,
+                        scan_id=scan_id,
+                        bar_time=bar_time,
+                        bid=float(q.bid),
+                        ask=float(q.ask),
+                        stop=req.stop_loss,
+                        target=req.take_profit,
+                        quantity=float(order_qty),
+                    ))
+                global_opportunity_counts["GLOBAL_CANDIDATES"] += (
+                    len(deferred_opportunities) - deferred_before
+                )
                 append_journal(
                     journal,
                     {
@@ -2748,13 +2933,41 @@ def main() -> None:
                                 information_id=information_id,
                                 symbol=sym,
                                 entry_ev=brain_decision.expected_net_value,
+                                authority_type=brain_decision.journal.get("authority_type"),
+                                authority_probability=brain_decision.journal.get(
+                                    "authority_probability"
+                                ),
+                                authority_capture_lcb95=brain_decision.journal.get(
+                                    "authority_capture_lcb95"
+                                ),
+                                authority_expected_net_ev=brain_decision.journal.get(
+                                    "authority_expected_net_ev"
+                                ),
+                                authority_horizon_s=selected_horizon,
+                                authority_evidence_source=brain_decision.journal.get(
+                                    "evidence_provenance"
+                                ),
+                                authority_observations=brain_decision.journal.get(
+                                    "authority_observations"
+                                ),
+                                shadow_model_probability=brain_decision.journal.get(
+                                    "shadow_model_probability"
+                                ),
                                 decision_snapshot=decision_snapshot,
                                 selected_horizon_s=selected_horizon,
                                 model_artifact=model_artifact,
                                 prediction_snapshot=prediction_snapshot,
                                 feature_snapshot=prediction_snapshot.get("feature_snapshot"),
-                                p_captured_win=prediction_snapshot.get("probability"),
-                                expected_net_pnl=prediction_snapshot.get("expected_net_pnl"),
+                                p_captured_win=(
+                                    brain_decision.journal.get("authority_probability")
+                                    if brain_decision.journal.get("exploration")
+                                    else prediction_snapshot.get("probability")
+                                ),
+                                expected_net_pnl=(
+                                    brain_decision.expected_net_value
+                                    if brain_decision.journal.get("exploration")
+                                    else prediction_snapshot.get("expected_net_pnl")
+                                ),
                                 expected_net_pnl_lcb95=prediction_snapshot.get("expected_net_pnl_lcb95"),
                                 expected_mfe=prediction_snapshot.get("expected_mfe"),
                                 expected_mae=prediction_snapshot.get("expected_mae"),
@@ -3078,38 +3291,107 @@ def main() -> None:
                                                 or {}
                                             )
                                             lifecycle_meta = ticket_metadata_store.get(position_id)
+                                            _meta_snapshot = (
+                                                dict(lifecycle_meta.decision_snapshot or {})
+                                                if lifecycle_meta is not None
+                                                and isinstance(lifecycle_meta.decision_snapshot, dict)
+                                                else {}
+                                            )
+                                            _meta_journal = (
+                                                dict(_meta_snapshot.get("prediction") or {})
+                                                if isinstance(_meta_snapshot.get("prediction"), dict)
+                                                else {}
+                                            )
+                                            _memory_features = {
+                                                "symbol": (
+                                                    getattr(lifecycle_meta, "symbol", None)
+                                                    or event.get("symbol")
+                                                ),
+                                                "side": (
+                                                    getattr(lifecycle_meta, "side", None)
+                                                    or event.get("side")
+                                                ),
+                                                "mechanism": getattr(
+                                                    lifecycle_meta, "strategy_family", None
+                                                ) or event.get("family"),
+                                                "selected_horizon_s": getattr(
+                                                    lifecycle_meta, "selected_horizon_s", None
+                                                ) or getattr(lifecycle_meta, "max_hold_s", None),
+                                                "horizon_s": getattr(
+                                                    lifecycle_meta, "selected_horizon_s", None
+                                                ) or getattr(lifecycle_meta, "max_hold_s", None),
+                                                "session": getattr(
+                                                    lifecycle_meta, "session", None
+                                                ) or event.get("session"),
+                                                "regime": getattr(
+                                                    lifecycle_meta, "regime", None
+                                                ) or event.get("regime"),
+                                                "entry_time": getattr(lifecycle_meta, "opened_ts", None),
+                                                "stop_price": getattr(lifecycle_meta, "stop_loss", None),
+                                                "target_price": getattr(lifecycle_meta, "target_price", None),
+                                                "entry_ev": getattr(lifecycle_meta, "entry_ev", None),
+                                                "authority_probability": getattr(
+                                                    lifecycle_meta, "authority_probability", None
+                                                ),
+                                                "authority_capture_lcb95": getattr(
+                                                    lifecycle_meta, "authority_capture_lcb95", None
+                                                ),
+                                                "spread_pips": _meta_journal.get("spread_pips"),
+                                                "structure": _meta_journal.get("structure"),
+                                                "h1_direction": _meta_journal.get("h1_direction"),
+                                                "m5_direction": _meta_journal.get("m5_direction"),
+                                                "breakout_state": _meta_journal.get("breakout_state"),
+                                                "rejection_state": _meta_journal.get("rejection_state"),
+                                                "expansion_state": _meta_journal.get("expansion_state"),
+                                            }
+                                            _replay_quotes = []
+                                            _replay_cost = abs(float(close_facts.get("round_trip_cost_usd") or 0.0))
+                                            _replay_usd_per_price_unit = 1.0
+                                            try:
+                                                _contract = eng.symbol_spec(
+                                                    str(_memory_features.get("symbol") or event.get("symbol") or "")
+                                                )
+                                                from aegis.intel.broker_math import BrokerSymbolSpec
+
+                                                _broker_spec = BrokerSymbolSpec.from_mapping(_contract)
+                                                _replay_usd_per_price_unit = (
+                                                    _broker_spec.usd_per_price_unit_per_lot()
+                                                    * float(close_facts.get("entry_quantity") or 0.0)
+                                                )
+                                                if _replay_usd_per_price_unit <= 0:
+                                                    _replay_usd_per_price_unit = 1.0
+                                            except (AttributeError, OSError, TypeError, ValueError):
+                                                _replay_usd_per_price_unit = 1.0
+                                            try:
+                                                _closed_ts = (
+                                                    float(event["time_msc"]) / 1000.0
+                                                    if event.get("time_msc")
+                                                    else datetime.fromisoformat(
+                                                        str(close_facts.get("close_timestamp") or "")
+                                                        .replace("Z", "+00:00")
+                                                    ).timestamp()
+                                                )
+                                            except (TypeError, ValueError, OverflowError):
+                                                _closed_ts = time.time()
+                                            try:
+                                                _replay_quotes = quote_buffer.quotes_between(
+                                                    float(_memory_features.get("entry_time") or 0.0),
+                                                    _closed_ts,
+                                                )
+                                            except (AttributeError, TypeError, ValueError):
+                                                _replay_quotes = []
                                             outcome_memory.record_closed(
                                                 outcome_id=position_id,
-                                                features={
-                                                    "symbol": (
-                                                        getattr(lifecycle_meta, "symbol", None)
-                                                        or event.get("symbol")
-                                                    ),
-                                                    "side": (
-                                                        getattr(lifecycle_meta, "side", None)
-                                                        or event.get("side")
-                                                    ),
-                                                    "mechanism": getattr(
-                                                        lifecycle_meta, "strategy_family", None
-                                                    ) or event.get("family"),
-                                                    "selected_horizon_s": getattr(
-                                                        lifecycle_meta, "selected_horizon_s", None
-                                                    ) or getattr(
-                                                        lifecycle_meta, "max_hold_s", None
-                                                    ),
-                                                    "session": getattr(
-                                                        lifecycle_meta, "session", None
-                                                    ) or event.get("session"),
-                                                    "regime": getattr(
-                                                        lifecycle_meta, "regime", None
-                                                    ) or event.get("regime"),
-                                                },
+                                                features=_memory_features,
                                                 realized_net_usd=net_pnl,
                                                 mfe_usd=lifecycle_detail.get("mfe_usd"),
                                                 mae_usd=lifecycle_detail.get("mae_usd"),
                                                 time_to_green_s=lifecycle_detail.get(
                                                     "first_green_s"
                                                 ),
+                                                counterfactual_quotes=_replay_quotes,
+                                                counterfactual_cost_usd=_replay_cost,
+                                                counterfactual_usd_per_price_unit=_replay_usd_per_price_unit,
                                             )
                                             memory_recorded_positions.add(position_id)
                                         except Exception as exc:
@@ -3184,6 +3466,9 @@ def main() -> None:
                     "CANDIDATES_GENERATED": int(
                         _funnel.get("CANDIDATES_GENERATED", 0) or 0
                     ),
+                    "SEARCH_CANDIDATES": int(
+                        _funnel.get("SEARCH_CANDIDATES", _funnel.get("CANDIDATES_GENERATED", 0)) or 0
+                    ),
                     "BUY_VARIANTS_TESTED": int(
                         _funnel.get("BUY_VARIANTS_TESTED", 0) or 0
                     ),
@@ -3195,6 +3480,12 @@ def main() -> None:
                     ),
                     "MECHANISMS_TESTED": int(
                         _funnel.get("MECHANISMS_TESTED", 0) or 0
+                    ),
+                    "MECHANISMS_AVAILABLE": int(
+                        _funnel.get("MECHANISMS_AVAILABLE", 0) or 0
+                    ),
+                    "MECHANISMS_ACTUALLY_GENERATING_CANDIDATES": int(
+                        _funnel.get("MECHANISMS_ACTUALLY_GENERATING_CANDIDATES", 0) or 0
                     ),
                     "SPREAD_FAIL": int(_funnel.get("SPREAD_FAIL", 0) or 0),
                     "GEOMETRY_FAIL": int(_funnel.get("GEOMETRY_FAIL", 0) or 0),
@@ -3232,9 +3523,12 @@ def main() -> None:
                     "TAIL_REJECT": int(_brain_counts.get("tail_reject", 0) or 0),
                     "STALE_REJECT": int(_funnel.get("STALE_REJECT", 0) or 0),
                     "RISK_REJECT": int(_funnel.get("RISK_REJECT", 0) or 0),
-                    "FIRES": int(_brain_counts.get("fire", 0) or 0),
+                    "BRAIN_INTENTS": int(_brain_counts.get("fire", 0) or 0),
+                    "FIRES": int(submitted_count),
                     "SUBMITTED": int(submitted_count),
                     "FILLS": int(fill_count),
+                    "OPEN_TICKETS": len(eng.positions()),
+                    **global_opportunity_counts,
                     "GREEN_WITHIN_3S": int(_turnover.get("green_within_3s", 0) or 0),
                     "GREEN_WITHIN_5S": int(_turnover.get("green_within_5s", 0) or 0),
                     "GREEN_WITHIN_10S": int(_turnover.get("green_within_10s", 0) or 0),
@@ -3417,6 +3711,12 @@ def main() -> None:
                                 remaining_ev=_rem_ev,
                                 remaining_ev_status=_rem_status,
                             )
+                            fast_verdict = {
+                                "action": "HOLD",
+                                "reason": "fast_exit_not_evaluated",
+                                "why": "fast exit evidence not yet available",
+                                "policy": "safety_noop",
+                            }
                             # Fast exit state machine governs FAST tickets.
                             _is_fast = bool(video_style_mode)
                             _ticket_meta = ticket_metadata_store.get(tk)
@@ -3444,6 +3744,11 @@ def main() -> None:
                                             side=_side_l,
                                             broker_spec=_fast_engine_spec,
                                             quantity=_fast_quantity,
+                                            horizon_s=(
+                                                _ticket_meta.selected_horizon_s
+                                                if _ticket_meta is not None
+                                                else None
+                                            ),
                                         )
                                     except Exception as exc:
                                         logger.debug(
@@ -3568,6 +3873,11 @@ def main() -> None:
                                     else:
                                         evidence = {"status": "NO_EVIDENCE", "reason": "missing_exact_basket_ownership"}
                                     trace = attach_runtime_evidence(trace, evidence)
+                                    fast_verdict = {
+                                        **dict(fast_verdict),
+                                        "evidence_snapshot": dict(trace),
+                                        "remaining_ev": _rem_ev,
+                                    }
                                     firehose_turnover.record_exit_trace(
                                         tk,
                                         observed_at=fast_exit_ctx.now_ts,
@@ -3575,9 +3885,6 @@ def main() -> None:
                                         pnl_usd=trace.get("pnl_usd"),
                                     )
                                     append_journal(journal, trace)
-                                    verdict = unified_trade_controller_decision(
-                                        verdict, fast_verdict
-                                    )
                                 except Exception as fast_exc:
                                     fast_exit_error_count += 1
                                     append_journal(
@@ -3590,7 +3897,11 @@ def main() -> None:
                                             observed_at=datetime.now(timezone.utc).isoformat(),
                                         ),
                                     )
-                            if verdict["action"] == "EXIT" and hasattr(eng, "close_ticket"):
+                            verdict = unified_trade_controller_decision(
+                                verdict,
+                                fast_verdict,
+                            )
+                            if verdict["action"] in {"HARVEST", "SCRATCH", "ABORT"} and hasattr(eng, "close_ticket"):
                                 res_close = eng.close_ticket(tk)
                                 try:
                                     close_facts = broker_close_evidence(
@@ -3952,14 +4263,25 @@ def main() -> None:
                         logger.exception("Symbol loop error %s", sym)
 
                 if bool(cfg.get("intelligent_firehose", False)) and deferred_opportunities:
+                    _open_for_allocation = len(eng.positions())
+                    _remaining_capacity = max(0, int(max_positions) - _open_for_allocation)
+                    _per_trade_budget = float(
+                        cfg.get("exploration_max_risk_per_trade_usd", 0.0) or 0.0
+                    )
                     ranked_opportunities, selected_opportunities = rank_and_allocate(
                         deferred_opportunities,
-                        max_positions=max_positions,
+                        max_positions=_remaining_capacity,
+                        max_total_risk_usd=(
+                            _per_trade_budget * _remaining_capacity
+                            if _per_trade_budget > 0 else None
+                        ),
                         occupied_theses=(
                             key for key, mem in intelligent_brain.memory.theses.items()
                             if mem.tickets
                         ) if intelligent_brain is not None else (),
                     )
+                    global_opportunity_counts["GLOBAL_RANKED"] += len(ranked_opportunities)
+                    global_opportunity_counts["GLOBAL_SELECTED"] += len(selected_opportunities)
                     append_journal(
                         journal,
                         {
@@ -3968,7 +4290,7 @@ def main() -> None:
                             "ranked": len(ranked_opportunities),
                             "selected": len(selected_opportunities),
                             "selected_ids": [
-                                row.get("candidate_id") for row in selected_opportunities
+                            row.get("candidate_id") for row in selected_opportunities
                             ],
                         },
                     )
@@ -3978,6 +4300,7 @@ def main() -> None:
                             equity,
                             len(eng.positions()),
                             selected_execution=True,
+                            frozen_opportunity=opportunity,
                         )
 
                 if holding:

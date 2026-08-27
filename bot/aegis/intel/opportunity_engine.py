@@ -2,7 +2,54 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Any, Iterable
+
+
+@dataclass(frozen=True)
+class FrozenOpportunity(Mapping[str, Any]):
+    """Immutable point-in-time opportunity selected by the global allocator.
+
+    The runner may revalidate the quote used for this object, but it must not
+    regenerate or silently replace the side, mechanism, horizon, or geometry.
+    """
+
+    values: Mapping[str, Any]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "values", _freeze_value(dict(self.values)))
+
+    def __getitem__(self, key: str) -> Any:
+        return self.values[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.values)
+
+    def __len__(self) -> int:
+        return len(self.values)
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self.values)
+
+
+def freeze_opportunity(candidate: Mapping[str, Any]) -> FrozenOpportunity:
+    """Snapshot a candidate before global ranking and broker execution."""
+    if isinstance(candidate, FrozenOpportunity):
+        return candidate
+    return FrozenOpportunity(dict(candidate))
+
+
+def _freeze_value(value: Any) -> Any:
+    """Recursively freeze nested candidate metadata as well as top-level fields."""
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: _freeze_value(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return tuple(_freeze_value(item) for item in value)
+    if isinstance(value, set):
+        return frozenset(_freeze_value(item) for item in value)
+    return value
 
 
 def _number(row: Mapping[str, Any], *keys: str, default: float = 0.0) -> float:
@@ -22,7 +69,7 @@ def rank_and_allocate(
     max_positions: int | None,
     occupied_theses: Iterable[str] = (),
     max_total_risk_usd: float | None = None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[FrozenOpportunity], list[FrozenOpportunity]]:
     """Rank all valid opportunities, then allocate independent theses.
 
     Capture probability is the primary ordering dimension. Candidates still need
@@ -30,9 +77,9 @@ def rank_and_allocate(
     relax either gate. Duplicate thesis identities are never counted as separate
     opportunities.
     """
-    ranked: list[dict[str, Any]] = []
+    ranked: list[FrozenOpportunity] = []
     for candidate in candidates:
-        row = dict(candidate)
+        row = freeze_opportunity(candidate)
         if row.get("portfolio_ok") is False:
             continue
         p_capture = _number(row, "p_captured_win", "p_capture", default=float("nan"))
@@ -41,24 +88,22 @@ def rank_and_allocate(
             continue
         if not math.isfinite(expected_ev) or expected_ev <= 0.0:
             continue
-        row["p_captured_win"] = p_capture
-        row["expected_net_ev"] = expected_ev
         ranked.append(row)
 
     ranked.sort(
         key=lambda row: (
             -_number(row, "p_captured_win"),
+            -_number(row, "fast_winner_similarity"),
             -_number(row, "expected_net_ev_lcb95", "expected_net_ev_lcb", default=float("-inf")),
             _number(row, "fast_loser_similarity"),
             _number(row, "tail_loss_probability"),
             _number(row, "expected_time_to_green_s", default=float("inf")),
             -_number(row, "expected_net_ev"),
-            -_number(row, "fast_winner_similarity"),
             str(row.get("candidate_id") or row.get("thesis_key") or ""),
         )
     )
 
-    selected: list[dict[str, Any]] = []
+    selected: list[FrozenOpportunity] = []
     used_theses = {str(value) for value in occupied_theses if str(value)}
     risk_used = 0.0
     capacity = None if max_positions is None or int(max_positions) <= 0 else int(max_positions)

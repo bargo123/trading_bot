@@ -413,11 +413,13 @@ def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
                'volatility': {'phase': 'stable'}},
         market_ctx=ctx,
     )
-    assert low_result is None
-    assert low_skip == (
-        'exploration_economics_rejected:'
-        'exploration_capture_probability_below_floor'
-    )
+    # A sub-50% point estimate is not rejected by a universal floor.  The
+    # candidate is authorized only because its own measured payoff geometry
+    # places breakeven below the evidence lower bound.
+    assert low_result is not None, low_skip
+    authorization = low_result.journal['capture_authorization']
+    assert authorization['probability'] < 0.50
+    assert authorization['lower_95'] >= authorization['required_probability']
 
     brain.outcome_memory.should_suppress = lambda features: True
     blocked_result, blocked_skip = brain._maybe_explore(

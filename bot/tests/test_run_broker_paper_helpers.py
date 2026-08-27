@@ -26,9 +26,11 @@ from scripts.run_broker_paper import (
     remove_confirmed_firehose_basket,
     remove_confirmed_firehose_basket_then_cleanup,
     firehose_decision_snapshot,
+    frozen_opportunity_from_decision,
     intelligent_refresh_spread_limit,
     meaningful_quote_change,
     video_style_signal_for_scan,
+    pending_order_lifecycle_metadata,
 )
 from aegis.intel.send_guard import candidate_spread_limit, refresh_verdict
 
@@ -38,6 +40,56 @@ def test_meaningful_quote_change_allows_same_bar_reevaluation():
     assert meaningful_quote_change(previous, bid=1.10000, ask=1.10002, pip=0.0001) is False
     assert meaningful_quote_change(previous, bid=1.10001, ask=1.10003, pip=0.0001) is True
     assert meaningful_quote_change(None, bid=1.1, ask=1.1001, pip=0.0001) is True
+
+
+def test_frozen_opportunity_preserves_the_decision_identity():
+    from aegis.intel.firehose_brain import DemoDecision
+
+    decision = DemoDecision(
+        "fire",
+        "exploration_hypothesis_test",
+        side="sell",
+        sl=1.1010,
+        tp=1.0990,
+        quantity=0.01,
+        expected_net_value=0.12,
+        journal={
+            "exploration": True,
+            "hypothesis_id": "h1",
+            "thesis_key": "EURUSD|sell|breakout|range|asia",
+            "setup_family": "breakout",
+            "variant_id": "breakout:sell:5s",
+            "search_horizon_s": 5,
+            "capture_authorization": {
+                "probability": 0.63,
+                "lower_95": 0.56,
+                "required_probability": 0.50,
+                "observations": 100,
+            },
+            "exploration_economics": {"econ_expected_net_usd": 0.12},
+        },
+    )
+
+    frozen = frozen_opportunity_from_decision(
+        decision=decision,
+        symbol="EURUSD",
+        scan_id="scan-1",
+        bar_time="2026-08-27T00:00:00+00:00",
+        bid=1.1000,
+        ask=1.1002,
+        stop=1.1010,
+        target=1.0990,
+        quantity=0.01,
+    )
+
+    assert frozen["candidate_id"] == "scan-1:breakout:sell:5s"
+    assert frozen["side"] == "sell"
+    assert frozen["mechanism"] == "breakout"
+    assert frozen["horizon_s"] == 5
+    assert frozen["stop"] == 1.1010
+    assert frozen["target"] == 1.0990
+    assert frozen["authority_probability"] == 0.63
+    assert frozen["shadow_model_probability"] is None
 
 
 def test_risk_halt_records_one_terminal_funnel_row_without_order_intent():
@@ -162,6 +214,50 @@ def test_pending_ticket_metadata_is_rebound_to_broker_ticket_after_restart():
     assert metadata.stop_loss == pytest.approx(1.0992)
     assert metadata.selected_horizon_s == 5
     assert metadata.prediction_snapshot == {"probability": 0.8}
+
+
+def test_pending_metadata_keeps_exploration_authority_separate_from_shadow_probability():
+    from aegis.intel.firehose_brain import DemoDecision
+
+    decision = DemoDecision(
+        "fire", "exploration_hypothesis_test", side="buy", expected_net_value=0.07,
+        journal={
+            "exploration": True,
+            "hypothesis_id": "h-exp",
+            "thesis_key": "EURUSD|buy|breakout|range|asia",
+            "setup_family": "breakout",
+            "search_horizon_s": 5,
+            "capture_authorization": {
+                "probability": 0.41,
+                "lower_95": 0.38,
+                "required_probability": 0.35,
+                "observations": 80,
+                "evidence_source": "measured_analogue_capture",
+            },
+            "shadow_model_probability": 0.91,
+            "exploration_economics": {
+                "econ_expected_net_usd": 0.07,
+                "econ_expected_loss_usd": 0.15,
+            },
+        },
+    )
+    pending = pending_order_lifecycle_metadata(
+        decision=decision,
+        snapshot={
+            "prediction": {"probability": 0.91, "expected_net_pnl": 0.9},
+            "model": {"status": "SHADOW_ONLY"},
+            "economics": {},
+            "risk": {"spread": 0.0001},
+        },
+        symbol="EURUSD", side="buy", entry=1.1, stop=1.099, target=1.102,
+        client_tag="EXP-h-exp", config={"commission_round_trip_usd": 0.0},
+    )
+
+    assert pending["entry_ev"] == pytest.approx(0.07)
+    assert pending["authority_probability"] == pytest.approx(0.41)
+    assert pending["p_captured_win"] == pytest.approx(0.41)
+    assert pending["shadow_model_probability"] == pytest.approx(0.91)
+    assert pending["expected_net_pnl"] == pytest.approx(0.07)
 
 
 def test_ticket_metadata_carries_execution_lifecycle_snapshot(tmp_path):
