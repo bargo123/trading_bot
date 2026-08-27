@@ -35,6 +35,24 @@ def test_global_ranking_prefers_later_symbol_with_higher_capture_probability():
     assert [row["candidate_id"] for row in selected] == ["later"]
 
 
+def test_global_ranking_uses_capture_probability_before_winner_similarity_and_ev():
+    high_confidence = _candidate(
+        "high-confidence", symbol="EURUSD", thesis="t1",
+        p_capture=0.97, ev=0.05, lcb=0.80,
+    )
+    high_winner_similarity = _candidate(
+        "high-winner-similarity", symbol="GBPUSD", thesis="t2",
+        p_capture=0.90, ev=100.0, lcb=0.80,
+    )
+    high_winner_similarity["fast_winner_similarity"] = 1.0
+
+    ranked, _ = rank_and_allocate(
+        [high_winner_similarity, high_confidence], max_positions=1
+    )
+
+    assert ranked[0]["candidate_id"] == "high-confidence"
+
+
 def test_global_allocator_blocks_duplicate_theses_but_allows_independent_entries():
     ranked, selected = rank_and_allocate(
         [

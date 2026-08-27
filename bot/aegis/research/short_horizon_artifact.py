@@ -30,6 +30,7 @@ from aegis.intel.trade_economics import wilson_lower_bound
 ARTIFACT_SCHEMA = "short_horizon_ensemble.v1"
 MIN_CAPTURED_EXIT_LOSSES = 5  # align with the repo's sampled-loss promotion standard
 MIN_CAPTURED_EXIT_WIN_LCB95 = 0.95
+FAST_GREEN_CEILING_S = 3
 
 
 @dataclass(frozen=True)
@@ -467,6 +468,7 @@ def build_quote_training_frame(
                             "captured_exit_net_pnl": captured,
                             "captured_exit_return": captured / float(mid[index]) if mid[index] > 0 else np.nan,
                             "captured_exit_reason": captured_reason,
+                            "captured_net_win": bool(captured > 0.0),
                             "assumed_slippage_bps": slippage_bps,
                             "assumed_commission_round_trip_usd": commission_round_trip_usd,
                             "expected_initial_friction_price": (
@@ -475,6 +477,27 @@ def build_quote_training_frame(
                             ),
                             "mfe": mfe,
                             "mae": mae,
+                            "maximum_favorable_executable_move": mfe,
+                            "maximum_adverse_executable_move": mae,
+                            "time_to_peak_s": (
+                                shared_replay.get("time_to_peak_s")
+                                if shared_replay is not None
+                                else (future_times.iloc[int(np.argmax(signed))] - features.iloc[index]["time"]).total_seconds()
+                            ),
+                            "never_green": bool(
+                                shared_replay.get("never_green")
+                                if shared_replay is not None
+                                else not len(profitable)
+                            ),
+                            "green_then_loser": bool(
+                                shared_replay.get("green_then_loser")
+                                if shared_replay is not None
+                                else bool(len(profitable) and captured <= 0.0)
+                            ),
+                            "capture_ratio": (
+                                shared_replay.get("capture_ratio")
+                                if shared_replay is not None else None
+                            ),
                             "tail_loss": int(mae <= -tail_threshold),
                             "time_to_profit_s": time_to_profit,
                             "time_to_failure_s": time_to_failure,
@@ -513,6 +536,9 @@ def _model_frame(frame: pd.DataFrame) -> pd.DataFrame:
         "terminal_return", "mfe", "mae", "tail_loss",
         "harvest_return", "time_to_profit_s", "time_to_failure_s",
         "captured_exit_net_pnl", "captured_exit_return", "captured_exit_reason",
+        "captured_net_win", "never_green", "green_then_loser", "capture_ratio",
+        "maximum_favorable_executable_move", "maximum_adverse_executable_move",
+        "time_to_peak_s",
         "assumed_slippage_bps",
     }
     columns = [column for column in frame.columns if column not in excluded]
@@ -638,8 +664,25 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
         return float(values.mean()) if len(values) else None
 
     def selected_median(column: str) -> float | None:
+        if column not in selected_frame.columns:
+            return None
         values = pd.to_numeric(selected_frame[column], errors="coerce").dropna()
         return float(values.median()) if len(values) else None
+
+    def selected_rate(column: str) -> float | None:
+        if column not in selected_frame.columns or selected_frame.empty:
+            return None
+        return float(selected_frame[column].astype(bool).mean())
+
+    def selected_numeric_mean(column: str) -> float | None:
+        if column not in selected_frame.columns or selected_frame.empty:
+            return None
+        values = pd.to_numeric(selected_frame[column], errors="coerce").dropna()
+        return float(values.mean()) if len(values) else None
+
+    time_to_green = pd.to_numeric(
+        selected_frame.get("time_to_profit_s", pd.Series(dtype=float)), errors="coerce"
+    ).dropna()
 
     return {
         "n": int(len(frame)),
@@ -681,7 +724,15 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
         "expected_mfe": selected_mean("mfe"),
         "expected_mae": selected_mean("mae"),
         "median_time_to_green_s": selected_median("time_to_profit_s"),
+        "median_time_to_peak_s": selected_median("time_to_peak_s"),
         "median_time_to_failure_s": selected_median("time_to_failure_s"),
+        "never_green_rate": selected_rate("never_green"),
+        "fast_green_rate": (
+            float((time_to_green <= FAST_GREEN_CEILING_S).mean())
+            if len(time_to_green) else None
+        ),
+        "green_then_loser_rate": selected_rate("green_then_loser"),
+        "capture_ratio": selected_numeric_mean("capture_ratio"),
         "winner_giveback_rate": (
             float(((selected_frame["mfe"] > 0.0) & (selected_frame["terminal_return"] <= 0.0)).mean())
             if len(selected_frame) else None
@@ -1243,10 +1294,26 @@ def train_and_publish(
                 "P_CAPTURED_WIN": sealed_metrics.get("captured_exit_win_rate"),
                 "P_CAPTURED_WIN_LCB95": sealed_metrics.get("captured_exit_win_lcb95"),
                 "TARGET_CAPTURE_WIN_RATE_LCB95": MIN_CAPTURED_EXIT_WIN_LCB95,
+                "OOS_CAPTURED_EV_LCB95": sealed_metrics.get("captured_exit_lcb95_return"),
                 "P95_LOSS": sealed_metrics.get("p95_loss_return"),
                 "P99_LOSS": sealed_metrics.get("p99_loss_return"),
                 "CALIBRATION_ECE": sealed_metrics.get("calibration_ece"),
                 "ABSTAIN_RATE": sealed_metrics.get("abstain_rate"),
+                "SEALED_OOS_TRADES": sealed_metrics.get("selected"),
+                "SEALED_OOS_WINS": sealed_metrics.get("captured_exit_win_count"),
+                "SEALED_OOS_LOSSES": sealed_metrics.get("captured_exit_loss_count"),
+                "SEALED_OOS_WR": sealed_metrics.get("captured_exit_win_rate"),
+                "SEALED_OOS_WR_LCB95": sealed_metrics.get("captured_exit_win_lcb95"),
+                "SEALED_OOS_EV_LCB95": sealed_metrics.get("captured_exit_lcb95_return"),
+                "NEVER_GREEN_RATE": sealed_metrics.get("never_green_rate"),
+                "FAST_GREEN_RATE": sealed_metrics.get("fast_green_rate"),
+                "GREEN_THEN_LOSER_RATE": sealed_metrics.get("green_then_loser_rate"),
+                "CAPTURE_RATIO": sealed_metrics.get("capture_ratio"),
+                "TARGET_LOSS_RATE_5_PERCENT_STATUS": (
+                    "SUPPORTED_BY_SEALED_OOS"
+                    if execution_status == "EXECUTION_CANDIDATE"
+                    else "TARGET_95_WR_NOT_PROVEN"
+                ),
             },
         }
     )
