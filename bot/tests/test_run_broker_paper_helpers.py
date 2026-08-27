@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from aegis.engines.base import PositionSnapshot
+from aegis.engines.base import PositionSnapshot, Quote
 from aegis.intel.firehose_basket import BasketMetadataStore
 from aegis.intel.firehose_turnover import FirehoseReentryGuard, TurnoverMetrics
 from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
@@ -34,6 +34,9 @@ from scripts.run_broker_paper import (
     frozen_opportunity_from_decision,
     intelligent_refresh_spread_limit,
     meaningful_quote_change,
+    quote_scan_verdict,
+    acquire_fresh_quote,
+    QuoteFeedHealth,
     video_style_signal_for_scan,
     pending_order_lifecycle_metadata,
     outcome_features_from_ticket_metadata,
@@ -63,6 +66,71 @@ def test_meaningful_quote_change_allows_same_bar_reevaluation():
     assert meaningful_quote_change(previous, bid=1.10000, ask=1.10002, pip=0.0001) is False
     assert meaningful_quote_change(previous, bid=1.10001, ask=1.10003, pip=0.0001) is True
     assert meaningful_quote_change(None, bid=1.1, ask=1.1001, pip=0.0001) is True
+
+
+def test_stale_quote_is_research_usable_but_not_executable():
+    now = pd.Timestamp("2026-08-28T00:00:00Z").to_pydatetime()
+    quote = Quote(
+        symbol="EURUSD", bid=1.10000, ask=1.10002,
+        time=now - pd.Timedelta(seconds=7),
+    )
+
+    verdict = quote_scan_verdict(quote, max_age_s=5.0, max_future_skew_s=5.0, now=now)
+
+    assert verdict.scan_allowed is True
+    assert verdict.execution_allowed is False
+    assert verdict.reason == "stale_for_execution"
+
+
+def test_fresh_quote_acquisition_polls_without_rerunning_research():
+    class Clock:
+        wall = 100.0
+        mono = 0.0
+
+        def monotonic(self):
+            return self.mono
+
+        def sleep(self, seconds):
+            self.mono += seconds
+
+    clock = Clock()
+    quotes = iter([
+        Quote("EURUSD", 1.10000, 1.10002, pd.Timestamp(93, unit="s", tz="UTC").to_pydatetime()),
+        Quote("EURUSD", 1.10001, 1.10003, pd.Timestamp(99.5, unit="s", tz="UTC").to_pydatetime()),
+    ])
+    initial = Quote("EURUSD", 1.10000, 1.10002, pd.Timestamp(93, unit="s", tz="UTC").to_pydatetime())
+
+    acquired, detail = acquire_fresh_quote(
+        lambda: next(quotes),
+        initial_quote=initial,
+        max_age_s=5.0,
+        max_future_skew_s=5.0,
+        timeout_s=0.5,
+        poll_s=0.05,
+        now_fn=lambda: clock.wall,
+        monotonic_fn=clock.monotonic,
+        sleep_fn=clock.sleep,
+    )
+
+    assert acquired is not None
+    assert acquired.bid == 1.10001
+    assert detail["attempts"] == 2
+    assert detail["acquired"] is True
+
+
+def test_feed_health_distinguishes_benchmark_stall_from_normal_advancement():
+    health = QuoteFeedHealth.for_symbols(["EURUSD", "GBPUSD", "USDJPY"])
+    quote = Quote("EURUSD", 1.1, 1.1001, pd.Timestamp(100, unit="s", tz="UTC").to_pydatetime())
+    for symbol in health.benchmarks:
+        health.observe(symbol, quote, 0.0)
+
+    assert health.evaluate(0.0, stall_after_s=30.0) == "HEALTHY"
+    assert health.evaluate(31.0, stall_after_s=30.0) == "FEED_STALLED"
+    assert health.stall_count == 1
+
+    advanced = Quote("EURUSD", 1.10001, 1.10011, pd.Timestamp(131, unit="s", tz="UTC").to_pydatetime())
+    health.observe("EURUSD", advanced, 31.0)
+    assert health.evaluate(31.0, stall_after_s=30.0) == "HEALTHY"
 
 
 def test_emergency_broker_stop_is_wide_but_stays_inside_risk_budget():

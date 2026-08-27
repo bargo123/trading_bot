@@ -138,10 +138,10 @@ class MT5Engine(BrokerEngine):
                 tick = None
             if tick is None:
                 continue
-            ts_raw = getattr(tick, "time", None)
-            if not ts_raw:
+            ts_raw = self._tick_timestamp_seconds(tick)
+            if ts_raw is None:
                 continue
-            offset = float(ts_raw) - time.time()
+            offset = ts_raw - time.time()
             self._offset_samples.append(offset)
             if len(self._offset_samples) >= 3:
                 median = sorted(self._offset_samples)[len(self._offset_samples) // 2]
@@ -155,7 +155,18 @@ class MT5Engine(BrokerEngine):
 
     def _quote_time_utc(self, ts_raw: Any) -> datetime:
         offset = self._server_utc_offset()
-        return datetime.fromtimestamp(int(ts_raw) - offset, tz=timezone.utc)
+        return datetime.fromtimestamp(float(ts_raw) - offset, tz=timezone.utc)
+
+    @staticmethod
+    def _tick_timestamp_seconds(tick: Any) -> float | None:
+        """Return the most precise broker tick timestamp available."""
+        raw_msc = float(getattr(tick, "time_msc", 0) or 0)
+        if math.isfinite(raw_msc) and raw_msc > 0:
+            return raw_msc / 1000.0
+        raw_s = float(getattr(tick, "time", 0) or 0)
+        if math.isfinite(raw_s) and raw_s > 0:
+            return raw_s
+        return None
 
     def _is_paper_mode(self, trade_mode: int) -> bool:
         mt5 = self._api()
@@ -401,12 +412,34 @@ class MT5Engine(BrokerEngine):
             bid = ask
         if ask <= 0:
             ask = bid
-        ts_raw = getattr(tick, "time", None)
-        if ts_raw:
-            ts = self._quote_time_utc(ts_raw)
+        raw_time = int(getattr(tick, "time", 0) or 0) or None
+        raw_time_msc = int(float(getattr(tick, "time_msc", 0) or 0)) or None
+        tick_seconds = self._tick_timestamp_seconds(tick)
+        if tick_seconds is not None:
+            ts = self._quote_time_utc(tick_seconds)
         else:
             ts = datetime.now(timezone.utc)
-        return Quote(symbol=name, bid=bid, ask=ask, time=ts)
+        normalized_msc = int(round(ts.timestamp() * 1000.0)) if tick_seconds is not None else None
+        return Quote(
+            symbol=name,
+            bid=bid,
+            ask=ask,
+            time=ts,
+            time_msc=normalized_msc,
+            raw_time=raw_time,
+            raw_time_msc=raw_time_msc,
+        )
+
+    def refresh_symbols(self, symbols: list[str]) -> int:
+        """Refresh Market Watch subscriptions and re-query broker ticks."""
+        mt5 = self._require()
+        refreshed = 0
+        for symbol in symbols:
+            name = self._resolve_symbol(symbol)
+            self._ensure_symbol(name)
+            if mt5.symbol_info_tick(name) is not None:
+                refreshed += 1
+        return refreshed
 
     def symbol_spec(self, symbol: str) -> dict[str, Any]:
         """Broker contract facts (Harris/Aldridge: measure costs before promoting a scalp)."""
@@ -456,9 +489,22 @@ class MT5Engine(BrokerEngine):
             return []
         out: list[dict[str, Any]] = []
         for row in raw:
+            raw_time = int(row["time"] if hasattr(row, "__getitem__") else row.time)
+            try:
+                raw_msc_value = row["time_msc"] if hasattr(row, "__getitem__") else getattr(row, "time_msc", 0)
+            except (KeyError, IndexError, TypeError, ValueError):
+                raw_msc_value = 0
+            raw_time_msc = int(
+                float(raw_msc_value or 0)
+            ) or None
+            tick_seconds = raw_time_msc / 1000.0 if raw_time_msc else float(raw_time)
+            normalized_time = self._quote_time_utc(tick_seconds).timestamp()
             out.append(
                 {
-                    "time": int(row["time"] if hasattr(row, "__getitem__") else row.time),
+                    "time": normalized_time,
+                    "time_msc": int(round(normalized_time * 1000.0)),
+                    "raw_time": raw_time,
+                    "raw_time_msc": raw_time_msc,
                     "bid": float(row["bid"] if hasattr(row, "__getitem__") else row.bid),
                     "ask": float(row["ask"] if hasattr(row, "__getitem__") else row.ask),
                     "last": float(row["last"] if hasattr(row, "__getitem__") else getattr(row, "last", 0) or 0),

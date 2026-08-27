@@ -10,10 +10,10 @@ import math
 import os
 import sys
 import time
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 
 import pandas as pd
 
@@ -595,6 +595,175 @@ def meaningful_quote_change(
         )
     except (KeyError, TypeError, ValueError):
         return True
+
+
+@dataclass(frozen=True)
+class QuoteScanVerdict:
+    """Separate research usability from executable quote freshness."""
+
+    scan_allowed: bool
+    execution_allowed: bool
+    reason: str
+    age_s: float
+    future_skew_s: float
+
+
+def quote_scan_verdict(
+    quote: Any,
+    *,
+    max_age_s: float,
+    max_future_skew_s: float,
+    now: datetime | None = None,
+) -> QuoteScanVerdict:
+    """Allow stale prices into research while keeping send safety fail-closed."""
+    try:
+        bid = float(quote.bid)
+        ask = float(quote.ask)
+    except (AttributeError, TypeError, ValueError):
+        return QuoteScanVerdict(False, False, "invalid_quote", float("inf"), 0.0)
+    if bid <= 0 or ask <= 0 or ask + 1e-12 < bid:
+        return QuoteScanVerdict(False, False, "invalid_quote", float("inf"), 0.0)
+    age_s = quote_age_s(quote, now)
+    future_s = quote_future_skew_s(quote, now)
+    if max_future_skew_s > 0 and future_s > max_future_skew_s:
+        return QuoteScanVerdict(True, False, "future_for_execution", age_s, future_s)
+    if max_age_s > 0 and age_s > max_age_s:
+        return QuoteScanVerdict(True, False, "stale_for_execution", age_s, future_s)
+    return QuoteScanVerdict(True, True, "fresh_for_execution", age_s, future_s)
+
+
+def acquire_fresh_quote(
+    quote_getter: Callable[[], Any],
+    *,
+    initial_quote: Any | None = None,
+    max_age_s: float,
+    max_future_skew_s: float,
+    timeout_s: float = 1.0,
+    poll_s: float = 0.05,
+    now_fn: Callable[[], float] = time.time,
+    monotonic_fn: Callable[[], float] = time.monotonic,
+    sleep_fn: Callable[[float], None] = time.sleep,
+) -> tuple[Any | None, dict[str, Any]]:
+    """Poll a bounded hot path for a new executable quote, never for research."""
+    started = monotonic_fn()
+    deadline = started + max(0.0, float(timeout_s))
+    previous = initial_quote
+    attempts = 0
+    last_reason = "quote_refresh_timeout"
+    last_age = float("inf")
+    last_skew = 0.0
+    while True:
+        retrieved_at = monotonic_fn()
+        try:
+            quote = quote_getter()
+        except Exception as exc:
+            return None, {
+                "attempts": attempts + 1,
+                "acquired": False,
+                "wait_ms": max(0.0, (monotonic_fn() - started) * 1000.0),
+                "reason": f"quote_refresh_error:{type(exc).__name__}",
+            }
+        attempts += 1
+        verdict = quote_scan_verdict(
+            quote,
+            max_age_s=max_age_s,
+            max_future_skew_s=max_future_skew_s,
+            now=datetime.fromtimestamp(now_fn(), timezone.utc),
+        )
+        last_reason = verdict.reason
+        last_age = verdict.age_s
+        last_skew = verdict.future_skew_s
+        changed = previous is None or (
+            quote.time > previous.time
+            or float(quote.bid) != float(previous.bid)
+            or float(quote.ask) != float(previous.ask)
+        )
+        if verdict.execution_allowed and changed:
+            return quote, {
+                "attempts": attempts,
+                "acquired": True,
+                "wait_ms": max(0.0, (monotonic_fn() - started) * 1000.0),
+                "local_quote_acquisition_age_ms": max(
+                    0.0, (monotonic_fn() - retrieved_at) * 1000.0
+                ),
+                "broker_tick_age_s": verdict.age_s,
+                "future_skew_s": verdict.future_skew_s,
+                "timestamp_or_price_advanced": True,
+                "reason": verdict.reason,
+            }
+        previous = quote
+        if monotonic_fn() >= deadline:
+            return None, {
+                "attempts": attempts,
+                "acquired": False,
+                "wait_ms": max(0.0, (monotonic_fn() - started) * 1000.0),
+                "broker_tick_age_s": last_age,
+                "future_skew_s": last_skew,
+                "timestamp_or_price_advanced": changed,
+                "reason": last_reason,
+            }
+        sleep_fn(max(0.0, min(float(poll_s), deadline - monotonic_fn())))
+
+
+@dataclass
+class QuoteFeedHealth:
+    """Track broker tick advancement independently from local retrieval time."""
+
+    benchmarks: tuple[str, ...]
+    last_observation: dict[str, tuple[float, float, float]]
+    last_advanced_monotonic: dict[str, float]
+    status: str = "UNKNOWN"
+    stall_count: int = 0
+    recovery_attempts: int = 0
+
+    @classmethod
+    def for_symbols(cls, symbols: list[str]) -> "QuoteFeedHealth":
+        wanted = {str(s).upper() for s in symbols}
+        benchmarks = tuple(s for s in ("EURUSD", "GBPUSD", "USDJPY") if s in wanted)
+        return cls(benchmarks, {}, {})
+
+    def observe(self, symbol: str, quote: Any, monotonic_now: float) -> bool:
+        key = str(symbol).upper()
+        try:
+            timestamp = float(
+                getattr(quote, "time_msc", 0) or quote.time.timestamp() * 1000.0
+            )
+            current = (float(quote.bid), float(quote.ask), timestamp)
+        except (AttributeError, TypeError, ValueError):
+            return False
+        previous = self.last_observation.get(key)
+        advanced = previous is None or current[2] > previous[2] or current[:2] != previous[:2]
+        self.last_observation[key] = current
+        if advanced:
+            self.last_advanced_monotonic[key] = float(monotonic_now)
+        return advanced
+
+    def evaluate(self, monotonic_now: float, *, stall_after_s: float) -> str:
+        if not self.benchmarks:
+            self.status = "UNMONITORED"
+            return self.status
+        observed = [s for s in self.benchmarks if s in self.last_observation]
+        if not observed:
+            self.status = "UNKNOWN"
+            return self.status
+        stalled = all(
+            monotonic_now - self.last_advanced_monotonic.get(s, monotonic_now)
+            >= max(1.0, float(stall_after_s))
+            for s in self.benchmarks
+        )
+        previous = self.status
+        self.status = "FEED_STALLED" if stalled else "HEALTHY"
+        if self.status == "FEED_STALLED" and previous != self.status:
+            self.stall_count += 1
+        return self.status
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "stall_count": int(self.stall_count),
+            "recovery_attempts": int(self.recovery_attempts),
+            "benchmarks": list(self.benchmarks),
+        }
 
 
 def funnel_terminal_for_reason(reason: object) -> str:
@@ -1694,6 +1863,8 @@ def main() -> None:
     margin_block_until = 0.0
     last_nomoney_journal = 0.0
     last_mktclosed_journal = 0.0
+    last_quote_health_journal = 0.0
+    next_feed_recovery_at = 0.0
     last_intel_journal: dict[str, float] = {}
     intelligent_brain = None
     from aegis.intel.lifecycle import ingest_deals, load_cursor, save_cursor
@@ -1720,7 +1891,12 @@ def main() -> None:
         "margin_precheck_skip": 0,
         "min_lot_precheck_skip": 0,
         "risk_budget_precheck_skip": 0,
+        "fresh_tick_acquisition_attempts": 0,
+        "fresh_tick_acquired": 0,
     }
+    quote_refresh_wait_ms: list[float] = []
+    quote_feed_health = QuoteFeedHealth.for_symbols(symbols)
+    last_quote_diagnostics: dict[str, dict[str, Any]] = {}
     observed_funnel_counts: dict[str, int] = {"SCANS": 0, "RISK_REJECT": 0}
     global_opportunity_counts: dict[str, int] = {
         "GLOBAL_CANDIDATES": 0,
@@ -1789,6 +1965,7 @@ def main() -> None:
         if not live_symbols:
             raise SystemExit("No tradeable symbols on this MT5 account.")
         symbols = live_symbols
+        quote_feed_health = QuoteFeedHealth.for_symbols(symbols)
         if short_horizon_predictor.pipeline is not None:
             seeded = 0
             for name in symbols:
@@ -2101,7 +2278,7 @@ def main() -> None:
             selected_execution: bool = False,
             frozen_opportunity: FrozenOpportunity | None = None,
         ) -> None:
-            nonlocal day_trades, day_stamp, last_halt_journal, close_block_until
+            nonlocal day_trades, day_stamp, last_halt_journal, last_quote_health_journal, close_block_until
             nonlocal margin_block_until
             nonlocal submitted_count, fill_count
             nonlocal global_opportunity_counts
@@ -2172,41 +2349,45 @@ def main() -> None:
             loop_cfg["firehose_pip_size"] = pip
             loop_cfg["volman_pip_size"] = pip
 
-            if bool(cfg.get("oms_pretrade", False)):
-                max_age = float(cfg.get("max_quote_age_s", 5.0) or 0.0)
-                age = quote_age_s(q)
-                if max_age > 0 and age > max_age:
-                    t2t.note_reject("stale_quote")
-                    append_journal(
-                        journal,
-                        {
-                            "event": "quote_stale",
-                            "symbol": sym,
-                            "candidate_id": scan_id,
-                            "age_s": age,
-                            "max_s": max_age,
-                            "bar": str(bar_time),
-                        },
-                    )
-                    return
-                # quote_age_s clamps at zero, so a future-stamped tick reports age 0.0
-                # and would look perfectly fresh here. Reject it explicitly.
-                max_skew = float(cfg.get("max_quote_future_skew_s", max_age) or 0.0)
-                skew = quote_future_skew_s(q)
-                if max_skew > 0 and skew > max_skew:
-                    t2t.note_reject("future_quote")
-                    append_journal(
-                        journal,
-                        {
-                            "event": "quote_future",
-                            "symbol": sym,
-                            "candidate_id": scan_id,
-                            "skew_s": skew,
-                            "max_s": max_skew,
-                            "bar": str(bar_time),
-                        },
-                    )
-                    return
+            max_age = float(cfg.get("max_quote_age_s", 5.0) or 0.0) if bool(
+                cfg.get("oms_pretrade", False)
+            ) else 0.0
+            max_skew = float(cfg.get("max_quote_future_skew_s", max_age) or 0.0) if max_age > 0 else 0.0
+            scan_quote = quote_scan_verdict(
+                q,
+                max_age_s=max_age,
+                max_future_skew_s=max_skew,
+                now=datetime.fromtimestamp(now_ts, timezone.utc),
+            )
+            if not scan_quote.scan_allowed:
+                append_journal(
+                    journal,
+                    {
+                        "event": "quote_unusable_for_scan",
+                        "symbol": sym,
+                        "candidate_id": scan_id,
+                        "reason": scan_quote.reason,
+                        "bar": str(bar_time),
+                    },
+                )
+                return
+            # A stale/future broker timestamp is an execution blocker only. The
+            # research brain still evaluates this marked-age context.
+            observed_funnel_counts["SCANS"] += 1
+            if not scan_quote.execution_allowed and now_ts - last_quote_health_journal >= 15.0:
+                last_quote_health_journal = now_ts
+                append_journal(
+                    journal,
+                    {
+                        "event": "quote_not_executable_for_send",
+                        "symbol": sym,
+                        "candidate_id": scan_id,
+                        "reason": scan_quote.reason,
+                        "broker_tick_age_s": scan_quote.age_s,
+                        "future_skew_s": scan_quote.future_skew_s,
+                        "bar": str(bar_time),
+                    },
+                )
 
             # Live daily-loss is UTC wall clock. Bar timestamps can be yesterday
             # (or a stale MT5 bar) and would wipe a persisted halt on restart.
@@ -2921,10 +3102,75 @@ def main() -> None:
                         },
                     )
                     return
+            # Candidate discovery is research-only. A stale discovery quote
+            # must not prevent this candidate from entering global ranking;
+            # selected candidates still pass every send-time gate below.
+            if collect_only:
+                deferred_before = len(deferred_opportunities)
+                if brain_decision is None or brain_decision.action not in {"fire", "scale"}:
+                    return
+                decision_journal = dict(brain_decision.journal)
+                viable_candidates = decision_journal.get("viable_candidates")
+                if isinstance(viable_candidates, list) and viable_candidates:
+                    for candidate_row in viable_candidates:
+                        if not isinstance(candidate_row, dict):
+                            continue
+                        candidate_journal = candidate_row.get("decision_journal")
+                        if not isinstance(candidate_journal, dict):
+                            continue
+                        candidate_decision = replace(
+                            brain_decision,
+                            side=str(candidate_row.get("side") or "").lower(),
+                            sl=candidate_row.get("stop"),
+                            tp=candidate_row.get("target"),
+                            quantity=candidate_row.get("quantity"),
+                            expected_net_value=candidate_row.get("expected_net_ev"),
+                            journal=dict(candidate_journal),
+                        )
+                        deferred_opportunities.append(frozen_opportunity_from_decision(
+                            decision=candidate_decision,
+                            symbol=str(candidate_row.get("symbol") or sym),
+                            scan_id=scan_id,
+                            bar_time=bar_time,
+                            bid=float(q.bid),
+                            ask=float(q.ask),
+                            stop=candidate_row.get("stop"),
+                            target=candidate_row.get("target"),
+                            quantity=float(candidate_row.get("quantity") or order_qty),
+                        ))
+                else:
+                    deferred_opportunities.append(frozen_opportunity_from_decision(
+                        decision=brain_decision,
+                        symbol=sym,
+                        scan_id=scan_id,
+                        bar_time=bar_time,
+                        bid=float(q.bid),
+                        ask=float(q.ask),
+                        stop=sl,
+                        target=tp,
+                        quantity=float(brain_decision.quantity or order_qty),
+                    ))
+                global_opportunity_counts["GLOBAL_CANDIDATES"] += (
+                    len(deferred_opportunities) - deferred_before
+                )
+                append_journal(
+                    journal,
+                    {
+                        "event": "global_opportunity_discovered",
+                        "scan_id": scan_id,
+                        "symbol": sym,
+                        "side": sig.side,
+                        "expected_net_ev": brain_decision.expected_net_value,
+                        "p_captured_win": deferred_opportunities[-1].get("p_captured_win"),
+                        "discovery_quote_age_s": quote_age_s(q),
+                    },
+                )
+                return
+
             # --- Pre-send refresh (P8): the decision was priced on quote q,
-            # fetched before the brain ran. If that quote is now stale, fetch
-            # ONE fresh tick and re-validate; never send on stale pricing and
-            # never disable stale protection to force trades through.
+            # fetched before the brain ran. If that quote is now stale, use a
+            # short bounded acquisition loop and re-validate; never send on
+            # stale pricing and never disable stale protection to force trades.
             from aegis.intel.send_guard import (
                 margin_precheck_ok,
                 min_lot_ok,
@@ -2933,11 +3179,31 @@ def main() -> None:
             )
 
             max_age_send = float(cfg.get("max_quote_age_s", 5.0) or 0.0)
-            if needs_quote_refresh(quote_age_s(q), max_age_s=max_age_send):
+            max_skew_send = float(
+                cfg.get("max_quote_future_skew_s", max_age_send) or 0.0
+            )
+            if needs_quote_refresh(quote_age_s(q), max_age_s=max_age_send) or (
+                max_skew_send > 0 and quote_future_skew_s(q) > max_skew_send
+            ):
                 quote_refresh_counts["stale_observed_at_send"] += 1
-                try:
-                    q = eng.quote(sym)
-                except Exception as exc:
+                refreshed, acquisition = acquire_fresh_quote(
+                    lambda: eng.quote(sym),
+                    initial_quote=q,
+                    max_age_s=max_age_send,
+                    max_future_skew_s=max_skew_send,
+                    timeout_s=float(cfg.get("fresh_quote_timeout_s", 1.0) or 1.0),
+                    poll_s=float(cfg.get("fresh_quote_poll_s", 0.05) or 0.05),
+                )
+                quote_refresh_counts["fresh_tick_acquisition_attempts"] += int(
+                    acquisition.get("attempts", 0) or 0
+                )
+                if acquisition.get("acquired"):
+                    quote_refresh_counts["fresh_tick_acquired"] += 1
+                if acquisition.get("wait_ms") is not None:
+                    quote_refresh_wait_ms.append(float(acquisition["wait_ms"]))
+                    if len(quote_refresh_wait_ms) > 256:
+                        del quote_refresh_wait_ms[:-256]
+                if refreshed is None:
                     quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
                     if selected_execution:
                         global_opportunity_counts["GLOBAL_INVALIDATED_ON_REFRESH"] += 1
@@ -2946,11 +3212,14 @@ def main() -> None:
                         {
                             "event": "quote_refresh_failed",
                             "symbol": sym,
-                            "why": str(exc)[:120],
+                            "why": acquisition.get("reason", "quote_refresh_failed"),
+                            "attempts": acquisition.get("attempts", 0),
+                            "broker_tick_age_s": acquisition.get("broker_tick_age_s"),
                             "bar": str(bar_time),
                         },
                     )
                     return
+                q = refreshed
                 refreshed_age = quote_age_s(q)
                 live_spread = max(0.0, float(q.ask) - float(q.bid))
                 verdict = refresh_verdict(
@@ -2975,6 +3244,7 @@ def main() -> None:
                             "symbol": sym,
                             "reason": verdict.reason,
                             "age_s": refreshed_age,
+                            "future_skew_s": quote_future_skew_s(q),
                             "spread": live_spread,
                             "max_spread": max_spread,
                             "bar": str(bar_time),
@@ -3260,75 +3530,6 @@ def main() -> None:
                         },
                     )
                     return
-            # Reserve only after every pre-send guard passes. A rejected
-            # candidate must not consume an exploration slot for 180 seconds.
-            if collect_only:
-                deferred_before = len(deferred_opportunities)
-                if brain_decision is None or brain_decision.action not in {"fire", "scale"}:
-                    return
-                decision_journal = dict(brain_decision.journal)
-                prediction_journal = decision_journal.get("short_horizon_prediction") or {}
-                economics_journal = (
-                    decision_journal.get("exploration_economics")
-                    or decision_journal
-                )
-                viable_candidates = decision_journal.get("viable_candidates")
-                if isinstance(viable_candidates, list) and viable_candidates:
-                    for candidate_row in viable_candidates:
-                        if not isinstance(candidate_row, dict):
-                            continue
-                        candidate_journal = candidate_row.get("decision_journal")
-                        if not isinstance(candidate_journal, dict):
-                            continue
-                        candidate_decision = replace(
-                            brain_decision,
-                            side=str(candidate_row.get("side") or "").lower(),
-                            sl=candidate_row.get("stop"),
-                            tp=candidate_row.get("target"),
-                            quantity=candidate_row.get("quantity"),
-                            expected_net_value=candidate_row.get("expected_net_ev"),
-                            journal=dict(candidate_journal),
-                        )
-                        deferred_opportunities.append(frozen_opportunity_from_decision(
-                            decision=candidate_decision,
-                            symbol=str(candidate_row.get("symbol") or sym),
-                            scan_id=scan_id,
-                            bar_time=bar_time,
-                            bid=float(q.bid),
-                            ask=float(q.ask),
-                            stop=candidate_row.get("stop"),
-                            target=candidate_row.get("target"),
-                            quantity=float(candidate_row.get("quantity") or order_qty),
-                        ))
-                else:
-                    deferred_opportunities.append(frozen_opportunity_from_decision(
-                        decision=brain_decision,
-                        symbol=sym,
-                        scan_id=scan_id,
-                        bar_time=bar_time,
-                        bid=float(q.bid),
-                        ask=float(q.ask),
-                        stop=req.stop_loss,
-                        target=req.take_profit,
-                        quantity=float(order_qty),
-                    ))
-                global_opportunity_counts["GLOBAL_CANDIDATES"] += (
-                    len(deferred_opportunities) - deferred_before
-                )
-                append_journal(
-                    journal,
-                    {
-                        "event": "global_opportunity_discovered",
-                        "scan_id": scan_id,
-                        "symbol": sym,
-                        "side": sig.side,
-                        "expected_net_ev": brain_decision.expected_net_value,
-                        "p_captured_win": deferred_opportunities[-1].get(
-                            "p_captured_win"
-                        ),
-                    },
-                )
-                return
             if brain_decision is not None and brain_decision.journal.get("exploration"):
                 _thesis_key = str(brain_decision.journal.get("thesis_key") or "")
                 if _thesis_key:
@@ -3830,14 +4031,65 @@ def main() -> None:
                 )
                 # Continuously sample quotes for ALL watched symbols (not just on new M1 bar)
                 now_ts = time.time()
+                now_mono = time.monotonic()
                 deferred_opportunities.clear()
                 for sym in symbols:
                     try:
+                        acquired_at = time.monotonic()
                         q = eng.quote(sym)
+                        acquisition_age_ms = max(0.0, (time.monotonic() - acquired_at) * 1000.0)
+                        quote_feed_health.observe(sym, q, now_mono)
+                        last_quote_diagnostics[sym] = {
+                            "raw_tick_time": getattr(q, "raw_time", None),
+                            "raw_tick_time_msc": getattr(q, "raw_time_msc", None),
+                            "normalized_time": q.time.isoformat() if getattr(q, "time", None) else None,
+                            "broker_tick_age_s": quote_age_s(q),
+                            "local_quote_acquisition_age_ms": acquisition_age_ms,
+                            "bid": float(q.bid),
+                            "ask": float(q.ask),
+                        }
                         if q.bid and q.ask:
-                            quote_buffer.record_from_quote(sym, {"bid": q.bid, "ask": q.ask, "time": now_ts})
+                            # Preserve broker event time. The local retrieval
+                            # instant is telemetry only and must not fabricate
+                            # fresh market history from a stale last tick.
+                            quote_buffer.record_from_quote(
+                                sym,
+                                {"bid": q.bid, "ask": q.ask, "time": q.time.timestamp()},
+                            )
                     except Exception:
                         pass
+                feed_status = quote_feed_health.evaluate(
+                    now_mono,
+                    stall_after_s=float(cfg.get("feed_stall_after_s", 30.0) or 30.0),
+                )
+                if feed_status == "FEED_STALLED" and now_ts >= next_feed_recovery_at:
+                    quote_feed_health.recovery_attempts += 1
+                    next_feed_recovery_at = now_ts + max(
+                        5.0, float(cfg.get("feed_recovery_backoff_s", 30.0) or 30.0)
+                    )
+                    try:
+                        refresh_symbols = getattr(eng, "refresh_symbols", None)
+                        if callable(refresh_symbols):
+                            refresh_symbols(list(quote_feed_health.benchmarks))
+                        append_journal(
+                            journal,
+                            {
+                                "event": "feed_stalled_recovery",
+                                "benchmarks": list(quote_feed_health.benchmarks),
+                                "attempt": quote_feed_health.recovery_attempts,
+                                "backoff_s": max(5.0, float(cfg.get("feed_recovery_backoff_s", 30.0) or 30.0)),
+                            },
+                        )
+                    except Exception as exc:
+                        append_journal(
+                            journal,
+                            {
+                                "event": "feed_stalled_recovery_failed",
+                                "benchmarks": list(quote_feed_health.benchmarks),
+                                "attempt": quote_feed_health.recovery_attempts,
+                                "reason": f"{type(exc).__name__}:{exc}",
+                            },
+                        )
                 extra_hb = {
                     "status": "running",
                     "equity": equity,
@@ -3854,6 +4106,10 @@ def main() -> None:
                     ),
                     "per_trade_risk_active": bool(risk.risk_percent > 0),
                     "circuit_blocked_until": float(circuit.blocked_until or 0),
+                    "feed_status": feed_status,
+                    "feed_stall_count": quote_feed_health.stall_count,
+                    "feed_recovery_attempts": quote_feed_health.recovery_attempts,
+                    "quote_diagnostics": dict(last_quote_diagnostics),
                 }
                 _risk_ok, _risk_why = risk.allow(equity, open_positions=len(all_pos))
                 extra_hb["risk_halted"] = bool(risk.state.halted) or (not _risk_ok)
@@ -4188,6 +4444,23 @@ def main() -> None:
                     "FRESH_QUOTES_RECOVERED": int(
                         quote_refresh_counts.get("fresh_quote_recovered", 0) or 0
                     ),
+                    "FRESH_TICK_ACQUISITION_ATTEMPTS": int(
+                        quote_refresh_counts.get("fresh_tick_acquisition_attempts", 0) or 0
+                    ),
+                    "FRESH_TICK_ACQUIRED": int(
+                        quote_refresh_counts.get("fresh_tick_acquired", 0) or 0
+                    ),
+                    "FRESH_TICK_WAIT_P50_MS": (
+                        round(sorted(quote_refresh_wait_ms)[len(quote_refresh_wait_ms) // 2], 3)
+                        if quote_refresh_wait_ms else None
+                    ),
+                    "FRESH_TICK_WAIT_P95_MS": (
+                        round(sorted(quote_refresh_wait_ms)[int(0.95 * (len(quote_refresh_wait_ms) - 1))], 3)
+                        if quote_refresh_wait_ms else None
+                    ),
+                    "FEED_STATUS": quote_feed_health.status,
+                    "FEED_STALL_COUNT": int(quote_feed_health.stall_count),
+                    "FEED_RECOVERY_ATTEMPTS": int(quote_feed_health.recovery_attempts),
                     "RISK_RESIZED": int(
                         quote_refresh_counts.get("risk_resized", 0) or 0
                     ),

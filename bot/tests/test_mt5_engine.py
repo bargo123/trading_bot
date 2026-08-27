@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -225,6 +227,65 @@ def test_server_offset_does_not_absorb_stale_tick_age(monkeypatch):
 
     assert eng._server_utc_offset() == 10_800
     assert eng.quote("EURUSD").time.timestamp() == now - 35
+
+
+def test_quote_prefers_millisecond_tick_timestamp(monkeypatch):
+    import aegis.engines.mt5 as mt5_mod
+
+    now = 1_700_000_000.250
+    monkeypatch.setattr(mt5_mod.time, "time", lambda: now)
+    api = FakeMT5()
+    api.tick.time = int(now + 10_800 - 2)
+    api.tick.time_msc = int((now + 10_800 - 0.125) * 1000)
+    eng = _engine(api)
+    eng._connected = True
+    eng._server_utc_offset_s = 10_800
+
+    quote = eng.quote("EURUSD")
+
+    assert quote.time.timestamp() == pytest.approx(now - 0.125, abs=0.001)
+    assert quote.time_msc == int(round((now - 0.125) * 1000))
+
+
+@pytest.mark.parametrize("offset", [0, 7_200, 10_800])
+def test_server_offset_uses_millisecond_ticks_at_timezone_boundaries(monkeypatch, offset):
+    import aegis.engines.mt5 as mt5_mod
+
+    now = 1_700_000_000.750
+    monkeypatch.setattr(mt5_mod.time, "time", lambda: now)
+    api = FakeMT5()
+    api.tick.time = int(now + offset - 1)
+    api.tick.time_msc = int((now + offset - 0.125) * 1000)
+    eng = _engine(api)
+    eng._connected = True
+
+    assert eng._server_utc_offset() == offset
+
+
+def test_copy_ticks_normalizes_millisecond_timestamps(monkeypatch):
+    import aegis.engines.mt5 as mt5_mod
+
+    now = 1_700_000_000.250
+    monkeypatch.setattr(mt5_mod.time, "time", lambda: now)
+    api = FakeMT5()
+    api.copy_ticks_range = lambda *args: [{
+        "time": int(now + 10_800 - 2),
+        "time_msc": int((now + 10_800 - 0.125) * 1000),
+        "bid": 1.1,
+        "ask": 1.1002,
+        "last": 0.0,
+        "volume": 0.0,
+        "flags": 0,
+    }]
+    eng = _engine(api)
+    eng._connected = True
+    eng._server_utc_offset_s = 10_800
+
+    tick = eng.copy_ticks("EURUSD", lookback_seconds=10)[0]
+
+    assert tick["time"] == pytest.approx(now - 0.125, abs=0.001)
+    assert tick["time_msc"] == int(round((now - 0.125) * 1000))
+    assert tick["raw_time_msc"] == int((now + 10_800 - 0.125) * 1000)
 
 
 def test_factory_mt5():

@@ -30,6 +30,11 @@ class Quote:
     bid: float
     ask: float
     time: datetime
+    # Normalized UTC epoch milliseconds when supplied by the broker. Optional
+    # raw fields preserve feed diagnostics without changing other engines.
+    time_msc: int | None = None
+    raw_time: int | None = None
+    raw_time_msc: int | None = None
 
 
 @dataclass(frozen=True)
