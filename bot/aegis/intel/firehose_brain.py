@@ -409,9 +409,14 @@ def _prediction_for_candidate(
     *,
     side: str,
     horizon_s: int,
+    mechanism: str | None = None,
 ) -> dict[str, Any] | None:
-    """Select the calibrated result for one exact side/horizon variant."""
+    """Select the calibrated result for one exact side/mechanism/horizon variant."""
     if not isinstance(prediction, Mapping):
+        return None
+    configured_mechanism = str(prediction.get("mechanism") or "").strip().lower()
+    requested_mechanism = str(mechanism or "").strip().lower()
+    if configured_mechanism and requested_mechanism and configured_mechanism != requested_mechanism:
         return None
     side_predictions = prediction.get("side_predictions")
     side_prediction = (
@@ -1348,7 +1353,9 @@ class IntelligentFirehoseBrain:
             candidate_evidence = evidence
             candidate_prediction = _prediction_for_candidate(
                 short_horizon_prediction,
-                side=str(mc.side), horizon_s=int(mc.max_hold_s),
+                side=str(mc.side),
+                horizon_s=int(mc.max_hold_s),
+                mechanism=str(getattr(mc, "family", "") or ""),
             )
             shadow_probe = bool(
                 exploration_shadow_model_probe
@@ -2552,6 +2559,12 @@ class IntelligentFirehoseBrain:
                         "calibration_ece",
                         "expected_captured_exit_return",
                         "expected_captured_exit_return_lcb95",
+                        "p_captured_win",
+                        "p_captured_win_lcb95",
+                        "mechanism",
+                        "label_identity",
+                        "label_target",
+                        "capture_probability_reason",
                         "feature_snapshot",
                         "artifact_status",
                         "execution_status",

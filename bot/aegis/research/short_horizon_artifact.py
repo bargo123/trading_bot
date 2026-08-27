@@ -19,10 +19,16 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 import pandas as pd
 
-from aegis.research.short_horizon import DEFAULT_HORIZONS_S, session_features, symbol_features
+from aegis.research.short_horizon import (
+    DEFAULT_HORIZONS_S,
+    mechanism_features,
+    session_features,
+    symbol_features,
+)
 from aegis.research.registry import DuplicateExperimentError, ExperimentRegistry
 from aegis.research_factory.evaluation import record_outcome
 from aegis.research_factory.ml_pipeline import MLPipeline, ModelConfig
+from aegis.intel.analogue_store import is_executable_capture_provenance
 from aegis.intel.trade_controller import TradeController
 from aegis.intel.trade_economics import wilson_lower_bound
 
@@ -42,7 +48,11 @@ class ChronologicalSlices:
 
 
 def _hash_frame(frame: pd.DataFrame) -> str:
-    payload = frame.sort_values(["time", "symbol", "side", "horizon_s"], kind="stable")
+    order = [
+        column for column in ("time", "symbol", "side", "mechanism", "horizon_s")
+        if column in frame.columns
+    ]
+    payload = frame.sort_values(order, kind="stable") if order else frame
     raw = payload.to_json(orient="records", date_format="iso", double_precision=15).encode()
     return hashlib.sha256(raw).hexdigest()
 
@@ -288,6 +298,8 @@ def build_quote_training_frame(
     slippage_bps: float = 0.0,
     commission_round_trip_usd: float = 0.0,
     usd_per_price_unit_by_symbol: Mapping[str, float] | None = None,
+    mechanism: str = "quote_microstructure_v1",
+    provenance: str = "unknown",
 ) -> pd.DataFrame:
     """Create point-in-time feature/label rows from completed quotes.
 
@@ -304,6 +316,12 @@ def build_quote_training_frame(
         raise ValueError("at least one positive horizon is required")
     if int(sample_every_s) <= 0:
         raise ValueError("sample_every_s must be positive")
+    mechanism = str(mechanism or "").strip()
+    provenance = str(provenance or "").strip()
+    if not mechanism:
+        raise ValueError("mechanism must not be empty")
+    if not provenance:
+        raise ValueError("provenance must not be empty")
     target_mode = str(target_mode).strip().lower()
     if target_mode not in {"mfe_first", "fast_harvest", "terminal_profit", "captured_exit_replay"}:
         raise ValueError(
@@ -449,12 +467,24 @@ def build_quote_training_frame(
                         {
                             "time": features.iloc[index]["time"],
                             "symbol": str(symbol).upper(),
+                            "mechanism": mechanism,
+                            "label_provenance": provenance,
+                            "evidence_provenance": provenance,
+                            "label_target": (
+                                "captured_exit_net_pnl > 0"
+                                if target_mode == "captured_exit_replay"
+                                else f"{target_mode}_auxiliary"
+                            ),
+                            "label_identity": "|".join(
+                                (str(symbol).upper(), side, mechanism, str(int(horizon)))
+                            ),
                             "side": side,
                             "side_buy": 1.0 if side == "buy" else 0.0,
                             "entry_price": float(ask[index] if side == "buy" else bid[index]),
                             "entry_bid": float(bid[index]),
                             "entry_ask": float(ask[index]),
                             "horizon_s": float(horizon),
+                            **mechanism_features(mechanism),
                             # Profit means the executable path became green
                             # within the stated horizon, after spread.
                             "target": target,
@@ -468,9 +498,27 @@ def build_quote_training_frame(
                             "captured_exit_net_pnl": captured,
                             "captured_exit_return": captured / float(mid[index]) if mid[index] > 0 else np.nan,
                             "captured_exit_reason": captured_reason,
+                            "captured_exit_action": (
+                                shared_replay.get("captured_exit_action")
+                                if shared_replay is not None else None
+                            ),
                             "captured_net_win": bool(captured > 0.0),
+                            "captured_win_label": (
+                                int(captured > 0.0)
+                                if target_mode == "captured_exit_replay" else None
+                            ),
+                            "net_pnl": (
+                                captured if target_mode == "captured_exit_replay" else None
+                            ),
                             "assumed_slippage_bps": slippage_bps,
                             "assumed_commission_round_trip_usd": commission_round_trip_usd,
+                            "spread_price": float(ask[index] - bid[index]),
+                            "entry_spread_price": float(ask[index] - bid[index]),
+                            "commission_usd": float(commission_round_trip_usd),
+                            "commission": float(commission_round_trip_usd),
+                            "slippage_price": float(slippage_price),
+                            "slippage": float(slippage_price),
+                            "slippage_bps": float(slippage_bps),
                             "expected_initial_friction_price": (
                                 shared_replay.get("entry_spread_price")
                                 if shared_replay is not None else None
@@ -484,6 +532,8 @@ def build_quote_training_frame(
                                 if shared_replay is not None
                                 else (future_times.iloc[int(np.argmax(signed))] - features.iloc[index]["time"]).total_seconds()
                             ),
+                            "time_to_first_net_green_s": time_to_profit,
+                            "time_to_first_net_green": time_to_profit,
                             "never_green": bool(
                                 shared_replay.get("never_green")
                                 if shared_replay is not None
@@ -532,19 +582,79 @@ def _model_frame(frame: pd.DataFrame) -> pd.DataFrame:
     # Keep outcome columns out of the estimator entirely.  This explicit
     # allowlist prevents future label additions from becoming leaked features.
     excluded = {
-        "time", "symbol", "side", "target", "terminal_net_pnl",
+        "time", "symbol", "side", "mechanism", "label_provenance",
+        "evidence_provenance", "label_target", "label_identity",
+        "target", "terminal_net_pnl",
         "terminal_return", "mfe", "mae", "tail_loss",
         "harvest_return", "time_to_profit_s", "time_to_failure_s",
         "captured_exit_net_pnl", "captured_exit_return", "captured_exit_reason",
+        "captured_exit_action",
         "captured_net_win", "never_green", "green_then_loser", "capture_ratio",
         "maximum_favorable_executable_move", "maximum_adverse_executable_move",
         "time_to_peak_s",
+        "net_pnl", "captured_win_label", "spread_price", "commission_usd",
+        "slippage_price", "slippage_bps", "time_to_first_net_green_s",
         "assumed_slippage_bps",
     }
     columns = [column for column in frame.columns if column not in excluded]
     result = frame.loc[:, columns].copy()
     result["profit_barrier_first"] = frame["target"].astype(int)
     return result
+
+
+def captured_win_calibration_metrics(
+    predicted_probability: Sequence[float],
+    captured_net_pnl: Sequence[float],
+    *,
+    bins: int = 10,
+) -> dict[str, Any]:
+    """Measure calibration against the executable captured-net winner label.
+
+    A positive MFE, temporary green mark, or terminal mark is deliberately not
+    used here.  The binary target is the result of the sequential live-exit
+    replay after executable spread, slippage, and commission.
+    """
+    probabilities = np.asarray(tuple(predicted_probability), dtype=float)
+    net_pnl = np.asarray(tuple(captured_net_pnl), dtype=float)
+    if len(probabilities) != len(net_pnl):
+        raise ValueError("predicted_probability and captured_net_pnl must have equal length")
+    if not np.isfinite(probabilities).all() or (
+        (probabilities < 0.0) | (probabilities > 1.0)
+    ).any():
+        raise ValueError("predicted_probability must be finite and between 0 and 1")
+    if not np.isfinite(net_pnl).all():
+        raise ValueError("captured_net_pnl must be finite")
+    actual = (net_pnl > 0.0).astype(float)
+    calibration_bins: list[dict[str, Any]] = []
+    calibration_ece = 0.0
+    bin_count = max(1, int(bins))
+    for index in range(bin_count):
+        lower = float(index / bin_count)
+        upper = float((index + 1) / bin_count)
+        mask = (probabilities >= lower) & (
+            probabilities <= upper if index == bin_count - 1 else probabilities < upper
+        )
+        if not mask.any():
+            continue
+        predicted_mean = float(probabilities[mask].mean())
+        actual_mean = float(actual[mask].mean())
+        calibration_ece += float(mask.mean()) * abs(predicted_mean - actual_mean)
+        calibration_bins.append({
+            "lower": lower,
+            "upper": min(1.0, upper),
+            "n": int(mask.sum()),
+            "predicted_mean": predicted_mean,
+            "actual_rate": actual_mean,
+        })
+    return {
+        "target": "captured_exit_net_pnl > 0",
+        "n": int(len(actual)),
+        "captured_win_count": int(actual.sum()),
+        "captured_win_rate": float(actual.mean()) if len(actual) else None,
+        "brier_score": float(np.mean(np.square(probabilities - actual))) if len(actual) else None,
+        "calibration_ece": float(calibration_ece) if len(actual) else None,
+        "calibration_bins": calibration_bins,
+    }
 
 
 def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, Any]:
@@ -561,6 +671,28 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
     captured = pd.to_numeric(
         frame.get("captured_exit_return", frame["terminal_return"]), errors="coerce"
     ).to_numpy(dtype=float)
+    if "net_pnl" in frame:
+        captured_source = frame["net_pnl"]
+    elif "captured_exit_net_pnl" in frame:
+        captured_source = frame["captured_exit_net_pnl"]
+    elif "terminal_net_pnl" in frame:
+        captured_source = frame["terminal_net_pnl"]
+    else:
+        captured_source = frame["terminal_return"]
+    captured_net = pd.to_numeric(captured_source, errors="coerce").to_numpy(dtype=float)
+    if len(captured_net) != len(frame) or not np.isfinite(captured_net).all():
+        fallback_source = (
+            frame["captured_exit_net_pnl"]
+            if "captured_exit_net_pnl" in frame
+            else frame["terminal_net_pnl"]
+            if "terminal_net_pnl" in frame
+            else frame["terminal_return"]
+        )
+        captured_net = pd.to_numeric(fallback_source, errors="coerce").to_numpy(dtype=float)
+    captured_calibration = captured_win_calibration_metrics(
+        probability,
+        captured_net,
+    )
     selected_captured = captured[decision]
     mfe_values = pd.to_numeric(
         frame.get("mfe", pd.Series(np.nan, index=frame.index)), errors="coerce"
@@ -690,6 +822,9 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
         "positive_rate": float(actual.mean()) if len(actual) else None,
         "brier": float(np.mean(np.square(probability - actual))) if len(actual) else None,
         "calibration_ece": float(calibration_ece) if len(actual) else None,
+        "captured_win_brier": captured_calibration["brier_score"],
+        "captured_win_calibration_ece": captured_calibration["calibration_ece"],
+        "captured_win_calibration": captured_calibration,
         "calibration_bins": calibration_bins,
         "confusion_matrix": confusion,
         "expectancy_lcb95_return": expectancy_lcb95,
@@ -1184,6 +1319,23 @@ def train_and_publish(
         sealed_metrics=sealed_metrics,
         sealed_by_horizon=sealed_by_horizon,
     )
+    provenance_values = sorted(
+        {
+            str(value).strip().lower()
+            for value in frame.get("label_provenance", pd.Series(["unknown"])).dropna()
+            if str(value).strip()
+        }
+    )
+    if (
+        execution_status == "EXECUTION_CANDIDATE"
+        and (
+            str(target_definition).strip().lower() != "captured_exit_replay"
+            or not provenance_values
+            or not all(is_executable_capture_provenance(value) for value in provenance_values)
+        )
+    ):
+        execution_status = "SHADOW_ONLY_UNMEASURED_LABEL"
+        execution_status_reason = "execution_requires_measured_quote_replay_provenance"
     authorized_symbols = _authorized_symbols(
         test_by_symbol=test_by_symbol,
         sealed_by_symbol_horizon=sealed_by_symbol_horizon,
@@ -1196,6 +1348,38 @@ def train_and_publish(
     elif execution_status == "EXECUTION_CANDIDATE":
         execution_status = "SHADOW_ONLY_NO_POSITIVE_OOS"
         execution_status_reason = "no_symbol_scope_positive_oos"
+
+    def identity_metrics(part: pd.DataFrame) -> dict[str, dict[str, Any]]:
+        if part.empty:
+            return {}
+        working = part.copy()
+        if "mechanism" not in working.columns:
+            working["mechanism"] = "legacy_unknown"
+        groups = working.groupby(
+            ["symbol", "side", "mechanism", "horizon_s"],
+            sort=True,
+            dropna=False,
+        )
+        result: dict[str, dict[str, Any]] = {}
+        for (symbol, side, mechanism, horizon), subset in groups:
+            scope_threshold = threshold_by_symbol_horizon.get(
+                str(symbol).upper(), {}
+            ).get(str(int(float(horizon))), threshold)
+            key = "|".join((
+                str(symbol).upper(),
+                str(side).lower(),
+                str(mechanism).strip().lower(),
+                str(int(float(horizon))),
+            ))
+            result[key] = evaluate(
+                subset,
+                threshold=float(scope_threshold),
+                max_uncertainty=uncertainty_limit,
+            )
+        return result
+
+    test_by_identity = identity_metrics(slices.test)
+    sealed_by_identity = identity_metrics(slices.sealed)
 
     slippage_values = sorted(
         {
@@ -1236,6 +1420,17 @@ def train_and_publish(
             "decision_horizon_s": int(selected_decision_horizon),
             "decision_horizon_selection": horizon_selection_reason,
             "target_definition": str(target_definition),
+            "mechanisms": sorted(
+                {
+                    str(value).strip().lower()
+                    for value in frame.get("mechanism", pd.Series(["legacy_unknown"])).dropna()
+                    if str(value).strip()
+                }
+            ),
+            "label_provenance": provenance_values,
+            "evidence_identity_fields": ["symbol", "side", "mechanism", "horizon_s"],
+            "test_by_identity": test_by_identity,
+            "sealed_by_identity": sealed_by_identity,
             "threshold": float(threshold),
             "threshold_by_symbol_horizon": threshold_by_symbol_horizon,
             "min_model_agreement": 0.6,
@@ -1245,9 +1440,11 @@ def train_and_publish(
                 "validation_by_horizon": validation_by_horizon,
                 "test": test_metrics,
                 "test_by_symbol": test_by_symbol,
+                "test_by_identity": test_by_identity,
                 "sealed": sealed_metrics,
                 "sealed_by_horizon": sealed_by_horizon,
                 "sealed_by_symbol_horizon": sealed_by_symbol_horizon,
+                "sealed_by_identity": sealed_by_identity,
             },
             "trained_at": datetime.now(timezone.utc).isoformat(),
             "cost_evidence": (
@@ -1281,6 +1478,13 @@ def train_and_publish(
                 "SHORT_HORIZON_MODEL_STATUS": execution_status,
                 "EXECUTION_STATUS": execution_status,
                 "TARGET_DEFINITION": str(target_definition),
+                "PREDICTION_TARGET": (
+                    "captured_exit_net_pnl > 0"
+                    if str(target_definition).strip().lower() == "captured_exit_replay"
+                    else str(target_definition)
+                ),
+                "LABEL_PROVENANCE": provenance_values,
+                "EVIDENCE_IDENTITY": ["symbol", "side", "mechanism", "horizon_s"],
                 "AUTHORIZED_SYMBOLS": authorized_symbols,
                 "MODEL_COUNT": len(pipeline.models),
                 "DATASET_HASH": _hash_frame(frame),
@@ -1293,11 +1497,15 @@ def train_and_publish(
                 "OOS_CAPTURED_PF": sealed_metrics.get("captured_exit_profit_factor"),
                 "P_CAPTURED_WIN": sealed_metrics.get("captured_exit_win_rate"),
                 "P_CAPTURED_WIN_LCB95": sealed_metrics.get("captured_exit_win_lcb95"),
+                "P_CAPTURED_WIN_TARGET": "captured_exit_net_pnl > 0",
                 "TARGET_CAPTURE_WIN_RATE_LCB95": MIN_CAPTURED_EXIT_WIN_LCB95,
                 "OOS_CAPTURED_EV_LCB95": sealed_metrics.get("captured_exit_lcb95_return"),
                 "P95_LOSS": sealed_metrics.get("p95_loss_return"),
                 "P99_LOSS": sealed_metrics.get("p99_loss_return"),
                 "CALIBRATION_ECE": sealed_metrics.get("calibration_ece"),
+                "CAPTURED_WIN_CALIBRATION_ECE": sealed_metrics.get(
+                    "captured_win_calibration_ece"
+                ),
                 "ABSTAIN_RATE": sealed_metrics.get("abstain_rate"),
                 "SEALED_OOS_TRADES": sealed_metrics.get("selected"),
                 "SEALED_OOS_WINS": sealed_metrics.get("captured_exit_win_count"),

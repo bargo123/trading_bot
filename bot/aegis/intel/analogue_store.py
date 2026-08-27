@@ -36,9 +36,21 @@ class AnalogueEvidence:
     provenance: str = "unknown"
     outcome_unit: str = "unknown"
     horizon_s: int | None = None
+    mechanism: str | None = None
+
+    @property
+    def captured_win_probability(self) -> float | None:
+        """Return probability only for exact executable capture evidence."""
+        if not is_executable_capture_provenance(self.provenance):
+            return None
+        if self.horizon_s is None or not self.mechanism:
+            return None
+        return self.win_probability
 
     def as_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        result = asdict(self)
+        result["captured_win_probability"] = self.captured_win_probability
+        return result
 
 
 def _similarity(query: Mapping[str, str], row: Mapping[str, str]) -> float:
@@ -141,6 +153,7 @@ class AnalogueStore:
         pool_across_symbols: bool = False,
         exact_state: Mapping[str, str] | None = None,
         horizon_s: int | None = None,
+        mechanism: str | None = None,
     ) -> AnalogueEvidence:
         """Point-in-time analogue evidence for one state.
 
@@ -172,6 +185,7 @@ class AnalogueStore:
                 requested_horizon = int(horizon_s)
             except (TypeError, ValueError, OverflowError):
                 requested_horizon = -1
+        requested_mechanism = str(mechanism or "").strip().lower() or None
         for row in self._records:
             if not exact:
                 if symbol and not pool_across_symbols and str(row.get("symbol") or "").upper() != symbol:
@@ -195,6 +209,12 @@ class AnalogueStore:
                         continue
                 except (TypeError, ValueError, OverflowError):
                     continue
+            if requested_mechanism is not None:
+                row_mechanism = str(
+                    row.get("mechanism") or row.get("family") or ""
+                ).strip().lower()
+                if row_mechanism != requested_mechanism:
+                    continue
             if exact:
                 if not all(str(row.get(key) or "") == value for key, value in exact.items()):
                     continue
@@ -213,6 +233,7 @@ class AnalogueStore:
                 "no_observations", False, 0.0,
                 provenance=self.provenance, outcome_unit=self.outcome_unit,
                 horizon_s=(requested_horizon if requested_horizon and requested_horizon > 0 else None),
+                mechanism=requested_mechanism,
             )
         matched.sort(key=lambda item: item[0], reverse=True)
         outcomes = [value for _, value in matched]
@@ -251,4 +272,5 @@ class AnalogueStore:
             provenance=self.provenance,
             outcome_unit=self.outcome_unit,
             horizon_s=(requested_horizon if requested_horizon and requested_horizon > 0 else None),
+            mechanism=requested_mechanism,
         )

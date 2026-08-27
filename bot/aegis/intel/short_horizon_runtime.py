@@ -14,7 +14,11 @@ import pandas as pd
 
 from aegis.intel.broker_math import BrokerSymbolSpec
 from aegis.intel.paths import BOT_ROOT, resolve_bot_path
-from aegis.research.short_horizon import DEFAULT_HORIZONS_S, point_in_time_features
+from aegis.research.short_horizon import (
+    DEFAULT_HORIZONS_S,
+    mechanism_features,
+    point_in_time_features,
+)
 from aegis.research.short_horizon_artifact import (
     MIN_CAPTURED_EXIT_LOSSES,
     MIN_CAPTURED_EXIT_WIN_LCB95,
@@ -206,6 +210,18 @@ class ShortHorizonPredictor:
                         "execution_requires_exact_symbol_horizon_oos",
                     )
                     return
+                mechanisms = metadata.get("mechanisms")
+                identity_oos = (metadata.get("oos") or {}).get("sealed_by_identity")
+                if (
+                    not isinstance(mechanisms, list)
+                    or not mechanisms
+                    or not isinstance(identity_oos, Mapping)
+                ):
+                    self.status, self.reason = (
+                        "invalid_artifact",
+                        "execution_requires_exact_label_identity",
+                    )
+                    return
             self.pipeline = MLPipeline.load(self.artifact_path)
             if len(self.pipeline.models) < 2:
                 self.status, self.reason = "invalid_artifact", "insufficient_models"
@@ -244,6 +260,11 @@ class ShortHorizonPredictor:
             "model_count": len(self.pipeline.models) if self.pipeline is not None else 0,
             "execution_status": self.execution_status,
             "target_definition": self.metadata.get("target_definition"),
+            "prediction_target": self.metadata.get("runtime_proof", {}).get(
+                "PREDICTION_TARGET"
+            ) if isinstance(self.metadata.get("runtime_proof"), Mapping) else None,
+            "mechanisms": self.metadata.get("mechanisms") or [],
+            "evidence_identity_fields": self.metadata.get("evidence_identity_fields") or [],
             "authorized_symbols": self.metadata.get("authorized_symbols") or [],
             "decision_horizon_s": self.metadata.get("decision_horizon_s"),
             "runtime_proof": proof,
@@ -312,6 +333,7 @@ class ShortHorizonPredictor:
         broker_spec: Mapping[str, Any] | None = None,
         quantity: float | None = None,
         horizon_s: int | None = None,
+        mechanism: str | None = None,
     ) -> dict[str, Any]:
         """Evaluate BUY and SELL independently, then select or abstain.
 
@@ -332,6 +354,7 @@ class ShortHorizonPredictor:
                     broker_spec=broker_spec,
                     quantity=quantity,
                     horizon_s=horizon_s,
+                    mechanism=mechanism,
                 )
             except Exception:
                 result = self._fail_closed_prediction("prediction_error")
@@ -385,6 +408,7 @@ class ShortHorizonPredictor:
         broker_spec: Mapping[str, Any] | None = None,
         quantity: float | None = None,
         horizon_s: int | None = None,
+        mechanism: str | None = None,
     ) -> dict[str, Any] | None:
         normalized_symbol = str(symbol).upper()
         normalized_side = str(side).strip().lower()
@@ -407,6 +431,25 @@ class ShortHorizonPredictor:
                 return self._fail_closed_prediction("symbol_not_authorized")
         elif authorized and normalized_symbol not in authorized:
             return self._fail_closed_prediction("symbol_not_authorized")
+        configured_mechanisms = self.metadata.get("mechanisms")
+        if not isinstance(configured_mechanisms, (list, tuple, set)):
+            configured_mechanisms = (
+                [self.metadata.get("mechanism")]
+                if self.metadata.get("mechanism") else []
+            )
+        configured_mechanisms = {
+            str(value).strip().lower()
+            for value in configured_mechanisms
+            if str(value).strip()
+        }
+        requested_mechanism = str(mechanism or "").strip().lower()
+        if requested_mechanism and configured_mechanisms and requested_mechanism not in configured_mechanisms:
+            return self._fail_closed_prediction("mechanism_not_authorized")
+        if not requested_mechanism:
+            if len(configured_mechanisms) > 1:
+                return self._fail_closed_prediction("mechanism_identity_missing")
+            requested_mechanism = next(iter(configured_mechanisms), "")
+        exact_identity_required = bool(configured_mechanisms)
         if self.pipeline is None:
             return self._fail_closed_prediction(self.reason or "artifact_unavailable")
         if self.status != "ready":
@@ -464,6 +507,7 @@ class ShortHorizonPredictor:
                     **features,
                     "side_buy": 1.0 if normalized_side == "buy" else 0.0,
                     "horizon_s": float(horizon),
+                    **mechanism_features(requested_mechanism),
                 }])
                 min_model_agreement = float(
                     self.metadata.get("min_model_agreement", 0.6) or 0.6
@@ -505,6 +549,15 @@ class ShortHorizonPredictor:
             captured_exit_mode = target_definition == "captured_exit_replay"
 
             def horizon_oos(horizon_key: str) -> Mapping[str, Any]:
+                identity = "|".join((
+                    normalized_symbol,
+                    normalized_side,
+                    requested_mechanism,
+                    str(int(horizon_key)),
+                ))
+                exact = (oos.get("sealed_by_identity") or {}).get(identity)
+                if isinstance(exact, Mapping):
+                    return exact
                 if self.execution_status == "EXECUTION_CANDIDATE":
                     scoped = (
                         (oos.get("sealed_by_symbol_horizon") or {})
@@ -513,6 +566,16 @@ class ShortHorizonPredictor:
                     value = scoped.get(horizon_key) or {}
                 else:
                     value = (oos.get("sealed_by_horizon") or {}).get(horizon_key) or {}
+                return value if isinstance(value, Mapping) else {}
+
+            def exact_horizon_oos(horizon_key: str) -> Mapping[str, Any]:
+                identity = "|".join((
+                    normalized_symbol,
+                    normalized_side,
+                    requested_mechanism,
+                    str(int(horizon_key)),
+                ))
+                value = (oos.get("sealed_by_identity") or {}).get(identity)
                 return value if isinstance(value, Mapping) else {}
 
             def horizon_returns(metrics: Mapping[str, Any]) -> tuple[Any, Any]:
@@ -537,6 +600,9 @@ class ShortHorizonPredictor:
             mid = float(features["mid"])
             for horizon_key, horizon_prediction in by_horizon.items():
                 metrics = horizon_oos(horizon_key)
+                capture_metrics = exact_horizon_oos(horizon_key)
+                if not capture_metrics and not exact_identity_required:
+                    capture_metrics = metrics
                 expected_return, expected_lcb_return = horizon_returns(metrics)
                 if money_spec is not None and lots is not None:
                     horizon_net = (
@@ -572,10 +638,21 @@ class ShortHorizonPredictor:
                     "expected_captured_exit_return_lcb95": (
                         expected_lcb_return if captured_exit_mode else None
                     ),
-                    "p_captured_win": metrics.get("captured_exit_win_rate") if captured_exit_mode else None,
-                    "p_captured_win_lcb95": (
-                        metrics.get("captured_exit_win_lcb95") if captured_exit_mode else None
+                    "p_captured_win": (
+                        capture_metrics.get("captured_exit_win_rate")
+                        if captured_exit_mode else None
                     ),
+                    "p_captured_win_lcb95": (
+                        capture_metrics.get("captured_exit_win_lcb95")
+                        if captured_exit_mode else None
+                    ),
+                    "capture_probability_reason": (
+                        "exact_identity_oos"
+                        if capture_metrics else "exact_identity_oos_missing"
+                    ),
+                    "label_identity": "|".join((
+                        normalized_symbol, normalized_side, requested_mechanism, horizon_key
+                    )),
                     "expected_harvest_return": expected_return if harvest_mode else None,
                     "expected_harvest_return_lcb95": expected_lcb_return if harvest_mode else None,
                     "prediction_reason": horizon_prediction.get(
@@ -601,6 +678,9 @@ class ShortHorizonPredictor:
                 )[0]
             selected = by_horizon.get(selected_horizon) or next(iter(by_horizon.values()))
             selected_oos = horizon_oos(selected_horizon)
+            selected_capture_oos = exact_horizon_oos(selected_horizon)
+            if not selected_capture_oos and not exact_identity_required:
+                selected_capture_oos = selected_oos
             if self.execution_status == "EXECUTION_CANDIDATE" and not selected_oos:
                 return self._fail_closed_prediction("symbol_horizon_oos_missing")
             expected_return = (
@@ -614,11 +694,11 @@ class ShortHorizonPredictor:
                 else selected_oos.get("expectancy_lcb95_return")
             )
             p_captured_win = (
-                selected_oos.get("captured_exit_win_rate")
+                selected_capture_oos.get("captured_exit_win_rate")
                 if captured_exit_mode else None
             )
             p_captured_win_lcb95 = (
-                selected_oos.get("captured_exit_win_lcb95")
+                selected_capture_oos.get("captured_exit_win_lcb95")
                 if captured_exit_mode else None
             )
             if self.execution_status == "EXECUTION_CANDIDATE":
@@ -673,6 +753,11 @@ class ShortHorizonPredictor:
                 "model_count": len(self.pipeline.models),
                 "horizons_s": self.metadata.get("horizons_s"),
                 "decision_horizon_s": int(selected_horizon),
+                "mechanism": requested_mechanism or None,
+                "label_identity": "|".join((
+                    normalized_symbol, normalized_side, requested_mechanism,
+                    str(int(selected_horizon)),
+                )),
                 "threshold": float(selected.get("threshold", self.metadata.get("threshold", 0.5)) or 0.5),
                 "by_horizon": by_horizon,
                 "expected_net_pnl": expected_net,
@@ -688,6 +773,14 @@ class ShortHorizonPredictor:
                 "expected_captured_exit_return_lcb95": expected_lcb_return if captured_exit_mode else None,
                 "p_captured_win": p_captured_win,
                 "p_captured_win_lcb95": p_captured_win_lcb95,
+                "capture_probability_reason": (
+                    "exact_identity_oos"
+                    if selected_capture_oos else "exact_identity_oos_missing"
+                ),
+                "label_target": (
+                    "captured_exit_net_pnl > 0" if captured_exit_mode
+                    else str(target_definition)
+                ),
                 "tail_loss_probability": selected_oos.get("tail_loss_rate"),
                 "expected_mfe": selected_oos.get("expected_mfe"),
                 "expected_mae": selected_oos.get("expected_mae"),

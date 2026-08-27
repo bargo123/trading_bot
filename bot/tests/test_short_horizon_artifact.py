@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from aegis.research.registry import ExperimentRegistry
 from aegis.research.short_horizon_artifact import (
@@ -13,6 +14,7 @@ from aegis.research.short_horizon_artifact import (
     _select_threshold_for_prediction,
     _threshold_candidates,
     build_quote_training_frame,
+    captured_win_calibration_metrics,
     chronological_slices,
     record_artifact_outcome,
 )
@@ -404,6 +406,96 @@ def test_captured_exit_replay_subtracts_configured_slippage_without_double_count
     )
     assert slipped["captured_exit_net_pnl"] < 0.0
     assert slipped["target"] == 0
+
+
+def test_captured_labels_keep_exact_identity_and_provenance():
+    frame = build_quote_training_frame(
+        {"EURUSD": _quotes()},
+        horizons=(3, 10),
+        sample_every_s=5,
+        target_mode="captured_exit_replay",
+        mechanism="micro_momentum_continuation",
+        provenance="synthetic_fixture",
+    )
+
+    required = {
+        "symbol", "side", "mechanism", "horizon_s", "label_provenance",
+        "captured_win_label", "net_pnl", "mfe", "mae",
+        "time_to_first_net_green_s", "never_green", "green_then_loser",
+        "time_to_peak_s", "spread_price", "commission_usd", "slippage_price",
+    }
+    assert required.issubset(frame.columns)
+    assert set(frame["mechanism"]) == {"micro_momentum_continuation"}
+    assert set(frame["label_provenance"]) == {"synthetic_fixture"}
+    assert set(frame["captured_win_label"]).issubset({0, 1})
+    assert (frame["captured_win_label"] == (frame["net_pnl"] > 0)).all()
+
+
+def test_captured_win_probability_is_calibrated_against_net_winner_not_mfe():
+    report = captured_win_calibration_metrics(
+        [1.0, 0.0, 1.0, 0.0],
+        [0.25, -0.01, 0.10, -0.02],
+    )
+
+    assert report["target"] == "captured_exit_net_pnl > 0"
+    assert report["n"] == 4
+    assert report["captured_win_count"] == 2
+    assert report["brier_score"] == pytest.approx(0.0)
+    assert report["calibration_ece"] == pytest.approx(0.0)
+
+
+def test_horizon_specific_capture_labels_can_differ():
+    times = pd.date_range("2026-01-01T00:00:00Z", periods=25, freq="1s")
+    mid = np.full(25, 1.10000)
+    mid[1] = 1.10003
+    mid[2] = 1.10001
+    mid[3] = 1.10002
+    mid[4] = 1.10010
+    quotes = pd.DataFrame(
+        {"time": times, "bid": mid - 0.00001, "ask": mid + 0.00001}
+    )
+
+    frame = build_quote_training_frame(
+        {"EURUSD": quotes},
+        horizons=(3, 10),
+        sample_every_s=1,
+        target_mode="captured_exit_replay",
+    )
+    first_entry = frame[frame["time"] == times[0]]
+    by_horizon = {
+        int(row.horizon_s): int(row.captured_win_label)
+        for row in first_entry[first_entry["side"] == "buy"].itertuples()
+    }
+
+    assert by_horizon[3] == 0
+    assert by_horizon[10] == 1
+
+
+def test_captured_labels_use_executable_entry_and_liquidation_sides():
+    times = pd.date_range("2026-01-01T00:00:00Z", periods=12, freq="1s")
+    buy_mid = np.full(12, 1.10000)
+    buy_mid[1:] = 1.10010
+    sell_mid = np.full(12, 1.10000)
+    sell_mid[1:] = 1.09990
+    buy_frame = build_quote_training_frame(
+        {"EURUSD": pd.DataFrame({
+            "time": times, "bid": buy_mid - 0.00001, "ask": buy_mid + 0.00001,
+        })},
+        horizons=(3,), sample_every_s=1, target_mode="captured_exit_replay",
+    )
+    sell_frame = build_quote_training_frame(
+        {"EURUSD": pd.DataFrame({
+            "time": times, "bid": sell_mid - 0.00001, "ask": sell_mid + 0.00001,
+        })},
+        horizons=(3,), sample_every_s=1, target_mode="captured_exit_replay",
+    )
+    buy = buy_frame[(buy_frame["time"] == times[0]) & (buy_frame["side"] == "buy")].iloc[0]
+    sell = sell_frame[(sell_frame["time"] == times[0]) & (sell_frame["side"] == "sell")].iloc[0]
+
+    assert buy["entry_price"] == pytest.approx(1.10001)
+    assert buy["net_pnl"] == pytest.approx(0.00008)
+    assert sell["entry_price"] == pytest.approx(1.09999)
+    assert sell["net_pnl"] == pytest.approx(0.00008)
 
 
 def test_terminal_profit_target_does_not_label_temporary_mfe_as_a_win():

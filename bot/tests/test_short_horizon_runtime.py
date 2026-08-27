@@ -309,6 +309,127 @@ def test_runtime_exit_prediction_can_be_locked_to_ticket_horizon(tmp_path: Path)
     assert result["decision_horizon_s"] == 3
 
 
+def test_runtime_capture_probability_uses_exact_symbol_side_mechanism_horizon(tmp_path: Path):
+    class Pipeline:
+        models = [object(), object()]
+
+        def get_calibrated_ensemble_prediction(self, row, **kwargs):
+            return {
+                "probability": [0.70],
+                "decision": [True],
+                "abstain": [False],
+                "model_agreement": [1.0],
+                "uncertainty": [0.01],
+            }
+
+    class Buffer:
+        points = [
+            SimpleNamespace(timestamp=1787659200.0, bid=1.1, ask=1.1002),
+            SimpleNamespace(timestamp=1787659201.0, bid=1.1001, ask=1.1003),
+        ]
+
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+    predictor.pipeline = Pipeline()
+    predictor.status = "ready"
+    predictor.execution_status = "SHADOW_ONLY_NO_POSITIVE_OOS"
+    predictor.metadata = {
+        "mechanisms": ["micro_momentum_continuation"],
+        "horizons_s": [3, 10],
+        "decision_horizon_s": 3,
+        "target_definition": "captured_exit_replay",
+        "threshold": 0.5,
+        "oos": {
+            "sealed_by_horizon": {
+                "3": {"mean_captured_exit_return": 0.0001, "captured_exit_lcb95_return": 0.00005},
+                "10": {"mean_captured_exit_return": 0.0002, "captured_exit_lcb95_return": 0.0001},
+            },
+            "sealed_by_identity": {
+                "EURUSD|buy|micro_momentum_continuation|3": {
+                    "mean_captured_exit_return": 0.0001,
+                    "captured_exit_lcb95_return": 0.00005,
+                    "captured_exit_win_rate": 0.25,
+                    "captured_exit_win_lcb95": 0.10,
+                },
+                "EURUSD|buy|micro_momentum_continuation|10": {
+                    "mean_captured_exit_return": 0.0002,
+                    "captured_exit_lcb95_return": 0.0001,
+                    "captured_exit_win_rate": 0.75,
+                    "captured_exit_win_lcb95": 0.60,
+                },
+            },
+        },
+    }
+    buffer = SimpleNamespace(buffers={"EURUSD": Buffer()})
+
+    fast = predictor.predict(
+        symbol="EURUSD", quote_buffer=buffer, now_ts=1787659201.0,
+        side="buy", horizon_s=3, mechanism="micro_momentum_continuation",
+        notional_usd=100.0,
+    )
+    slow = predictor.predict(
+        symbol="EURUSD", quote_buffer=buffer, now_ts=1787659201.0,
+        side="buy", horizon_s=10, mechanism="micro_momentum_continuation",
+        notional_usd=100.0,
+    )
+
+    assert fast["p_captured_win"] == 0.25
+    assert slow["p_captured_win"] == 0.75
+    assert fast["label_identity"] != slow["label_identity"]
+
+
+def test_runtime_does_not_turn_global_horizon_oos_into_exact_capture_probability(tmp_path: Path):
+    class Pipeline:
+        models = [object(), object()]
+
+        def get_calibrated_ensemble_prediction(self, row, **kwargs):
+            return {
+                "probability": [0.70],
+                "decision": [True],
+                "abstain": [False],
+                "model_agreement": [1.0],
+                "uncertainty": [0.01],
+            }
+
+    class Buffer:
+        points = [
+            SimpleNamespace(timestamp=1787659200.0, bid=1.1, ask=1.1002),
+            SimpleNamespace(timestamp=1787659201.0, bid=1.1001, ask=1.1003),
+        ]
+
+    predictor = ShortHorizonPredictor(tmp_path / "missing")
+    predictor.pipeline = Pipeline()
+    predictor.status = "ready"
+    predictor.execution_status = "SHADOW_ONLY_NO_POSITIVE_OOS"
+    predictor.metadata = {
+        "mechanisms": ["micro_momentum_continuation"],
+        "horizons_s": [3],
+        "decision_horizon_s": 3,
+        "target_definition": "captured_exit_replay",
+        "threshold": 0.5,
+        "oos": {
+            "sealed_by_horizon": {
+                "3": {
+                    "mean_captured_exit_return": 0.0001,
+                    "captured_exit_lcb95_return": 0.00005,
+                    "captured_exit_win_rate": 0.99,
+                }
+            }
+        },
+    }
+
+    result = predictor.predict(
+        symbol="EURUSD",
+        quote_buffer=SimpleNamespace(buffers={"EURUSD": Buffer()}),
+        now_ts=1787659201.0,
+        side="buy",
+        mechanism="micro_momentum_continuation",
+        notional_usd=100.0,
+    )
+
+    assert result["p_captured_win"] is None
+    assert result["capture_probability_reason"] == "exact_identity_oos_missing"
+
+
 def test_runtime_compares_buy_and_sell_and_selects_best_positive_side(tmp_path: Path):
     class Pipeline:
         models = [object(), object()]

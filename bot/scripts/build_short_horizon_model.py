@@ -70,6 +70,8 @@ def main() -> None:
         target_mode=args.target_mode,
         slippage_bps=float(cfg.get("slippage_bps", 0.0) or 0.0),
         commission_round_trip_usd=float(cfg.get("commission_round_trip_usd", 0.0) or 0.0),
+        mechanism="quote_microstructure_v1",
+        provenance="mt5_quote_replay",
     )
     print(f"TRAINING_ROWS {len(frame)} SYMBOLS {frame['symbol'].nunique()} TIMES {frame['time'].min()}..{frame['time'].max()}")
     metadata = train_and_publish(

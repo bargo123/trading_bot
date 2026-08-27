@@ -19,6 +19,7 @@ from aegis.research.dataset import assert_no_lookahead
 
 DEFAULT_HORIZONS_S = (1, 2, 3, 5, 8, 10, 15, 20)
 SYMBOL_FEATURE_BUCKETS = 32
+MECHANISM_FEATURE_BUCKETS = 32
 SHORT_HORIZON_LABEL_COLUMNS = (
     "entry_time",
     "side",
@@ -48,6 +49,22 @@ def symbol_features(symbol: str | None) -> dict[str, float]:
         return features
     bucket = int.from_bytes(hashlib.sha256(normalized.encode("utf-8")).digest()[:4], "big")
     features[f"symbol_bucket_{bucket % SYMBOL_FEATURE_BUCKETS:02d}"] = 1.0
+    return features
+
+
+def mechanism_features(mechanism: str | None) -> dict[str, float]:
+    """Return a stable mechanism identity encoding for training and runtime."""
+    features = {
+        f"mechanism_bucket_{index:02d}": 0.0
+        for index in range(MECHANISM_FEATURE_BUCKETS)
+    }
+    normalized = str(mechanism or "").strip().lower()
+    if not normalized:
+        return features
+    bucket = int.from_bytes(
+        hashlib.sha256(normalized.encode("utf-8")).digest()[:4], "big"
+    )
+    features[f"mechanism_bucket_{bucket % MECHANISM_FEATURE_BUCKETS:02d}"] = 1.0
     return features
 
 

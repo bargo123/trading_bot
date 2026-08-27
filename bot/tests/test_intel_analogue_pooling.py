@@ -150,3 +150,59 @@ def test_horizon_filter_keeps_capture_evidence_point_in_time_and_horizon_specifi
     assert fast.expectancy != slow.expectancy
     assert missing.analogue_n == 0
     assert missing.uncertainty == "no_observations"
+
+
+def test_m1_evidence_never_exposes_seconds_capture_probability():
+    rows = [
+        {
+            "bar_time": f"2026-01-{index + 1:02d}T00:00:00+00:00",
+            "symbol": "EURUSD",
+            **STATE,
+            "mechanism": "micro_momentum_continuation",
+            "horizon_s": 3,
+            "outcome": 1.0,
+        }
+        for index in range(20)
+    ]
+    evidence = AnalogueStore(
+        rows, provenance="mt5_m1", outcome_unit="pips"
+    ).query(
+        signature={"symbol": "EURUSD", **STATE},
+        before_time=CUTOFF,
+        min_n=1,
+        min_similarity=0.0,
+        horizon_s=3,
+        mechanism="micro_momentum_continuation",
+    )
+
+    assert evidence.win_probability == 1.0
+    assert evidence.captured_win_probability is None
+
+
+def test_synthetic_capture_evidence_keeps_provenance_and_has_no_capture_authority():
+    rows = [
+        {
+            "bar_time": f"2026-01-{index + 1:02d}T00:00:00+00:00",
+            "symbol": "EURUSD",
+            **STATE,
+            "mechanism": "micro_momentum_continuation",
+            "horizon_s": 3,
+            "outcome": 1.0,
+        }
+        for index in range(20)
+    ]
+    evidence = AnalogueStore(
+        rows, provenance="synthetic_fixture", outcome_unit="usd"
+    ).query(
+        signature={"symbol": "EURUSD", **STATE},
+        before_time=CUTOFF,
+        min_n=1,
+        min_similarity=0.0,
+        horizon_s=3,
+        mechanism="micro_momentum_continuation",
+    )
+
+    assert evidence.provenance == "synthetic_fixture"
+    assert evidence.horizon_s == 3
+    assert evidence.mechanism == "micro_momentum_continuation"
+    assert evidence.captured_win_probability is None

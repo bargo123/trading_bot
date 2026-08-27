@@ -227,6 +227,7 @@ class TradeController:
         captured = float(terminal["net_pnl_usd"])
         return {
             "status": "REPLAYED",
+            "net_pnl": captured,
             "captured_exit_net_pnl": captured,
             "captured_exit_reason": str(terminal["reason"]),
             "captured_exit_action": str(terminal.get("action") or "TIMEOUT"),
@@ -244,6 +245,10 @@ class TradeController:
             "capture_ratio": captured / max_favorable if max_favorable > 0 else None,
             "entry_price": entry,
             "entry_spread_price": entry_ask - entry_bid,
+            "spread_price": entry_ask - entry_bid,
+            "commission_usd": commission,
+            "slippage_price": slippage,
+            "label_target": "captured_exit_net_pnl > 0",
             "expected_initial_friction_pips": initial_friction_pips,
             "actions": actions,
         }
