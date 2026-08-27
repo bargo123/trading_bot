@@ -19,6 +19,7 @@ from scripts.run_broker_paper import (
     record_funnel_execution,
     merge_firehose_funnel_counts,
     normalize_protective_stops,
+    emergency_broker_stop,
     order_margin_for_send,
     persist_confirmed_firehose_basket,
     record_confirmed_firehose_open,
@@ -40,6 +41,32 @@ def test_meaningful_quote_change_allows_same_bar_reevaluation():
     assert meaningful_quote_change(previous, bid=1.10000, ask=1.10002, pip=0.0001) is False
     assert meaningful_quote_change(previous, bid=1.10001, ask=1.10003, pip=0.0001) is True
     assert meaningful_quote_change(None, bid=1.1, ask=1.1001, pip=0.0001) is True
+
+
+def test_emergency_broker_stop_is_wide_but_stays_inside_risk_budget():
+    spec = {
+        "name": "EURUSD",
+        "trade_tick_size": 0.00001,
+        "trade_tick_value": 1.0,
+        "volume_min": 0.01,
+        "volume_step": 0.01,
+        "volume_max": 100.0,
+        "point": 0.00001,
+        "trade_stops_level": 0,
+        "trade_freeze_level": 0,
+        "trade_contract_size": 100000.0,
+    }
+    stop = emergency_broker_stop(
+        symbol="EURUSD", side="buy", entry=1.10000,
+        virtual_stop=1.09998, quantity=0.01, spec=spec,
+        max_risk_usd=0.15,
+    )
+    assert stop == pytest.approx(1.09992)
+    assert emergency_broker_stop(
+        symbol="EURUSD", side="buy", entry=1.10000,
+        virtual_stop=1.09990, quantity=0.01, spec=spec,
+        max_risk_usd=0.15,
+    ) is None
 
 
 def test_frozen_opportunity_preserves_the_decision_identity():

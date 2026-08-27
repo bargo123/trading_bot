@@ -85,6 +85,10 @@ class HarvestInput:
     opened_ts: float | None = None
     stop_loss: float | None = None
     target_price: float | None = None
+    # The initial executable spread is already embedded in gross_pnl_r when
+    # the liquidation mark is BID for BUY / ASK for SELL.  Keep it explicit so
+    # early adverse movement can be separated from ordinary opening friction.
+    expected_initial_friction_r: float = 0.0
 
     @property
     def observed_cost_r(self) -> float | None:
@@ -98,24 +102,39 @@ class HarvestInput:
         return sum(costs)
 
     @property
+    def additional_cost_r(self) -> float | None:
+        """Costs not already represented by the executable liquidation mark."""
+        costs = (self.observed_slippage_r, self.observed_commission_r)
+        if not all(_is_finite(value) for value in costs):
+            return None
+        return sum(costs)
+
+    @property
     def net_pnl_r(self) -> float | None:
-        return _after_cost(self.gross_pnl_r, self.observed_cost_r)
+        return _after_cost(self.gross_pnl_r, self.additional_cost_r)
+
+    @property
+    def friction_adjusted_net_pnl_r(self) -> float | None:
+        net = self.net_pnl_r
+        if net is None or not _is_finite(self.expected_initial_friction_r):
+            return None
+        return net + max(0.0, float(self.expected_initial_friction_r))
 
     @property
     def mfe_r(self) -> float | None:
-        return _after_cost(self.gross_mfe_r, self.observed_cost_r)
+        return _after_cost(self.gross_mfe_r, self.additional_cost_r)
 
     @property
     def return_5s_r(self) -> float | None:
-        return _after_cost(self.gross_return_5s_r, self.observed_cost_r)
+        return _after_cost(self.gross_return_5s_r, self.additional_cost_r)
 
     @property
     def return_15s_r(self) -> float | None:
-        return _after_cost(self.gross_return_15s_r, self.observed_cost_r)
+        return _after_cost(self.gross_return_15s_r, self.additional_cost_r)
 
     @property
     def return_30s_r(self) -> float | None:
-        return _after_cost(self.gross_return_30s_r, self.observed_cost_r)
+        return _after_cost(self.gross_return_30s_r, self.additional_cost_r)
 
     @property
     def has_required_evidence(self) -> bool:
@@ -133,6 +152,7 @@ class HarvestInput:
                 self.gross_return_30s_r,
                 self.remaining_ev,
                 self.observed_cost_r,
+                self.expected_initial_friction_r,
             ))
         )
 
@@ -175,7 +195,7 @@ class ProfitHarvester:
             return HarvestDecision("MOMENTUM_HOLD", "bounded_favorable_momentum")
         if (
             input.age_s <= policy.scratch_age_s
-            and input.net_pnl_r <= policy.scratch_loss_r
+            and input.friction_adjusted_net_pnl_r <= policy.scratch_loss_r
             and input.mfe_r < policy.min_mfe_r
             and input.return_5s_r < 0
         ):

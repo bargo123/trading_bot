@@ -18,6 +18,7 @@ The fast exit state machine manages each ticket through:
 from __future__ import annotations
 
 import hashlib
+import math
 import time
 from dataclasses import dataclass, field, replace
 from enum import Enum
@@ -876,31 +877,59 @@ class FastExitStateMachine:
         harvest_policy: HarvestPolicy | None = None,
         harvest_input: HarvestInput | None = None,
         harvest_decision: HarvestDecision | None = None,
+        expected_initial_friction_pips: float = 0.0,
     ) -> dict[str, Any]:
         R = max(stop_pips, 0.1)
         age = now - opened_ts
         giveback_pips = max(0.0, mfe_pips - pnl_pips)
+        try:
+            initial_friction = max(0.0, float(expected_initial_friction_pips))
+        except (TypeError, ValueError, OverflowError):
+            initial_friction = 0.0
+        if not math.isfinite(initial_friction):
+            initial_friction = 0.0
+        # The executable liquidation mark naturally includes the opening
+        # spread.  Remove only that expected transaction friction when deciding
+        # whether the thesis has actually moved against us; do not impose a
+        # minimum holding time.
+        adverse_beyond_friction = max(0.0, -(float(pnl_pips) + initial_friction))
 
         # 1. Structural target reached (within 0.2 pips)
         dist_to_target = abs(target - current_mark) / max(pip, 1e-9)
-        if dist_to_target <= 0.2:
-            return self._decide(ExitAction.TAKE, "target_reached",
-                                f"price within {dist_to_target:.1f} pips of target")
+        target_reached = (
+            (str(side).lower() == "buy" and current_mark >= target - 0.2 * pip)
+            or (str(side).lower() == "sell" and current_mark <= target + 0.2 * pip)
+        )
+        if target_reached:
+            return self._with_friction_evidence(
+                self._decide(ExitAction.TAKE, "target_reached",
+                             f"price within {dist_to_target:.1f} pips of target"),
+                initial_friction, adverse_beyond_friction,
+            )
 
         # 2. Regime change with loss
-        if regime_now and regime_at_entry and regime_now != regime_at_entry and pnl_pips < 0:
-            return self._decide(ExitAction.ABORT, "regime_change",
-                                f"regime {regime_at_entry}->{regime_now}, losing")
+        if regime_now and regime_at_entry and regime_now != regime_at_entry and (
+            float(pnl_pips) + initial_friction
+        ) < 0:
+            return self._with_friction_evidence(
+                self._decide(ExitAction.ABORT, "regime_change",
+                             f"regime {regime_at_entry}->{regime_now}, losing"),
+                initial_friction, adverse_beyond_friction,
+            )
 
         # 3. Rapid downside scratch. The configured fraction is measured against
         # the ticket's original stop distance, so a seconds-trade does not wait
         # for the time stop after already consuming too much of its risk budget.
         scratch_frac = float(self.cfg.min_scratch_loss_frac)
-        if scratch_frac > 0 and pnl_pips <= -(scratch_frac * R):
-            return self._decide(
-                ExitAction.SCRATCH,
-                "loss_fraction_scratch",
-                f"loss {abs(pnl_pips):.1f} pips reached {scratch_frac:.0%} of {R:.1f}-pip stop",
+        if scratch_frac > 0 and adverse_beyond_friction >= (scratch_frac * R):
+            return self._with_friction_evidence(
+                self._decide(
+                    ExitAction.SCRATCH,
+                    "loss_fraction_scratch",
+                    f"adverse move beyond expected friction {adverse_beyond_friction:.1f} pips "
+                    f"reached {scratch_frac:.0%} of {R:.1f}-pip stop",
+                ),
+                initial_friction, adverse_beyond_friction,
             )
 
         # 4. Time decay without progress
@@ -908,22 +937,31 @@ class FastExitStateMachine:
             mfe_pips >= self.cfg.mfe_arm_r * R
             and pnl_pips >= self.cfg.progress_frac * mfe_pips
         ):
-            return self._decide(ExitAction.SCRATCH, "time_decay_no_progress",
-                                f"{int(age)}s held, pnl {pnl_pips:.1f} vs mfe {mfe_pips:.1f}")
+            return self._with_friction_evidence(
+                self._decide(ExitAction.SCRATCH, "time_decay_no_progress",
+                             f"{int(age)}s held, pnl {pnl_pips:.1f} vs mfe {mfe_pips:.1f}"),
+                initial_friction, adverse_beyond_friction,
+            )
 
         # 4. MFE giveback (armed only after meaningful MFE)
         mfe_r = mfe_pips / R
         if mfe_r >= self.cfg.mfe_arm_r:
             max_giveback = self.cfg.giveback_frac * mfe_pips
             if giveback_pips > max_giveback:
-                return self._decide(ExitAction.TAKE, "mfe_giveback_limit",
-                                    f"gave back {giveback_pips:.1f} of mfe {mfe_pips:.1f} "
-                                    f"(max {max_giveback:.1f})")
+                return self._with_friction_evidence(
+                    self._decide(ExitAction.TAKE, "mfe_giveback_limit",
+                                 f"gave back {giveback_pips:.1f} of mfe {mfe_pips:.1f} "
+                                 f"(max {max_giveback:.1f})"),
+                    initial_friction, adverse_beyond_friction,
+                )
 
         # 5. Current EV exit (if estimable)
         if remaining_ev_status == "ESTIMATED" and remaining_ev is not None and remaining_ev <= 0:
-            return self._decide(ExitAction.ABORT, "remaining_ev_negative",
-                                f"remaining costed EV={remaining_ev:.4f} <= 0")
+            return self._with_friction_evidence(
+                self._decide(ExitAction.ABORT, "remaining_ev_negative",
+                             f"remaining costed EV={remaining_ev:.4f} <= 0"),
+                initial_friction, adverse_beyond_friction,
+            )
 
         # A policy may only replace the legacy default HOLD after all
         # structural, regime, time, giveback, and EV protections above.
@@ -940,14 +978,20 @@ class FastExitStateMachine:
             }
             action = harvest_actions.get(harvest_decision.action)
             if action is not None:
-                return self._decide(action, harvest_decision.reason,
-                                    f"harvest policy: {harvest_decision.reason}")
+                return self._with_friction_evidence(
+                    self._decide(action, harvest_decision.reason,
+                                 f"harvest policy: {harvest_decision.reason}"),
+                    initial_friction, adverse_beyond_friction,
+                )
 
         # 6. Breakeven/cost-plus lock via stop adjustment.
         if mfe_r >= self.cfg.mfe_arm_r and pnl_pips > self.cfg.breakeven_buffer_r * R:
-            return self._decide(ExitAction.LOCK, "breakeven_lock_armed",
-                                f"mfe {mfe_r:.1f}R armed cost-plus lock at "
-                                f"+{self.cfg.breakeven_buffer_r * R:.1f} pips")
+            return self._with_friction_evidence(
+                self._decide(ExitAction.LOCK, "breakeven_lock_armed",
+                             f"mfe {mfe_r:.1f}R armed cost-plus lock at "
+                             f"+{self.cfg.breakeven_buffer_r * R:.1f} pips"),
+                initial_friction, adverse_beyond_friction,
+            )
 
         # Default: HOLD with explanation
         hold_reasons = []
@@ -959,12 +1003,23 @@ class FastExitStateMachine:
                                 "protective stop owns downside")
         if remaining_ev_status == "ESTIMATED" and remaining_ev is not None and remaining_ev > 0:
             hold_reasons.append(f"remaining costed EV positive ({remaining_ev:.4f})")
-        return self._decide(ExitAction.HOLD, "fast_hold_justified",
-                            "; ".join(hold_reasons))
+        return self._with_friction_evidence(
+            self._decide(ExitAction.HOLD, "fast_hold_justified", "; ".join(hold_reasons)),
+            initial_friction,
+            adverse_beyond_friction,
+        )
 
     def _decide(self, action: ExitAction, reason: str, why: str) -> dict[str, Any]:
         return {"action": action.value, "reason": reason, "why": why,
                 "policy": reason}
+
+    @staticmethod
+    def _with_friction_evidence(
+        verdict: dict[str, Any], initial_friction: float, adverse_beyond_friction: float,
+    ) -> dict[str, Any]:
+        verdict["expected_initial_friction_pips"] = initial_friction
+        verdict["adverse_excursion_beyond_expected_friction_pips"] = adverse_beyond_friction
+        return verdict
 
 
 # ---------------------------------------------------------------------------

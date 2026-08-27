@@ -23,6 +23,7 @@ from aegis.research.short_horizon import DEFAULT_HORIZONS_S, session_features, s
 from aegis.research.registry import DuplicateExperimentError, ExperimentRegistry
 from aegis.research_factory.evaluation import record_outcome
 from aegis.research_factory.ml_pipeline import MLPipeline, ModelConfig
+from aegis.intel.trade_controller import TradeController
 
 
 ARTIFACT_SCHEMA = "short_horizon_ensemble.v1"
@@ -153,7 +154,12 @@ def _epoch_seconds(values: pd.Series) -> np.ndarray:
     return normalized.astype("int64").to_numpy(dtype=np.float64)
 
 
-def _feature_frame(quotes: pd.DataFrame, symbol: str) -> pd.DataFrame:
+def _feature_frame(
+    quotes: pd.DataFrame,
+    symbol: str,
+    *,
+    minimum_history_rows: int | None = None,
+) -> pd.DataFrame:
     required = {"time", "bid", "ask"}
     if not required.issubset(quotes.columns):
         raise ValueError(f"quotes require {sorted(required)}")
@@ -174,7 +180,8 @@ def _feature_frame(quotes: pd.DataFrame, symbol: str) -> pd.DataFrame:
         .dropna()
         .reset_index()
     )
-    if len(frame) < max(DEFAULT_HORIZONS_S) + 20:
+    minimum_rows = max(DEFAULT_HORIZONS_S) + 20 if minimum_history_rows is None else int(minimum_history_rows)
+    if len(frame) < max(minimum_rows, 2):
         raise ValueError(f"insufficient quote history for {symbol}: {len(frame)} rows")
 
     times = _epoch_seconds(frame["time"])
@@ -276,6 +283,8 @@ def build_quote_training_frame(
     sample_every_s: int = 5,
     target_mode: str = "captured_exit_replay",
     slippage_bps: float = 0.0,
+    commission_round_trip_usd: float = 0.0,
+    usd_per_price_unit_by_symbol: Mapping[str, float] | None = None,
 ) -> pd.DataFrame:
     """Create point-in-time feature/label rows from completed quotes.
 
@@ -303,9 +312,19 @@ def build_quote_training_frame(
         raise ValueError("slippage_bps must be a finite non-negative number") from exc
     if not np.isfinite(slippage_bps) or slippage_bps < 0.0:
         raise ValueError("slippage_bps must be a finite non-negative number")
+    try:
+        commission_round_trip_usd = float(commission_round_trip_usd)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("commission_round_trip_usd must be finite and non-negative") from exc
+    if not np.isfinite(commission_round_trip_usd) or commission_round_trip_usd < 0.0:
+        raise ValueError("commission_round_trip_usd must be finite and non-negative")
     rows: list[dict[str, Any]] = []
     for symbol, quotes in sorted(quotes_by_symbol.items()):
-        features = _feature_frame(quotes, symbol)
+        features = _feature_frame(
+            quotes,
+            symbol,
+            minimum_history_rows=max(horizon_values) + 1,
+        )
         times = _epoch_seconds(features["time"])
         bid = features["bid"].to_numpy(dtype=float)
         ask = features["ask"].to_numpy(dtype=float)
@@ -316,6 +335,7 @@ def build_quote_training_frame(
         # trip, matching the runner's round-trip-notional cost convention.
         tail_threshold = max(float(np.nanmedian(spreads)) * 3.0, 1e-12)
         harvest_threshold = max(float(np.nanmedian(spreads)) * 2.0, 1e-12)
+        replay_controller = TradeController()
         eligible = np.flatnonzero(times <= times[-1] - max(horizon_values))
         if not len(eligible):
             continue
@@ -362,20 +382,39 @@ def build_quote_training_frame(
                     captured = terminal
                     captured_reason = "timeout"
                     captured_index: int | None = None
+                    shared_replay: dict[str, Any] | None = None
                     if target_mode == "captured_exit_replay":
-                        # Sequential replay: only the current future quote is
-                        # visible when deciding capture, abort, or timeout.
-                        for future_index, value in enumerate(signed):
-                            if value >= harvest_threshold:
-                                captured = float(value)
-                                captured_reason = "harvest"
-                                captured_index = future_index
-                                break
-                            if value <= -tail_threshold:
-                                captured = float(value)
-                                captured_reason = "abort"
-                                captured_index = future_index
-                                break
+                        replay_quotes = [
+                            {"time": float(times[quote_index]), "bid": float(bid[quote_index]), "ask": float(ask[quote_index])}
+                            for quote_index in range(index, end + 1)
+                        ]
+                        entry = float(ask[index] if side == "buy" else bid[index])
+                        sign = 1.0 if side == "buy" else -1.0
+                        target_price = entry + sign * harvest_threshold
+                        stop_price = entry - sign * tail_threshold
+                        shared_replay = replay_controller.replay_quote_path(
+                            quotes=replay_quotes,
+                            side=side,
+                            horizon_s=horizon,
+                            target_price=target_price,
+                            stop_price=stop_price,
+                            pip_size=max(float(spreads[index]), 1e-12),
+                            slippage_price=slippage_price,
+                            commission_usd=commission_round_trip_usd,
+                            usd_per_price_unit=float(
+                                (usd_per_price_unit_by_symbol or {}).get(str(symbol).upper(), 1.0)
+                            ),
+                        )
+                        if shared_replay.get("status") != "REPLAYED":
+                            continue
+                        captured = float(shared_replay["captured_exit_net_pnl"])
+                        captured_reason = str(shared_replay["captured_exit_reason"])
+                        if captured_reason == "harvest":
+                            matching = [
+                                offset for offset, action in enumerate(shared_replay.get("actions") or [])
+                                if action.get("action") == "HARVEST"
+                            ]
+                            captured_index = matching[0] if matching else None
                     harvest = float(signed[int(harvestable[0])]) if len(harvestable) else terminal
                     if target_mode == "captured_exit_replay":
                         harvest = captured
@@ -389,6 +428,10 @@ def build_quote_training_frame(
                             if captured_reason == "harvest" and captured_index is not None
                             else None
                         )
+                        terminal = float(signed[-1])
+                        mfe = float(shared_replay["mfe_net_pnl"])
+                        mae = float(shared_replay["mae_net_pnl"])
+                        time_to_profit = shared_replay.get("time_to_green_s")
                     row = features.iloc[index].to_dict()
                     target = (
                         int(len(harvestable) > 0)
@@ -405,6 +448,9 @@ def build_quote_training_frame(
                             "symbol": str(symbol).upper(),
                             "side": side,
                             "side_buy": 1.0 if side == "buy" else 0.0,
+                            "entry_price": float(ask[index] if side == "buy" else bid[index]),
+                            "entry_bid": float(bid[index]),
+                            "entry_ask": float(ask[index]),
                             "horizon_s": float(horizon),
                             # Profit means the executable path became green
                             # within the stated horizon, after spread.
@@ -420,6 +466,11 @@ def build_quote_training_frame(
                             "captured_exit_return": captured / float(mid[index]) if mid[index] > 0 else np.nan,
                             "captured_exit_reason": captured_reason,
                             "assumed_slippage_bps": slippage_bps,
+                            "assumed_commission_round_trip_usd": commission_round_trip_usd,
+                            "expected_initial_friction_price": (
+                                shared_replay.get("entry_spread_price")
+                                if shared_replay is not None else None
+                            ),
                             "mfe": mfe,
                             "mae": mae,
                             "tail_loss": int(mae <= -tail_threshold),
@@ -1076,6 +1127,18 @@ def train_and_publish(
     if len(slippage_values) > 1:
         raise ValueError("training frame mixes multiple slippage assumptions")
     assumed_slippage_bps = slippage_values[0] if slippage_values else 0.0
+    commission_values = sorted(
+        {
+            float(value)
+            for value in pd.to_numeric(
+                frame.get("assumed_commission_round_trip_usd", pd.Series([0.0])),
+                errors="coerce",
+            ).dropna()
+        }
+    )
+    if len(commission_values) > 1:
+        raise ValueError("training frame mixes multiple commission assumptions")
+    assumed_commission_round_trip_usd = commission_values[0] if commission_values else 0.0
 
     output_path = Path(output_path)
     pipeline.save(output_path)
@@ -1109,9 +1172,10 @@ def train_and_publish(
             "cost_evidence": (
                 "executable_bid_ask_spread_in_labels; "
                 f"configured_round_trip_slippage_bps={assumed_slippage_bps}; "
-                "commission_round_trip_usd=0.0_for_current_demo_config"
+                f"commission_round_trip_usd={assumed_commission_round_trip_usd}"
             ),
             "assumed_slippage_bps": assumed_slippage_bps,
+            "assumed_commission_round_trip_usd": assumed_commission_round_trip_usd,
             "symbols": sorted(frame["symbol"].astype(str).str.upper().unique().tolist()),
             "authorized_symbols": authorized_symbols,
             "model_count": len(pipeline.models),
@@ -1127,7 +1191,7 @@ def train_and_publish(
                 "timeout": "last_future_quote_at_horizon",
                 "costs": (
                     "observed_bid_ask_spread_plus_configured_round_trip_slippage; "
-                    "commission_round_trip_usd=0.0_for_current_demo_config"
+                    f"commission_round_trip_usd={assumed_commission_round_trip_usd}"
                 ),
             },
             "runtime_proof": {

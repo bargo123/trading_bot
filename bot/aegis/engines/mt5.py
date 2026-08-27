@@ -661,6 +661,16 @@ class MT5Engine(BrokerEngine):
         acct = self.account()
         if not acct.is_paper and not self.allow_live:
             return "refusing mutation on non-demo MT5 account"
+        if "mode" in self.cfg and str(self.cfg.get("mode") or "").strip().lower() != "mt5_demo":
+            return "refusing mutation outside mode=mt5_demo"
+        if "paper_trading_enabled" in self.cfg and not bool(self.cfg.get("paper_trading_enabled")):
+            return "refusing mutation when paper_trading_enabled is false"
+        info = self._api().account_info()
+        if info is None or not bool(getattr(info, "trade_expert", False)):
+            return "refusing mutation: account trade_expert is not enabled"
+        terminal = self._api().terminal_info()
+        if terminal is None or not bool(getattr(terminal, "trade_allowed", False)):
+            return "refusing mutation: terminal trade_allowed is false"
         return None
 
     def place_order(self, req: OrderRequest) -> OrderResult:
@@ -678,8 +688,17 @@ class MT5Engine(BrokerEngine):
             return OrderResult(ok=False, message=f"no tick for {name}")
         filling = self._filling(info)
         comment = self._sanitize_comment(req.client_tag or "aegis")
-        sl = self._round_price(float(req.stop_loss), info) if req.stop_loss is not None else 0.0
-        tp = self._round_price(float(req.take_profit), info) if req.take_profit is not None else 0.0
+        # Supplying either broker-side field is an explicit execution-policy
+        # override.  The Firehose supplies only its wide catastrophe stop, so
+        # the strategic virtual target must not become a terminal TP.
+        if req.broker_stop_loss is not None or req.broker_take_profit is not None:
+            broker_sl = req.broker_stop_loss
+            broker_tp = req.broker_take_profit
+        else:
+            broker_sl = req.stop_loss
+            broker_tp = req.take_profit
+        sl = self._round_price(float(broker_sl), info) if broker_sl is not None else 0.0
+        tp = self._round_price(float(broker_tp), info) if broker_tp is not None else 0.0
         if req.kind == "limit":
             if req.limit_price is None:
                 return OrderResult(ok=False, message="limit_price required")

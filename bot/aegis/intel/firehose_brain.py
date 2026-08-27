@@ -1552,11 +1552,17 @@ class IntelligentFirehoseBrain:
             }
             return None, f"exploration_economics_rejected:{all_rejections[0] if all_rejections else 'unknown'}"
 
-        # Rank by the same captured net EV that will authorize the final order;
-        # payoff is only a deterministic tie-breaker.
+        # Rank win-rate confidence first. Positive captured EV remains a hard
+        # gate; raw EV is only a later tie-breaker after the calibrated Wilson
+        # lower bound and loser/tail evidence.
         viable.sort(key=lambda item: (
-            -(float(item[2].expected_net_value_usd)
-              if item[2].expected_net_value_usd is not None else float("-inf")),
+            -(float(item[4].lower_95)
+              if item[4].lower_95 is not None else float("-inf")),
+            -(float(item[4].probability)
+              if item[4].probability is not None else float("-inf")),
+            float(item[6].get("loser_similarity", 0.0)),
+            float(item[2].expected_net_value_usd)
+            if item[2].expected_net_value_usd is not None else float("-inf"),
             -item[0].payoff,
         ))
         (
@@ -1874,6 +1880,7 @@ class IntelligentFirehoseBrain:
                 "target": float(option_mc.target),
                 "quantity": float(option_sizing.get("lots") or 0.0),
                 "p_captured_win": option_auth.probability,
+                "p_captured_win_lcb95": option_auth.lower_95,
                 "authority_probability": option_auth.probability,
                 "authority_capture_lcb95": option_auth.lower_95,
                 "authority_expected_net_ev": option_econ.expected_net_value_usd,
@@ -2161,9 +2168,8 @@ class IntelligentFirehoseBrain:
         probability survives, ``evaluate_trade_economics`` rejects on
         ``no_win_probability_evidence`` rather than assuming a favourable one.
         """
-        measured = is_measured_provenance(getattr(evidence, "provenance", "unknown")) or bool(
-            self.cfg.get("intelligent_allow_synthetic_evidence", False)
-        )
+        evidence_provenance = str(getattr(evidence, "provenance", "unknown") or "unknown")
+        measured = is_measured_provenance(evidence_provenance)
         analogue_n = int(getattr(evidence, "analogue_n", 0) or 0) if measured else 0
         analogue_losses = int(getattr(evidence, "analogue_n_losses", 0) or 0) if measured else 0
         return evaluate_trade_economics(
@@ -2179,6 +2185,7 @@ class IntelligentFirehoseBrain:
             p_win=p_win,
             analogue_n=analogue_n,
             analogue_n_losses=analogue_losses,
+            probability_provenance=evidence_provenance,
             min_payoff_ratio=float(
                 self.cfg.get("intelligent_min_payoff_ratio", DEFAULT_MIN_PAYOFF_RATIO)
             ),

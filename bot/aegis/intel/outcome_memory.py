@@ -33,6 +33,7 @@ def classify_lifecycle(
     time_to_green_s: float | None,
     selected_horizon_s: int | float | None,
     min_mfe_usd: float = DEFAULT_MIN_MFE_USD,
+    expected_initial_friction_usd: float = 0.0,
 ) -> dict[str, Any]:
     """Classify a completed lifecycle without using floating PnL as its result."""
     net = _finite(realized_net_usd)
@@ -41,6 +42,8 @@ def classify_lifecycle(
     mfe_observed = _finite(mfe_usd)
     mfe = mfe_observed or 0.0
     mae = _finite(mae_usd) or 0.0
+    expected_friction = max(0.0, _finite(expected_initial_friction_usd) or 0.0)
+    adverse_beyond_friction = max(0.0, -mae - expected_friction)
     green_s = _finite(time_to_green_s)
     horizon = max(1.0, _finite(selected_horizon_s) or 1.0)
     excursion_known = mfe_observed is not None or green_s is not None
@@ -55,15 +58,18 @@ def classify_lifecycle(
         and excursion_known
         and not green_then_loser
         and (
-            bool(never_green)
+            adverse_beyond_friction > 1e-12
+            and (
+                bool(never_green)
             or (green_s is not None and green_s > horizon * DEFAULT_FAST_LOSER_HORIZON_MULTIPLIER)
+            )
         )
     )
     fast_winner = net > 0.0 and green_s is not None and green_s <= horizon
 
     if green_then_loser:
         classification = "GOOD_ENTRY_BAD_EXIT"
-    elif net < 0.0 and excursion_known and never_green:
+    elif net < 0.0 and excursion_known and never_green and adverse_beyond_friction > 1e-12:
         classification = "BAD_ENTRY"
     elif net > 0.0:
         classification = "GOOD_ENTRY_GOOD_EXIT"
@@ -78,6 +84,8 @@ def classify_lifecycle(
         "realized_net_usd": net,
         "mfe_usd": mfe,
         "mae_usd": mae,
+        "expected_initial_friction_usd": expected_friction,
+        "adverse_excursion_beyond_expected_friction_usd": adverse_beyond_friction,
         "time_to_green_s": green_s,
         "selected_horizon_s": int(horizon),
     }
@@ -104,6 +112,7 @@ def _normalized_features(features: Mapping[str, Any]) -> dict[str, Any]:
         "spread_pips", "stop_pips", "target_pips", "momentum", "compression",
         "expansion", "volatility_value", "quote_age_s", "time_to_green_s",
         "mfe_usd", "mae_usd", "hold_s",
+        "expected_initial_friction_usd",
     ):
         value = _finite(features.get(key))
         if value is not None:
@@ -212,6 +221,45 @@ def replay_counterfactual(
         or normalized_side == "sell" and not target_price < entry_price < stop_price
     ):
         return {"status": "UNAVAILABLE", "reason": "counterfactual_geometry_invalid"}
+    from aegis.intel.trade_controller import TradeController
+    entry_spread = max(rows[0][2] - rows[0][1], 1e-12)
+
+    replay = TradeController().replay_quote_path(
+        quotes=[{"time": timestamp, "bid": bid, "ask": ask} for timestamp, bid, ask in rows],
+        side=normalized_side,
+        horizon_s=horizon,
+        target_price=target_price,
+        stop_price=stop_price,
+        pip_size=entry_spread,
+        commission_usd=cost,
+        usd_per_price_unit=unit_value,
+    )
+    if replay.get("status") != "REPLAYED":
+        return {"status": "UNAVAILABLE", "reason": "counterfactual_quote_history_missing"}
+    actions = list(replay.get("actions") or [])
+    close_action = str(replay.get("captured_exit_action") or "TIMEOUT")
+    close_time_s = float(replay.get("captured_exit_time_s") or 0.0)
+    close_row = min(rows, key=lambda item: abs(item[0] - (start + close_time_s)))
+    close_price = close_row[1] if normalized_side == "buy" else close_row[2]
+    gross = (float(close_price) - entry_price) * sign * unit_value
+    return {
+        "status": "REPLAYED",
+        "chosen_net_usd": float(replay["captured_exit_net_pnl"]),
+        "chosen_gross_usd": gross,
+        "chosen_entry_price": entry_price,
+        "chosen_close_price": float(close_price),
+        "chosen_close_timestamp": close_row[0],
+        "chosen_close_reason": (
+            "target" if close_action == "HARVEST"
+            else "timeout" if close_action == "TIMEOUT"
+            else "stop"
+        ),
+        "opposite_net_usd": None,
+        "abstain_net_usd": 0.0,
+        "opposite_status": "UNAVAILABLE_NO_OPPOSITE_GEOMETRY",
+        "cost_usd": cost,
+        "controller_actions": actions,
+    }
     close_price = None
     close_timestamp = None
     close_reason = "timeout"
@@ -289,6 +337,7 @@ class OutcomeMemoryStore:
             mae_usd=mae_usd,
             time_to_green_s=time_to_green_s,
             selected_horizon_s=features.get("selected_horizon_s", features.get("horizon_s")),
+            expected_initial_friction_usd=features.get("expected_initial_friction_usd", 0.0),
         )
         replay = None
         if counterfactual_quotes is not None:

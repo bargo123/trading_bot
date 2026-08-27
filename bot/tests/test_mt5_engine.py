@@ -361,6 +361,20 @@ def test_max_lots_cap():
     assert "mt5_max_lots" in res.message
 
 
+def test_place_order_uses_emergency_broker_geometry_not_virtual_target():
+    api = FakeMT5()
+    eng = _engine(api)
+    eng.connect()
+    res = eng.place_order(OrderRequest(
+        symbol="EURUSD", side="buy", quantity=0.01, kind="market",
+        stop_loss=1.09990, take_profit=1.10100,
+        broker_stop_loss=1.09960, broker_take_profit=None,
+    ))
+    assert res.ok
+    assert api.sends[-1]["sl"] == 1.0996
+    assert api.sends[-1]["tp"] == 0.0
+
+
 def test_history_deals_and_orders_readonly():
     api = FakeMT5()
     api.deals = [

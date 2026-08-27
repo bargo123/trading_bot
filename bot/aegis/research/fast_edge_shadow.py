@@ -23,6 +23,7 @@ from sklearn.preprocessing import RobustScaler
 
 from aegis.research.short_horizon import _session_name
 from aegis.research.short_horizon_artifact import _feature_frame
+from aegis.intel.trade_controller import TradeController
 
 
 SHADOW_HORIZONS_S = (1, 2, 3, 5, 8, 10, 15, 20, 30, 45)
@@ -165,6 +166,66 @@ def replay_executable_path(
     entry = float(entry_ask if side == "buy" else entry_bid)
     entry_mid = (float(entry_bid) + float(entry_ask)) / 2.0
     entry_spread = max(float(entry_ask) - float(entry_bid), 1e-12)
+
+    if exit_policy == "captured_exit_replay":
+        # The executable target is the same controller used by the live
+        # runner. Alternative research policies below remain explicitly
+        # auxiliary and cannot become execution authority.
+        replay = TradeController().replay_quote_path(
+            quotes=[
+                {"time": float(entry_timestamp.timestamp()), "bid": float(entry_bid), "ask": float(entry_ask)},
+                *[
+                    {"time": float(pd.Timestamp(timestamp).timestamp()), "bid": float(b), "ask": float(a)}
+                    for timestamp, b, a in zip(times, bid, ask)
+                ],
+            ],
+            side=side,
+            horizon_s=horizon_s,
+            target_price=entry + (2.0 * entry_spread if side == "buy" else -2.0 * entry_spread),
+            stop_price=entry - (3.0 * entry_spread if side == "buy" else -3.0 * entry_spread),
+            pip_size=entry_spread,
+        )
+        if replay.get("status") != "REPLAYED":
+            raise ValueError(str(replay.get("reason") or "quote replay unavailable"))
+        signed = bid - entry if side == "buy" else entry - ask
+        first_green_index = next((i for i, value in enumerate(signed) if value > 0.0), None)
+        first_failure_index = next((i for i, value in enumerate(signed) if value <= -3.0 * entry_spread), None)
+        captured_time = float(replay["captured_exit_time_s"])
+        return {
+            "captured_exit_net_pnl": float(replay["captured_exit_net_pnl"]),
+            "captured_exit_return": float(replay["captured_exit_net_pnl"]) / entry_mid if entry_mid > 0 else np.nan,
+            "captured_exit_reason": str(replay["captured_exit_reason"]),
+            "captured_exit_action": str(replay.get("captured_exit_action") or "TIMEOUT"),
+            "terminal_net_pnl": float(signed[-1]),
+            "terminal_return": float(signed[-1]) / entry_mid if entry_mid > 0 else np.nan,
+            "mfe": float(np.max(signed)),
+            "mae": float(np.min(signed)),
+            "tail_loss": bool(np.min(signed) <= -3.0 * entry_spread),
+            "immediate_adverse_move": bool(float(signed[0]) <= -entry_spread),
+            "first_green": bool(first_green_index is not None),
+            "never_green": bool(first_green_index is None),
+            "time_to_green_s": replay.get("time_to_green_s"),
+            "time_to_profit_s": replay.get("time_to_green_s"),
+            "time_to_failure_s": (
+                float((pd.Timestamp(times[first_failure_index]) - entry_timestamp).total_seconds())
+                if first_failure_index is not None else None
+            ),
+            "time_to_mfe_s": replay.get("time_to_peak_s"),
+            "time_in_red_s": float(sum(
+                max(0.0, (pd.Timestamp(times[i]) - (entry_timestamp if i == 0 else pd.Timestamp(times[i - 1]))).total_seconds())
+                for i, value in enumerate(signed) if float(value) < 0.0
+            )),
+            "winner_giveback": bool(np.max(signed) > 0.0 and float(replay["captured_exit_net_pnl"]) < np.max(signed)),
+            "first_profitable_executable_close": bool(first_green_index is not None),
+            "first_profitable_close_net_pnl": (
+                float(signed[first_green_index]) if first_green_index is not None else None
+            ),
+            "future_path_observed_n": int(len(replay.get("actions") or [])),
+            "exit_policy": exit_policy,
+            "exit_time_s": captured_time,
+            "horizon_s": int(horizon_s),
+            "controller_actions": list(replay.get("actions") or []),
+        }
     signed = bid - entry if side == "buy" else entry - ask
     harvest_threshold = 2.0 * entry_spread
     abort_threshold = 3.0 * entry_spread

@@ -267,6 +267,7 @@ def frozen_opportunity_from_decision(
         "ask": float(ask),
         "spread": max(0.0, float(ask) - float(bid)),
         "p_captured_win": authority_probability,
+        "p_captured_win_lcb95": authority_lcb,
         "authority_probability": authority_probability,
         "authority_capture_lcb95": authority_lcb,
         "authority_expected_net_ev": expected_ev,
@@ -683,6 +684,58 @@ def normalize_protective_stops(
     return sl_out, tp_out
 
 
+def emergency_broker_stop(
+    *,
+    symbol: str,
+    side: str,
+    entry: float,
+    virtual_stop: float | None,
+    quantity: float,
+    spec: dict | None,
+    max_risk_usd: float,
+    width_multiple: float = 4.0,
+) -> float | None:
+    """Return a wide catastrophe stop without changing virtual strategy geometry.
+
+    Normal Firehose exits are controller-owned.  This broker stop is only an
+    emergency backstop, and is rejected if its wider distance would exceed the
+    already-approved per-trade risk budget.
+    """
+    if virtual_stop is None:
+        return None
+    try:
+        contract = ContractSpec.from_mapping(symbol, dict(spec or {}))
+        entry_price = float(entry)
+        stop_price = float(virtual_stop)
+        lots = float(quantity)
+        risk_cap = float(max_risk_usd)
+        width = max(1.0, float(width_multiple))
+        point = float((spec or {}).get("point") or contract.tick_size)
+        stops_level = max(
+            int((spec or {}).get("trade_stops_level") or 0),
+            int((spec or {}).get("trade_freeze_level") or 0),
+        )
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not all(math.isfinite(value) and value > 0 for value in (entry_price, lots, risk_cap, point)):
+        return None
+    virtual_distance = abs(entry_price - stop_price)
+    if not math.isfinite(virtual_distance) or virtual_distance <= 0:
+        return None
+    minimum_distance = max(point * 2.0, point * float(stops_level))
+    desired_distance = max(virtual_distance * width, minimum_distance)
+    usd_per_price = contract.tick_value / contract.tick_size
+    allowed_distance = risk_cap / (usd_per_price * lots) if usd_per_price > 0 else 0.0
+    if desired_distance > allowed_distance + 1e-12:
+        return None
+    side_l = str(side or "").lower()
+    if side_l == "buy":
+        return entry_price - desired_distance
+    if side_l == "sell":
+        return entry_price + desired_distance
+    return None
+
+
 def persist_confirmed_firehose_basket(
     *,
     root: Path,
@@ -764,6 +817,22 @@ def confirmed_position_geometry(position) -> dict[str, float | str]:
     return {"entry_price": entry_price, "stop_loss": stop_loss, "volume": volume}
 
 
+def virtual_stop_for_fill(
+    *, side: str, entry: float, candidate_stop: object, broker_stop: float,
+) -> float:
+    """Keep strategy invalidation separate from the broker emergency stop."""
+    try:
+        value = float(candidate_stop)
+        filled = float(entry)
+        if str(side or "").lower() == "buy" and value < filled:
+            return value
+        if str(side or "").lower() == "sell" and value > filled:
+            return value
+    except (TypeError, ValueError):
+        pass
+    return float(broker_stop)
+
+
 def ticket_metadata_from_pending(
     *, ticket: str, pending: dict[str, object], position,
 ):
@@ -778,6 +847,12 @@ def ticket_metadata_from_pending(
     )
     if any(not str(value or "").strip() for value in required):
         return None
+    virtual_stop = virtual_stop_for_fill(
+        side=str(pending["side"]),
+        entry=float(geometry["entry_price"]),
+        candidate_stop=pending.get("stop_loss"),
+        broker_stop=float(geometry["stop_loss"]),
+    )
     try:
         max_hold_s = int(
             pending.get("selected_horizon_s")
@@ -794,7 +869,7 @@ def ticket_metadata_from_pending(
         expected_mechanism=str(pending["expected_mechanism"]),
         side=str(pending["side"]),
         entry_price=float(geometry["entry_price"]),
-        stop_loss=float(geometry["stop_loss"]),
+        stop_loss=virtual_stop,
         target_price=pending.get("target_price"),
         max_hold_s=max_hold_s,
         regime=str(pending.get("regime") or ""),
@@ -806,7 +881,7 @@ def ticket_metadata_from_pending(
         symbol=str(pending.get("symbol") or getattr(position, "symbol", "")),
         entry_geometry={
             "entry_price": float(geometry["entry_price"]),
-            "stop_loss": float(geometry["stop_loss"]),
+            "stop_loss": virtual_stop,
         },
         initial_risk=pending.get("initial_risk"),
         cost_evidence=pending.get("cost_evidence"),
@@ -851,6 +926,12 @@ def record_confirmed_firehose_open(
     geometry = confirmed_position_geometry(position)
     if geometry.get("status") == "NO_EVIDENCE":
         return geometry
+    virtual_stop = virtual_stop_for_fill(
+        side=str(getattr(ticket_metadata, "side", "")),
+        entry=float(geometry["entry_price"]),
+        candidate_stop=getattr(ticket_metadata, "stop_loss", None),
+        broker_stop=float(geometry["stop_loss"]),
+    )
 
     basket_result = {"status": "NO_EVIDENCE"}
     if str(basket_metadata.get("trigger_id") or "").strip():
@@ -867,7 +948,7 @@ def record_confirmed_firehose_open(
             metadata={
                 **basket_metadata,
                 "entry_price": geometry["entry_price"],
-                "stop_loss": geometry["stop_loss"],
+                "stop_loss": virtual_stop,
             },
             contract=contract,
             volume=float(geometry["volume"]),
@@ -881,7 +962,7 @@ def record_confirmed_firehose_open(
     metadata = replace(
         ticket_metadata,
         entry_price=float(geometry["entry_price"]),
-        stop_loss=float(geometry["stop_loss"]),
+        stop_loss=virtual_stop,
         basket_id=basket_result.get("basket_id") if persisted else None,
         trigger_id=str(basket_metadata["trigger_id"]) if persisted else None,
         clip_sequence=1 if persisted else None,
@@ -2220,7 +2301,7 @@ def main() -> None:
                 order_qty = decision.lots
             entry = float(q.ask if sig.side == "buy" else q.bid)
             spec_map = None
-            if sl is not None or tp is not None:
+            if sl is not None or tp is not None or intelligent_mode:
                 try:
                     spec_map = eng.symbol_spec(sym)
                 except Exception:
@@ -2259,6 +2340,34 @@ def main() -> None:
                         return
                 else:
                     sl, tp = normalized_sl, normalized_tp
+            broker_sl = None
+            broker_tp = None
+            if intelligent_mode:
+                risk_cap = float(
+                    cfg.get("exploration_max_risk_per_trade_usd", 0.15) or 0.15
+                )
+                broker_sl = emergency_broker_stop(
+                    symbol=sym,
+                    side=sig.side,
+                    entry=entry,
+                    virtual_stop=sl,
+                    quantity=order_qty,
+                    spec=spec_map,
+                    max_risk_usd=risk_cap,
+                )
+                if broker_sl is None:
+                    append_journal(
+                        journal,
+                        {
+                            "event": "emergency_stop_skip",
+                            "symbol": sym,
+                            "reason": "wide_emergency_stop_exceeds_per_trade_risk_or_missing_geometry",
+                            "virtual_stop": sl,
+                            "risk_cap_usd": risk_cap,
+                            "bar": str(bar_time),
+                        },
+                    )
+                    return
             req = OrderRequest(
                 symbol=sym,
                 side=sig.side,
@@ -2266,6 +2375,8 @@ def main() -> None:
                 kind="market",
                 stop_loss=sl,
                 take_profit=tp,
+                broker_stop_loss=broker_sl,
+                broker_take_profit=broker_tp,
                 client_tag=(
                     # Exploration orders carry a compact hypothesis tag so
                     # broker-side SL/TP closes can be attributed back to the
@@ -2318,6 +2429,8 @@ def main() -> None:
                 limit_price=req.limit_price,
                 stop_loss=req.stop_loss,
                 take_profit=req.take_profit,
+                broker_stop_loss=req.broker_stop_loss,
+                broker_take_profit=req.broker_take_profit,
                 client_tag=client_tag,
             )
             if brain_decision is not None:
@@ -3362,6 +3475,47 @@ def main() -> None:
                                                     _replay_usd_per_price_unit = 1.0
                                             except (AttributeError, OSError, TypeError, ValueError):
                                                 _replay_usd_per_price_unit = 1.0
+                                            _expected_initial_friction_usd = 0.0
+                                            try:
+                                                _cost_evidence = (
+                                                    lifecycle_meta.cost_evidence
+                                                    if lifecycle_meta is not None
+                                                    and isinstance(lifecycle_meta.cost_evidence, dict)
+                                                    else {}
+                                                )
+                                                _spread_price = max(
+                                                    0.0, float(_cost_evidence.get("spread_price") or 0.0)
+                                                )
+                                                _entry_for_cost = float(
+                                                    lifecycle_meta.entry_price
+                                                    if lifecycle_meta is not None else 0.0
+                                                )
+                                                _slippage_bps = max(
+                                                    0.0, float(
+                                                        lifecycle_meta.slippage_assumption
+                                                        if lifecycle_meta is not None
+                                                        and lifecycle_meta.slippage_assumption is not None
+                                                        else cfg.get("slippage_bps", 0.0)
+                                                    )
+                                                )
+                                                _commission = max(
+                                                    0.0, float(
+                                                        lifecycle_meta.commission_assumption
+                                                        if lifecycle_meta is not None
+                                                        and lifecycle_meta.commission_assumption is not None
+                                                        else cfg.get("commission_round_trip_usd", 0.0)
+                                                    )
+                                                )
+                                                _expected_initial_friction_usd = (
+                                                    (_spread_price + 2.0 * _slippage_bps / 10_000.0 * _entry_for_cost)
+                                                    * _replay_usd_per_price_unit
+                                                    + _commission
+                                                )
+                                            except (TypeError, ValueError, OverflowError):
+                                                _expected_initial_friction_usd = 0.0
+                                            _memory_features["expected_initial_friction_usd"] = (
+                                                _expected_initial_friction_usd
+                                            )
                                             try:
                                                 _closed_ts = (
                                                     float(event["time_msc"]) / 1000.0

@@ -49,6 +49,7 @@ def _econ(**overrides):
         "commission_round_trip_usd": 0.0,
         "analogue_n": 100,
         "analogue_n_losses": 40,
+        "probability_provenance": "mt5_m1",
     }
     kwargs.update(overrides)
     return evaluate_trade_economics(**kwargs)

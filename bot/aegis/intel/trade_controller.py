@@ -1,6 +1,7 @@
 """Single canonical owner for per-ticket lifecycle actions."""
 from __future__ import annotations
 
+import math
 from typing import Any, Mapping
 
 
@@ -78,3 +79,168 @@ class TradeController:
         if action == "HOLD" and not result["why_hold"]:
             result["why_hold"] = "no exit policy triggered"
         return result
+
+    def replay_quote_path(
+        self,
+        *,
+        quotes: list[Mapping[str, Any]],
+        side: str,
+        horizon_s: float,
+        target_price: float,
+        stop_price: float,
+        pip_size: float = 0.0001,
+        slippage_price: float = 0.0,
+        commission_usd: float = 0.0,
+        usd_per_price_unit: float = 1.0,
+    ) -> dict[str, Any]:
+        """Replay the live controller against sequential executable quotes.
+
+        The first quote is the entry quote (ASK for BUY, BID for SELL).  Every
+        later decision sees only that quote's liquidation side (BID for BUY,
+        ASK for SELL), so the opening spread is represented once and no future
+        quote is used before its decision point.  This is intentionally an
+        evidence adapter: it never submits or modifies a broker order.
+        """
+        normalized_side = str(side or "").strip().lower()
+        if normalized_side not in {"buy", "sell"}:
+            return {"status": "UNAVAILABLE", "reason": "unknown_side"}
+        try:
+            horizon = float(horizon_s)
+            target = float(target_price)
+            stop = float(stop_price)
+            pip = float(pip_size)
+            slippage = float(slippage_price)
+            commission = float(commission_usd)
+            unit = float(usd_per_price_unit)
+        except (TypeError, ValueError, OverflowError):
+            return {"status": "UNAVAILABLE", "reason": "invalid_replay_parameters"}
+        if not all(math.isfinite(value) for value in (
+            horizon, target, stop, pip, slippage, commission, unit
+        )):
+            return {"status": "UNAVAILABLE", "reason": "invalid_replay_parameters"}
+        if horizon <= 0 or pip <= 0 or slippage < 0 or commission < 0 or unit <= 0:
+            return {"status": "UNAVAILABLE", "reason": "invalid_replay_parameters"}
+        if not isinstance(quotes, list) or not quotes:
+            return {"status": "UNAVAILABLE", "reason": "quote_history_missing"}
+
+        normalized: list[tuple[float, float, float]] = []
+        for quote in quotes:
+            if not isinstance(quote, Mapping):
+                return {"status": "UNAVAILABLE", "reason": "quote_history_invalid"}
+            try:
+                timestamp = float(quote["time"])
+                bid = float(quote["bid"])
+                ask = float(quote["ask"])
+            except (KeyError, TypeError, ValueError, OverflowError):
+                return {"status": "UNAVAILABLE", "reason": "quote_history_invalid"}
+            if not all(math.isfinite(value) for value in (timestamp, bid, ask)) or bid <= 0 or ask < bid:
+                return {"status": "UNAVAILABLE", "reason": "quote_history_invalid"}
+            normalized.append((timestamp, bid, ask))
+        normalized.sort(key=lambda item: item[0])
+        start, entry_bid, entry_ask = normalized[0]
+        entry = entry_ask if normalized_side == "buy" else entry_bid
+        direction = 1.0 if normalized_side == "buy" else -1.0
+        if (
+            (normalized_side == "buy" and not (stop < entry < target))
+            or (normalized_side == "sell" and not (target < entry < stop))
+        ):
+            return {"status": "UNAVAILABLE", "reason": "invalid_replay_geometry"}
+        future = [item for item in normalized[1:] if start < item[0] <= start + horizon]
+        if not future:
+            return {"status": "UNAVAILABLE", "reason": "quote_history_missing_future"}
+
+        # FastExitStateMachine is imported lazily to keep the controller usable
+        # by the research modules without creating an import cycle at startup.
+        from aegis.intel.fast_firehose import FastExitConfig, FastExitStateMachine
+
+        initial_friction_price = (entry_ask - entry_bid) + slippage
+        initial_friction_pips = initial_friction_price / pip
+        if unit > 0:
+            initial_friction_pips += (commission / unit) / pip
+        machine = FastExitStateMachine(FastExitConfig(time_exit_s=horizon))
+        actions: list[dict[str, Any]] = []
+        signed_prices: list[float] = []
+        first_green_s: float | None = None
+        peak_time_s: float | None = None
+        peak_price = -float("inf")
+        terminal: dict[str, Any] | None = None
+        for timestamp, bid, ask in future:
+            mark = bid if normalized_side == "buy" else ask
+            signed_price = (mark - entry) * direction
+            signed_prices.append(signed_price)
+            if signed_price > peak_price:
+                peak_price = signed_price
+                peak_time_s = timestamp - start
+            pnl_pips = signed_price / pip
+            mfe_pips = max(signed_prices) / pip
+            mae_pips = min(signed_prices) / pip
+            net_usd = signed_price * unit - slippage * unit - commission
+            if first_green_s is None and net_usd > 0:
+                first_green_s = timestamp - start
+            fast = machine.evaluate(
+                side=normalized_side,
+                entry_price=entry,
+                current_mark=mark,
+                stop_loss=stop,
+                target=target,
+                opened_ts=start,
+                now=timestamp,
+                pnl_pips=pnl_pips,
+                mfe_pips=mfe_pips,
+                mae_pips=mae_pips,
+                stop_pips=abs(entry - stop) / pip,
+                pip=pip,
+                expected_initial_friction_pips=initial_friction_pips,
+            )
+            decision = self.decide(None, fast)
+            action = decision["action"]
+            actions.append({
+                "time_s": timestamp - start,
+                "action": action,
+                "reason": decision["reason"],
+                "net_pnl_usd": net_usd,
+            })
+            if action in {"HARVEST", "SCRATCH", "ABORT"}:
+                terminal = {
+                    "time_s": timestamp - start,
+                    # Keep the historical label vocabulary stable while
+                    # retaining the exact canonical controller action below.
+                    "reason": "harvest" if action == "HARVEST" else "abort",
+                    "action": action,
+                    "net_pnl_usd": net_usd,
+                }
+                break
+
+        last_timestamp, last_bid, last_ask = future[-1]
+        if terminal is None:
+            mark = last_bid if normalized_side == "buy" else last_ask
+            final_signed = (mark - entry) * direction
+            terminal = {
+                "time_s": last_timestamp - start,
+                "reason": "timeout",
+                "action": "TIMEOUT",
+                "net_pnl_usd": final_signed * unit - slippage * unit - commission,
+            }
+        max_favorable = max(signed_prices) * unit - slippage * unit - commission
+        max_adverse = min(signed_prices) * unit - slippage * unit - commission
+        captured = float(terminal["net_pnl_usd"])
+        return {
+            "status": "REPLAYED",
+            "captured_exit_net_pnl": captured,
+            "captured_exit_reason": str(terminal["reason"]),
+            "captured_exit_action": str(terminal.get("action") or "TIMEOUT"),
+            "captured_exit_time_s": float(terminal["time_s"]),
+            "terminal_net_pnl": captured,
+            "mfe_net_pnl": float(max_favorable),
+            "mae_net_pnl": float(max_adverse),
+            "time_to_green_s": first_green_s,
+            "time_to_peak_s": peak_time_s,
+            "never_green": first_green_s is None,
+            "green_then_loser": first_green_s is not None and captured <= 0,
+            "tail_loss": captured < 0 and max_adverse < 0,
+            "capture_ratio": captured / max_favorable if max_favorable > 0 else None,
+            "entry_price": entry,
+            "entry_spread_price": entry_ask - entry_bid,
+            "expected_initial_friction_pips": initial_friction_pips,
+            "actions": actions,
+        }

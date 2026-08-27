@@ -22,6 +22,8 @@ import math
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping
 
+from aegis.intel.analogue_store import is_measured_provenance
+
 # A reward smaller than the invalidation distance is the structural signature of the
 # high-win-rate / negative-expectancy failure. 1.0R is a floor, not a target.
 DEFAULT_MIN_PAYOFF_RATIO = 1.0
@@ -53,6 +55,7 @@ class TradeEconomics:
     breakeven_win_rate: float | None
     usd_per_price_unit: float | None
     lots: float
+    probability_provenance: str = "unknown"
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -71,6 +74,7 @@ class TradeEconomics:
             "econ_cost_usd": self.cost_usd,
             "econ_p_win": self.p_win,
             "econ_p_win_source": self.p_win_source,
+            "econ_probability_provenance": self.probability_provenance,
             "econ_expected_net_usd": self.expected_net_value_usd,
             "econ_payoff_ratio": self.payoff_ratio,
             "econ_breakeven_wr": self.breakeven_win_rate,
@@ -94,6 +98,7 @@ def _reject(reason: str, *, entry: float, lots: float, **kwargs: Any) -> TradeEc
         "payoff_ratio": None,
         "breakeven_win_rate": None,
         "usd_per_price_unit": None,
+        "probability_provenance": "unknown",
     }
     base.update(kwargs)
     return TradeEconomics(acceptable=False, reason=reason, entry=float(entry), lots=float(lots), **base)
@@ -165,6 +170,7 @@ def evaluate_trade_economics(
     p_win: float | None = None,
     analogue_n: int = 0,
     analogue_n_losses: int = 0,
+    probability_provenance: str | None = None,
     min_payoff_ratio: float = DEFAULT_MIN_PAYOFF_RATIO,
     min_expected_net_usd: float = DEFAULT_MIN_EXPECTED_NET_USD,
 ) -> TradeEconomics:
@@ -173,8 +179,8 @@ def evaluate_trade_economics(
     ``invalidation`` and ``target`` are absolute structural prices. Missing or
     side-invalid geometry is rejected rather than replaced with invented prices.
 
-    ``p_win`` is used as supplied when given; otherwise the Wilson lower bound of the
-    analogue win rate is used, so a thin sample cannot masquerade as a strong edge.
+    Supplied probabilities and analogue evidence must identify measured market
+    history. Synthetic, proxy, and unknown evidence fail closed.
     """
     lots = float(lots or 0.0)
     entry = float(entry)
@@ -250,9 +256,28 @@ def evaluate_trade_economics(
 
     payoff_ratio = expected_win_usd / expected_loss_usd if expected_loss_usd > 0 else None
 
+    provenance = str(probability_provenance or "unknown")
+    if (p_win is not None or int(analogue_n) > 0) and not is_measured_provenance(provenance):
+        return _reject(
+            "probability_provenance_untrusted",
+            entry=entry,
+            lots=lots,
+            invalidation=invalidation,
+            target=resolved_target,
+            target_source=target_source,
+            risk_price=risk_price,
+            reward_price=reward_price,
+            expected_win_usd=expected_win_usd,
+            expected_loss_usd=expected_loss_usd,
+            cost_usd=cost_usd,
+            payoff_ratio=payoff_ratio,
+            probability_provenance=provenance,
+            usd_per_price_unit=per_unit,
+        )
+
     # Win probability: prefer the caller's calibrated value, else the conservative
     # lower bound of the analogue sample.
-    p_win_source = "supplied"
+    p_win_source = "supplied_measured"
     resolved_p: float | None = None
     if p_win is not None:
         try:
@@ -280,6 +305,7 @@ def evaluate_trade_economics(
             expected_loss_usd=expected_loss_usd,
             cost_usd=cost_usd,
             payoff_ratio=payoff_ratio,
+            probability_provenance=provenance,
             usd_per_price_unit=per_unit,
         )
 
@@ -300,6 +326,7 @@ def evaluate_trade_economics(
         "cost_usd": cost_usd,
         "p_win": resolved_p,
         "p_win_source": p_win_source,
+        "probability_provenance": provenance,
         "expected_net_value_usd": expected_net,
         "payoff_ratio": payoff_ratio,
         "breakeven_win_rate": breakeven_wr,

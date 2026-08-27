@@ -123,7 +123,9 @@ def test_observed_costs_can_remove_gross_winner_take_eligibility():
         observed_commission_r=0.05,
     )
 
-    assert gross_winner.net_pnl_r == 0.50
+    # The executable liquidation mark already contains the observed spread;
+    # only additional slippage and commission are deducted here.
+    assert gross_winner.net_pnl_r == 0.52
     assert harvester.evaluate(gross_winner).action == "QUICK_TAKE"
     assert harvester.evaluate(higher_cost).action == "UNAVAILABLE"
 

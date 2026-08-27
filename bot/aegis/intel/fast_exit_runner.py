@@ -61,6 +61,7 @@ class FastExitContext:
     spread_normal: Optional[bool] = None
     harvest_policy: Optional[HarvestPolicy] = None
     short_horizon_prediction: Optional[Mapping[str, Any]] = None
+    expected_initial_friction_pips: float = 0.0
 
 
 class MissingLiquidationMarkError(Exception):
@@ -159,6 +160,7 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     _stop_dist_pips = abs(
         _entry_px - float(_stop_loss or 0)
     ) / max(_pip_sz, 1e-10) if _stop_loss else 10.0
+    _friction_pips, _ = initial_friction_for_context(ctx, entry_price=_entry_px, pip=_pip_sz)
 
     # Use exact ticket metadata for target and max_hold_s (first priority)
     _tgt_px = _ticket_meta.target_price if _ticket_meta else None
@@ -216,6 +218,7 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
         remaining_ev_status=ctx.remaining_ev_status if remaining_ev_active else "UNKNOWN",
         harvest_policy=ctx.harvest_policy,
         harvest_input=harvest_input,
+        expected_initial_friction_pips=_friction_pips,
     )
 
     # Current calibrated model support may replace only the default HOLD, and
@@ -223,7 +226,7 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
     # giveback, regime, EV, and lock decisions keep priority.
     if (
         fast_verdict.get("action") == "HOLD"
-        and _pnl_pips <= 0
+        and (_pnl_pips + _friction_pips) <= 0
         and short_horizon_support_revoked(ctx.short_horizon_prediction)
     ):
         prediction = ctx.short_horizon_prediction or {}
@@ -293,6 +296,9 @@ def build_harvest_input(ctx: FastExitContext) -> HarvestInput | None:
         opened_ts=meta.opened_ts,
         stop_loss=stop,
         target_price=meta.target_price,
+        expected_initial_friction_r=initial_friction_for_context(
+            ctx, entry_price=entry, pip=1.0
+        )[1] / max(risk_usd, 1e-12),
     )
 
 
@@ -322,6 +328,12 @@ def firehose_exit_trace(ctx: FastExitContext, verdict: Mapping[str, Any]) -> dic
         "observed_spread_r": (harvest.observed_spread_r if harvest else ctx.observed_spread_r),
         "observed_slippage_r": (harvest.observed_slippage_r if harvest else ctx.observed_slippage_r),
         "observed_commission_r": (harvest.observed_commission_r if harvest else ctx.observed_commission_r),
+        "expected_initial_friction_r": (
+            harvest.expected_initial_friction_r if harvest else None
+        ),
+        "adverse_excursion_beyond_expected_friction_r": verdict.get(
+            "adverse_excursion_beyond_expected_friction_pips"
+        ),
         "spread_normal": (harvest.spread_normal if harvest else ctx.spread_normal),
         "remaining_ev": ctx.remaining_ev,
         "remaining_ev_status": ctx.remaining_ev_status,
@@ -355,6 +367,43 @@ def _risk_usd(ctx: FastExitContext, meta: TicketMetadata | None) -> float | None
         return risk if _finite_positive(risk) else None
     except (TypeError, ValueError):
         return None
+
+
+def initial_friction_for_context(
+    ctx: FastExitContext,
+    *,
+    entry_price: float,
+    pip: float,
+) -> tuple[float, float]:
+    """Return expected opening friction in pips and price units.
+
+    Spread is read from the fill-time cost evidence and therefore is not
+    charged again as an observed exit cost. Slippage and commission are the
+    only additional round-trip costs used by the harvester.
+    """
+    meta = ctx.ticket_meta
+    spread_price = 0.0
+    if meta is not None and isinstance(meta.cost_evidence, Mapping):
+        spread_price = _finite_nonnegative(meta.cost_evidence.get("spread_price")) or 0.0
+    slippage_bps = (
+        meta.slippage_assumption if meta is not None and meta.slippage_assumption is not None
+        else ctx.config.get("slippage_bps", 0.0)
+    )
+    commission = (
+        meta.commission_assumption if meta is not None and meta.commission_assumption is not None
+        else ctx.config.get("commission_round_trip_usd", 0.0)
+    )
+    try:
+        slippage_price = 2.0 * max(0.0, float(slippage_bps or 0.0)) / 10_000.0 * float(entry_price)
+        commission_usd = max(0.0, float(commission or 0.0))
+        spec = BrokerSymbolSpec.from_mapping(ctx.engine_spec)
+        unit = spec.usd_per_price_unit_per_lot() * max(float(ctx.quantity), 0.0)
+        commission_price = commission_usd / unit if unit > 0 else 0.0
+    except (TypeError, ValueError, ZeroDivisionError):
+        slippage_price = 0.0
+        commission_price = 0.0
+    price = max(0.0, spread_price + slippage_price + commission_price)
+    return price / max(float(pip), 1e-12), price
 
 
 def spread_r_from_geometry(
@@ -456,6 +505,10 @@ def _finite(value: object) -> bool:
 
 def _finite_positive(value: object) -> bool:
     return _finite(value) and value > 0
+
+
+def _finite_nonnegative(value: object) -> float | None:
+    return float(value) if _finite(value) and float(value) >= 0 else None
 
 
 def pip_size_for(symbol: str, config: Mapping[str, Any]) -> float:

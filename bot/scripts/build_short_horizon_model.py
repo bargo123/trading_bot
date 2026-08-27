@@ -69,6 +69,7 @@ def main() -> None:
         sample_every_s=max(1, int(args.sample_every_seconds)),
         target_mode=args.target_mode,
         slippage_bps=float(cfg.get("slippage_bps", 0.0) or 0.0),
+        commission_round_trip_usd=float(cfg.get("commission_round_trip_usd", 0.0) or 0.0),
     )
     print(f"TRAINING_ROWS {len(frame)} SYMBOLS {frame['symbol'].nunique()} TIMES {frame['time'].min()}..{frame['time'].max()}")
     metadata = train_and_publish(

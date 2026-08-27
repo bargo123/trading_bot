@@ -65,8 +65,13 @@ class OrderRequest:
     quantity: float
     kind: OrderKind = "market"
     limit_price: Optional[float] = None
+    # ``stop_loss``/``take_profit`` describe the strategy's virtual geometry.
+    # A broker implementation may carry a separate emergency-only stop so the
+    # normal lifecycle remains owned by the controller.
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
+    broker_stop_loss: Optional[float] = None
+    broker_take_profit: Optional[float] = None
     client_tag: str = ""
 
 

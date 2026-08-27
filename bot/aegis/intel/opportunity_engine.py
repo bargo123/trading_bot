@@ -92,7 +92,12 @@ def rank_and_allocate(
 
     ranked.sort(
         key=lambda row: (
-            -_number(row, "p_captured_win"),
+            -_number(
+                row,
+                "p_captured_win_lcb95",
+                "authority_capture_lcb95",
+                "p_captured_win",
+            ),
             -_number(row, "fast_winner_similarity"),
             -_number(row, "expected_net_ev_lcb95", "expected_net_ev_lcb", default=float("-inf")),
             _number(row, "fast_loser_similarity"),
