@@ -1292,6 +1292,183 @@ def broker_close_evidence(deals, *, ticket: str) -> dict[str, object]:
     return {"status": "BROKER_CONFIRMED", **facts}
 
 
+def outcome_features_from_ticket_metadata(
+    metadata: Any,
+    *,
+    event: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Reconstruct the exact point-in-time state captured before a fill."""
+    event_values = dict(event or {})
+    snapshot = getattr(metadata, "decision_snapshot", None)
+    snapshot = dict(snapshot) if isinstance(snapshot, Mapping) else {}
+    prediction = getattr(metadata, "prediction_snapshot", None)
+    prediction = dict(prediction) if isinstance(prediction, Mapping) else {}
+    if not prediction and isinstance(snapshot.get("prediction"), Mapping):
+        prediction = dict(snapshot["prediction"])
+    feature_snapshot = getattr(metadata, "feature_snapshot", None)
+    feature_snapshot = dict(feature_snapshot) if isinstance(feature_snapshot, Mapping) else {}
+    if not feature_snapshot and isinstance(prediction.get("feature_snapshot"), Mapping):
+        feature_snapshot = dict(prediction["feature_snapshot"])
+
+    state: dict[str, Any] = dict(feature_snapshot)
+    derived_context = {
+        "short_returns": {
+            key: value for key, value in feature_snapshot.items()
+            if "return" in str(key).lower()
+        },
+        "quote_tick_dynamics": {
+            key: value for key, value in feature_snapshot.items()
+            if any(token in str(key).lower() for token in ("quote", "tick"))
+        },
+        "volatility_context": {
+            key: value for key, value in feature_snapshot.items()
+            if "volatility" in str(key).lower() or key in {"vol", "atr"}
+        },
+        "m1_context": {
+            key: value for key, value in feature_snapshot.items()
+            if str(key).lower().startswith("m1")
+        },
+        "m5_context": {
+            key: value for key, value in feature_snapshot.items()
+            if str(key).lower().startswith("m5")
+        },
+        "m15_context": {
+            key: value for key, value in feature_snapshot.items()
+            if str(key).lower().startswith("m15")
+        },
+    }
+    state.update({key: value for key, value in derived_context.items() if value})
+    observed = {
+        "symbol": getattr(metadata, "symbol", None) or event_values.get("symbol"),
+        "side": getattr(metadata, "side", None) or event_values.get("side"),
+        "mechanism": (
+            getattr(metadata, "expected_mechanism", None)
+            or getattr(metadata, "strategy_family", None)
+            or event_values.get("mechanism")
+            or event_values.get("family")
+        ),
+        "horizon_s": (
+            getattr(metadata, "selected_horizon_s", None)
+            or getattr(metadata, "max_hold_s", None)
+            or event_values.get("horizon_s")
+        ),
+        "selected_horizon_s": getattr(metadata, "selected_horizon_s", None),
+        "session": getattr(metadata, "session", None) or event_values.get("session"),
+        "regime": getattr(metadata, "regime", None) or event_values.get("regime"),
+        "entry_time": getattr(metadata, "opened_ts", None),
+        "entry_price": getattr(metadata, "entry_price", None),
+        "stop_price": getattr(metadata, "stop_loss", None),
+        "target_price": getattr(metadata, "target_price", None),
+        "entry_geometry": getattr(metadata, "entry_geometry", None),
+        "geometry": getattr(metadata, "entry_geometry", None),
+        "initial_risk_usd": getattr(metadata, "initial_risk", None),
+        "p_captured_win": getattr(metadata, "p_captured_win", None),
+        "entry_ev": getattr(metadata, "entry_ev", None),
+        "spread_assumption": getattr(metadata, "spread_assumption", None),
+        "expected_net_pnl": getattr(metadata, "expected_net_pnl", None),
+        "cost_assumptions": {
+            "spread": getattr(metadata, "spread_assumption", None),
+            "slippage": getattr(metadata, "slippage_assumption", None),
+            "commission": getattr(metadata, "commission_assumption", None),
+        },
+        "cost_evidence": getattr(metadata, "cost_evidence", None),
+        "prediction_snapshot": prediction,
+        "model_artifact": getattr(metadata, "model_artifact", None),
+        "decision_snapshot": snapshot,
+    }
+    for key, value in observed.items():
+        if value is not None:
+            state[key] = value
+    return state
+
+
+def broker_replay_usd_per_price_unit(
+    engine: Any,
+    *,
+    symbol: str,
+    close_facts: Mapping[str, Any],
+) -> float:
+    """Use broker-native money conversion for post-close research replay."""
+    try:
+        from aegis.intel.broker_math import BrokerSymbolSpec
+
+        spec = BrokerSymbolSpec.from_mapping(engine.symbol_spec(symbol))
+        quantity = float(close_facts.get("entry_quantity") or 0.0)
+        unit = spec.usd_per_price_unit_per_lot() * quantity
+        return unit if math.isfinite(unit) and unit > 0 else 1.0
+    except (AttributeError, OSError, TypeError, ValueError, OverflowError):
+        return 1.0
+
+
+def record_broker_confirmed_outcome_learning(
+    *,
+    outcome_memory: Any,
+    outcome_id: str,
+    close_facts: Mapping[str, Any],
+    metadata: Any,
+    lifecycle_detail: Mapping[str, Any] | None,
+    quote_buffer: Any = None,
+    event: Mapping[str, Any] | None = None,
+    counterfactual_geometries: Mapping[str, Mapping[str, Any]] | None = None,
+    alternative_horizons_s: tuple[int, ...] | list[int] | None = None,
+    usd_per_price_unit: float = 1.0,
+) -> dict[str, Any]:
+    """Record or stage one completed ticket without using floating PnL."""
+    from aegis.intel.outcome_memory import _finite
+
+    state = outcome_features_from_ticket_metadata(metadata, event=event)
+    detail = dict(lifecycle_detail or {})
+    symbol = str(state.get("symbol") or "").upper()
+    entry_time = state.get("entry_time")
+    close_timestamp = close_facts.get("close_timestamp") if isinstance(close_facts, Mapping) else None
+    try:
+        closed_at = (
+            datetime.fromisoformat(str(close_timestamp).replace("Z", "+00:00")).timestamp()
+            if close_timestamp else (
+                float(event["time_msc"]) / 1000.0
+                if event is not None and event.get("time_msc") else time.time()
+            )
+        )
+    except (TypeError, ValueError, OverflowError):
+        closed_at = time.time()
+    quotes: list[Mapping[str, Any]] = []
+    if quote_buffer is not None and symbol and entry_time is not None:
+        try:
+            quotes = quote_buffer.quotes_between(symbol, float(entry_time), closed_at)
+        except (AttributeError, TypeError, ValueError):
+            quotes = []
+    cost_usd = abs(
+        float(close_facts.get("round_trip_cost_usd", close_facts.get("cost_usd", 0.0)) or 0.0)
+    ) if isinstance(close_facts, Mapping) else 0.0
+    if counterfactual_geometries is None and isinstance(
+        state.get("counterfactual_geometries"), Mapping
+    ):
+        counterfactual_geometries = state["counterfactual_geometries"]
+    common = {
+        "outcome_id": str(outcome_id),
+        "features": state,
+        "mfe_usd": detail.get("mfe_usd"),
+        "mae_usd": detail.get("mae_usd"),
+        "time_to_green_s": detail.get("first_green_s"),
+        "counterfactual_quotes": quotes,
+        "counterfactual_geometries": counterfactual_geometries,
+        "alternative_horizons_s": alternative_horizons_s,
+        "counterfactual_cost_usd": cost_usd,
+        "counterfactual_usd_per_price_unit": usd_per_price_unit,
+        "exit_reason": detail.get("exit_reason") or (
+            event.get("close_reason") if event is not None else None
+        ),
+    }
+    if close_facts.get("status") != "BROKER_CONFIRMED":
+        return outcome_memory.stage_pending_close(**common)
+    if _finite(close_facts.get("realized_net_usd")) is None:
+        return outcome_memory.stage_pending_close(**common)
+    return outcome_memory.record_confirmed_close(
+        **common,
+        broker_facts=close_facts,
+    )
+
+
 def legacy_normal_exit_enabled(intelligent_mode: bool) -> bool:
     """Keep legacy CORE exits out of the intelligent Firehose lane."""
     return not bool(intelligent_mode)
@@ -1987,6 +2164,12 @@ def main() -> None:
 
                 if intelligent_brain is None:
                     intelligent_brain = IntelligentFirehoseBrain(cfg)
+                    try:
+                        intelligent_brain.outcome_memory.import_historical_confirmed_trades(
+                            ROOT / "intel" / "outcome_log.jsonl"
+                        )
+                    except Exception as exc:
+                        logger.warning("historical outcome import skipped: %s", exc)
                 completed = raw.iloc[:-1].copy() if len(raw) >= 2 else raw
                 hint_cfg = dict(loop_cfg)
                 hint_cfg["intel_enabled"] = False
@@ -3461,148 +3644,30 @@ def main() -> None:
                                                 or {}
                                             )
                                             lifecycle_meta = ticket_metadata_store.get(position_id)
-                                            _meta_snapshot = (
-                                                dict(lifecycle_meta.decision_snapshot or {})
-                                                if lifecycle_meta is not None
-                                                and isinstance(lifecycle_meta.decision_snapshot, dict)
-                                                else {}
-                                            )
-                                            _meta_journal = (
-                                                dict(_meta_snapshot.get("prediction") or {})
-                                                if isinstance(_meta_snapshot.get("prediction"), dict)
-                                                else {}
-                                            )
-                                            _memory_features = {
-                                                "symbol": (
-                                                    getattr(lifecycle_meta, "symbol", None)
-                                                    or event.get("symbol")
-                                                ),
-                                                "side": (
-                                                    getattr(lifecycle_meta, "side", None)
-                                                    or event.get("side")
-                                                ),
-                                                "mechanism": getattr(
-                                                    lifecycle_meta, "strategy_family", None
-                                                ) or event.get("family"),
-                                                "selected_horizon_s": getattr(
-                                                    lifecycle_meta, "selected_horizon_s", None
-                                                ) or getattr(lifecycle_meta, "max_hold_s", None),
-                                                "horizon_s": getattr(
-                                                    lifecycle_meta, "selected_horizon_s", None
-                                                ) or getattr(lifecycle_meta, "max_hold_s", None),
-                                                "session": getattr(
-                                                    lifecycle_meta, "session", None
-                                                ) or event.get("session"),
-                                                "regime": getattr(
-                                                    lifecycle_meta, "regime", None
-                                                ) or event.get("regime"),
-                                                "entry_time": getattr(lifecycle_meta, "opened_ts", None),
-                                                "stop_price": getattr(lifecycle_meta, "stop_loss", None),
-                                                "target_price": getattr(lifecycle_meta, "target_price", None),
-                                                "entry_ev": getattr(lifecycle_meta, "entry_ev", None),
-                                                "authority_probability": getattr(
-                                                    lifecycle_meta, "authority_probability", None
-                                                ),
-                                                "authority_capture_lcb95": getattr(
-                                                    lifecycle_meta, "authority_capture_lcb95", None
-                                                ),
-                                                "spread_pips": _meta_journal.get("spread_pips"),
-                                                "structure": _meta_journal.get("structure"),
-                                                "h1_direction": _meta_journal.get("h1_direction"),
-                                                "m5_direction": _meta_journal.get("m5_direction"),
-                                                "breakout_state": _meta_journal.get("breakout_state"),
-                                                "rejection_state": _meta_journal.get("rejection_state"),
-                                                "expansion_state": _meta_journal.get("expansion_state"),
-                                            }
-                                            _replay_quotes = []
-                                            _replay_cost = abs(float(close_facts.get("round_trip_cost_usd") or 0.0))
-                                            _replay_usd_per_price_unit = 1.0
-                                            try:
-                                                _contract = eng.symbol_spec(
-                                                    str(_memory_features.get("symbol") or event.get("symbol") or "")
-                                                )
-                                                from aegis.intel.broker_math import BrokerSymbolSpec
-
-                                                _broker_spec = BrokerSymbolSpec.from_mapping(_contract)
-                                                _replay_usd_per_price_unit = (
-                                                    _broker_spec.usd_per_price_unit_per_lot()
-                                                    * float(close_facts.get("entry_quantity") or 0.0)
-                                                )
-                                                if _replay_usd_per_price_unit <= 0:
-                                                    _replay_usd_per_price_unit = 1.0
-                                            except (AttributeError, OSError, TypeError, ValueError):
-                                                _replay_usd_per_price_unit = 1.0
-                                            _expected_initial_friction_usd = 0.0
-                                            try:
-                                                _cost_evidence = (
-                                                    lifecycle_meta.cost_evidence
-                                                    if lifecycle_meta is not None
-                                                    and isinstance(lifecycle_meta.cost_evidence, dict)
-                                                    else {}
-                                                )
-                                                _spread_price = max(
-                                                    0.0, float(_cost_evidence.get("spread_price") or 0.0)
-                                                )
-                                                _entry_for_cost = float(
-                                                    lifecycle_meta.entry_price
-                                                    if lifecycle_meta is not None else 0.0
-                                                )
-                                                _slippage_bps = max(
-                                                    0.0, float(
-                                                        lifecycle_meta.slippage_assumption
-                                                        if lifecycle_meta is not None
-                                                        and lifecycle_meta.slippage_assumption is not None
-                                                        else cfg.get("slippage_bps", 0.0)
-                                                    )
-                                                )
-                                                _commission = max(
-                                                    0.0, float(
-                                                        lifecycle_meta.commission_assumption
-                                                        if lifecycle_meta is not None
-                                                        and lifecycle_meta.commission_assumption is not None
-                                                        else cfg.get("commission_round_trip_usd", 0.0)
-                                                    )
-                                                )
-                                                _expected_initial_friction_usd = (
-                                                    (_spread_price + 2.0 * _slippage_bps / 10_000.0 * _entry_for_cost)
-                                                    * _replay_usd_per_price_unit
-                                                    + _commission
-                                                )
-                                            except (TypeError, ValueError, OverflowError):
-                                                _expected_initial_friction_usd = 0.0
-                                            _memory_features["expected_initial_friction_usd"] = (
-                                                _expected_initial_friction_usd
-                                            )
-                                            try:
-                                                _closed_ts = (
-                                                    float(event["time_msc"]) / 1000.0
-                                                    if event.get("time_msc")
-                                                    else datetime.fromisoformat(
-                                                        str(close_facts.get("close_timestamp") or "")
-                                                        .replace("Z", "+00:00")
-                                                    ).timestamp()
-                                                )
-                                            except (TypeError, ValueError, OverflowError):
-                                                _closed_ts = time.time()
-                                            try:
-                                                _replay_quotes = quote_buffer.quotes_between(
-                                                    float(_memory_features.get("entry_time") or 0.0),
-                                                    _closed_ts,
-                                                )
-                                            except (AttributeError, TypeError, ValueError):
-                                                _replay_quotes = []
-                                            outcome_memory.record_closed(
+                                            _memory_result = record_broker_confirmed_outcome_learning(
+                                                outcome_memory=outcome_memory,
                                                 outcome_id=position_id,
-                                                features=_memory_features,
-                                                realized_net_usd=net_pnl,
-                                                mfe_usd=lifecycle_detail.get("mfe_usd"),
-                                                mae_usd=lifecycle_detail.get("mae_usd"),
-                                                time_to_green_s=lifecycle_detail.get(
-                                                    "first_green_s"
+                                                close_facts=close_facts,
+                                                metadata=lifecycle_meta,
+                                                lifecycle_detail=lifecycle_detail,
+                                                quote_buffer=quote_buffer,
+                                                event=event,
+                                                usd_per_price_unit=broker_replay_usd_per_price_unit(
+                                                    eng,
+                                                    symbol=str(event.get("symbol") or ""),
+                                                    close_facts=close_facts,
                                                 ),
-                                                counterfactual_quotes=_replay_quotes,
-                                                counterfactual_cost_usd=_replay_cost,
-                                                counterfactual_usd_per_price_unit=_replay_usd_per_price_unit,
+                                            )
+                                            append_journal(
+                                                journal,
+                                                {
+                                                    "event": "outcome_learning",
+                                                    "ticket": position_id,
+                                                    "status": _memory_result.get("status", "RECORDED"),
+                                                    "evidence_status": _memory_result.get("evidence_status"),
+                                                    "classification": _memory_result.get("classification"),
+                                                    "speed_label": _memory_result.get("speed_label"),
+                                                },
                                             )
                                             memory_recorded_positions.add(position_id)
                                         except Exception as exc:
@@ -4202,6 +4267,41 @@ def main() -> None:
                                         confirmed=True,
                                         exit_reason=str(verdict.get("reason") or "unknown"),
                                     )
+                                    outcome_memory = getattr(
+                                        intelligent_brain, "outcome_memory", None
+                                    ) if intelligent_brain is not None else None
+                                    if outcome_memory is not None:
+                                        try:
+                                            replay_unit = broker_replay_usd_per_price_unit(
+                                                eng,
+                                                symbol=str(getattr(pos, "symbol", "")),
+                                                close_facts=close_facts,
+                                            )
+                                            learning_result = record_broker_confirmed_outcome_learning(
+                                                outcome_memory=outcome_memory,
+                                                outcome_id=tk,
+                                                close_facts=close_facts,
+                                                metadata=_ticket_meta,
+                                                lifecycle_detail=firehose_turnover.close_detail(tk),
+                                                quote_buffer=quote_buffer,
+                                                usd_per_price_unit=replay_unit,
+                                            )
+                                            append_journal(
+                                                journal,
+                                                {
+                                                    "event": "outcome_learning",
+                                                    "ticket": tk,
+                                                    "status": learning_result.get("status", "RECORDED"),
+                                                    "evidence_status": learning_result.get("evidence_status"),
+                                                    "classification": learning_result.get("classification"),
+                                                    "speed_label": learning_result.get("speed_label"),
+                                                },
+                                            )
+                                        except Exception as learning_exc:
+                                            logger.error(
+                                                "outcome learning update failed position=%s: %s",
+                                                tk, learning_exc, exc_info=True,
+                                            )
                                     append_journal(
                                         journal,
                                         {

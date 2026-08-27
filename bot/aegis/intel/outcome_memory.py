@@ -25,6 +25,19 @@ def _finite(value: object) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def _json_safe(value: Any) -> Any:
+    """Copy observed state without manufacturing values for unsupported data."""
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return None
+
+
 def classify_lifecycle(
     *,
     realized_net_usd: float,
@@ -109,15 +122,40 @@ def _normalized_features(features: Mapping[str, Any]) -> dict[str, Any]:
             normalized[key] = str(features.get(key) or "").lower()
     for key in (
         "entry_ev", "authority_probability", "authority_capture_lcb95",
-        "spread_pips", "stop_pips", "target_pips", "momentum", "compression",
-        "expansion", "volatility_value", "quote_age_s", "time_to_green_s",
-        "mfe_usd", "mae_usd", "hold_s",
+        "p_captured_win", "spread_pips", "stop_pips", "target_pips", "momentum",
+        "compression", "expansion", "volatility_value", "quote_age_s",
+        "quote_change_rate", "tick_rate_per_min", "short_volatility",
+        "signed_tick_imbalance", "return_3s", "return_5s", "return_8s",
+        "return_10s", "return_15s", "return_20s", "return_30s", "return_60s",
+        "return_3s_buy", "return_3s_sell", "return_5s_buy", "return_5s_sell",
+        "return_15s_buy", "return_15s_sell", "return_30s_buy", "return_30s_sell",
+        "return_60s_buy", "return_60s_sell", "m1_open", "m1_high", "m1_low",
+        "m1_close", "m1_prev_close", "m1_atr", "m1_volume", "m1_range", "m1_body",
+        "m5_support", "m5_resistance", "m5_atr", "m5_compression",
+        "m15_support", "m15_resistance", "m15_range_mid", "m15_range_half_width",
         "expected_initial_friction_usd",
     ):
         value = _finite(features.get(key))
         if value is not None:
             normalized[key] = value
     return normalized
+
+
+def _state_key(features: Mapping[str, Any]) -> str:
+    """Identify a pre-entry state, never including post-entry outcome fields."""
+    normalized = _normalized_features(features)
+    normalized.pop("source", None)
+    return json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+
+
+def _same_state_identity(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
+    required = ("symbol", "side", "mechanism", "horizon_s")
+    return all(
+        left.get(key) not in {None, "", 0}
+        and right.get(key) not in {None, "", 0}
+        and str(left.get(key)) == str(right.get(key))
+        for key in required
+    )
 
 
 def _similarity(left: Mapping[str, Any], right: Mapping[str, Any]) -> float:
@@ -260,37 +298,95 @@ def replay_counterfactual(
         "cost_usd": cost,
         "controller_actions": actions,
     }
-    close_price = None
-    close_timestamp = None
-    close_reason = "timeout"
-    for timestamp, bid, ask in rows[1:]:
-        liquidation = bid if normalized_side == "buy" else ask
-        move = (liquidation - entry_price) * sign
-        if move >= (target_price - entry_price) * sign:
-            close_price, close_timestamp, close_reason = liquidation, timestamp, "target"
-            break
-        if move <= (stop_price - entry_price) * sign:
-            close_price, close_timestamp, close_reason = liquidation, timestamp, "stop"
-            break
-    if close_price is None:
-        _, bid, ask = rows[-1]
-        close_price = bid if normalized_side == "buy" else ask
-        close_timestamp = rows[-1][0]
-    gross = (float(close_price) - entry_price) * sign * unit_value
-    net = gross - cost
-    return {
-        "status": "REPLAYED",
-        "chosen_net_usd": net,
-        "chosen_gross_usd": gross,
-        "chosen_entry_price": entry_price,
-        "chosen_close_price": float(close_price),
-        "chosen_close_timestamp": close_timestamp,
-        "chosen_close_reason": close_reason,
-        "opposite_net_usd": None,
-        "abstain_net_usd": 0.0,
-        "opposite_status": "UNAVAILABLE_NO_OPPOSITE_GEOMETRY",
-        "cost_usd": cost,
-    }
+
+
+def replay_counterfactuals(
+    *,
+    quotes: list[Mapping[str, Any]],
+    entry_time: float,
+    actual_side: str,
+    actual_stop: object,
+    actual_target: object,
+    actual_horizon_s: float,
+    counterfactual_geometries: Mapping[str, Mapping[str, Any]] | None = None,
+    alternative_horizons_s: tuple[int, ...] | list[int] | None = None,
+    cost_usd: float = 0.0,
+    usd_per_price_unit: float = 1.0,
+) -> dict[str, Any]:
+    """Replay both directions and alternate time horizons using observed quotes.
+
+    The caller invokes this only after a confirmed close.  An opposite-side
+    replay is deliberately unavailable unless its geometry was observed or
+    supplied explicitly; this prevents the learner from inventing a stop or
+    target after the fact.
+    """
+    side = str(actual_side or "").strip().lower()
+    geometries = dict(counterfactual_geometries or {})
+    results: dict[str, Any] = {}
+    for candidate_side in ("buy", "sell"):
+        geometry = {
+            "stop_price": actual_stop,
+            "target_price": actual_target,
+        } if candidate_side == side else geometries.get(candidate_side)
+        if not isinstance(geometry, Mapping):
+            results[f"what_if_{candidate_side}"] = {
+                "status": "UNAVAILABLE",
+                "reason": "counterfactual_geometry_missing",
+                "side": candidate_side,
+            }
+            continue
+        replay = replay_counterfactual(
+            quotes=quotes,
+            entry_time=entry_time,
+            side=candidate_side,
+            stop=geometry.get("stop_price", geometry.get("stop")),
+            target=geometry.get("target_price", geometry.get("target")),
+            horizon_s=actual_horizon_s,
+            cost_usd=cost_usd,
+            usd_per_price_unit=usd_per_price_unit,
+        )
+        results[f"what_if_{candidate_side}"] = {
+            "side": candidate_side,
+            "horizon_s": int(float(actual_horizon_s)),
+            **replay,
+            "net_pnl_usd": replay.get("chosen_net_usd"),
+        }
+
+    results["what_if_abstain"] = {"status": "NO_TRADE", "net_pnl_usd": 0.0}
+    alternatives: dict[str, Any] = {}
+    horizons = alternative_horizons_s
+    if horizons is None:
+        horizons = (1, 2, 3, 5, 8, 10, 15, 20)
+    try:
+        actual_horizon = int(float(actual_horizon_s))
+    except (TypeError, ValueError, OverflowError):
+        actual_horizon = 0
+    actual_geometry = {"stop_price": actual_stop, "target_price": actual_target}
+    for raw_horizon in horizons:
+        try:
+            horizon = int(raw_horizon)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if horizon <= 0 or horizon == actual_horizon:
+            continue
+        replay = replay_counterfactual(
+            quotes=quotes,
+            entry_time=entry_time,
+            side=side,
+            stop=actual_geometry["stop_price"],
+            target=actual_geometry["target_price"],
+            horizon_s=horizon,
+            cost_usd=cost_usd,
+            usd_per_price_unit=usd_per_price_unit,
+        )
+        alternatives[str(horizon)] = {
+            "side": side,
+            "horizon_s": horizon,
+            **replay,
+            "net_pnl_usd": replay.get("chosen_net_usd"),
+        }
+    results["alternative_horizons"] = alternatives
+    return results
 
 
 class OutcomeMemoryStore:
@@ -299,6 +395,7 @@ class OutcomeMemoryStore:
     def __init__(self, path: Path):
         self.path = Path(path)
         self.records: list[dict[str, Any]] = []
+        self.pending: dict[str, dict[str, Any]] = {}
         self._load()
 
     def _load(self) -> None:
@@ -309,10 +406,20 @@ class OutcomeMemoryStore:
         rows = payload.get("records") if isinstance(payload, dict) else payload
         if isinstance(rows, list):
             self.records = [row for row in rows if isinstance(row, dict)]
+        if isinstance(payload, dict) and isinstance(payload.get("pending"), dict):
+            self.pending = {
+                str(key): dict(value)
+                for key, value in payload["pending"].items()
+                if isinstance(value, dict)
+            }
 
     def _persist(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"schema": "outcome_memory.v1", "records": self.records[-5000:]}
+        payload = {
+            "schema": "outcome_memory.v2",
+            "records": self.records[-5000:],
+            "pending": self.pending,
+        }
         temp = self.path.with_suffix(".tmp")
         temp.write_text(json.dumps(payload, default=str), encoding="utf-8")
         temp.replace(self.path)
@@ -330,16 +437,23 @@ class OutcomeMemoryStore:
         counterfactual_quotes: list[Mapping[str, Any]] | None = None,
         counterfactual_cost_usd: float = 0.0,
         counterfactual_usd_per_price_unit: float = 1.0,
+        counterfactual_geometries: Mapping[str, Mapping[str, Any]] | None = None,
+        alternative_horizons_s: tuple[int, ...] | list[int] | None = None,
+        broker_facts: Mapping[str, Any] | None = None,
+        evidence_status: str | None = None,
+        exit_reason: str | None = None,
     ) -> dict[str, Any]:
+        """Store one completed observation; production uses ``record_confirmed_close``."""
         lifecycle = classify_lifecycle(
             realized_net_usd=realized_net_usd,
             mfe_usd=mfe_usd,
             mae_usd=mae_usd,
             time_to_green_s=time_to_green_s,
-            selected_horizon_s=features.get("selected_horizon_s", features.get("horizon_s")),
+            selected_horizon_s=features.get("selected_horizon_s") or features.get("horizon_s"),
             expected_initial_friction_usd=features.get("expected_initial_friction_usd", 0.0),
         )
         replay = None
+        replay_set: dict[str, Any] = {}
         if counterfactual_quotes is not None:
             replay = replay_counterfactual(
                 quotes=counterfactual_quotes,
@@ -347,29 +461,191 @@ class OutcomeMemoryStore:
                 side=str(features.get("side") or ""),
                 stop=features.get("stop_price"),
                 target=features.get("target_price"),
-                horizon_s=features.get("horizon_s"),
+                horizon_s=features.get("selected_horizon_s") or features.get("horizon_s"),
                 cost_usd=counterfactual_cost_usd,
                 usd_per_price_unit=counterfactual_usd_per_price_unit,
             )
+            replay_set = replay_counterfactuals(
+                quotes=counterfactual_quotes,
+                entry_time=float(features.get("entry_time", 0.0) or 0.0),
+                actual_side=str(features.get("side") or ""),
+                actual_stop=features.get("stop_price"),
+                actual_target=features.get("target_price"),
+                actual_horizon_s=(
+                    features.get("selected_horizon_s") or features.get("horizon_s")
+                ),
+                counterfactual_geometries=counterfactual_geometries,
+                alternative_horizons_s=alternative_horizons_s,
+                cost_usd=counterfactual_cost_usd,
+                usd_per_price_unit=counterfactual_usd_per_price_unit,
+            )
+        safe_state = _json_safe(dict(features))
+        if not isinstance(safe_state, dict):
+            safe_state = {}
+        observed_broker_facts = (
+            _json_safe(dict(broker_facts))
+            if isinstance(broker_facts, Mapping) else None
+        )
+        cf_payload = dict(_json_safe(dict(counterfactuals or {})) or {})
+        cf_payload.update({
+            "chosen_net_usd": float(realized_net_usd),
+            "opposite_net_usd": None,
+            "abstain_net_usd": None,
+            "status": "UNAVAILABLE",
+        })
+        if replay is not None:
+            cf_payload.update(replay)
+            if replay.get("status") != "REPLAYED":
+                cf_payload["reason"] = replay.get("reason")
+        cf_payload.update(replay_set)
         row = {
             "outcome_id": str(outcome_id),
             "features": _normalized_features(features),
+            "pre_entry_state": safe_state,
+            "state_key": _state_key(features),
             **lifecycle,
-            "counterfactuals": {
-                "chosen_net_usd": float(realized_net_usd),
-                "opposite_net_usd": None,
-                "abstain_net_usd": None,
-                "status": "UNAVAILABLE",
-                **dict(counterfactuals or {}),
-                **(
-                    replay if replay is not None and replay.get("status") == "REPLAYED"
-                    else {"status": replay.get("status"), "reason": replay.get("reason")}
-                    if replay is not None else {}
-                ),
-            },
+            "lifecycle_labels": [
+                label for label, enabled in (
+                    (lifecycle.get("speed_label"), lifecycle.get("speed_label") is not None),
+                    ("NEVER_GREEN", lifecycle.get("never_green") is True),
+                    ("GREEN_THEN_LOSER", lifecycle.get("green_then_loser") is True),
+                ) if enabled and label
+            ],
+            "exit_reason": str(exit_reason or "") or None,
+            "evidence_status": str(evidence_status or (
+                "BROKER_CONFIRMED" if observed_broker_facts is not None else "UNVERIFIED"
+            )),
+            "broker_facts": observed_broker_facts,
+            "counterfactuals": cf_payload,
         }
         self.records = [item for item in self.records if item.get("outcome_id") != row["outcome_id"]]
         self.records.append(row)
+        self._persist()
+        return row
+
+    def stage_pending_close(
+        self,
+        *,
+        outcome_id: str,
+        features: Mapping[str, Any],
+        mfe_usd: float | None,
+        mae_usd: float | None,
+        time_to_green_s: float | None,
+        counterfactual_quotes: list[Mapping[str, Any]] | None = None,
+        counterfactual_geometries: Mapping[str, Mapping[str, Any]] | None = None,
+        alternative_horizons_s: tuple[int, ...] | list[int] | None = None,
+        counterfactual_cost_usd: float = 0.0,
+        counterfactual_usd_per_price_unit: float = 1.0,
+        exit_reason: str | None = None,
+    ) -> dict[str, Any]:
+        """Keep close context until delayed broker deal history is available."""
+        self.pending[str(outcome_id)] = {
+            "features": _json_safe(dict(features)),
+            "mfe_usd": mfe_usd,
+            "mae_usd": mae_usd,
+            "time_to_green_s": time_to_green_s,
+            "counterfactual_quotes": _json_safe(counterfactual_quotes),
+            "counterfactual_geometries": _json_safe(counterfactual_geometries),
+            "alternative_horizons_s": _json_safe(alternative_horizons_s),
+            "counterfactual_cost_usd": counterfactual_cost_usd,
+            "counterfactual_usd_per_price_unit": counterfactual_usd_per_price_unit,
+            "exit_reason": exit_reason,
+        }
+        self._persist()
+        return {"status": "PENDING", "outcome_id": str(outcome_id)}
+
+    def record_confirmed_close(
+        self,
+        *,
+        outcome_id: str,
+        features: Mapping[str, Any],
+        broker_facts: Mapping[str, Any],
+        mfe_usd: float | None,
+        mae_usd: float | None,
+        time_to_green_s: float | None,
+        counterfactual_quotes: list[Mapping[str, Any]] | None = None,
+        counterfactual_geometries: Mapping[str, Mapping[str, Any]] | None = None,
+        alternative_horizons_s: tuple[int, ...] | list[int] | None = None,
+        counterfactual_cost_usd: float = 0.0,
+        counterfactual_usd_per_price_unit: float = 1.0,
+        exit_reason: str | None = None,
+    ) -> dict[str, Any]:
+        """Train exactly once from broker-confirmed realized net PnL."""
+        if not isinstance(broker_facts, Mapping) or not (
+            broker_facts.get("confirmed") is True
+            or str(broker_facts.get("status") or "") == "BROKER_CONFIRMED"
+        ):
+            return {
+                "status": "SKIPPED",
+                "reason": "broker_confirmation_required",
+                "outcome_id": str(outcome_id),
+            }
+        net = _finite(broker_facts.get("realized_net_usd"))
+        if net is None:
+            return {
+                "status": "SKIPPED",
+                "reason": "broker_realized_net_pnl_missing",
+                "outcome_id": str(outcome_id),
+            }
+        existing = next(
+            (row for row in reversed(self.records)
+             if str(row.get("outcome_id") or "") == str(outcome_id)
+             and row.get("evidence_status") == "BROKER_CONFIRMED"),
+            None,
+        )
+        if existing is not None:
+            self.pending.pop(str(outcome_id), None)
+            self._persist()
+            return existing
+        pending = self.pending.get(str(outcome_id)) or {}
+        pending_features = pending.get("features")
+        merged_features = dict(features) if isinstance(features, Mapping) else {}
+        if isinstance(pending_features, Mapping):
+            # A delayed deal row is often sparse; never let it erase the exact
+            # pre-entry snapshot captured before the broker mutation.
+            merged_features = {**merged_features, **dict(pending_features)}
+        row = self.record_closed(
+            outcome_id=str(outcome_id),
+            features=merged_features,
+            realized_net_usd=net,
+            mfe_usd=(mfe_usd if mfe_usd is not None else pending.get("mfe_usd")),
+            mae_usd=(mae_usd if mae_usd is not None else pending.get("mae_usd")),
+            time_to_green_s=(
+                time_to_green_s
+                if time_to_green_s is not None else pending.get("time_to_green_s")
+            ),
+            counterfactual_quotes=(
+                counterfactual_quotes
+                if counterfactual_quotes
+                else pending.get("counterfactual_quotes")
+            ),
+            counterfactual_geometries=(
+                counterfactual_geometries
+                if counterfactual_geometries
+                else pending.get("counterfactual_geometries")
+            ),
+            alternative_horizons_s=(
+                alternative_horizons_s
+                if alternative_horizons_s is not None
+                else pending.get("alternative_horizons_s")
+            ),
+            counterfactual_cost_usd=(
+                counterfactual_cost_usd
+                if counterfactual_cost_usd else pending.get("counterfactual_cost_usd", 0.0)
+            ),
+            counterfactual_usd_per_price_unit=(
+                counterfactual_usd_per_price_unit
+                if counterfactual_usd_per_price_unit != 1.0
+                else pending.get("counterfactual_usd_per_price_unit", 1.0)
+            ),
+            exit_reason=(
+                exit_reason
+                if exit_reason is not None else pending.get("exit_reason")
+            ),
+            broker_facts=broker_facts,
+            evidence_status="BROKER_CONFIRMED",
+        )
+        self.pending.pop(str(outcome_id), None)
         self._persist()
         return row
 
@@ -419,6 +695,79 @@ class OutcomeMemoryStore:
             imported += 1
         return {"imported": imported, "skipped": skipped, "unavailable": 0}
 
+    def import_historical_confirmed_trades(self, source_path: Path) -> dict[str, int]:
+        """Import only rows carrying explicit broker-confirmed net PnL."""
+        path = Path(source_path)
+        try:
+            if path.suffix.lower() == ".jsonl":
+                rows = [
+                    json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+            else:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                rows = (
+                    payload.get("trades", payload.get("outcomes", []))
+                    if isinstance(payload, Mapping) else payload
+                )
+        except (OSError, json.JSONDecodeError):
+            return {"imported": 0, "skipped": 0, "unavailable": 1}
+        if not isinstance(rows, list):
+            return {"imported": 0, "skipped": 0, "unavailable": 1}
+
+        imported = skipped = 0
+        for item in rows:
+            if not isinstance(item, Mapping):
+                skipped += 1
+                continue
+            nested = item.get("broker_facts")
+            facts = dict(nested) if isinstance(nested, Mapping) else {}
+            explicitly_confirmed = (
+                str(item.get("evidence_status") or "") == "BROKER_CONFIRMED"
+                or item.get("broker_confirmed") is True
+                or facts.get("confirmed") is True
+            )
+            if not explicitly_confirmed:
+                skipped += 1
+                continue
+            if "realized_net_usd" not in facts and item.get("realized_net_usd") is not None:
+                facts["realized_net_usd"] = item.get("realized_net_usd")
+            net = _finite(facts.get("realized_net_usd"))
+            outcome_id = str(
+                item.get("position_id")
+                or item.get("position")
+                or item.get("ticket")
+                or item.get("outcome_id")
+                or ""
+            ).strip()
+            if not outcome_id or net is None:
+                skipped += 1
+                continue
+            facts.setdefault("status", "BROKER_CONFIRMED")
+            facts.setdefault("confirmed", True)
+            state = item.get("pre_entry_state")
+            if not isinstance(state, Mapping):
+                state = item.get("features")
+            if not isinstance(state, Mapping):
+                state = {
+                    key: item[key] for key in (
+                        "symbol", "side", "mechanism", "horizon_s", "session", "regime",
+                    ) if key in item
+                }
+            result = self.record_confirmed_close(
+                outcome_id=outcome_id,
+                features=state,
+                broker_facts=facts,
+                mfe_usd=item.get("mfe_usd"),
+                mae_usd=item.get("mae_usd"),
+                time_to_green_s=item.get("time_to_green_s"),
+            )
+            if result.get("evidence_status") == "BROKER_CONFIRMED":
+                imported += 1
+            else:
+                skipped += 1
+        return {"imported": imported, "skipped": skipped, "unavailable": 0}
+
     def similarity(self, features: Mapping[str, Any]) -> list[tuple[float, dict[str, Any]]]:
         query = _normalized_features(features)
         scored = [
@@ -445,6 +794,32 @@ class OutcomeMemoryStore:
             "loser_similarity": max(losers, default=0.0),
             "winner_count": len(winners),
             "loser_count": len(losers),
+            **self.state_feedback(features),
+        }
+
+    def state_feedback(
+        self,
+        features: Mapping[str, Any],
+        *,
+        threshold: float = DEFAULT_SIMILARITY_THRESHOLD,
+    ) -> dict[str, Any]:
+        """Return repeated-state reward/penalty without symbol-only learning."""
+        query = _normalized_features(features)
+        matches = [
+            (score, row) for score, row in self.similarity(features)
+            if score >= threshold and _same_state_identity(query, row.get("features") or {})
+        ]
+        loser_count = sum(
+            row.get("speed_label") == "FAST_LOSER" for _score, row in matches
+        )
+        winner_count = sum(
+            row.get("speed_label") == "FAST_WINNER" for _score, row in matches
+        )
+        return {
+            "fast_loser_count": loser_count,
+            "fast_winner_count": winner_count,
+            "loser_penalty": min(1.0, 0.35 * loser_count),
+            "winner_bonus": min(1.0, 0.20 * winner_count),
         }
 
     def should_suppress(
@@ -455,6 +830,9 @@ class OutcomeMemoryStore:
     ) -> bool:
         return any(
             score >= threshold
+            and _same_state_identity(
+                _normalized_features(features), row.get("features") or {}
+            )
             and (
                 row.get("speed_label") == "FAST_LOSER"
                 or row.get("classification") == "BAD_ENTRY"
@@ -470,16 +848,40 @@ class OutcomeMemoryStore:
         )
 
     def snapshot(self) -> dict[str, Any]:
+        counterfactual_rows = [
+            row.get("counterfactuals") or {} for row in self.records
+        ]
+        counterfactual_available = any(
+            any(
+                isinstance(value, Mapping) and value.get("status") == "REPLAYED"
+                for key, value in payload.items()
+                if key.startswith("what_if_") or key == "alternative_horizons"
+            )
+            for payload in counterfactual_rows
+        )
+        counterfactual_unavailable = any(
+            payload.get("status") == "UNAVAILABLE"
+            or any(
+                isinstance(value, Mapping) and value.get("status") == "UNAVAILABLE"
+                for key, value in payload.items()
+                if key.startswith("what_if_") or key == "alternative_horizons"
+            )
+            for payload in counterfactual_rows
+        )
+        counterfactual_status = (
+            "PARTIAL" if counterfactual_available and counterfactual_unavailable
+            else "AVAILABLE" if counterfactual_available
+            else "UNAVAILABLE" if counterfactual_unavailable
+            else "NONE"
+        )
         return {
             "records": len(self.records),
+            "pending_closes": len(self.pending),
             "fast_winner_count": sum(row.get("speed_label") == "FAST_WINNER" for row in self.records),
             "fast_loser_count": sum(row.get("speed_label") == "FAST_LOSER" for row in self.records),
             "bad_entry_count": sum(row.get("classification") == "BAD_ENTRY" for row in self.records),
             "good_entry_bad_exit_count": sum(
                 row.get("classification") == "GOOD_ENTRY_BAD_EXIT" for row in self.records
             ),
-            "counterfactual_status": "UNAVAILABLE" if any(
-                (row.get("counterfactuals") or {}).get("status") == "UNAVAILABLE"
-                for row in self.records
-            ) else "NONE",
+            "counterfactual_status": counterfactual_status,
         }

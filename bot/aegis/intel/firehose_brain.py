@@ -1566,7 +1566,7 @@ class IntelligentFirehoseBrain:
             memory_features = {
                 "symbol": mc.symbol,
                 "side": mc.side,
-                "mechanism": mc.family,
+                "mechanism": getattr(mc, "mechanism", None) or mc.family,
                 "horizon_s": mc.max_hold_s,
                 "session": session,
                 "regime": regime,

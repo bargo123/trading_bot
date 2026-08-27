@@ -215,3 +215,184 @@ def test_sparse_prior_autopsy_loser_does_not_suppress_rich_candidate(tmp_path):
         "symbol": "EURUSD", "side": "buy", "mechanism": "pullback",
         "horizon_s": 5, "session": "london", "regime": "trend",
     }) is False
+
+
+def _broker_facts(net: float) -> dict[str, object]:
+    return {
+        "status": "BROKER_CONFIRMED",
+        "confirmed": True,
+        "realized_net_usd": net,
+        "gross_realized_pnl_usd": net + 0.03,
+        "cost_usd": 0.03,
+        "round_trip_cost_usd": 0.03,
+        "actual_close_price": 1.1008,
+        "close_timestamp": "2026-08-27T10:00:02Z",
+    }
+
+
+def test_confirmed_close_uses_broker_truth_and_preserves_exact_pre_entry_state(tmp_path):
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    features = {
+        "symbol": "EURUSD",
+        "side": "buy",
+        "mechanism": "micro_momentum",
+        "selected_horizon_s": 3,
+        "session": "london",
+        "regime": "trend",
+        "p_captured_win": 0.62,
+        "entry_ev": 0.04,
+        "entry_geometry": {"entry_price": 1.1002, "stop_price": 1.0990, "target_price": 1.1007},
+        "cost_assumptions": {"spread": 0.0002, "commission_usd": 0.01},
+        "feature_snapshot": {
+            "return_3s": 0.0003,
+            "tick_rate_per_min": 42,
+            "short_volatility": 0.0001,
+            "m1": {"close": 1.1001},
+            "m5": {"direction": "up"},
+            "m15": {"structure": "trend"},
+        },
+    }
+
+    row = store.record_confirmed_close(
+        outcome_id="T-CONFIRMED",
+        features=features,
+        broker_facts=_broker_facts(0.25),
+        mfe_usd=0.30,
+        mae_usd=-0.02,
+        time_to_green_s=1.0,
+        counterfactual_quotes=[
+            {"timestamp": 100.0, "bid": 1.1000, "ask": 1.1002},
+            {"timestamp": 101.0, "bid": 1.1008, "ask": 1.1010},
+        ],
+    )
+
+    assert row["evidence_status"] == "BROKER_CONFIRMED"
+    assert row["realized_net_usd"] == pytest.approx(0.25)
+    assert row["broker_facts"]["realized_net_usd"] == pytest.approx(0.25)
+    assert row["pre_entry_state"] == features
+    assert row["features"]["horizon_s"] == 3
+    assert "FAST_WINNER" in row["lifecycle_labels"]
+
+
+def test_confirmed_close_refuses_unconfirmed_or_floating_pnl(tmp_path):
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    skipped = store.record_confirmed_close(
+        outcome_id="T-UNCONFIRMED",
+        features={"symbol": "EURUSD", "side": "buy"},
+        broker_facts={"status": "INCOMPLETE_BROKER_EVIDENCE", "floating_pnl": 9.0},
+        mfe_usd=9.0,
+        mae_usd=0.0,
+        time_to_green_s=0.1,
+    )
+    assert skipped["status"] == "SKIPPED"
+    assert store.records == []
+
+
+def test_confirmed_close_replays_buy_sell_abstain_and_alternative_horizons_after_close(tmp_path):
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    row = store.record_confirmed_close(
+        outcome_id="T-COUNTERFACTUAL",
+        features={
+            "symbol": "EURUSD", "side": "buy", "mechanism": "breakout",
+            "entry_time": 100.0, "horizon_s": 3,
+            "stop_price": 1.0990, "target_price": 1.1007,
+        },
+        broker_facts=_broker_facts(0.10),
+        mfe_usd=0.12,
+        mae_usd=-0.01,
+        time_to_green_s=1.0,
+        counterfactual_quotes=[
+            {"timestamp": 100.0, "bid": 1.1000, "ask": 1.1002},
+            {"timestamp": 101.0, "bid": 1.1008, "ask": 1.1010},
+            {"timestamp": 102.0, "bid": 1.1006, "ask": 1.1008},
+        ],
+        counterfactual_geometries={
+            "buy": {"stop_price": 1.0990, "target_price": 1.1007},
+            "sell": {"stop_price": 1.1010, "target_price": 1.0990},
+        },
+        alternative_horizons_s=(1, 3),
+    )
+
+    counterfactuals = row["counterfactuals"]
+    assert counterfactuals["what_if_buy"]["status"] == "REPLAYED"
+    assert counterfactuals["what_if_sell"]["status"] == "REPLAYED"
+    assert counterfactuals["what_if_abstain"] == {
+        "status": "NO_TRADE", "net_pnl_usd": 0.0,
+    }
+    assert set(counterfactuals["alternative_horizons"]) == {"1"}
+
+
+def test_repeated_state_feedback_penalizes_losers_rewards_winners_without_symbol_blacklist(tmp_path):
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    state = {
+        "symbol": "EURUSD", "side": "buy", "mechanism": "pullback",
+        "horizon_s": 5, "session": "london", "regime": "trend",
+    }
+    for index in range(2):
+        store.record_closed(
+            outcome_id=f"LOSS-{index}", features=state,
+            realized_net_usd=-0.12, mfe_usd=0.01, mae_usd=-0.10,
+            time_to_green_s=None,
+        )
+    loser_feedback = store.state_feedback(state)
+    assert loser_feedback["fast_loser_count"] == 2
+    assert loser_feedback["loser_penalty"] > 0
+    assert store.should_suppress({**state, "side": "sell"}) is False
+
+    winner_state = {**state, "side": "sell", "mechanism": "breakout"}
+    for index in range(2):
+        store.record_closed(
+            outcome_id=f"WIN-{index}", features=winner_state,
+            realized_net_usd=0.12, mfe_usd=0.14, mae_usd=-0.01,
+            time_to_green_s=1.0,
+        )
+    winner_feedback = store.state_feedback(winner_state)
+    assert winner_feedback["fast_winner_count"] == 2
+    assert winner_feedback["winner_bonus"] > 0
+
+
+def test_pending_close_context_is_reused_when_broker_deal_arrives_later(tmp_path):
+    path = tmp_path / "outcome_memory.json"
+    store = OutcomeMemoryStore(path)
+    features = {
+        "symbol": "USDJPY", "side": "sell", "mechanism": "reversal",
+        "horizon_s": 8, "session": "asia", "regime": "range",
+        "entry_ev": 0.02,
+    }
+    assert store.stage_pending_close(
+        outcome_id="T-PENDING", features=features,
+        mfe_usd=0.02, mae_usd=-0.05, time_to_green_s=None,
+    )["status"] == "PENDING"
+    restarted = OutcomeMemoryStore(path)
+    row = restarted.record_confirmed_close(
+        outcome_id="T-PENDING", features={}, broker_facts=_broker_facts(-0.08),
+        mfe_usd=None, mae_usd=None, time_to_green_s=None,
+    )
+    assert row["pre_entry_state"] == features
+    assert row["realized_net_usd"] == pytest.approx(-0.08)
+    assert restarted.pending == {}
+
+
+def test_historical_import_requires_explicit_broker_confirmation(tmp_path):
+    source = tmp_path / "outcome_log.jsonl"
+    source.write_text(
+        "\n".join([
+            json.dumps({
+                "ticket": "H1", "evidence_status": "BROKER_CONFIRMED",
+                "realized_net_usd": -0.09,
+                "pre_entry_state": {
+                    "symbol": "EURUSD", "side": "buy",
+                    "mechanism": "pullback", "horizon_s": 5,
+                },
+            }),
+            json.dumps({"ticket": "H2", "pnl": -0.20, "evidence_status": "PARTIAL"}),
+        ]),
+        encoding="utf-8",
+    )
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    result = store.import_historical_confirmed_trades(source)
+
+    assert result == {"imported": 1, "skipped": 1, "unavailable": 0}
+    assert store.records[0]["outcome_id"] == "H1"
+    assert store.records[0]["realized_net_usd"] == pytest.approx(-0.09)
+    assert store.records[0]["pre_entry_state"]["mechanism"] == "pullback"

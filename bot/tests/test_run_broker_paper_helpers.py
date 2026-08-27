@@ -32,6 +32,8 @@ from scripts.run_broker_paper import (
     meaningful_quote_change,
     video_style_signal_for_scan,
     pending_order_lifecycle_metadata,
+    outcome_features_from_ticket_metadata,
+    record_broker_confirmed_outcome_learning,
     legacy_normal_exit_enabled,
 )
 from aegis.intel.send_guard import candidate_spread_limit, refresh_verdict
@@ -326,6 +328,89 @@ def test_pending_metadata_keeps_exploration_authority_separate_from_shadow_proba
     assert pending["p_captured_win"] == pytest.approx(0.41)
     assert pending["shadow_model_probability"] == pytest.approx(0.91)
     assert pending["expected_net_pnl"] == pytest.approx(0.07)
+
+
+def test_outcome_learning_helper_keeps_exact_pre_entry_snapshot_and_broker_net_truth(tmp_path):
+    from aegis.intel.outcome_memory import OutcomeMemoryStore
+
+    metadata = create_ticket_metadata(
+        ticket="T-LEARN",
+        hypothesis_id="hyp-learn",
+        thesis_key="thesis-learn",
+        strategy_family="breakout",
+        expected_mechanism="micro_momentum",
+        side="buy",
+        entry_price=1.1002,
+        stop_loss=1.0990,
+        target_price=1.1020,
+        max_hold_s=5,
+        regime="trend",
+        session="london",
+        symbol="EURUSD",
+        selected_horizon_s=5,
+        feature_snapshot={"return_3s": 0.0003, "m5": {"direction": "up"}},
+        prediction_snapshot={"probability": 0.62},
+        p_captured_win=0.62,
+        entry_ev=0.04,
+        entry_geometry={"entry_price": 1.1002, "stop_loss": 1.0990},
+        cost_evidence={"spread_price": 0.0002},
+        spread_assumption=0.0002,
+        commission_assumption=0.01,
+    )
+    state = outcome_features_from_ticket_metadata(metadata)
+    assert state["return_3s"] == pytest.approx(0.0003)
+    assert state["short_returns"]["return_3s"] == pytest.approx(0.0003)
+    assert state["m5_context"]["m5"]["direction"] == "up"
+    assert state["mechanism"] == "micro_momentum"
+    assert state["entry_geometry"]["stop_loss"] == pytest.approx(1.0990)
+    assert state["p_captured_win"] == pytest.approx(0.62)
+
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    row = record_broker_confirmed_outcome_learning(
+        outcome_memory=store,
+        outcome_id="T-LEARN",
+        close_facts={
+            "status": "BROKER_CONFIRMED", "confirmed": True,
+            "realized_net_usd": -0.08, "cost_usd": 0.03,
+            "close_timestamp": "2026-08-27T10:00:02Z",
+        },
+        metadata=metadata,
+        lifecycle_detail={"mfe_usd": 0.01, "mae_usd": -0.10, "first_green_s": None},
+    )
+    assert row["evidence_status"] == "BROKER_CONFIRMED"
+    assert row["realized_net_usd"] == pytest.approx(-0.08)
+    assert row["pre_entry_state"]["return_3s"] == pytest.approx(0.0003)
+
+
+def test_outcome_learning_helper_stages_context_until_delayed_deal_confirmation(tmp_path):
+    from aegis.intel.outcome_memory import OutcomeMemoryStore
+
+    path = tmp_path / "outcome_memory.json"
+    store = OutcomeMemoryStore(path)
+    metadata = _ticket_metadata(basket_id=None)
+    pending = record_broker_confirmed_outcome_learning(
+        outcome_memory=store,
+        outcome_id="T-DELAYED",
+        close_facts={"status": "INCOMPLETE_BROKER_EVIDENCE"},
+        metadata=metadata,
+        lifecycle_detail={"mfe_usd": 0.01, "mae_usd": -0.05, "first_green_s": None},
+    )
+    assert pending["status"] == "PENDING"
+
+    restarted = OutcomeMemoryStore(path)
+    confirmed = record_broker_confirmed_outcome_learning(
+        outcome_memory=restarted,
+        outcome_id="T-DELAYED",
+        close_facts={
+            "status": "BROKER_CONFIRMED", "confirmed": True,
+            "realized_net_usd": -0.08, "cost_usd": 0.02,
+            "close_timestamp": "2026-08-27T10:00:02Z",
+        },
+        metadata=None,
+        lifecycle_detail={},
+    )
+    assert confirmed["evidence_status"] == "BROKER_CONFIRMED"
+    assert confirmed["pre_entry_state"]["symbol"] == "EURUSD"
 
 
 def test_ticket_metadata_carries_execution_lifecycle_snapshot(tmp_path):
