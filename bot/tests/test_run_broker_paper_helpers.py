@@ -77,6 +77,28 @@ def test_emergency_broker_stop_is_wide_but_stays_inside_risk_budget():
     ) is None
 
 
+def test_forced_demo_emergency_stop_clamps_to_existing_risk_budget():
+    spec = {
+        "name": "EURUSD",
+        "trade_tick_size": 0.00001,
+        "trade_tick_value": 1.0,
+        "volume_min": 0.01,
+        "volume_step": 0.01,
+        "point": 0.00001,
+        "trade_stops_level": 0,
+        "trade_freeze_level": 0,
+        "trade_contract_size": 100000.0,
+    }
+
+    stop = emergency_broker_stop(
+        symbol="EURUSD", side="buy", entry=1.10000,
+        virtual_stop=1.09990, quantity=0.01, spec=spec,
+        max_risk_usd=0.15, clamp_to_risk=True,
+    )
+
+    assert stop == pytest.approx(1.09985)
+
+
 def test_frozen_opportunity_preserves_the_decision_identity():
     from aegis.intel.firehose_brain import DemoDecision
 

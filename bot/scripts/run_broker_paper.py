@@ -727,6 +727,7 @@ def emergency_broker_stop(
     spec: dict | None,
     max_risk_usd: float,
     width_multiple: float = 4.0,
+    clamp_to_risk: bool = False,
 ) -> float | None:
     """Return a wide catastrophe stop without changing virtual strategy geometry.
 
@@ -760,7 +761,12 @@ def emergency_broker_stop(
     usd_per_price = contract.tick_value / contract.tick_size
     allowed_distance = risk_cap / (usd_per_price * lots) if usd_per_price > 0 else 0.0
     if desired_distance > allowed_distance + 1e-12:
-        return None
+        if not clamp_to_risk or allowed_distance < minimum_distance:
+            return None
+        # Forced DEMO exploration may use the smallest valid strategy geometry
+        # even when a 4R emergency backstop would exceed the same approved risk
+        # cap. Keep the broker protection, but never exceed that cap.
+        desired_distance = allowed_distance
     side_l = str(side or "").lower()
     if side_l == "buy":
         return entry_price - desired_distance
@@ -2592,6 +2598,12 @@ def main() -> None:
                     quantity=order_qty,
                     spec=spec_map,
                     max_risk_usd=risk_cap,
+                    clamp_to_risk=bool(
+                        brain_decision is not None
+                        and str(
+                            brain_decision.journal.get("authority_type") or ""
+                        ).upper() == "FORCED_DEMO_EXPLORATION"
+                    ),
                 )
                 if broker_sl is None:
                     append_journal(
