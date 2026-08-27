@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal, so no strategy, validation plan, or safety controls can be assessed. It makes no measurable claim and provides no reproducible evidence or fallback plan; resolve the unsupported model configuration before presenting a council proposal.

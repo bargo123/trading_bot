@@ -1,0 +1,106 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_0256",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T02:57:45.138530+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_0256",
+    "current_evidence": "Proposal: Add a realized-spread-regime check to the validated-state gate as a challenger tested in the next research cycle. Hypothesis: firehose entries admitted when the live DEMO spread at signal time exceeds the trailing 24-hour median by more than ~25% have negative net expectancy after the runn",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Proposal: Add a realized-spread-regime check to the validated-state gate as a challenger tested in the next research cycle. Hypothesis: firehose entries admitted when the live DEMO spread at signal time exceeds the trailing 24-hour median by more than ~25% have negative net expectancy after the runner's existing spread/slippage cost model, because the gate currently validates market state but not executable-cost state. Test: log spread-at-decision-time for every gated-in trade over the next ~200",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T02:56:04.314593+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 1,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "PF=None/EV=None means zero prior evidence \u2014 approval is strictly for the logging/validation phase, not adoption",
+        "A fixed 25%-over-24h-median threshold conflates predictable microstructure events (daily rollover spread spikes, session opens, news windows) with genuinely degraded execution regimes; raw threshold risk is false signal",
+        "Spread-at-decision-time differs from spread-at-fill; the study must confirm the existing cost model's slippage assumptions still hold in the elevated-spread bucket",
+        "~200 gated-in trades may take multiple cycles at current admission rates; expectancy estimate will be noisy if strategy mix shifts between buckets",
+        "If the check were enabled to block entries before validation completes, it would censor the very data needed to validate it"
+      ],
+      "confidence": 0.75,
+      "model": "x-preview-f-free",
+      "reason": "Low-risk, reversible, DEMO-only challenger that fills a real gap: the validated-state gate currently checks market state but not executable-cost state. Measurement-first design (log spread-at-decision-time across ~200 gated-in trades before any behavior change) with pre-registered falsification criteria and clean rollback makes this a proper governed exploration experiment. No gate bypass, no live YAML contact, no champion-path impact, no order flow from research components.",
+      "requested_revisions": [
+        "Shadow-log only during exploration: the spread-regime check must not block or alter any entry decisions until all promotion gates pass",
+        "Compute the trailing 24h median strictly point-in-time (past window ending at decision timestamp); document the window mechanics to prove no lookahead",
+        "Pre-register a sensitivity grid (e.g. thresholds 15%/25%/40%, optionally excluding rollover minutes) before seeing outcomes to prevent post-hoc threshold tuning",
+        "Register the experiment in ExperimentRegistry up front and report net-of-runner-cost expectancy with per-bucket sample counts; if fewer than a pre-declared minimum N accumulates by cycle end, record 'insufficient sample' rather than an expectancy verdict",
+        "Compare decision-time spread against actual fill spread/slippage on DEMO for the logged subset to validate the cost model in the elevated-spread regime"
+      ],
+      "vote": "APPROVE_FOR_TEST"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "The spread definition, units, symbol normalization, and 24-hour median sampling method are unspecified.",
+        "A fixed ~25% threshold is uncalibrated and may reduce trade count or introduce session-dependent selection bias.",
+        "The proposed ~200 trades may be insufficient without predeclared power/minimum sample, cost model version, OOS split, and success criteria.",
+        "Affected files include runtime intel/council paths, but the proposal does not explicitly guarantee the change remains research-only and cannot modify broker execution behavior."
+      ],
+      "confidence": 0.86,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The hypothesis is plausible and DEMO-only testing is acceptable, but the proposal lacks a complete, reproducible experiment specification and must not alter the validated-state gate before challenger evidence is collected.",
+      "requested_revisions": [
+        "Implement observation-only logging first; do not gate, block, or alter order eligibility during data collection.",
+        "Pre-register spread source, timestamp, units, rolling-window construction, missing-data handling, threshold grid, sample target, metrics, and net-cost assumptions in ExperimentRegistry.",
+        "Evaluate the challenger on a sealed OOS holdout with trade-count, expectancy, drawdown, and coverage impacts reported by spread regime.",
+        "State explicit fail-closed boundaries: no live configuration edits, no champion promotion, no risk-limit changes, and no direct MT5 order mutation outside the governed DEMO runner."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Affected files and exact gate behavior are underspecified.",
+        "No explicit confirmation that all trades remain subject to existing risk, quote, spread, economics, OMS, portfolio, and execution gates.",
+        "No stated requirement to use ExperimentRegistry and preserve challenger/holdout records.",
+        "A ~200-trade sample may be inadequate unless supported by a predeclared statistical power or stopping rule.",
+        "The proposed median and 25% threshold, lookback data source, warm-up behavior, and missing-data handling are undefined.",
+        "No explicit baseline comparison or acceptance criteria beyond negative expectancy."
+      ],
+      "confidence": 0.93,
+      "model": null,
+      "reason": "The hypothesis is testable and rollback is bounded, but the proposal lacks sufficient implementation and governance detail to authorize testing. It must clearly preserve the single governed DEMO execution path, avoid live YAML changes or research-side order submission, and record the experiment with costed outcomes and predefined gates.",
+      "requested_revisions": [
+        "Specify exact files, functions, and whether the check is shadow-only or can block DEMO entries; do not edit protected live YAML.",
+        "Confirm research components remain read-only and that only bot/scripts/run_broker_paper.py may execute MT5 DEMO orders, with all required fail-closed checks unchanged.",
+        "Define the trailing 24-hour realized-spread calculation, threshold, warm-up, outlier handling, and missing-data behavior.",
+        "Register the experiment before execution and define baseline/challenger cohorts, net spread/slippage cost methodology, minimum sample size, confidence or stopping criteria, and rollback procedure.",
+        "State that no champion promotion or intelligent_champion.json modification can result from this test without the existing promotion gates."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

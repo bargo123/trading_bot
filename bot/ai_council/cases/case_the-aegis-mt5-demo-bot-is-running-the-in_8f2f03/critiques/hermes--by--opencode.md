@@ -1,0 +1,1 @@
+This is an API compatibility error, not a trading proposal with testable assumptions or risk controls. It provides no methodology, validation evidence, performance metrics, or safety analysis, so it cannot be evaluated or approved.

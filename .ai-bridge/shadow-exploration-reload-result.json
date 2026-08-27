@@ -1,0 +1,9 @@
+﻿{
+    "mode":  "shadow_exploration_reload",
+    "returncode":  125,
+    "restarted":  false,
+    "old_runner_pid":  0,
+    "new_runner_pid":  0,
+    "tests":  "..............................................................           [100%]\r\n62 passed in 11.62s\r\n",
+    "stderr":  "  File \"\u003cstring\u003e\", line 1"
+}

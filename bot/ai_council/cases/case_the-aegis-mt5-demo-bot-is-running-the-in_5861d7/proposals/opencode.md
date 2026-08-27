@@ -1,0 +1,1 @@
+Run a sealed-holdout ablation that adds a 15-minute post-validation cooldown before MT5 DEMO entry. Accept it only if net expectancy improves after configured spread/slippage while trade count remains at least 80% of baseline and maximum drawdown does not increase. Otherwise reject the cooldown and retain the current validated-state gate.

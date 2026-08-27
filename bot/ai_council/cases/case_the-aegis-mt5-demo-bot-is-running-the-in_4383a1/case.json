@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-27T07:15:09.641713+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4383a1\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 14.93,
+          "finished_utc": "2026-08-27T07:22:35.848863+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-27T07:22:20.921997+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-27T07:22:35.852368+00:00",
+        "text": "This is an API compatibility error, not a research proposal, so no strategy, validation plan, or safety controls can be assessed. It makes no measurable claim and provides no reproducible evidence or fallback plan; resolve the unsupported model configuration before presenting a council proposal."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4383a1\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 7.73,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-27T07:22:43.598368+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-27T07:23:05.471275+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_938c0a",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_938c0a for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_4383a1",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4383a1\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.05,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-27T07:15:24.357241+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4383a1\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.17,
+        "finished_utc": "2026-08-27T07:15:52.095057+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-27T07:15:38.927247+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-27T07:15:52.097057+00:00",
+      "text": "Run a registered holdout experiment that adds a post-entry spread-expansion feature to the validated-state gate and scratches positions when spread exceeds 1.5x entry spread for two consecutive scans. Compare net, cost-inclusive expectancy and tail loss against the current champion on sealed holdouts; reject the candidate unless both improve without reducing trade count by more than 20%. This is DEMO research only and must not modify the champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4383a1\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.31,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-27T07:22:50.925734+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4383a1\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 14.5,
+        "finished_utc": "2026-08-27T07:23:05.441713+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-27T07:22:50.945782+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-27T07:23:05.444225+00:00",
+      "text": "Run a registered sealed-holdout experiment using an available supported model, adding a post-entry spread-expansion feature to the validated-state gate and scratching positions when spread exceeds 1.5x entry spread for two consecutive scans. Compare net, cost-inclusive expectancy and tail loss against the current champion; reject the candidate unless both improve without reducing trade count by more than 20%. This remains DEMO research only and must not modify the champion."
+    }
+  },
+  "status": "decided"
+}

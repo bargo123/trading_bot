@@ -1,0 +1,1 @@
+Run a sealed-holdout ablation of the validated-state gate’s minimum evidence threshold against the current threshold using identical MT5 DEMO cost assumptions. Promote a lower threshold only if it increases net expectancy and profit factor while not increasing maximum drawdown or tail-loss rate on the sealed holdout. Otherwise retain the current gate unchanged.

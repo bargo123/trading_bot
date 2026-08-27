@@ -170,6 +170,26 @@ def test_profitable_pooled_state_does_not_autopilot_every_symbol():
         assert set(o["pool_symbols"]) <= {"EURUSD", "AUDUSD"}
 
 
+def test_survivor_count_dedupes_hierarchical_views_of_same_actionable_state():
+    records = []
+    for i in range(200):
+        records.append(_state_record("GBPUSD", "trend", "asia", "buy", i, 3.0 if i % 2 else -0.5))
+
+    selection = hierarchical_strategy_selection(
+        records,
+        cost_by_symbol={"GBPUSD": 0.3},
+        shortlist_frac=0.6,
+        min_shortlist_n=20,
+        min_validate_n=10,
+        min_symbols_pool=3,
+    )
+
+    survivor_rows = [o for o in selection["opportunities"] if o["survives_validate"]]
+    assert len(survivor_rows) >= 1
+    assert selection["n_survive"] == 1
+    assert selection["n_survive_rows"] == len(survivor_rows)
+
+
 def test_level_b_beats_pooled_when_symbol_specific_evidence_exists():
     records = []
     for i in range(200):

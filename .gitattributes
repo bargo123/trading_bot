@@ -1,0 +1,4 @@
+bot/reports/research/**/*.jsonl filter=lfs diff=lfs merge=lfs -text
+bot/reports/research/fast_edge_generations/** filter=lfs diff=lfs merge=lfs -text
+bot/reports/*.jsonl filter=lfs diff=lfs merge=lfs -text
+bot/reports/*.log filter=lfs diff=lfs merge=lfs -text

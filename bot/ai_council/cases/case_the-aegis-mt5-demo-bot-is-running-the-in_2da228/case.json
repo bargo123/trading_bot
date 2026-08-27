@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T22:18:02.828336+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2da228\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 10.86,
+          "finished_utc": "2026-08-23T22:19:53.723112+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T22:19:42.862098+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T22:19:53.739193+00:00",
+        "text": "Per-symbol/session thresholds multiply degrees of freedom and can overfit unless calibration uses nested, purged walk-forward splits rather than a single training split. \u201cImprove\u201d lacks predefined minimum effect sizes, confidence intervals, sample-size requirements, and a multiple-testing correction. Holdout evaluation must remain strictly one-shot; if it informs threshold selection or retries, the sealed holdout is contaminated."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2da228\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 14.1,
+          "finished_utc": "2026-08-23T22:19:42.845498+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T22:19:28.747595+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T22:19:42.845498+00:00",
+        "text": "The \u201csealed\u201d holdout is invalid if the confidence threshold is selected or adjusted after observing its results, creating lookahead and overfitting. A minimum of 100 eligible observations is arbitrary and may be severely underpowered, with no confidence intervals, multiple-testing correction, regime coverage, or robustness checks for drawdown. \u201cIdentical entries\u201d does not ensure identical execution costs, and the proposal omits mandatory ExperimentRegistry recording and explicit confirmation that all data access remains read-only and strictly DEMO/research-only."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T22:20:20.166868+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_d79a85",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_d79a85 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_2da228",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2da228\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.09,
+        "finished_utc": "2026-08-23T22:18:24.065204+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T22:18:12.977481+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T22:18:24.065204+00:00",
+      "text": "Run a sealed-holdout study requiring the validated-state gate to abstain unless its confidence threshold is met across at least 100 eligible DEMO observations. Compare net expectancy after modeled spread and slippage against the current gate at identical entries. Adopt the stricter threshold only if it improves sealed-holdout expectancy and reduces maximum drawdown; otherwise reject it."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2da228\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 17.4,
+        "finished_utc": "2026-08-23T22:19:02.986582+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T22:18:45.583940+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T22:19:02.986582+00:00",
+      "text": "Test a symbol/session-specific validated-state threshold calibrated on the training split, instead of one global threshold. On the sealed holdout, this candidate must improve net expectancy and precision without reducing coverage by more than 10%; otherwise reject it. Leave the current champion unchanged and record the result in the experiment registry."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2da228\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 14.55,
+        "finished_utc": "2026-08-23T22:20:20.133616+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T22:20:05.585234+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T22:20:20.133616+00:00",
+      "text": "Test symbol/session-specific validated-state thresholds calibrated only within nested, purged walk-forward splits of the training data, with all calibration choices pre-registered. Define minimum effect sizes for net expectancy and precision, require adequate per-group sample sizes and confidence intervals meeting the pre-registered criteria, and apply a multiple-testing correction across threshold and group comparisons. Evaluate the final candidate exactly once on the sealed holdout, which must not inform threshold selection, tuning, or retries; require improved net expectancy and precision with coverage no lower than 90% of the champion. Leave the current champion unchanged if any gate fails, and record the complete result in the experiment registry."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2da228\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.81,
+        "finished_utc": "2026-08-23T22:20:05.568658+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T22:19:53.755003+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T22:20:05.568658+00:00",
+      "text": "Pre-register the confidence threshold and analysis plan before accessing a time-sealed, read-only DEMO holdout; evaluate any alternative thresholds only through nested validation with multiple-testing correction. Require a power-based sample size, report confidence intervals for net expectancy and drawdown, and stratify results across defined market regimes with execution-cost sensitivity and bootstrap robustness checks. Compare identical signals using the same timestamped spread, slippage, and fill model. Record the complete experiment in `ExperimentRegistry`; all access remains strictly read-only and research-only. Adopt only if the pre-specified challenger meets all gates on the sealed holdout; otherwise retain the current gate."
+    }
+  },
+  "status": "decided"
+}

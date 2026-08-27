@@ -1,0 +1,1 @@
+Run a registered holdout experiment that raises the validated-state minimum sample threshold by 25% before intelligent signals are eligible. Accept it only if net holdout expectancy improves while trade count remains at least 80% of the current gate baseline after identical spread and slippage assumptions. Reject it if either condition fails.

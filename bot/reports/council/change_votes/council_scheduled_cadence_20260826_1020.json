@@ -1,0 +1,109 @@
+{
+  "change_id": "council_scheduled_cadence_20260826_1020",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-26T10:22:56.915706+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260826_1020",
+    "current_evidence": "Candidate: calibrate the promote-gate cost model against measured MT5 DEMO fills instead of relying on the static spread/slippage assumption. Hypothesis: the current fixed cost assumption misestimates true round-trip cost by \u226520% on at least one actively traded symbol, systematically biasing challen",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate: calibrate the promote-gate cost model against measured MT5 DEMO fills instead of relying on the static spread/slippage assumption. Hypothesis: the current fixed cost assumption misestimates true round-trip cost by \u226520% on at least one actively traded symbol, systematically biasing challenger-vs-champion EV comparisons in bot/aegis/research/promote.py. Test: log per-order realized spread and slippage (requested vs. filled price at entry and confirmed close) for the next ~50 DEMO execut",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T10:20:34.053002+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Falsification criterion is decoupled from the hypothesis: exploration trades can be net-negative while cost calibration still succeeds, and vice versa, so 'negative costed expectancy' neither confirms nor refutes the >=20% misestimation claim.",
+        "affected_files mismatch: bot/aegis/research/promote.py is the claimed bias site but is not listed; bot/ai_council/ appears irrelevant; fill telemetry would naturally be emitted along the governed execution path (run_broker_paper.py chain), which is also unlisted.",
+        "~50 fills spread across multiple active symbols cannot support a per-symbol conclusion; spreads widen sharply around session opens and news, so unstratified sampling risks calibrating to an unrepresentative regime.",
+        "Measurement ambiguity: requested-vs-filled differs from mid-vs-filled, and MT5 commission and swap materially affect true round-trip cost; partial fills and volume weighting are unaddressed.",
+        "Logging must remain strictly observational: no mt5.order_send() calls from research components and zero added latency or gating interference in the order/confirmed-close path.",
+        "Raw fill logs must not overwrite or contaminate runtime intel artifacts consumed by champion promotion, and the experiment must be registered in ExperimentRegistry before the first measurement."
+      ],
+      "confidence": 0.74,
+      "model": "x-preview-f-free",
+      "reason": "Calibrating the promote-gate cost model against measured MT5 DEMO fills is a legitimate, safety-compatible observational study: it places no new orders, involves no live exposure, leaves governed promotion untouched, and directly targets a plausible bias source (static spread/slippage assumptions distorting challenger-vs-champion EV in bot/aegis/research/promote.py). However, the specification has material gaps before testing: the falsification criterion (negative costed expectancy of exploration trades) does not test the stated >=20% cost-misestimation hypothesis; affected_files omit the very module named in the hypothesis while listing bot/ai_council/ which the design does not touch; ~50 total fills is statistically thin for a per-symbol claim given strong session-dependent spread variation; and the measurement definitions (price anchor, commission/swap treatment, round-trip formula) are unspecified. The idea is worth running once these are fixed.",
+      "requested_revisions": [
+        "Rewrite falsification criteria to mirror the hypothesis, e.g.: reject calibration if no actively traded symbol shows a statistically significant >=20% deviation of realized round-trip cost from the static assumption, with predefined per-symbol minimum n and a stated estimator (bootstrap CI or median+MAD).",
+        "Correct affected_files to include bot/aegis/research/promote.py (cost-model consumer) and the actual execution-path module emitting fill telemetry; drop bot/ai_council/ unless genuinely modified.",
+        "Define the exact measurement schema: entry and exit slippage anchored to both requested price and prevailing mid at submission, explicit inclusion/exclusion of commission, swap, and volume-weighted partial fills, plus symbol, direction, volume, epoch timestamps, session bucket, and news-window flag per record.",
+        "Replace the flat ~50-order budget with per-symbol minimum sample counts and a session-stratified sampling plan, fixed before data collection begins.",
+        "Store raw fill records append-only under bot/research/ (not bot/intel/) and create the ExperimentRegistry entry before the first logged order.",
+        "Scope this proposal to measurement-only; any subsequent adoption of calibrated costs into promote.py must come back as a separate proposal including historical challengers re-scored under calibrated costs and a green pytest baseline."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "The proposal does not specify that data collection is passive from existing authorized DEMO orders; trades must never be forced to reach 50 samples.",
+        "Realized cost definitions are incomplete: requested price, fill price, commissions, swaps, spread, partial fills, rejected orders, and confirmed-close prices require a consistent symbol-normalized methodology.",
+        "A 50-order sample may be insufficient across symbols, sessions, volatility regimes, and directions.",
+        "Promotion-gate calibration must remain an experiment/challenger input until sealed OOS validation and all existing promotion gates pass.",
+        "Affected files omit the governed execution owner/logging path needed to collect authoritative fill data."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "Measured DEMO-fill costs can improve research realism, but the proposal lacks a governed measurement design and must not create or alter execution behavior to obtain samples.",
+      "requested_revisions": [
+        "State explicitly that only bot/scripts/run_broker_paper.py may record broker execution data and that collection is passive from already-authorized MT5 DEMO trades.",
+        "Define the cost formula, units, handling of partial/rejected orders, commissions/swaps, close confirmation, and immutable provenance records.",
+        "Pre-register the experiment in ExperimentRegistry, define symbol/session stratification, minimum samples, and a held-out OOS comparison against the static model.",
+        "Keep calibrated costs isolated from champion promotion and live-facing artifacts until promote.py gates and sealed-holdout validation approve it.",
+        "Specify that DEMO-account, allow_live=false, mt5_demo mode, paper-trading, and existing risk/OMS/EV gates remain unchanged."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "The sample size, symbols, measurement window, and statistical acceptance criteria are unspecified.",
+        "Realized spread/slippage definitions and requested-versus-filled price handling are not specified, including confirmed close prices and units.",
+        "The proposal does not explicitly state that only bot/scripts/run_broker_paper.py may submit MT5 orders and that all other research components remain read-only.",
+        "The claim of no champion impact needs enforcement details ensuring promote.py and champion artifacts cannot be modified by the experiment.",
+        "Logging order and fill data may create sensitive or incomplete records unless schema, persistence, and failure handling are defined."
+      ],
+      "confidence": 0.93,
+      "model": null,
+      "reason": "The experiment is potentially useful and DEMO-only, but the proposal lacks sufficient operational and governance detail to approve testing. It must explicitly preserve the designated Firehose execution owner, DEMO safeguards, existing risk and promotion gates, and research-only restrictions.",
+      "requested_revisions": [
+        "Specify symbols, execution horizon, target sample size, minimum data-quality requirements, and statistical method for estimating cost deviation.",
+        "Define entry and close realized-cost calculations, spread/slippage units, timestamps, partial fills, rejected orders, and missing confirmed-close handling.",
+        "State and test that execution remains exclusively through bot/scripts/run_broker_paper.py with mode mt5_demo, allow_live false, paper_trading_enabled true, DEMO-account verification, and existing risk gates unchanged.",
+        "Add explicit safeguards preventing changes to intelligent_champion.json or promotion decisions during the experiment.",
+        "Register the experiment in ExperimentRegistry and define an auditable report, rollback procedure, and falsification thresholds before collecting data."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

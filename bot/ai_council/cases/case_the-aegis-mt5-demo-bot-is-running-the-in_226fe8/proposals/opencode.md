@@ -1,0 +1,1 @@
+Test a stricter spread-normalized entry filter that abstains when expected net edge is below 1.5 times estimated spread plus slippage. Evaluate it only on sealed MT5 DEMO outcome data against the current champion, requiring higher net expectancy and no increase in tail-loss rate. Reject the candidate if either condition fails.

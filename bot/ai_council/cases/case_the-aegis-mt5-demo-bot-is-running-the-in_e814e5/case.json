@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-23T02:14:50.774620+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-23T02:17:45.460580+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_519a60",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_519a60 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_e814e5",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e814e5\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 83.63,
+        "finished_utc": "2026-08-23T02:16:26.075633+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T02:15:02.448045+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T02:16:26.075633+00:00",
+      "text": "Proposal: Run a governed exit-research experiment on the dominant loss source \u2014 the \"manual\"/runner-flatten close bucket (1,928 of 2,518 reconciled exits, PF \u2248 0.64, expectancy \u22120.013) which, together with SL hits (exp \u22120.55 each), drives the firehose's inverted payoff geometry (avg win $0.060 vs avg loss \u2212$0.177, payoff ratio 0.34, overall PF 0.77). Pre-register a challenger that replaces the current quick_win/never_green/gave_back flatten logic with a deterministic time-stop (exit if trade hasn't reached +k\u00d7median_win within N bars, N swept over {30, 60, 120}) plus a hard tail-loss cap sized so max loss \u2264 3\u00d7 median win, using triple-barrier labels as specified in Advances in Financial Machine Learning (Prado 2018) and evaluated net of the runner's cost profile. Falsifiable prediction: on the sealed holdout the time-stop variant raises expectancy from \u22120.012 to \u2265 +0.01 with bootstrap p05 > 0 and \u2265 300 sampled exits; if it fails either threshold, it is recorded as rejected in ExperimentRegistry and never promoted. This touches only research modules and reports \u2014 no champion edit, no live YAML, no orders."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

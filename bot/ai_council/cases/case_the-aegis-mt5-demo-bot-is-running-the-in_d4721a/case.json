@@ -1,0 +1,47 @@
+{
+  "created_utc": "2026-08-24T21:48:18.912259+00:00",
+  "critiques": {},
+  "decision": null,
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_d4721a",
+  "mode": "REAL",
+  "phase": "proposal",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4721a\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.08,
+        "finished_utc": "2026-08-24T21:48:41.166673+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T21:48:30.088338+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T21:48:41.166673+00:00",
+      "text": "Test a stricter validated-state confidence threshold that abstains from entries when recent analogue coverage is sparse. Accept it only if the sealed holdout improves net expectancy after modeled spread/slippage without increasing maximum drawdown or reducing trade count by more than 30% versus the current champion. Record the experiment and retain the incumbent if any gate fails."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4721a\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 15.96,
+        "finished_utc": "2026-08-24T21:49:15.379814+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T21:48:59.418214+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T21:49:15.382014+00:00",
+      "text": "Test a research-only challenger that adds a spread-and-volatility regime filter to the existing validated-state gate, using only information available before entry. Pre-register it and evaluate net of spread/slippage on the sealed holdout against the current champion. Promote only if it improves holdout expectancy by at least 10% without increasing drawdown or materially reducing validated opportunities."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "open"
+}

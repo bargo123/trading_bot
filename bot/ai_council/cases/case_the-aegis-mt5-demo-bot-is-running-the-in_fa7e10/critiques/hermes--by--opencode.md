@@ -1,0 +1,1 @@
+This is an error message, not a trading proposal: it contains no hypothesis, signal definition, validation plan, or measurable performance claim. No safety or execution assessment is possible until the unsupported model dependency is replaced and the intended strategy is specified.

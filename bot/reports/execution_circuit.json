@@ -3,7 +3,7 @@
   "window_s": 300.0,
   "backoff_s": 60.0,
   "blocked_until": 1787077119.5273592,
-  "consecutive_failures": 10,
+  "consecutive_failures": 0,
   "no_money_times": [
     1787076799.70815,
     1787076863.0901926,

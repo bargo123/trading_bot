@@ -1,0 +1,90 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_1133",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T11:34:56.944122+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_1133",
+    "current_evidence": "API call failed after 3 retries: HTTP 503: Error from provider (Console): Upstream request failed: Endpoint is unavailable.",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "API call failed after 3 retries: HTTP 503: Error from provider (Console): Upstream request failed: Endpoint is unavailable.",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (1/1)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T11:33:56.690630+00:00",
+  "totals": {
+    "abstain": 1,
+    "approve_for_test": 0,
+    "counted": 2,
+    "reject": 0,
+    "revise_and_resubmit": 1
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "raw": "API call failed after 3 retries: HTTP 503: Error from provider (Console): Upstream request failed: Endpoint is unavailable.",
+      "reason": "unparseable vote: ''",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "No actionable proposed behavior is specified.",
+        "Affected files are too broad without a diff or design.",
+        "Tests and falsification criteria lack measurable thresholds and cost assumptions.",
+        "DEMO status does not remove the need for governed execution and experiment registry evidence."
+      ],
+      "confidence": 0.96,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposed change is an API failure message, not an implementable research change; it contains no hypothesis, parameters, code behavior, or validation design to evaluate.",
+      "requested_revisions": [
+        "Provide a concrete change description and patch/design for the retry or provider-fallback behavior.",
+        "Define bounded retry, timeout, backoff, failure handling, and fail-closed behavior.",
+        "Specify experiment registration, OOS protocol, cost assumptions, sample size, and quantitative promotion/rejection thresholds.",
+        "Confirm research components remain read-only and no execution/risk gates are altered."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "No specific files, code paths, parameters, or behavior changes are identified.",
+        "No current baseline metrics or reproducible evidence are provided.",
+        "The claimed DEMO-only safety impact is not independently verifiable.",
+        "Rollback and falsification procedures are too generic."
+      ],
+      "confidence": 0.99,
+      "model": null,
+      "reason": "The proposal contains no concrete proposed change; both evidence and change details are replaced by an API failure message. There is insufficient information to evaluate mechanism, implementation, tests, or safety.",
+      "requested_revisions": [
+        "Provide the exact diff or detailed implementation plan.",
+        "Replace the provider error with validated baseline evidence and measured expected impact.",
+        "Specify all affected runtime and research paths, including confirmation that research processes cannot submit orders.",
+        "Define executable exploration-lifecycle and out-of-sample validation tests with pass/fail thresholds.",
+        "Document registry recording, rollback steps, and explicit champion-promotion safeguards."
+      ],
+      "vote": "ABSTAIN_INSUFFICIENT_EVIDENCE"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

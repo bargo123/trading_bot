@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T06:43:14.295837+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_921860\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 35.09,
+          "finished_utc": "2026-08-23T06:46:46.455202+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T06:46:11.364238+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T06:46:46.455202+00:00",
+        "text": "The acceptance rule is under-specified and overfit-prone: the regime definition, volatility bucketing, and the magic 10% expectancy bar are all researcher-tuned, yet you propose a single sealed-holdout peek with no power analysis or multiple-comparison control\u2014on typical firehose per-regime sample sizes, a 10% net-expectancy delta will be statistically indistinguishable from noise, and conditioning itself fragments the sample into thin regimes that flatter the result. \"Without invalidating calibration\" is unmeasurable as written\u2014name the calibration metric, its tolerated degradation, and which drawdown statistic (max DD? time-under-water?) binds\u2014or the clause is gate theater. Missing validation details: fold count, purge/embargo between walk-forward segments, and proof that regime labels persist out-of-sample rather than reshuffling at the boundary. Finally, commit that the holdout is unsealed exactly once and only after every promote.py gate passes; any iterative re-evaluation against it converts your seal into a second training set."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_921860\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 14.15,
+          "finished_utc": "2026-08-23T06:46:11.347884+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T06:45:57.193674+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T06:46:11.347884+00:00",
+        "text": "The evidence is observational and confounded: TP closures are selected by trades that reach TP, while manual-flatten counts are internally inconsistent (1,383 + 1,288 + 229 exceeds 1,928 unless categories overlap), so it does not establish that early exits cause the losses. \u201cValidated states\u201d and the \u2265+0.01/\u22120.55 thresholds appear outcome-tuned, while sealed-holdout counterfactual replay cannot reliably model fills, spread/slippage, duration, concurrency, or exposure changes from waiting for barriers. The implementation must also prove it never alters protected live YAML or enables live trading, and require walk-forward, regime/symbol stratification, and independently defined tail and cost metrics before any promotion."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T06:48:01.295525+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_b2dcfe",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_b2dcfe for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_921860",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_921860\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 87.15,
+        "finished_utc": "2026-08-23T06:44:57.186379+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T06:43:30.035263+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T06:44:57.198866+00:00",
+      "text": "**Candidate: replace quick_win/never_green early flattening with hold-to-original-TP/SL resolution for fires inside the two validated states.** Measured evidence points at the exit layer as the binding loss driver: in `outcome_learning.md` (n=2518 exits) TP-closes carry expectancy +0.107 while manual-flatten closes (n=1928; flatten reasons quick_win 1383 / never_green 1288 / gave_back 229 in the failure audit) carry PF 0.64 and expectancy \u22120.013, with tail losses erasing ~20\u00d7 the average win \u2014 whereas expanding the validated-state set is weakly supported since 92.6% of skips are dominated by `no_validated_strategy_model` but the surviving asia/sell/range state already validates at PF 2.78. Experiment: register an exit-research challenger (via ExperimentRegistry) that disables early flattening only for fires in validated states and lets positions resolve at their original TP/SL barriers, \u00e0 la triple-barrier labeling in *Advances in Financial Machine Learning*, consistent with exit-asymmetry doctrine in *Trade Your Way to Financial Freedom*. Falsifiable prediction: counterfactual replay on the sealed holdout shows net expectancy improving from \u22120.012 to \u2265 +0.01 per trade after costs with tail_loss_5pct no worse than \u22120.55; if replay fails either bound, reject the challenger, log it in `bot/research/sealed_holdouts.jsonl`, and leave the champion untouched pending full promote.py gating."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_921860\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 17.21,
+        "finished_utc": "2026-08-23T06:45:26.537930+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T06:45:09.323210+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T06:45:26.537930+00:00",
+      "text": "Test a regime-conditioned admission threshold for validated firehose signals, using volatility and session as pre-entry features while preserving all existing gates. Register a costs-netted walk-forward ablation against the current champion and evaluate it on the sealed holdout. Accept the candidate only if it improves net expectancy by at least 10% without increasing drawdown or invalidating calibration; otherwise reject it."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_921860\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 25.02,
+        "finished_utc": "2026-08-23T06:48:01.271285+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T06:47:36.251185+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T06:48:01.271285+00:00",
+      "text": "Pre-register a single regime definition: 20-bar ATR/close, bucketed into low/mid/high terciles using trailing 252-bar training data, with fixed session windows and fold-specific cutpoints frozen out-of-sample. Evaluate a costs-netted ablation in five walk-forward folds with a purge and embargo equal to one maximum holding period, requiring labels and volatility buckets to remain frozen throughout each test segment and each regime to contain at least 200 observations. Accept only if the paired block-bootstrap 95% confidence interval shows a positive net-expectancy improvement of at least 10%, the pre-study power analysis provides at least 80% power for that effect, max drawdown worsens by no more than 1 percentage point, time-under-water by no more than 10%, and Brier score worsens by no more than 0.005; apply Holm correction if more than one challenger is tested. Unseal the holdout exactly once, only after every `promote.py` gate passes, and use it solely for the final decision; any failed gate or inadequate power rejects the candidate without further holdout evaluation."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_921860\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 49.77,
+        "finished_utc": "2026-08-23T06:47:36.243170+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T06:46:46.475753+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T06:47:36.247190+00:00",
+      "text": "**Candidate (rev. 2): disable quick_win/never_green early flattening for fires inside validated states and let positions resolve at original TP/SL barriers \u2014 framed as a causal hypothesis to be tested, not a conclusion drawn from observational splits.** First, correcting the audit: flatten-reason tags are non-exclusive (quick_win 1,383 + never_green 1,288 + gave_back 229 over-count the 1,928 unique manual closes), and because TP-closes are conditioned on trades that reach TP, the observed expectancy gap is treated as motivation only. The challenger, its two-state scope, and all acceptance bounds (net expectancy \u2265 +0.01 per trade after costs; tail_loss_5pct no worse than \u22120.55) are pre-registered in ExperimentRegistry before any holdout contact, with thresholds frozen from training-window distributions and cost break-even arithmetic rather than tuned against outcomes. Evaluation is strict walk-forward replay under conservative fill assumptions (barrier fills require spread-inclusive price crossing, runner-model slippage applied per trade, and changes in holding duration, exposure, and concurrency reported explicitly), stratified by regime and symbol, and scored by an independent evaluator that recomputes both champion and challenger metrics identically from raw fills. Falsifiable prediction: the median walk-forward fold meets both bounds and no regime/symbol stratum breaches the tail bound; failure on either rejects the challenger into `bot/research/sealed_holdouts.jsonl` with the champion untouched pending full `promote.py` gating. Execution is read-only throughout \u2014 no orders, no edits to `bot/config*.yaml` or any protected live YAML."
+    }
+  },
+  "status": "decided"
+}

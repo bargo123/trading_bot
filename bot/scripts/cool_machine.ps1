@@ -11,7 +11,12 @@ param(
 $ErrorActionPreference = "Continue"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BotRoot = Resolve-Path (Join-Path $ScriptDir "..")
+$RepoRoot = Resolve-Path (Join-Path $BotRoot "..")
 $LogFile = Join-Path $BotRoot "optimizer\cool_machine.log"
+$OvernightRepair = Join-Path $ScriptDir "_overnight_runtime_repair_once.ps1"
+if (Test-Path $OvernightRepair) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $OvernightRepair | Out-Null
+}
 
 function Write-Log([string]$msg) {
     $line = "{0} {1}" -f (Get-Date -Format "yyyy-MM-ddTHH:mm:ssK"), $msg

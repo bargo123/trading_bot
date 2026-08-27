@@ -1,0 +1,111 @@
+{
+  "change_id": "council_scheduled_cadence_20260826_0534",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-26T05:36:25.078251+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260826_0534",
+    "current_evidence": "Candidate improvement: recalibrate the validated-state gate from assumed costs to measured costs. For every DEMO firehose order already logged, pull actual entry/exit spread and slippage from the broker trade records and compare them against the runner's cost assumptions currently used by the promot",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate improvement: recalibrate the validated-state gate from assumed costs to measured costs. For every DEMO firehose order already logged, pull actual entry/exit spread and slippage from the broker trade records and compare them against the runner's cost assumptions currently used by the promote.py economics; then rerun the split-primary OOS and sealed-holdout evaluations with measured costs substituted. Falsifiable criterion, pre-registered: if champion ranking, gate pass/fail status, and ",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T05:34:20.397377+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Both current_evidence and proposed_change are cut off mid-sentence; the pre-registered falsification criterion is incomplete, so the test is not yet falsifiable in its submitted form.",
+        "Direction-of-error hazard: DEMO fills over a short/calm window will typically measure BETTER than assumed costs. Naively substituting means would relax the promotion gate exactly when measurement is least reliable, increasing downstream risk rather than improving rigor.",
+        "Sealed-holdout reuse: rerunning split-primary OOS AND sealed-holdout evaluations under a new cost basis against the same sealed data is iterative testing on the holdout; without a one-shot, pre-registered, registry-logged protocol this erodes the seal's meaning.",
+        "affected_files mismatch: the actual gate lives in bot/aegis/research/promote.py plus the runner's cost-assumption module; neither is listed (bot/intel/, bot/ai_council/ are not where the economics gate sits).",
+        "No minimum sample-size or market-regime coverage requirement stated for the DEMO trade records before substitution is deemed valid.",
+        "Changing the champion-promotion gate's cost basis touches a governed path (AGENTS.md rule 3) and warrants explicit operator visibility even though it is DEMO/read-only."
+      ],
+      "confidence": 0.78,
+      "model": "x-preview-f-free",
+      "reason": "Measuring realized DEMO spread/slippage and substituting it into promote.py economics is a legitimate, read-only research improvement with genuine merit, but as written the proposal is truncated mid-specification, leaves the sealed-holdout protocol undefined, and contains no asymmetry guarantee preventing measured (possibly optimistic) DEMO costs from LOOSENING the validated-state gate.",
+      "requested_revisions": [
+        "Complete the truncated falsification criterion: name the exact decision metrics (champion rank stability, gate pass/fail flip count) and numeric thresholds that constitute failure.",
+        "Make recalibration asymmetric by default: substitute conservative estimates (e.g., upper-95%-confidence or worst-decile of measured spread/slippage per symbol/session). Tightening the gate is auto-allowed; any loosening versus current assumed costs requires explicit operator sign-off.",
+        "Define the sealed-holdout protocol: single pre-registered rerun recorded in ExperimentRegistry before execution, or re-seal a fresh holdout window; no repeated substitutions or post-hoc criterion edits after seeing results.",
+        "Correct affected_files to include bot/aegis/research/promote.py and the runner cost-assumption source; confirm broker trade-record access is strictly read-only via the permitted research path (no mt5.order_send(), consistent with AGENTS.md).",
+        "State minimum evidence requirements: minimum number of DEMO orders, minimum calendar coverage, and per-symbol/per-session breakdown (Asia vs London/NY) before measured costs are accepted as valid inputs.",
+        "Add a rollback detail beyond 'revert experiment': specify that prior champion promotions made under assumed costs remain valid and are NOT retroactively re-evaluated unless the operator requests it."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Actual spread/slippage attribution must be defined per fill, including partial fills, commissions, swaps, rejected orders, and timestamp alignment.",
+        "Using realized costs from the same evaluated trades can leak outcome-conditional information unless the cost model is estimated only from training-period data and applied unchanged to OOS/holdout periods.",
+        "Tiny DEMO samples may produce unstable cost estimates and spuriously alter promotion gates.",
+        "The affected files omit likely evaluation and promotion modules despite proposing changes to promote.py economics.",
+        "The pre-registered criterion is incomplete, so acceptance and rollback conditions are not falsifiable as written."
+      ],
+      "confidence": 0.93,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "Measured DEMO execution costs should improve evaluation fidelity, but the proposal is truncated and lacks a defined broker-data schema, reconciliation method, minimum sample requirements, and protections against leakage or selective substitution.",
+      "requested_revisions": [
+        "Provide the complete pre-registered acceptance criterion, including exact ranking/gate metrics, tolerance thresholds, sample-size minimums, and treatment of missing broker records.",
+        "Specify a reproducible immutable DEMO fill-extraction and reconciliation pipeline that remains read-only and records the experiment in ExperimentRegistry.",
+        "Fit cost assumptions using only the relevant training window; evaluate split-primary OOS and sealed holdout with a frozen model and no holdout-derived calibration.",
+        "Define fallback behavior when actual-cost coverage is insufficient, fields disagree, or estimates are statistically unstable.",
+        "List all affected source files and add tests for fill reconciliation, no-lookahead temporal splits, cost application, and unchanged champion-promotion governance."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Confirm broker-record extraction is strictly read-only and cannot invoke MT5 order execution.",
+        "Define exact entry/exit spread and slippage fields, timestamp alignment, instrument handling, and missing-data policy.",
+        "Specify minimum sample size and statistical uncertainty thresholds before substituting measured costs.",
+        "Complete the falsifiable criterion, including exact champion-ranking and gate-status comparisons.",
+        "Register the experiment and preserve champion-promotion governance; no automatic champion impact.",
+        "Provide baseline-versus-measured-cost results and exploration lifecycle/OOS/sealed-holdout test evidence.",
+        "DEMO-only exposure does not by itself make execution-related changes safety-neutral."
+      ],
+      "confidence": 0.96,
+      "model": null,
+      "reason": "The research direction is potentially valid and read-only, but the proposal is incomplete and lacks sufficient evidence for approval. The proposed change is truncated, current PF/EV are unavailable, and the data sufficiency, cost definitions, and exact pass/fail rules are unspecified.",
+      "requested_revisions": [
+        "Resubmit the complete proposal without truncation.",
+        "Add a pre-registered analysis plan with exact formulas, datasets, sample-size requirements, and pass/fail thresholds.",
+        "Explicitly state that all components remain read-only and that no broker positions or champion artifacts may be modified by this experiment.",
+        "Record the experiment and its outcome in ExperimentRegistry, including honest failure handling.",
+        "Include baseline and measured-cost evaluation results before requesting approval for any promotion or runtime change."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

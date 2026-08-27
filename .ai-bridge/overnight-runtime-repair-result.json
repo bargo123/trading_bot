@@ -1,0 +1,21 @@
+﻿{
+    "mode":  "broker_only_stale_owner_cleanup",
+    "returncode":  125,
+    "cleanup_complete":  false,
+    "focused_tests":  "\r\n=================================== ERRORS ====================================\r\n________________ ERROR collecting tests/test_watcher_audit.py _________________\r\n..\\.venv\\Lib\\site-packages\\_pytest\\python.py:508: in importtestmodule\r\n    mod = import_path(\r\n..\\.venv\\Lib\\site-packages\\_pytest\\pathlib.py:596: in import_path\r\n    importlib.import_module(module_name)\r\n..\\..\\..\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\importlib\\__init__.py:90: in import_module\r\n    return _bootstrap._gcd_import(name[level:], package, level)\r\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n\u003cfrozen importlib._bootstrap\u003e:1387: in _gcd_import\r\n    ???\r\n\u003cfrozen importlib._bootstrap\u003e:1360: in _find_and_load\r\n    ???\r\n\u003cfrozen importlib._bootstrap\u003e:1331: in _find_and_load_unlocked\r\n    ???\r\n\u003cfrozen importlib._bootstrap\u003e:935: in _load_unlocked\r\n    ???\r\n..\\.venv\\Lib\\site-packages\\_pytest\\assertion\\rewrite.py:188: in exec_module\r\n    exec(co, module.__dict__)\r\ntests\\test_watcher_audit.py:11: in \u003cmodule\u003e\r\n    import scripts.research_fast_watcher as w  # noqa: E402\r\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\nE     File \"C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\scripts\\research_fast_watcher.py\", line 805\r\nE       \"\r\nE       ^\r\nE   SyntaxError: unterminated string literal (detected at line 805)\r\n=========================== short test summary info ===========================\r\nERROR tests/test_watcher_audit.py\r\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\r\n1 error in 1.74s\r\n",
+    "mt5":  null,
+    "heartbeat_before":  null,
+    "broker_before":  [
+
+                      ],
+    "stopped_broker_pids":  [
+
+                            ],
+    "broker_after_cleanup":  [
+
+                             ],
+    "watcher_processes_untouched":  [
+
+                                    ],
+    "stderr":  "focused pytest failed rc=2"
+}

@@ -1,0 +1,1 @@
+This is not a trading or research proposal; it provides no hypothesis, methodology, metrics, or validation plan. The unsupported preview model error must be resolved with a supported, pinned model before any results can be evaluated.

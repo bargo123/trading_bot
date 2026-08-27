@@ -1,0 +1,1 @@
+Test a stricter validated-state gate requiring two consecutive matching classifications before entry, using a supported model configuration. Compare it with the current gate on a sealed MT5 DEMO replay, net of spread and slippage. Adopt it only if adverse-excursion loss decreases without reducing net expectancy or qualified-trade count by more than 10%.

@@ -1,0 +1,74 @@
+{
+  "change_id": "council_scheduled_cadence_20260824_2003",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-24T20:04:40.851392+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260824_2003",
+    "current_evidence": "Evaluate a volatility-adjusted trailing exit against the current champion on the sealed holdout, with identical entry signals and net runner costs. Accept it only if it improves holdout expectancy by at least 0.05R per trade and does not reduce the lower 95% bootstrap confidence bound of profit fact",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Evaluate a volatility-adjusted trailing exit against the current champion on the sealed holdout, with identical entry signals and net runner costs. Accept it only if it improves holdout expectancy by at least 0.05R per trade and does not reduce the lower 95% bootstrap confidence bound of profit factor. Otherwise retain the champion unchanged and record the rejected experiment.",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (1/2)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-24T20:03:58.352711+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 1,
+    "counted": 2,
+    "reject": 0,
+    "revise_and_resubmit": 1
+  },
+  "votes": [
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Profit-factor bootstrap method, sample size, resampling unit, and confidence-bound calculation are unspecified.",
+        "The sealed-holdout access and experiment-registry recording mechanism are not explicitly identified.",
+        "'Negative costed expectancy after exploration trades' conflicts with sealed-holdout validation and is not an appropriate primary falsification criterion.",
+        "'Tiny DEMO risk' is unnecessary and potentially conflicts with the research-only scope."
+      ],
+      "confidence": 0.91,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal is research-only and preserves the champion unless predefined holdout gates pass, but the validation specification is incomplete for a governed comparison.",
+      "requested_revisions": [
+        "Specify deterministic exit parameters, cost/slippage assumptions, bootstrap procedure, minimum trade count, and multiple-testing controls before evaluating the sealed holdout.",
+        "Use the existing ExperimentRegistry and promotion gates; state that the holdout is accessed only through the governed evaluation path.",
+        "Define falsification as failure of either pre-registered holdout gate, including net expectancy improvement below 0.05R per trade or a lower 95% PF confidence-bound reduction.",
+        "Remove DEMO/exploration trading language unless a separately governed, explicitly read-only research workflow requires it."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "concerns": [
+        "Ensure that 'net runner costs' include slippage and commission models accurate to the DEMO environment to prevent expectancy inflation."
+      ],
+      "confidence": 0.95,
+      "model": null,
+      "reason": "The proposal follows a rigorous statistical validation protocol, requiring both a significant improvement in holdout expectancy (0.05R) and maintenance of the lower 95% bootstrap confidence bound for the profit factor. The risk is strictly confined to the DEMO environment.",
+      "requested_revisions": [],
+      "vote": "APPROVE_FOR_TEST"
+    },
+    {
+      "agent": "codex",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Test a stricter validated-state entry filter requiring two consecutive matching state classifications before signal acceptance. On sealed holdout data, adopt it only if net expectancy improves by at least 10% after modeled spread/slippage while trade count remains at least 70% of baseline; otherwise reject it. Record the experiment and retain the current champion unchanged.

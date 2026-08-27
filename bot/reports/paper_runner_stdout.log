@@ -1,16 +1,3 @@
-order EURUSD ok=True id=57996490252 Request executed
-order GBPUSD ok=True id=57996490347 Request executed
-order USDCHF ok=True id=57996490633 Request executed
-order AUDUSD ok=True id=57996490800 Request executed
-order NZDUSD ok=True id=57996490934 Request executed
-order USDCAD ok=False id=0 10019 No money
-order NZDUSD ok=True id=57996495699 Request executed
-order USDCAD ok=False id=0 10019 No money
-order NZDUSD ok=True id=57996525204 Request executed
-order EURCHF ok=False id=0 10019 No money
-order AUDNZD ok=True id=57996721440 Request executed
-order EURGBP ok=True id=57996735344 Request executed
-order AUDCHF ok=True id=57996740233 Request executed
-order GBPCHF ok=True id=57996753255 Request executed
-order EURGBP ok=True id=57996766811 Request executed
-order NZDUSD ok=True id=57996796037 Request executed
+version https://git-lfs.github.com/spec/v1
+oid sha256:0e397a5b497e69df475ef1f1ef9fa9d05c48bfa2116855025987be1f139e957f
+size 831

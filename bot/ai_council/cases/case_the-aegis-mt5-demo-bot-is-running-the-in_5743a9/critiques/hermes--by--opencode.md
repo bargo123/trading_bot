@@ -1,0 +1,1 @@
+This is an error message, not a research proposal: it defines no hypothesis, data, strategy, or measurable outcome. It provides no validation plan, cost assumptions, safety controls, or evidence that switching models would improve trading decisions.

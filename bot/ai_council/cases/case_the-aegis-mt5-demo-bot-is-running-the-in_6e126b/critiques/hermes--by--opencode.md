@@ -1,0 +1,1 @@
+The proposal is not a trading or research strategy, so it provides no hypothesis, data, validation plan, or measurable claim to review. It appears to be an API configuration failure, not evidence supporting a model change or execution action; no trading behavior should be altered until the unsupported model identifier is corrected and the integration is tested.

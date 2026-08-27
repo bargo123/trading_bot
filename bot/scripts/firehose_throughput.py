@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Iterable, Mapping
 
 BOT = Path(__file__).resolve().parents[1]
+
 SESSIONS = (("00", "07", "asia"), ("07", "12", "london"), ("12", "16", "london"),
             ("16", "21", "newyork"), ("21", "24", "asia"))
 FUNNEL_STAGES = (

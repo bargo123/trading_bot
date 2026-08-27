@@ -118,3 +118,15 @@ def test_watcher_adds_claude_only_for_senior_review_trigger(monkeypatch):
 
     assert "hermes" in agents
     assert agents[-1] == "claude"
+
+
+def test_recurring_watcher_filters_codex_from_legacy_operator_override(monkeypatch):
+    monkeypatch.setenv(
+        "AEGIS_COUNCIL_AGENTS",
+        "hermes,opencode,gemini,codex,cursor",
+    )
+
+    agents = research_fast_watcher._council_agents_for_trigger("scheduled_cadence")
+
+    assert agents == ["hermes", "opencode", "gemini", "cursor"]
+    assert "codex" not in agents

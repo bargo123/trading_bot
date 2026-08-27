@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-25T00:00:23.174372+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-25T00:01:57.820495+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_identify-one-falsifiable-seconds-first-l_266400",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_identify-one-falsifiable-seconds-first-l_266400 for the validation pipeline"
+  },
+  "id": "identify-one-falsifiable-seconds-first-l_6b2745",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_identify-one-falsifiable-seconds-first-l_6b2745\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 61.38,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "hy3-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T00:01:57.108187+00:00",
+      "text": "Test a \"seconds-first hard exit\" rule on historical/DEMO replay: for any Firehose position whose calibrated short-horizon model (the same gate used for entry) flips to negative predicted EV within the first 5 seconds of fill, forcibly close at second 5 if unrealized PnL \u2264 0; keep a matched control cohort using the standard exit. Falsifiable prediction: the hard-exit cohort's mean realized loss-per-losing-trade is at least 40% smaller than control across a minimum 200-trade sample, with the difference significant at p<0.05 (Mann\u2013Whitney). The hypothesis is rejected if the reduction is <10% or not statistically significant, indicating sub-second adverse selection dominates and the rule adds no containment benefit.</arg_value:6124c78e>"
+    }
+  ],
+  "question": "Identify one falsifiable seconds-first loss-containment experiment from current measured evidence. Return a concrete candidate only; no code or trades.",
+  "revisions": {},
+  "status": "decided"
+}

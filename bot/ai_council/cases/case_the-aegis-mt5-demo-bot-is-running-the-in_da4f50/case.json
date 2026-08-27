@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T10:09:33.012251+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_da4f50\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 27.65,
+          "finished_utc": "2026-08-23T10:12:43.875045+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T10:12:16.225018+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T10:12:43.875045+00:00",
+        "text": "The proposal leaves its central hyperparameter\u2014the cost-share threshold\u2014undefined in selection methodology; tune it on the same walk-forward folds used for evaluation and you've just fit noise with extra steps, so it demands nested selection or a frozen a priori value. \"Improves held-out net expectancy\" and \"worsening calibration\" are unmeasurable as written: no minimum effect size, no statistical significance or bootstrap interval, and no named calibration metric or numeric drawdown gate\u2014predefined gates that aren't stated can't be audited post hoc. Validation gaps include no regime/session stratification check (a cost filter plausibly helps only in thin-liquidity sessions), no multi-split robustness, and no mention of registering the experiment in `ExperimentRegistry` or sealing the holdout before any tuning occurs, all mandated by council rules. Finally, since this challenger alters live entry behavior upon promotion, the proposal must explicitly route through the governed `promote.py` gates and touch no protected live YAML\u2014silence on that is a safety violation waiting to happen."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_da4f50\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.37,
+          "finished_utc": "2026-08-23T10:12:16.198618+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T10:12:04.832003+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T10:12:16.212391+00:00",
+        "text": "The 2,404-deal replay is in-sample and highly vulnerable to selection and path-reconstruction bias; without a time-split holdout, untouched validation set, and pre-specified target/trailing parameters, the >+0.01 prediction is not credible. \u201cEntries work\u201d is an unmeasurable causal claim confounded by state, regime, and exit selection, while the cited books provide rationale\u2014not evidence that this dataset supports the proposed change. A demo A/B evaluation may still violate the research-only/no-trading boundary, and the proposal does not specify registry failure handling, reproducibility, or the required promotion gates in enough detail to establish safety."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T10:13:37.782350+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_ab2482",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_ab2482 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_da4f50",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_da4f50\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 78.84,
+        "finished_utc": "2026-08-23T10:11:08.882455+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T10:09:50.046517+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T10:11:08.882455+00:00",
+      "text": "Proposal: Run an exit-rule experiment in `exit_research` testing replacement of the `quick_win` flatten rule with hold-to-validated-target (or trailing stop) for the two validated states, evaluated as a counterfactual replay of the 2,404 logged deals net of spread/slippage and registered in `ExperimentRegistry`. Measured basis: the failure audit shows 68.4% win rate but PF 0.751 and net \u221226.9 because avg_loss (\u22120.142) is ~2.9\u00d7 avg_win (+0.049); TP-exits carry +0.090 expectancy while the dominant \"manual\"/quick_win cohort (1,383 flattens) runs at PF 0.567 and \u221231.23 net \u2014 entries work, the early-profit-taking exit destroys the payoff asymmetry. Falsifiable prediction: converting quick_win flattens into target/trailing exits raises replayed net expectancy from \u22120.011 to > +0.01/trade while keeping 5% tail loss \u2264 current \u22120.49; if not, reject and keep the challenger sealed per `bot/aegis/research/promote.py` gates. This matches *Trade Your Way to Financial Freedom (2006)* (Tharp): expectancy is set by the exit-generated R-distribution, and *The Ultimate Forex Trading System* notes reward:risk must exceed ~1:2 to survive inevitable stop hits \u2014 currently we invert that ratio. No champion or live YAML changes; demo-only A/B shadow evaluation next cycle."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_da4f50\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.34,
+        "finished_utc": "2026-08-23T10:11:40.801544+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T10:11:27.461279+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T10:11:40.803555+00:00",
+      "text": "Test a research-only challenger that raises the intelligent-firehose entry threshold when estimated spread/slippage consumes a defined share of expected edge. Evaluate it against the current champion using identical walk-forward and sealed-holdout data, net of runner costs. The candidate is successful only if it improves held-out net expectancy without worsening calibration or drawdown beyond predefined gates; otherwise, retain the current champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_da4f50\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 20.04,
+        "finished_utc": "2026-08-23T10:13:37.754685+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T10:13:17.712075+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T10:13:37.754685+00:00",
+      "text": "Test a research-only challenger with a cost-share threshold fixed a priori at 25% of estimated expected edge; any future threshold tuning must use nested inner folds only. Seal the holdout and register the experiment in `ExperimentRegistry` before tuning, then compare champion and challenger on identical cost-adjusted data across at least three walk-forward splits, stratified by market regime and session, including thin-liquidity periods. Success requires a paired-bootstrap 95% confidence interval for the challenger\u2019s net-expectancy improvement to exclude zero and show at least +0.05R per trade, while Brier score worsens by no more than 0.01, expected calibration error by no more than 0.02, and maximum drawdown by no more than two percentage points. If every gate passes, route promotion exclusively through `promote.py`; otherwise retain the champion and modify no protected live YAML."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_da4f50\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 33.79,
+        "finished_utc": "2026-08-23T10:13:17.692561+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T10:12:43.905027+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T10:13:17.692561+00:00",
+      "text": "Revised proposal: Run an exit-rule experiment in `exit_research` testing replacement of the `quick_win` flatten rule with pre-registered hold-to-validated-target and trailing-stop variants (all parameters frozen in the registry entry *before* any evaluation), using a chronological 70/30 time-split of the 2,404 logged deals so that the in-sample replay serves only for parameter selection and the falsifiable prediction is judged exclusively on the untouched final-period holdout, net of runner spread/slippage assumptions. We withdraw the causal claim that \"entries work\": the cohort statistics are descriptive and confounded by state, regime, and exit-selection effects, so the experiment instead compares exit-rule counterfactuals within matched state/regime strata against the quick_win baseline rather than attributing P&L to entry quality. The Tharp and reward:risk citations are motivation only and carry no evidential weight; all support must come from the held-out replay. Falsifiable prediction: on the holdout, target/trailing exits improve net expectancy from \u22120.011 to > +0.01/trade while keeping 5% tail loss \u2264 the current \u22120.49; otherwise the challenger is rejected and sealed under the full gate sequence in `bot/aegis/research/promote.py`. There is no demo A/B and no order placement of any kind \u2014 evaluation is strictly read-only counterfactual replay of logged deals plus read-only MT5 data fetches, honoring the never-trade boundary. Every run is registered in `ExperimentRegistry` with pinned seeds, code commit hash, split boundaries, and frozen parameters; pipeline failures or null results are recorded honestly as failed experiments, with no champion or live YAML changes under any outcome."
+    }
+  },
+  "status": "decided"
+}

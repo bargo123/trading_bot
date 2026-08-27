@@ -1,0 +1,235 @@
+{
+  "created_utc": "2026-08-26T10:10:37.075889+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\critiques\\codex--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 66.22,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T10:18:48.461273+00:00",
+        "text": "Reusing the sealed holdout for this A/B is flawed twice over: the incumbent champion was presumably validated on that same window, so the comparison is biased toward the gate already fitted to it, and every additional candidate replayed against a \"sealed\" holdout erodes the seal \u2014 by proposal N it's just another training set; demand a fresh untouched holdout or a pre-registered single-use budget. One replay path yields a point estimate, not evidence: without a paired bootstrap (or block bootstrap honoring trade overlap) plus a minimum-trade-count floor, claimed improvements in net expectancy and drawdown are indistinguishable from noise, and drawdown differences especially need far longer samples than any single sealed window. \"Trade-validity calibration beyond predefined tolerances\" is unfalsifiable as written \u2014 the numeric tolerance must be committed to the experiment registry before the run, alongside the exact margin-calibration grid; if more than one margin value was tried anywhere in the pipeline, the grid size and selection rule must be disclosed or the \"calibrated only on training data\" claim is unverifiable. Finally, spread-normalizing the margin at decision time makes the gate endogenous to regime-dependent spread widening (exactly when uncertainty spikes), so validate the candidate's calibration separately across session/regime strata, not just pooled."
+      },
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.31,
+          "finished_utc": "2026-08-26T10:18:59.793900+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-26T10:18:48.488491+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T10:18:59.795901+00:00",
+        "text": "Training-calibrated margin selection can still overfit unless its candidate range and selection rule are fixed before touching the sealed holdout. \u201cTrade-validity calibration\u201d and its tolerances are undefined, making the promotion criterion unmeasurable and vulnerable to post-hoc interpretation. The proposal also omits confidence intervals, minimum sample sizes, regime-stratified results, and a forward DEMO shadow-validation period before promotion."
+      }
+    ],
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.08,
+          "finished_utc": "2026-08-26T10:16:20.064008+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-26T10:16:07.983940+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T10:16:20.068008+00:00",
+        "text": "Fifty fills per symbol is too small and regime-dependent to mandate a new baseline; medians hide tail slippage during volatile or illiquid conditions. Re-scoring only the incumbent creates selection bias, and changing promotion costs requires validation across sealed holdouts and future executions before affecting challenger comparisons. The proposal also leaves fill logging, close attribution, partial fills, and symbol/session stratification unspecified, making its claimed \u226520% bias unmeasurable."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\critiques\\hermes--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 10.96,
+          "finished_utc": "2026-08-26T10:16:31.054212+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-26T10:16:20.090248+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T10:16:31.057209+00:00",
+        "text": "The ~50 fills per symbol are a small, regime- and execution-condition-biased sample; medians lack uncertainty and ignore tail costs, fees, latency, partial fills, and spread variation. \u201cRequested versus filled\u201d prices do not by themselves isolate spread from slippage, and rescoring the sealed holdout with post-hoc realized-fill data risks holdout contamination and lookahead. Making a noisy calibration mandatory changes a governed promotion gate, so it requires registry-recorded validation, confidence bounds, an untouched out-of-sample period, and explicit authorization rather than being treated as a purely research-only change."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 58.77,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T10:17:29.833007+00:00",
+        "text": "The proposal's headline claim is untested by its own criteria: \"reduces false starts\" is never operationally defined or measured \u2014 acceptance rests on MDD and expectancy proxies, so a pass would not establish the claimed mechanism; define false start (e.g., entry followed by invalidation within N bars) and test it directly alongside the financial metrics. The decision rule is post-hoc adjustable as written: \"non-inferior\" has no pre-registered margin or test statistic, and max drawdown is a single path-dependent point estimate that needs bootstrap or subperiod decomposition, not a raw holdout comparison \u2014 precisely the vagueness where holdout overfitting enters. Double-gating mechanically shrinks the trade sample, yet no minimum-N or power analysis backs the vague \"statistically recorded trade counts,\" so underpowered non-inferiority could pass on noise, and there is no protection against iteratively re-testing variant definitions against the same sealed holdout. Safety-wise it's compliant (research-only, cost-net, no execution path), but \"MT5 DEMO-equivalent\" data must be pinned to actual recorded DEMO-feed quotes with the hypothesis and thresholds pre-registered in the ExperimentRegistry before first holdout touch, or the result is unauditable."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.37,
+          "finished_utc": "2026-08-26T10:17:42.227508+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-26T10:17:29.859662+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T10:17:42.230507+00:00",
+        "text": "\u201cValidated-state\u201d and \u201cfalse start\u201d are undefined, so the claimed improvement cannot be measured reproducibly or distinguished from simply delaying entries and missing profitable moves. A single sealed holdout is vulnerable to regime dependence and selection bias, while \u201clower maximum drawdown\u201d plus \u201cnon-inferior expectancy\u201d lacks pre-specified thresholds, power analysis, confidence intervals, and an appropriate paired statistical test. The proposal also omits adverse execution, signal-latency, skipped-trade opportunity cost, and live DEMO shadow validation, so unchanged sizing/exits do not establish that the gate is safe or robust."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-26T10:20:34.026996+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_40f434",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 6,
+      "n_proposals": 3,
+      "n_revisions": 3,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_40f434 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_d4bac6",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 90.75,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T10:12:28.150802+00:00",
+      "text": "Candidate: calibrate the promote-gate cost model against measured MT5 DEMO fills instead of relying on the static spread/slippage assumption. Hypothesis: the current fixed cost assumption misestimates true round-trip cost by \u226520% on at least one actively traded symbol, systematically biasing challenger-vs-champion EV comparisons in bot/aegis/research/promote.py. Test: log per-order realized spread and slippage (requested vs. filled price at entry and confirmed close) for the next ~50 DEMO executions per symbol, compute median realized cost, and re-score the incumbent champion's sealed-holdout economics under both the static and calibrated cost models. Falsification criterion: if median realized cost lands within \u00b110% of the modeled cost on every traded symbol, the static model is adequate and this candidate is rejected; if not, the calibrated model becomes the mandatory baseline for all future promotion decisions. This is purely a research-scoring change \u2014 it touches neither intel/intelligent_champion.json nor any execution path, and it strengthens compliance with the net-of-costs requirement rather than loosening any gate."
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.87,
+        "finished_utc": "2026-08-26T10:12:51.077465+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T10:12:39.207260+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T10:12:51.080464+00:00",
+      "text": "Test whether requiring two consecutive validated-state observations before entry reduces false starts versus the current single-observation gate. Evaluate on sealed historical MT5 DEMO-equivalent data net of configured spread and slippage, with entries, sizing, and exits otherwise unchanged. Accept only if the holdout shows lower maximum drawdown and non-inferior net expectancy with statistically recorded trade counts; otherwise reject it."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.41,
+        "finished_utc": "2026-08-26T10:15:40.402187+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-26T10:15:28.993751+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T10:15:40.404191+00:00",
+      "text": "Test whether adding a spread-normalized minimum expected-value margin before entry improves the validated-state firehose\u2019s net DEMO expectancy. Replay the sealed holdout with the current gate versus the same gate plus a margin calibrated only on training data, including spread and slippage costs. Advance the candidate only if it improves net expectancy and drawdown without reducing trade-validity calibration beyond predefined tolerances; otherwise retain the current champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 22.99,
+        "finished_utc": "2026-08-26T10:20:33.984247+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-26T10:20:10.997385+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T10:20:33.989414+00:00",
+      "text": "Pre-register the fixed margin grid, training-only selection rule, calibration metric, numeric tolerance, minimum trade count, single-use holdout budget, and all prior grid searches in the experiment registry, then evaluate the incumbent and candidate on a fresh untouched holdout. Compare net expectancy and drawdown after spread/slippage costs using paired block-bootstrap confidence intervals that respect trade overlap, with promotion requiring the minimum sample floor and predefined confidence thresholds. Assess trade-validity calibration separately across session and spread/volatility regime strata, not only in aggregate, and require every stratum to remain within the registered tolerance. If the candidate passes these tests, run a forward MT5 DEMO shadow-validation period under the same fixed rules before promotion; otherwise retain the current champion."
+    },
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 58.12,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T10:19:57.930652+00:00",
+      "text": "Revised: Reframe this as a two-phase measurement study registered in ExperimentRegistry up front, not an automatic baseline change. Phase 1 logs \u2265200 DEMO executions per traded symbol over at least four weeks spanning session (Asia/London/NY) and volatility strata; each order \u2014 including proportional attribution of partial fills and confirmed close \u2014 has its realized round-trip cost decomposed into spread (fill price vs. contemporaneous bid/ask midpoint) and slippage (midpoint vs. requested price), reported per symbol\u00d7stratum as full distributions with bootstrap confidence intervals on both median and 90th/95th-percentile tail costs, not medians alone. Falsification: if every symbol\u00d7stratum confidence interval overlaps the static modeled cost within \u00b110% for both central and tail estimates, the static model stands and the candidate is rejected; otherwise Phase 2 freezes the calibrated model and validates it strictly prospectively on a future, previously untouched execution window, re-scoring sealed-holdout economics for the incumbent and top challengers under both models to test whether net-of-cost rankings materially change out of sample. The calibrated model becomes a candidate baseline only if it shows statistically significant, out-of-sample-stable differences, and any resulting edit to promote.py's cost assumptions is then submitted for explicit operator authorization through the governed promotion process \u2014 no writes to intel/intelligent_champion.json, sealed holdouts, or any execution path occur during either phase."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d4bac6\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.02,
+        "finished_utc": "2026-08-26T10:20:10.974004+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T10:19:57.958448+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T10:20:10.976176+00:00",
+      "text": "Pre-register in ExperimentRegistry: validated state, false start (entry invalidated within 3 bars or stopped before +0.5R), and a fixed two-observation gate, using timestamped recorded MT5 DEMO-feed quotes net of configured spread, slippage, latency, and skipped-trade opportunity cost. On untouched sealed data, compare paired eligible signals with unchanged sizing and exits; require a statistically significant reduction in false-start rate, net expectancy non-inferior within a pre-specified margin, and no material degradation in adverse execution. Require a minimum pre-specified trade count and power, bootstrap confidence intervals for maximum drawdown, and consistent results across pre-defined regime subperiods. The holdout may be touched once; any variant, threshold, or failed result is recorded and requires a new sealed holdout. If accepted, validate only through read-only live MT5 DEMO shadow monitoring before any governed execution change."
+    }
+  },
+  "status": "decided"
+}

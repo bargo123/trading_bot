@@ -1,0 +1,1497 @@
+{
+  "cost_evidence": "executable_bid_ask_spread_in_labels; no synthetic slippage",
+  "dataset_hash": "e568eb9b53a7f361550fc30a85b72d5c86cc00c4aafa17f6cf9703493634ed56",
+  "decision_horizon_s": 10,
+  "execution_status": "SHADOW_ONLY_NO_POSITIVE_OOS",
+  "execution_status_reason": "test_or_sealed_oos_not_positive",
+  "feature_names": [
+    "bid",
+    "ask",
+    "mid",
+    "spread",
+    "spread_change",
+    "tick_velocity",
+    "price_acceleration",
+    "quote_age_s",
+    "hour_utc",
+    "dow_utc",
+    "symbol_bucket_00",
+    "symbol_bucket_01",
+    "symbol_bucket_02",
+    "symbol_bucket_03",
+    "symbol_bucket_04",
+    "symbol_bucket_05",
+    "symbol_bucket_06",
+    "symbol_bucket_07",
+    "symbol_bucket_08",
+    "symbol_bucket_09",
+    "symbol_bucket_10",
+    "symbol_bucket_11",
+    "symbol_bucket_12",
+    "symbol_bucket_13",
+    "symbol_bucket_14",
+    "symbol_bucket_15",
+    "symbol_bucket_16",
+    "symbol_bucket_17",
+    "symbol_bucket_18",
+    "symbol_bucket_19",
+    "symbol_bucket_20",
+    "symbol_bucket_21",
+    "symbol_bucket_22",
+    "symbol_bucket_23",
+    "symbol_bucket_24",
+    "symbol_bucket_25",
+    "symbol_bucket_26",
+    "symbol_bucket_27",
+    "symbol_bucket_28",
+    "symbol_bucket_29",
+    "symbol_bucket_30",
+    "symbol_bucket_31",
+    "session_asia_or_off",
+    "session_london",
+    "session_new_york",
+    "session_overlap",
+    "spread_percentile",
+    "micro_volatility",
+    "realized_vol_60s",
+    "spread_to_micro_vol",
+    "spread_to_realized_vol",
+    "return_5s",
+    "return_10s",
+    "return_15s",
+    "return_30s",
+    "return_60s",
+    "side_buy",
+    "horizon_s"
+  ],
+  "horizons_s": [
+    3,
+    5,
+    8,
+    10,
+    15,
+    20,
+    30,
+    45
+  ],
+  "max_uncertainty": 0.2,
+  "min_model_agreement": 0.6,
+  "models": [
+    {
+      "config_hash": "a22ea3d10091153d",
+      "feature_hash": "fbbbf46dc6821c6b",
+      "metrics": {
+        "accuracy": 0.773382777091059,
+        "brier": 0.0899093933842532,
+        "calibration_status": "calibrated_isotonic",
+        "dropped_non_finite_train_rows": 718,
+        "dropped_non_finite_validation_rows": 0,
+        "f1": 0.38097917839054585,
+        "log_loss": 0.2997634159240289,
+        "precision": 0.2773680760406424,
+        "recall": 0.6081566654689184,
+        "roc_auc": 0.7859097686873182,
+        "validation_classes": 2
+      },
+      "name": "logistic",
+      "threshold": 0.2,
+      "trained_at": "2026-08-25T05:19:14.682062+00:00"
+    },
+    {
+      "config_hash": "7faa3ff7247383ca",
+      "feature_hash": "fbbbf46dc6821c6b",
+      "metrics": {
+        "accuracy": 0.7864647713226205,
+        "brier": 0.09036767855845072,
+        "calibration_status": "calibrated_isotonic",
+        "dropped_non_finite_train_rows": 718,
+        "dropped_non_finite_validation_rows": 0,
+        "f1": 0.3744341843201159,
+        "log_loss": 0.3017269118228073,
+        "precision": 0.28192311187857855,
+        "recall": 0.5573122529644269,
+        "roc_auc": 0.7815541572647164,
+        "validation_classes": 2
+      },
+      "name": "rf",
+      "threshold": 0.2,
+      "trained_at": "2026-08-25T05:19:17.205626+00:00"
+    },
+    {
+      "config_hash": "528ac0f3c363a083",
+      "feature_hash": "fbbbf46dc6821c6b",
+      "metrics": {
+        "accuracy": 0.7788627935723115,
+        "brier": 0.09119489668622557,
+        "calibration_status": "calibrated_isotonic",
+        "dropped_non_finite_train_rows": 718,
+        "dropped_non_finite_validation_rows": 0,
+        "f1": 0.3673228810562301,
+        "log_loss": 0.30348418519067194,
+        "precision": 0.2733333333333333,
+        "recall": 0.5598275242544017,
+        "roc_auc": 0.7764784670960913,
+        "validation_classes": 2
+      },
+      "name": "gbm",
+      "threshold": 0.2,
+      "trained_at": "2026-08-25T05:20:05.014052+00:00"
+    }
+  ],
+  "oos": {
+    "sealed": {
+      "abstain_rate": 0.00016257519102584944,
+      "brier": 0.09749350825497924,
+      "calibration_bins": [
+        {
+          "actual_rate": 0.04340058065956972,
+          "lower": 0.0,
+          "n": 13433,
+          "predicted_mean": 0.04174599984279646,
+          "upper": 0.1
+        },
+        {
+          "actual_rate": 0.1470135204518227,
+          "lower": 0.1,
+          "n": 5843,
+          "predicted_mean": 0.14725441803179204,
+          "upper": 0.2
+        },
+        {
+          "actual_rate": 0.2794005588011176,
+          "lower": 0.2,
+          "n": 3937,
+          "predicted_mean": 0.2484786680794251,
+          "upper": 0.30000000000000004
+        },
+        {
+          "actual_rate": 0.3838757396449704,
+          "lower": 0.30000000000000004,
+          "n": 1352,
+          "predicted_mean": 0.3248335192501454,
+          "upper": 0.4
+        },
+        {
+          "actual_rate": 0.42105263157894735,
+          "lower": 0.4,
+          "n": 38,
+          "predicted_mean": 0.4539030330759503,
+          "upper": 0.5
+        },
+        {
+          "actual_rate": 0.0,
+          "lower": 0.5,
+          "n": 1,
+          "predicted_mean": 0.5539443443032354,
+          "upper": 0.6
+        }
+      ],
+      "calibration_ece": 0.009226157292219647,
+      "confidence_bands": {
+        "50-60%": {
+          "actual_rate": 0.0,
+          "avg_loss": -5.8671673316181647e-05,
+          "mean_terminal_return": -5.8671673316181647e-05,
+          "n": 1,
+          "tail_loss_rate": 1.0
+        },
+        "60-70%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "70-80%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "80-90%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "90-95%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "95-98%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "98-99%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "99-100%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        }
+      },
+      "confusion_matrix": {
+        "fn": 2951,
+        "fp": 172,
+        "tn": 21355,
+        "tp": 126
+      },
+      "expectancy_lcb95_return": -6.989103441775118e-06,
+      "expected_mae": -7.664429530201295e-05,
+      "expected_mfe": 3.818791946313587e-05,
+      "mean_terminal_return": -2.6673205256991394e-06,
+      "median_time_to_failure_s": 11.0,
+      "median_time_to_green_s": 5.0,
+      "n": 24604,
+      "net_terminal_return": -0.0007948615166583435,
+      "positive_rate": 0.1250609656966347,
+      "precision": 0.4228187919463087,
+      "selected": 298,
+      "tail_loss_rate": 0.5503355704697986,
+      "uncertainty_p90": 0.04586117010762073,
+      "winner_giveback_rate": 0.3053691275167785
+    },
+    "sealed_by_horizon": {
+      "10": {
+        "abstain_rate": 0.0,
+        "brier": 0.08121939665151064,
+        "calibration_bins": [
+          {
+            "actual_rate": 0.03963873557451079,
+            "lower": 0.0,
+            "n": 1993,
+            "predicted_mean": 0.03953913420161616,
+            "upper": 0.1
+          },
+          {
+            "actual_rate": 0.15352697095435686,
+            "lower": 0.1,
+            "n": 723,
+            "predicted_mean": 0.1479698017184827,
+            "upper": 0.2
+          },
+          {
+            "actual_rate": 0.29874213836477986,
+            "lower": 0.2,
+            "n": 318,
+            "predicted_mean": 0.24290171100567037,
+            "upper": 0.30000000000000004
+          },
+          {
+            "actual_rate": 0.35526315789473684,
+            "lower": 0.30000000000000004,
+            "n": 76,
+            "predicted_mean": 0.32604860790256557,
+            "upper": 0.4
+          }
+        ],
+        "calibration_ece": 0.0077793892583015575,
+        "confidence_bands": {
+          "50-60%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "60-70%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "70-80%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "80-90%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "90-95%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "95-98%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "98-99%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "99-100%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          }
+        },
+        "confusion_matrix": {
+          "fn": 309,
+          "fp": 5,
+          "tn": 2793,
+          "tp": 3
+        },
+        "expectancy_lcb95_return": -2.839384227614681e-05,
+        "expected_mae": -2.7499999999958114e-05,
+        "expected_mfe": 7.499999999993623e-06,
+        "mean_terminal_return": -6.417967374722605e-06,
+        "median_time_to_failure_s": 2.0,
+        "median_time_to_green_s": 4.0,
+        "n": 3110,
+        "net_terminal_return": -5.134373899778084e-05,
+        "positive_rate": 0.10032154340836012,
+        "precision": 0.375,
+        "selected": 8,
+        "tail_loss_rate": 0.5,
+        "uncertainty_p90": 0.032755305444788094,
+        "winner_giveback_rate": 0.0
+      },
+      "15": {
+        "abstain_rate": 0.0,
+        "brier": 0.1012453097134101,
+        "calibration_bins": [
+          {
+            "actual_rate": 0.050720461095100866,
+            "lower": 0.0,
+            "n": 1735,
+            "predicted_mean": 0.04436387480365493,
+            "upper": 0.1
+          },
+          {
+            "actual_rate": 0.1562913907284768,
+            "lower": 0.1,
+            "n": 755,
+            "predicted_mean": 0.14622457532347716,
+            "upper": 0.2
+          },
+          {
+            "actual_rate": 0.28598848368522073,
+            "lower": 0.2,
+            "n": 521,
+            "predicted_mean": 0.24577970773661523,
+            "upper": 0.30000000000000004
+          },
+          {
+            "actual_rate": 0.4392523364485981,
+            "lower": 0.30000000000000004,
+            "n": 107,
+            "predicted_mean": 0.326720033852084,
+            "upper": 0.4
+          }
+        ],
+        "calibration_ece": 0.01655511593761511,
+        "confidence_bands": {
+          "50-60%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "60-70%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "70-80%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "80-90%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "90-95%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "95-98%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "98-99%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "99-100%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          }
+        },
+        "confusion_matrix": {
+          "fn": 396,
+          "fp": 8,
+          "tn": 2708,
+          "tp": 6
+        },
+        "expectancy_lcb95_return": -2.2012300762868724e-05,
+        "expected_mae": -2.357142857142439e-05,
+        "expected_mfe": 1.785714285714882e-05,
+        "mean_terminal_return": -2.619524727030582e-06,
+        "median_time_to_failure_s": 4.5,
+        "median_time_to_green_s": 3.0,
+        "n": 3118,
+        "net_terminal_return": -3.667334617842815e-05,
+        "positive_rate": 0.12892880051314945,
+        "precision": 0.42857142857142855,
+        "selected": 14,
+        "tail_loss_rate": 0.42857142857142855,
+        "uncertainty_p90": 0.03394276511663294,
+        "winner_giveback_rate": 0.14285714285714285
+      },
+      "20": {
+        "abstain_rate": 0.0,
+        "brier": 0.12075449699035995,
+        "calibration_bins": [
+          {
+            "actual_rate": 0.06479625918503674,
+            "lower": 0.0,
+            "n": 1497,
+            "predicted_mean": 0.0468619731241325,
+            "upper": 0.1
+          },
+          {
+            "actual_rate": 0.17048346055979643,
+            "lower": 0.1,
+            "n": 786,
+            "predicted_mean": 0.1475973644241311,
+            "upper": 0.2
+          },
+          {
+            "actual_rate": 0.27884615384615385,
+            "lower": 0.2,
+            "n": 624,
+            "predicted_mean": 0.24856179248587323,
+            "upper": 0.30000000000000004
+          },
+          {
+            "actual_rate": 0.3853658536585366,
+            "lower": 0.30000000000000004,
+            "n": 205,
+            "predicted_mean": 0.31984761778047727,
+            "upper": 0.4
+          },
+          {
+            "actual_rate": 0.5,
+            "lower": 0.4,
+            "n": 6,
+            "predicted_mean": 0.4178904555524218,
+            "upper": 0.5
+          }
+        ],
+        "calibration_ece": 0.024906168988553353,
+        "confidence_bands": {
+          "50-60%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "60-70%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "70-80%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "80-90%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "90-95%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "95-98%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "98-99%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "99-100%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          }
+        },
+        "confusion_matrix": {
+          "fn": 463,
+          "fp": 25,
+          "tn": 2606,
+          "tp": 24
+        },
+        "expectancy_lcb95_return": -7.522955721810518e-06,
+        "expected_mae": -2.530612244897771e-05,
+        "expected_mfe": 2.4489795918355588e-05,
+        "mean_terminal_return": 1.4972182390903175e-06,
+        "median_time_to_failure_s": 11.0,
+        "median_time_to_green_s": 5.0,
+        "n": 3118,
+        "net_terminal_return": 7.336369371542555e-05,
+        "positive_rate": 0.15618986529826812,
+        "precision": 0.4897959183673469,
+        "selected": 49,
+        "tail_loss_rate": 0.40816326530612246,
+        "uncertainty_p90": 0.037400348073469966,
+        "winner_giveback_rate": 0.22448979591836735
+      },
+      "3": {
+        "abstain_rate": 0.0,
+        "brier": 0.04220360323055775,
+        "calibration_bins": [
+          {
+            "actual_rate": 0.017366136034732273,
+            "lower": 0.0,
+            "n": 2073,
+            "predicted_mean": 0.03694137725773045,
+            "upper": 0.1
+          },
+          {
+            "actual_rate": 0.08603896103896104,
+            "lower": 0.1,
+            "n": 616,
+            "predicted_mean": 0.1431690340470864,
+            "upper": 0.2
+          },
+          {
+            "actual_rate": 0.20812182741116753,
+            "lower": 0.2,
+            "n": 197,
+            "predicted_mean": 0.23974596481401592,
+            "upper": 0.30000000000000004
+          },
+          {
+            "actual_rate": 0.22727272727272727,
+            "lower": 0.30000000000000004,
+            "n": 22,
+            "predicted_mean": 0.3217104440834802,
+            "upper": 0.4
+          }
+        ],
+        "calibration_ece": 0.028913062196175426,
+        "confidence_bands": {
+          "50-60%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "60-70%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "70-80%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "80-90%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "90-95%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "95-98%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "98-99%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "99-100%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          }
+        },
+        "confusion_matrix": {
+          "fn": 135,
+          "fp": 1,
+          "tn": 2772,
+          "tp": 0
+        },
+        "expectancy_lcb95_return": null,
+        "expected_mae": -5.0000000000105516e-05,
+        "expected_mfe": -2.0000000000131024e-05,
+        "mean_terminal_return": -3.666979582265424e-05,
+        "median_time_to_failure_s": 2.0,
+        "median_time_to_green_s": null,
+        "n": 2908,
+        "net_terminal_return": -3.666979582265424e-05,
+        "positive_rate": 0.04642365887207703,
+        "precision": 0.0,
+        "selected": 1,
+        "tail_loss_rate": 1.0,
+        "uncertainty_p90": 0.038569167166385546,
+        "winner_giveback_rate": 0.0
+      },
+      "30": {
+        "abstain_rate": 0.0,
+        "brier": 0.13973386085339587,
+        "calibration_bins": [
+          {
+            "actual_rate": 0.07078039927404718,
+            "lower": 0.0,
+            "n": 1102,
+            "predicted_mean": 0.049070694282508744,
+            "upper": 0.1
+          },
+          {
+            "actual_rate": 0.1664804469273743,
+            "lower": 0.1,
+            "n": 895,
+            "predicted_mean": 0.14801165657731324,
+            "upper": 0.2
+          },
+          {
+            "actual_rate": 0.29064039408866993,
+            "lower": 0.2,
+            "n": 812,
+            "predicted_mean": 0.25638557483160196,
+            "upper": 0.30000000000000004
+          },
+          {
+            "actual_rate": 0.3795379537953795,
+            "lower": 0.30000000000000004,
+            "n": 303,
+            "predicted_mean": 0.32319448901449727,
+            "upper": 0.4
+          },
+          {
+            "actual_rate": 0.3333333333333333,
+            "lower": 0.4,
+            "n": 6,
+            "predicted_mean": 0.42149775546095786,
+            "upper": 0.5
+          }
+        ],
+        "calibration_ece": 0.027539971732550437,
+        "confidence_bands": {
+          "50-60%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "60-70%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "70-80%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "80-90%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "90-95%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "95-98%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "98-99%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "99-100%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          }
+        },
+        "confusion_matrix": {
+          "fn": 553,
+          "fp": 36,
+          "tn": 2502,
+          "tp": 27
+        },
+        "expectancy_lcb95_return": -1.0954565996339282e-05,
+        "expected_mae": -3.5714285714287065e-05,
+        "expected_mfe": 2.8095238095235352e-05,
+        "mean_terminal_return": -2.6778938710123693e-06,
+        "median_time_to_failure_s": 11.0,
+        "median_time_to_green_s": 5.0,
+        "n": 3118,
+        "net_terminal_return": -0.00016870731387377927,
+        "positive_rate": 0.1860166773572803,
+        "precision": 0.42857142857142855,
+        "selected": 63,
+        "tail_loss_rate": 0.5714285714285714,
+        "uncertainty_p90": 0.04440295303962129,
+        "winner_giveback_rate": 0.3492063492063492
+      },
+      "45": {
+        "abstain_rate": 0.0012828736369467607,
+        "brier": 0.1591322281184052,
+        "calibration_bins": [
+          {
+            "actual_rate": 0.0984759671746776,
+            "lower": 0.0,
+            "n": 853,
+            "predicted_mean": 0.05322980007990029,
+            "upper": 0.1
+          },
+          {
+            "actual_rate": 0.1522633744855967,
+            "lower": 0.1,
+            "n": 729,
+            "predicted_mean": 0.1527041979683389,
+            "upper": 0.2
+          },
+          {
+            "actual_rate": 0.2683937823834197,
+            "lower": 0.2,
+            "n": 965,
+            "predicted_mean": 0.2521106481986052,
+            "upper": 0.30000000000000004
+          },
+          {
+            "actual_rate": 0.3915441176470588,
+            "lower": 0.30000000000000004,
+            "n": 544,
+            "predicted_mean": 0.3278042085542056,
+            "upper": 0.4
+          },
+          {
+            "actual_rate": 0.4230769230769231,
+            "lower": 0.4,
+            "n": 26,
+            "predicted_mean": 0.46969176887714753,
+            "upper": 0.5
+          },
+          {
+            "actual_rate": 0.0,
+            "lower": 0.5,
+            "n": 1,
+            "predicted_mean": 0.5539443443032354,
+            "upper": 0.6
+          }
+        ],
+        "calibration_ece": 0.02920782752428844,
+        "confidence_bands": {
+          "50-60%": {
+            "actual_rate": 0.0,
+            "avg_loss": -5.8671673316181647e-05,
+            "mean_terminal_return": -5.8671673316181647e-05,
+            "n": 1,
+            "tail_loss_rate": 1.0
+          },
+          "60-70%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "70-80%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "80-90%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "90-95%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "95-98%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "98-99%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "99-100%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          }
+        },
+        "confusion_matrix": {
+          "fn": 616,
+          "fp": 93,
+          "tn": 2347,
+          "tp": 62
+        },
+        "expectancy_lcb95_return": -1.0326157919121287e-05,
+        "expected_mae": -0.00012006451612903451,
+        "expected_mfe": 5.1677419354937304e-05,
+        "mean_terminal_return": -3.6612702901428517e-06,
+        "median_time_to_failure_s": 11.5,
+        "median_time_to_green_s": 5.0,
+        "n": 3118,
+        "net_terminal_return": -0.000567496894972142,
+        "positive_rate": 0.21744708146247593,
+        "precision": 0.4,
+        "selected": 155,
+        "tail_loss_rate": 0.6064516129032258,
+        "uncertainty_p90": 0.0691260141433275,
+        "winner_giveback_rate": 0.36129032258064514
+      },
+      "5": {
+        "abstain_rate": 0.0,
+        "brier": 0.054694519569539975,
+        "calibration_bins": [
+          {
+            "actual_rate": 0.021687883074021686,
+            "lower": 0.0,
+            "n": 2121,
+            "predicted_mean": 0.03704744536274752,
+            "upper": 0.1
+          },
+          {
+            "actual_rate": 0.12232415902140673,
+            "lower": 0.1,
+            "n": 654,
+            "predicted_mean": 0.14450225040729792,
+            "upper": 0.2
+          },
+          {
+            "actual_rate": 0.27230046948356806,
+            "lower": 0.2,
+            "n": 213,
+            "predicted_mean": 0.23949215933639986,
+            "upper": 0.30000000000000004
+          },
+          {
+            "actual_rate": 0.34375,
+            "lower": 0.30000000000000004,
+            "n": 32,
+            "predicted_mean": 0.3202963605392509,
+            "upper": 0.4
+          }
+        ],
+        "calibration_ece": 0.018152579438692428,
+        "confidence_bands": {
+          "50-60%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "60-70%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "70-80%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "80-90%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "90-95%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "95-98%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "98-99%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "99-100%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          }
+        },
+        "confusion_matrix": {
+          "fn": 194,
+          "fp": 1,
+          "tn": 2824,
+          "tp": 1
+        },
+        "expectancy_lcb95_return": -7.187279981240231e-05,
+        "expected_mae": -1.4999999999987246e-05,
+        "expected_mfe": 1.4999999999987246e-05,
+        "mean_terminal_return": 0.0,
+        "median_time_to_failure_s": 2.0,
+        "median_time_to_green_s": 1.0,
+        "n": 3020,
+        "net_terminal_return": 0.0,
+        "positive_rate": 0.06456953642384106,
+        "precision": 0.5,
+        "selected": 2,
+        "tail_loss_rate": 0.5,
+        "uncertainty_p90": 0.039223783181140476,
+        "winner_giveback_rate": 0.0
+      },
+      "8": {
+        "abstain_rate": 0.0,
+        "brier": 0.0756860256976108,
+        "calibration_bins": [
+          {
+            "actual_rate": 0.036425449247207385,
+            "lower": 0.0,
+            "n": 2059,
+            "predicted_mean": 0.03895618923562593,
+            "upper": 0.1
+          },
+          {
+            "actual_rate": 0.15036496350364964,
+            "lower": 0.1,
+            "n": 685,
+            "predicted_mean": 0.14675317578936214,
+            "upper": 0.2
+          },
+          {
+            "actual_rate": 0.30662020905923343,
+            "lower": 0.2,
+            "n": 287,
+            "predicted_mean": 0.23745762580140334,
+            "upper": 0.30000000000000004
+          },
+          {
+            "actual_rate": 0.3492063492063492,
+            "lower": 0.30000000000000004,
+            "n": 63,
+            "predicted_mean": 0.32201405756282014,
+            "upper": 0.4
+          }
+        ],
+        "calibration_ece": 0.009453020035223105,
+        "confidence_bands": {
+          "50-60%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "60-70%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "70-80%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "80-90%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "90-95%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "95-98%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "98-99%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          },
+          "99-100%": {
+            "actual_rate": null,
+            "avg_loss": null,
+            "mean_terminal_return": null,
+            "n": 0,
+            "tail_loss_rate": null
+          }
+        },
+        "confusion_matrix": {
+          "fn": 285,
+          "fp": 3,
+          "tn": 2803,
+          "tp": 3
+        },
+        "expectancy_lcb95_return": -2.650876629924634e-05,
+        "expected_mae": -1.8333333333305408e-05,
+        "expected_mfe": 1.3333333333346667e-05,
+        "mean_terminal_return": -1.2223534214974697e-06,
+        "median_time_to_failure_s": 4.5,
+        "median_time_to_green_s": 4.0,
+        "n": 3094,
+        "net_terminal_return": -7.334120528984818e-06,
+        "positive_rate": 0.09308338720103426,
+        "precision": 0.5,
+        "selected": 6,
+        "tail_loss_rate": 0.3333333333333333,
+        "uncertainty_p90": 0.03377350850362211,
+        "winner_giveback_rate": 0.0
+      }
+    },
+    "test": {
+      "abstain_rate": 0.0005906907143419705,
+      "brier": 0.09572723547654037,
+      "calibration_bins": [
+        {
+          "actual_rate": 0.04625801853171775,
+          "lower": 0.0,
+          "n": 14030,
+          "predicted_mean": 0.04268602849467048,
+          "upper": 0.1
+        },
+        {
+          "actual_rate": 0.14152542372881355,
+          "lower": 0.1,
+          "n": 5900,
+          "predicted_mean": 0.1461120860591392,
+          "upper": 0.2
+        },
+        {
+          "actual_rate": 0.2600816743236345,
+          "lower": 0.2,
+          "n": 3918,
+          "predicted_mean": 0.24839880823067592,
+          "upper": 0.30000000000000004
+        },
+        {
+          "actual_rate": 0.35588633288227334,
+          "lower": 0.30000000000000004,
+          "n": 1478,
+          "predicted_mean": 0.3275798131459897,
+          "upper": 0.4
+        },
+        {
+          "actual_rate": 0.35294117647058826,
+          "lower": 0.4,
+          "n": 51,
+          "predicted_mean": 0.4353262460251852,
+          "upper": 0.5
+        },
+        {
+          "actual_rate": 0.2857142857142857,
+          "lower": 0.5,
+          "n": 14,
+          "predicted_mean": 0.5521759143313353,
+          "upper": 0.6
+        },
+        {
+          "actual_rate": 0.0,
+          "lower": 0.6000000000000001,
+          "n": 3,
+          "predicted_mean": 0.6874545204431102,
+          "upper": 0.7000000000000001
+        }
+      ],
+      "calibration_ece": 0.00688277933371607,
+      "confidence_bands": {
+        "50-60%": {
+          "actual_rate": 0.2857142857142857,
+          "avg_loss": -2.474733293531976e-05,
+          "mean_terminal_return": -6.808487925627809e-06,
+          "n": 14,
+          "tail_loss_rate": 0.21428571428571427
+        },
+        "60-70%": {
+          "actual_rate": 0.0,
+          "avg_loss": -3.6663880229591606e-05,
+          "mean_terminal_return": -2.4442586819727736e-05,
+          "n": 3,
+          "tail_loss_rate": 0.3333333333333333
+        },
+        "70-80%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "80-90%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "90-95%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "95-98%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "98-99%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "99-100%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        }
+      },
+      "confusion_matrix": {
+        "fn": 2904,
+        "fp": 202,
+        "tn": 22141,
+        "tp": 147
+      },
+      "expectancy_lcb95_return": -5.919779227433508e-06,
+      "expected_mae": -8.76790830945634e-05,
+      "expected_mfe": 6.538681948425136e-05,
+      "mean_terminal_return": -1.4802975748210154e-06,
+      "median_time_to_failure_s": 9.0,
+      "median_time_to_green_s": 5.0,
+      "n": 25394,
+      "net_terminal_return": -0.0005166238536125344,
+      "positive_rate": 0.12014649129715681,
+      "precision": 0.42120343839541546,
+      "selected": 349,
+      "tail_loss_rate": 0.44412607449856734,
+      "uncertainty_p90": 0.04669541910150938,
+      "winner_giveback_rate": 0.2808022922636103
+    },
+    "validation": {
+      "abstain_rate": 0.0,
+      "brier": 0.08964350498055178,
+      "calibration_bins": [
+        {
+          "actual_rate": 0.037195210979705066,
+          "lower": 0.0,
+          "n": 27396,
+          "predicted_mean": 0.03981148389471835,
+          "upper": 0.1
+        },
+        {
+          "actual_rate": 0.1334682470848993,
+          "lower": 0.1,
+          "n": 10377,
+          "predicted_mean": 0.1461564351013561,
+          "upper": 0.2
+        },
+        {
+          "actual_rate": 0.2594850948509485,
+          "lower": 0.2,
+          "n": 7380,
+          "predicted_mean": 0.24932286940190343,
+          "upper": 0.30000000000000004
+        },
+        {
+          "actual_rate": 0.36537885594489367,
+          "lower": 0.30000000000000004,
+          "n": 3339,
+          "predicted_mean": 0.3287267266285263,
+          "upper": 0.4
+        },
+        {
+          "actual_rate": 0.5227272727272727,
+          "lower": 0.4,
+          "n": 44,
+          "predicted_mean": 0.42762662943831864,
+          "upper": 0.5
+        },
+        {
+          "actual_rate": 1.0,
+          "lower": 0.5,
+          "n": 4,
+          "predicted_mean": 0.5555930198852441,
+          "upper": 0.6
+        }
+      ],
+      "calibration_ece": 0.00837827522976828,
+      "confidence_bands": {
+        "50-60%": {
+          "actual_rate": 1.0,
+          "avg_loss": null,
+          "mean_terminal_return": 4.949228666330743e-05,
+          "n": 4,
+          "tail_loss_rate": 0.0
+        },
+        "60-70%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "70-80%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "80-90%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "90-95%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "95-98%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "98-99%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        },
+        "99-100%": {
+          "actual_rate": null,
+          "avg_loss": null,
+          "mean_terminal_return": null,
+          "n": 0,
+          "tail_loss_rate": null
+        }
+      },
+      "confusion_matrix": {
+        "fn": 5249,
+        "fp": 423,
+        "tn": 42551,
+        "tp": 317
+      },
+      "expectancy_lcb95_return": -3.6192275879161866e-06,
+      "expected_mae": -2.9905405405410033e-05,
+      "expected_mfe": 2.6972972972976393e-05,
+      "mean_terminal_return": -8.757342916159245e-07,
+      "median_time_to_failure_s": 11.0,
+      "median_time_to_green_s": 5.0,
+      "n": 48540,
+      "net_terminal_return": -0.0006480433757957841,
+      "positive_rate": 0.11466831479192419,
+      "precision": 0.4283783783783784,
+      "selected": 740,
+      "tail_loss_rate": 0.40675675675675677,
+      "winner_giveback_rate": 0.34054054054054056
+    }
+  },
+  "schema": "short_horizon_ensemble.v1",
+  "symbols": [
+    "AUDCAD",
+    "AUDCHF",
+    "AUDJPY",
+    "AUDNZD",
+    "AUDSGD",
+    "AUDUSD",
+    "CADCHF",
+    "CADJPY",
+    "EURAUD",
+    "EURCAD",
+    "EURCHF",
+    "EURGBP",
+    "EURJPY",
+    "EURNZD",
+    "EURUSD",
+    "GBPAUD",
+    "GBPCAD",
+    "GBPCHF",
+    "GBPJPY",
+    "GBPNZD",
+    "GBPUSD",
+    "NZDJPY",
+    "NZDUSD",
+    "USDCAD",
+    "USDCHF",
+    "USDJPY"
+  ],
+  "target_definition": "terminal_profit",
+  "threshold": 0.34405976230606555,
+  "trained_at": "2026-08-25T05:20:19.340147+00:00",
+  "validation_hash": "cc6475967e455ff2d4d600927eb07e6bd18622661533d6f46970bd637b08ff56"
+}

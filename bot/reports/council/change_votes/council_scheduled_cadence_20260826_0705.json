@@ -1,0 +1,116 @@
+{
+  "change_id": "council_scheduled_cadence_20260826_0705",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-26T07:07:48.300244+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260826_0705",
+    "current_evidence": "Candidate improvement: replace the validated-state gate's static validation window with a rolling walk-forward revalidation aligned to each candidate's own horizon, evaluated strictly as an offline replay over existing records (bot/research/sealed_holdouts.jsonl, ExperimentRegistry, outcome logs) be",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate improvement: replace the validated-state gate's static validation window with a rolling walk-forward revalidation aligned to each candidate's own horizon, evaluated strictly as an offline replay over existing records (bot/research/sealed_holdouts.jsonl, ExperimentRegistry, outcome logs) before any champion change. Hypothesis: a meaningful fraction of gate rejections are candidates whose edge decays within days rather than being absent, so a decay-aware recheck would raise net-of-cost e",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T07:05:40.459108+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Sealed-holdout reuse: walk-forward replay over sealed_holdouts.jsonl erodes seal integrity; any window already consumed by a prior reject/promote decision cannot serve as independent evidence for a later one",
+        "Multiple-testing inflation: repeated rechecks of rejected candidates degrade effective significance with no stated correction (no deflated-Sharpe / White reality check / familywise-error control)",
+        "Zero supporting evidence in the proposal: current_evidence shows PF=None, EV=None and the decay-fraction claim ('meaningful fraction') is unquantified \u2014 the hypothesis should be measured from outcome logs BEFORE the gate is modified",
+        "Gate-weakening risk: a decay-aware recheck is semantically a looser rejection criterion; champion promotion must remain exclusively via research_promote_champion.py / promote.py with all gates passing, and a flipped decision must carry registry lineage to the original rejection",
+        "Lookahead exposure: replay must be point-in-time strict (replay clock, features computed only from data available at each replay timestamp); nothing in the proposal states how this is enforced or tested",
+        "Cost fidelity unspecified: outcomes must be net of the runner's actual spread/slippage assumptions per AGENTS.md rule 6; the replay cost model is not defined",
+        "Scope ambiguity in bot/intel/: proposal must confirm runtime intel components remain read-only with respect to broker positions and gain no order capability",
+        "Falsification criterion covers exploration trades but not the offline phase; there is no stated kill-condition for the replay itself"
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "The core hypothesis (short-horizon edge decay masquerading as gate rejection) is plausible and worth testing, and the proposed mechanism is offline-only over existing records with no execution-path or config impact, so no safety violation is apparent. However, as written the design has two methodological defects that would corrupt gate integrity if shipped: (1) rolling revalidation replayed against the same sealed_holdouts.jsonl records converts the sealed holdout into a reusable selection dataset, which is textbook holdout erosion \u2014 repeated looks inflate false-positive promotions; and (2) 'PF=None, EV=None' means no evidence exists yet that decay-driven rejections are a meaningful fraction at all. The change also functionally weakens the validated-state gate (a second look that flips rejections to acceptances), so it must be framed and implemented as generating a NEW challenger evaluation through the governed promote path, not as a direct state flip.",
+      "requested_revisions": [
+        "Phase 0 measurement study: quantify from ExperimentRegistry/outcome logs what fraction of gate rejections exhibit decay-vs-absent-edge profiles; report the number and only proceed if it clears a pre-stated minimum fraction",
+        "Holdout hygiene rule: revalidation may only score windows never previously consumed by any decision for that candidate; fitting uses pre-window data, scoring uses untouched post-rejection data; document per-candidate window consumption in the registry",
+        "Multiple-testing control: apply an explicit correction (e.g., deflated Sharpe, White's reality check, or Bonferroni-style alpha adjustment across repeated looks) and state the adjusted threshold",
+        "Governance framing: revalidation output may only mint a new challenger evaluation through the standard promote path; validated-state can never be flipped in place; every replay recorded in ExperimentRegistry with lineage to the original rejection experiment id",
+        "Point-in-time enforcement: implement a replay-clock guard plus a dedicated leakage regression test proving features never access post-timestamp label data",
+        "Specify the exact net-of-cost model (spread/slippage matching the runner config) used inside the replay and require costed expectancy in all reported metrics",
+        "Concrete test plan: unit tests for horizon alignment arithmetic, leakage regression test, registry-integration test, and a test that a failing replay leaves validated state untouched",
+        "Add an offline-phase falsification criterion: e.g., abandon the approach if revalidated candidates show no statistically significant net-of-cost expectancy uplift on untouched windows",
+        "Explicit statement that all bot/intel/ and bot/ai_council/ changes preserve read-only research constraints (no mt5.order_send() reachable from any touched code path)"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Candidate-specific horizon selection can introduce selection bias or lookahead.",
+        "The proposed gate change may weaken validated-state requirements without predefined acceptance thresholds.",
+        "PF/EV are currently absent, so expected benefit is unsubstantiated.",
+        "Falsification based on exploration trades conflicts with the stated strictly offline replay scope."
+      ],
+      "confidence": 0.86,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "Offline, costed rolling walk-forward revalidation is compatible with research-only governance, but the proposal lacks a precise leakage-safe protocol and promotion safeguards.",
+      "requested_revisions": [
+        "Specify horizon selection, rolling folds, embargo/purge rules, minimum sample sizes, and net-cost metrics before evaluation.",
+        "Pre-register fixed pass/fail thresholds versus the current static gate using sealed holdouts only.",
+        "Require no champion promotion unless existing governed promotion gates also pass unchanged.",
+        "Replace exploration-trade falsification with offline OOS falsification criteria; keep any DEMO observation separate and read-only for research components.",
+        "Add tests proving no future records, outcome labels, or post-window registry data enter each fold."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Affected files are too broad and do not identify the exact gate or implementation path.",
+        "The expected mechanism and success metrics are incomplete, including the truncated net-of-cost expectancy claim.",
+        "No baseline comparison, sample-size requirement, statistical criteria, or per-candidate horizon definition is provided.",
+        "The rollback statement does not explain how to prevent changes to intelligent_champion.json or other runtime artifacts.",
+        "The falsification criterion mentions exploration trades despite the proposal being described as offline-only.",
+        "No explicit confirmation that ExperimentRegistry records the replay, configuration, datasets, and failure status is included."
+      ],
+      "confidence": 0.94,
+      "model": null,
+      "reason": "The proposal is plausibly safe as an offline research experiment, but evidence, scope, and safeguards are insufficiently specified. A rolling walk-forward gate could affect candidate promotion or downstream DEMO exploration unless isolation and governance are explicit.",
+      "requested_revisions": [
+        "Specify exact files, functions, and an offline-only execution path with no MT5 order capability.",
+        "Define candidate horizon alignment, rolling-window parameters, minimum sample sizes, costs, and no-lookahead rules.",
+        "Provide baseline versus revised gate metrics and predefine quantitative promotion/rejection thresholds with uncertainty reporting.",
+        "Require ExperimentRegistry registration and immutable input snapshots for every replay.",
+        "Add an explicit hard gate preventing champion writes and runtime deployment until separately approved by the governed promotion process.",
+        "Clarify that the experiment produces no exploration trades; if trades are later enabled, submit a separate proposal with risk and execution controls.",
+        "Define a tested rollback procedure and run the required lifecycle and OOS validation tests with before/after pass counts."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

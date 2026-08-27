@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal with testable assumptions or measurable outcomes. It provides no validation plan, risk controls, or evidence that the referenced model is available or appropriate for the council.

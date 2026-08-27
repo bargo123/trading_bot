@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T09:03:13.334561+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a7c1a3\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 44.07,
+          "finished_utc": "2026-08-23T09:07:48.193823+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T09:07:04.123632+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T09:07:48.193823+00:00",
+        "text": "Accepting on a single \u226510% expectancy-per-signal delta with no confidence interval, minimum sample size, or significance test means you'd promote noise as readily as edge \u2014 and per-signal expectancy is trivially gamed: culling the worst 20% of trades mechanically raises it while total net PnL falls, so aggregate outcome and drawdown/tail behavior must be gated too. Every challenger evaluated against the same sealed holdout burns it through multiple testing; the 10%/20% thresholds must be pre-registered in the registry *before* unsealing, with an explicit budget on holdout reuses, or this is holdout-fitting dressed as governance. The persistence filter also silently shifts entry timing by one bar, changing both the traded population and realized spread/slippage exposure, so \"same period and cost assumptions\" does not make the comparison apples-to-apples unless entries are re-timestamped and re-costed. Finally, the proposal reads as if the holdout delta alone decides promotion \u2014 clarify that all standard `promote.py` gates (walk-forward stability, regime slices, cost-adjusted EV) still apply rather than being bypassed by this bespoke rule."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a7c1a3\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 14.55,
+          "finished_utc": "2026-08-23T09:07:04.107672+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T09:06:49.561804+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T09:07:04.107672+00:00",
+        "text": "The \u201cpre-registration\u201d is incomplete: breakeven timing, trailing distance, symbols, regimes, sampling window, cost model, and adaptation rules are unspecified, allowing post-hoc tuning and overfitting to the observed exit labels. A \u2265300-trade holdout may still be temporally or instrumentally correlated, and \u201cbootstrap p05 > 0,\u201d \u201cwin rate not collapsing below ~55%,\u201d and the expectancy/payoff gates are ambiguous without a predefined test, confidence level, multiplicity control, and power analysis. \u201cDemo-only\u201d and \u201cno live config edits\u201d are asserted rather than technically enforced, so the proposal needs an explicit path-level safety check preventing the challenger from reaching live YAML, order placement, or champion promotion."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T09:08:44.954444+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_2fc335",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_2fc335 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_a7c1a3",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a7c1a3\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 89.89,
+        "finished_utc": "2026-08-23T09:05:46.972230+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T09:04:17.080562+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T09:05:46.972230+00:00",
+      "text": "**Proposal:** Run one pre-registered demo-only exit experiment targeting the measured payoff asymmetry: realized trades show PF 0.751 with avg_win 0.049 vs avg_loss \u22120.142 (payoff ratio ~0.34), while tp-exits carry +0.09 expectancy and sl-exits \u22120.50, and quick_win flattens (1,383) plus never_green flattens (1,288) dominate closes \u2014 so replace the quick-win/never-green flatten with a trailing-stop-after-breakeven exit (let winners extend toward TP, keep SL unchanged) as a challenger strategy spec in `bot/research/strategies/`. Falsifiable success gate: on a sealed holdout of \u2265300 closed demo round-trips net of runner costs, expectancy must flip from \u22120.012 to >0 with bootstrap p05 > 0 and payoff ratio \u22650.6 without win rate collapsing below ~55%; if it fails, the challenger is rejected and recorded per the promote gates (`bot/aegis/research/promote.py`). This directly tests the classic \"cut losses short, let profits run\" prescription (*Technical Analysis of Stock Trends*) and follows the falsification discipline of *Evidence-Based Technical Analysis* (Aronson); no champion change, no live config edits, no order flow outside the existing research/demo sandbox."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a7c1a3\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.07,
+        "finished_utc": "2026-08-23T09:06:23.575220+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T09:06:11.509619+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T09:06:23.575220+00:00",
+      "text": "Test a two-consecutive-bar persistence requirement for the validated-state gate in a registry-recorded, read-only shadow experiment. Using the same symbols, period, and spread/slippage assumptions, accept it only if the sealed holdout improves net expectancy per signal by at least 10% while reducing signal count by no more than 20%. Otherwise, reject the challenger and leave the champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a7c1a3\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 14.46,
+        "finished_utc": "2026-08-23T09:08:44.922700+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T09:08:30.465644+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T09:08:44.922700+00:00",
+      "text": "Test the two-consecutive-bar persistence requirement in a registry-recorded, read-only shadow experiment, pre-registering before unsealing the sealed holdout the minimum sample size, confidence level, significance test, 10% expectancy threshold, 20% signal-count limit, and a strict holdout-reuse budget. Re-timestamp entries to the persistence-confirmed bar and recompute spread/slippage and all outcomes so the comparison reflects the actual traded population and exposure. Accept the challenger only if the pre-specified statistical test supports at least a 10% improvement in net expectancy per signal, while aggregate net PnL is non-inferior or improved, signal count declines no more than 20%, and drawdown and tail-risk metrics remain within pre-registered limits. Promotion additionally requires every standard `promote.py` gate\u2014including walk-forward stability, regime-slice robustness, and cost-adjusted expected value\u2014to pass; otherwise reject the challenger and leave the champion unchanged."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a7c1a3\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 42.23,
+        "finished_utc": "2026-08-23T09:08:30.449544+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T09:07:48.217438+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T09:08:30.449544+00:00",
+      "text": "**Proposal:** Run one pre-registered demo-only exit experiment: on a frozen symbol set (EURUSD, XAUUSD) and regime band (ATR-percentile 20\u201380) over a fixed sampling window, replace quick-win/never-green flattens with a trailing stop that arms at +0.8R breakeven and trails 1.0\u00d7ATR(14) behind the extreme close, SL unchanged \u2014 all parameters, window bounds, cost model (runner-recorded spread/slippage per fill), and adaptation rules (any post-hoc change voids the run and is logged as a separate rejected variant) committed to a spec in `bot/research/strategies/` before any holdout is touched. The single primary endpoint, declared ex ante with no multiplicity: net-of-cost expectancy > 0 on \u2265300 sealed holdout round-trips, tested at two-sided \u03b1=0.05 via a one-day stationary block bootstrap (p05 > 0), jointly requiring payoff ratio \u2265 0.6 and win rate \u2265 55%, with a pre-unsealing power check confirming n\u2248300 gives ~80% power for \u0394expectancy \u2248 0.05 given realized exit variance. Holdout integrity is enforced structurally: chronological split with a \u226530-day embargo gap and per-symbol stratification so temporally/instrumentally correlated trades cannot leak between dev and holdout. \"Demo-only\" is technically enforced rather than asserted \u2014 the experiment runner whitelists writes to `bot/research/strategies/`, `bot/research/sealed_holdouts.jsonl`, and `bot/reports/research/`, asserts against the `PROTECTED_LIVE_YAML` list, uses MT5 strictly read-only, and leaves champion promotion impossible unless every gate in `bot/aegis/research/promote.py` passes plus explicit human approval. Failure flips nothing: the challenger and its full metrics are recorded as rejected via `ExperimentRegistry` and the sealed-holdout log, keeping the falsification discipline of Aronson's *Evidence-Based Technical Analysis* while testing the *Technical Analysis of Stock Trends* \"let profits run\" prescription."
+    }
+  },
+  "status": "decided"
+}

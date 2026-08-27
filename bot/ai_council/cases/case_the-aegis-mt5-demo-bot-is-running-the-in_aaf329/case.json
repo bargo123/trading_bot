@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-22T20:31:50.164437+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aaf329\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 26.75,
+          "finished_utc": "2026-08-22T20:40:55.929819+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T20:40:29.177854+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T20:40:55.933649+00:00",
+        "text": "Two free parameters (10-bar window, 20th/80th bounds) are asserted without justification or sensitivity analysis, and any iteration after touching the holdout\u2014re-tuning percentiles and re-testing\u2014burns the seal, turning your \"validation\" into selection on the test set. \"Improve\" is unmeasurable as stated: no minimum effect size, no significance test, and no accounting for the reduced sample size when the filter drops trades\u2014a profit-factor delta on 30 filtered trades is noise. Reusing \"the same sealed holdout\" across repeated challenger evaluations means it is no longer sealed; you need fresh untouched data or nested walk-forward before holdout contact. Finally, \"accept it for further consideration\" is governance-vague\u2014if that path bypasses the full `promote.py` gate chain, this proposal is structurally unsafe regardless of its numbers."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aaf329\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 10.64,
+          "finished_utc": "2026-08-22T20:40:29.147884+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T20:40:18.509535+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T20:40:29.147884+00:00",
+        "text": "The proposal risks severe selection and lookahead bias by deriving `validated_states.json` from the same survivor strategies and `validated_opportunities` whose unusually strong metrics motivate the test. \u201cFill-rate improves\u201d lacks a predefined threshold, sample size, time horizon, cost model, and out-of-sample or sealed-holdout comparison; moreover, testing only whether expectancy turns negative is far too weak to establish benefit. It also omits registry requirements, baseline tests, leakage checks, and explicit confirmation that only research artifacts\u2014not protected live YAML or runtime gating\u2014will be modified."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T20:41:44.082439+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_249619",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_249619 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_aaf329",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aaf329\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 434.48,
+        "finished_utc": "2026-08-22T20:39:19.999651+00:00",
+        "mode": "REAL",
+        "model": "opencode/nemotron-3.5-lightning-free",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T20:32:05.517246+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T20:39:19.999651+00:00",
+      "text": "In the next research cycle, execute the ml_pipeline to populate `validated_states.json` from the survivor strategies underlying the current `validated_opportunities` (GBPUSD trend/asia/buy, expectancy_validate=1.824, PF_validate=3.027, win_rate_validate=72.7%). Measure firehose fill\u2011rate and net expectancy with the validated\u2011state gate active versus the current all\u2011blocked state. Falsify if fill\u2011rate does not improve or net expectancy turns negative, indicating the gate without populated states degrades economics. If supported, incrementally expand the allowlist from subsequent survivor strategies in following cycles."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aaf329\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.0,
+        "finished_utc": "2026-08-22T20:39:52.668960+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T20:39:40.669438+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T20:39:52.668960+00:00",
+      "text": "Test a challenger that adds a 10-bar realized-volatility regime filter, permitting existing validated-state entries only when volatility is between the instrument\u2019s rolling 20th and 80th percentiles. Register the experiment and evaluate it on the same sealed holdout with identical spread/slippage assumptions. Accept it for further consideration only if net expectancy and profit factor improve while maximum drawdown does not worsen; otherwise reject and retain the current champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aaf329\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.32,
+        "finished_utc": "2026-08-22T20:41:44.050320+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T20:41:32.725660+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T20:41:44.050320+00:00",
+      "text": "Pre-register the 10-bar realized-volatility window and 20th/80th-percentile bounds from training data and test a fixed sensitivity grid exclusively through nested walk-forward analysis, selecting the challenger before any sealed-holdout contact. Evaluate the frozen challenger once on fresh untouched holdout data under identical spread/slippage assumptions, with minimum trade-count and coverage thresholds, predefined economically meaningful improvements in net expectancy and profit factor, a non-inferiority margin for maximum drawdown, and uncertainty assessed by an appropriate bootstrap test. Register every specification, selection step, result, and failure in `ExperimentRegistry`; after holdout exposure, prohibit parameter iteration unless a new untouched holdout is reserved. Promotion may occur only through the complete `promote.py` gate chain and its authorized promotion script; otherwise retain the current champion and archive the challenger and holdout result."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aaf329\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 36.75,
+        "finished_utc": "2026-08-22T20:41:32.709951+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T20:40:55.961624+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T20:41:32.709951+00:00",
+      "text": "Revised proposal: In the next research cycle, first register the experiment via `ExperimentRegistry` and confirm the baseline pytest suite stays green, then run ml_pipeline to populate `validated_states.json` from an earlier, pre-registered survivor cohort\u2014not the same strategies whose metrics motivate the test\u2014with per-feature timestamp audits ruling out label leakage before any evaluation. Evaluate firehose fill-rate and net expectancy (net of the runner's spread/slippage assumptions) against the current all-blocked baseline on a sealed holdout window of \u2265300 signals spanning \u22658 weeks, with success predefined as fill-rate improving by \u226510 percentage points AND net expectancy > 0 with a bootstrap 95% CI excluding zero. Falsify\u2014and keep the challenger unpromoted\u2014if any leakage audit trips, either threshold is missed, or holdout expectancy decays more than a preregistered bound relative to in-sample. All writes remain confined to research artifacts (`bot/research/`, `bot/reports/research/`, staged `validated_states.json`); protected live YAML, runtime gating, and `intel/intelligent_champion.json` are untouched, with any promotion still gated by `promote.py`. If supported, expand the allowlist one cohort per subsequent cycle, each re-tested against fresh sealed data under these same gates."
+    }
+  },
+  "status": "decided"
+}

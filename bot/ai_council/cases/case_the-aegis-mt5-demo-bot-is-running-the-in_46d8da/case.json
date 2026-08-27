@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T06:57:37.160909+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_46d8da\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.15,
+          "finished_utc": "2026-08-24T06:59:45.121557+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T06:59:33.974245+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T06:59:45.121557+00:00",
+        "text": "The \u201cindependent\u201d analogue/outcome model may share data, features, or tuning decisions with the validated-state gate, making agreement a correlated filter rather than genuine confirmation and inviting overfitting. \u201cCalibration\u201d and the 10% expectancy threshold lack predefined statistical tests, confidence bounds, sample-size requirements, and multiple-comparison controls. A single next holdout is insufficient to establish robustness across regimes; require frozen specifications and additional temporal/regime holdouts before any governed promotion."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_46d8da\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.98,
+          "finished_utc": "2026-08-24T06:59:33.958275+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T06:59:20.979027+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T06:59:33.958275+00:00",
+        "text": "The proposal risks overfitting by tuning and judging a new rule directly on the sealed holdout, which ceases to be a valid holdout if evaluated repeatedly. \u201cHigher profit factor\u201d and \u201cno increase in maximum drawdown\u201d are unmeasurable without minimum trade counts, confidence intervals, test horizons, and precise ATR/percentile definitions; PF is especially unstable with sparse trades. It also omits walk-forward and regime-specific validation, cost sensitivity, and mandatory experiment-registry/governance checks before any promotion."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T07:00:19.806191+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_f02752",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_f02752 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_46d8da",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_46d8da\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 38.96,
+        "finished_utc": "2026-08-24T06:58:26.350511+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T06:57:47.392721+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T06:58:26.352526+00:00",
+      "text": "Test an adaptive volatility filter that blocks entries when 20-bar ATR exceeds its rolling 90th percentile. Evaluate it on the existing sealed holdout net of current spread/slippage assumptions, requiring a higher profit factor and no increase in maximum drawdown versus the validated champion. Reject the candidate if either condition fails."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_46d8da\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 17.81,
+        "finished_utc": "2026-08-24T06:58:56.557491+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T06:58:38.746878+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T06:58:56.557491+00:00",
+      "text": "Test a shadow-only two-source confirmation gate: require the existing validated-state gate and an independent analogue/outcome model to agree on direction after spread/slippage costs. Compare it with the current gate on the next sealed holdout using net expectancy, coverage, drawdown, and calibration. Accept only if net expectancy improves by at least 10% without reducing coverage by more than 20% or worsening drawdown; otherwise reject it and leave the champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_46d8da\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 22.53,
+        "finished_utc": "2026-08-24T07:00:19.774251+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T06:59:57.248949+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T07:00:19.774251+00:00",
+      "text": "Test the shadow-only two-source confirmation gate using a frozen, pre-registered specification in which the analogue/outcome model has disjoint training data, labels, features, and tuning windows from the validated-state gate, with all holdouts sealed before evaluation. Evaluate against the current gate across multiple temporal and market-regime holdouts, requiring at least 200 independent eligible signals per arm and regime. Use paired block-bootstrap confidence intervals at \u03b1=.05, with Holm correction across the primary expectancy, coverage, drawdown, and calibration comparisons. Accept only if the expectancy ratio\u2019s lower 95% bound exceeds 1.10, coverage\u2019s lower bound is at least 0.80 of baseline, drawdown does not worsen within the confidence bound, and calibration is non-inferior under the pre-specified test; otherwise reject it and leave the champion unchanged."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_46d8da\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.09,
+        "finished_utc": "2026-08-24T06:59:57.243169+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T06:59:45.151544+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T06:59:57.245181+00:00",
+      "text": "Develop the ATR filter using training and walk-forward validation only, defining ATR as 20-bar Wilder ATR and the threshold as the prior 252 bars' 90th percentile, with no label leakage. Require at least 100 trades per evaluation horizon, bootstrap confidence intervals for profit factor and drawdown, and validation across trending, ranging, and high-volatility regimes under baseline and stressed spread/slippage costs. Register every experiment and select a single pre-specified candidate before one sealed-holdout evaluation; do not retune after that result. Promote only if all existing governance gates pass and the sealed result shows a statistically supported profit-factor improvement with no material drawdown deterioration versus the champion."
+    }
+  },
+  "status": "decided"
+}

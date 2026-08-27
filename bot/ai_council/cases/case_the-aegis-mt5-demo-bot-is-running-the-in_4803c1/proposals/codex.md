@@ -1,0 +1,1 @@
+Test a volatility-regime-conditioned exit policy against the current firehose exit logic, using identical entries, costs, and sealed holdouts. It is successful only if it improves net expectancy by at least 10% without worsening maximum drawdown or failing the validated-state promotion gates. Otherwise, retain the current champion and record the challenger as rejected.

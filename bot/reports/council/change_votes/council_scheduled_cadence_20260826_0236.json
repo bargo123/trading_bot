@@ -1,0 +1,111 @@
+{
+  "change_id": "council_scheduled_cadence_20260826_0236",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-26T02:38:44.879288+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260826_0236",
+    "current_evidence": "Proposal: add a cost-stress robustness gate to the validated-state promotion path \u2014 a challenger may pass only if its primary split-OOS expectancy stays non-negative when evaluated at stressed costs (e.g., 1.5x its configured spread/slippage assumption, or the 90th percentile of recently logged Fire",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Proposal: add a cost-stress robustness gate to the validated-state promotion path \u2014 a challenger may pass only if its primary split-OOS expectancy stays non-negative when evaluated at stressed costs (e.g., 1.5x its configured spread/slippage assumption, or the 90th percentile of recently logged Firehose spreads), computed from the already-recorded per-trade economics in the experiment registry rather than any new data collection. This is directly falsifiable: re-score every challenger currently ",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T02:36:34.862089+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "current_evidence field is circular \u2014 it restates the proposal instead of citing registry metrics, and the trigger reports PF=None, EV=None (no quantified baseline)",
+        "Nondeterministic gate threshold: 1.5x configured costs vs p90 of logged Firehose spreads can disagree; an implementer would have to pick, introducing drift in a governed path",
+        "No minimum split-OOS trade-count floor; near-zero-sample expectancy flipping sign under stress is noise, not signal",
+        "Retroactivity ambiguity: does re-scoring apply only to pending challengers, or can it fail the incumbent champion? Rollback text assumes no champion impact without justification",
+        "affected_files (bot/intel/, bot/ai_council/) omits the actual gate location bot/aegis/research/promote.py, the promote scripts, and bot/tests/",
+        "Expected-mechanism framing ('improve throughput') misdescribes a recall-reducing, precision-improving gate"
+      ],
+      "confidence": 0.75,
+      "model": "x-preview-f-free",
+      "reason": "The core idea is sound and safety-aligned: a cost-stress gate on the validated-state promotion path strengthens existing AGENTS.md cost discipline (rule 6), uses already-recorded registry economics (no new data collection, no lookahead), touches no protected trading YAML, alters no execution ownership, and is fully reversible. It is not a safety concern. However, this modifies the governed promotion gate (bot/aegis/research/promote.py), so the spec must be deterministic before implementation. As submitted it is not: the stress-cost definition offers two different thresholds (1.5x configured vs p90 logged spreads) without saying which applies, there is no minimum OOS sample size making 'non-negative expectancy' statistically meaningful, retroactivity is unresolved (the proposal hints at re-scoring all current challengers while rollback claims 'no champion impact' \u2014 these need reconciliation), and both the evidence and proposal strings are truncated mid-sentence, preventing full evaluation. Additionally, the stated mechanism ('improve exploration/validation throughput') conflicts with what a strictness-increasing gate does \u2014 it will reduce promotion count and should be framed as improving promotion precision.",
+      "requested_revisions": [
+        "Pin the stress definition deterministically: stressed_cost = max(1.5 x configured spread/slippage, p90 of last N logged Firehose spreads), with N documented and sourced from outcome/economics logs",
+        "Add a minimum primary split-OOS sample size (e.g., >=30 trades); below it the gate returns INSUFFICIENT_EVIDENCE, not pass/fail",
+        "State explicitly whether the gate is prospective-only or also re-scores incumbents; if incumbents can fail, route any demotion through the same governed promote script with registry recording",
+        "Correct affected_files to include bot/aegis/research/promote.py, the relevant scripts/research_promote_* entry points, and unit tests covering boundary cases (zero trades, exactly-zero stressed expectancy, missing per-trade economics)",
+        "Repair the truncated JSON fields and replace circular current_evidence with concrete registry statistics",
+        "Record the gate change itself as an ExperimentRegistry entry so its effect on challenger pass rates is measurable"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "'1.5x or 90th percentile' is ambiguous and can produce non-reproducible gate outcomes.",
+        "Recently logged spreads may be sparse, stale, symbol-mismatched, or unavailable.",
+        "Per-trade registry economics must distinguish spread, slippage, commissions, and realized P&L without double-counting costs.",
+        "Affected files omit the governed promotion implementation and its tests.",
+        "Existing challengers need a recorded re-evaluation result and an explicit policy for insufficient economics data."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "A cost-stress OOS gate is directionally safety-improving, but the proposal lacks a deterministic stress-cost definition, economics-field mapping, sample requirements, and the actual promotion-path files to change.",
+      "requested_revisions": [
+        "Specify a deterministic per-symbol, timestamp-bounded stress-cost formula and fallback when percentile data is insufficient.",
+        "Define required registry fields, units, cost recomputation, and handling of missing or malformed records.",
+        "Apply the gate in the governed promotion path, not only under bot/intel/ or bot/ai_council/.",
+        "Add tests for pass, fail, missing-data fail-closed, percentile fallback, and no cost double-counting.",
+        "Record stress assumptions and re-scored OOS metrics in the experiment registry/report for every evaluated challenger."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Proposal text is truncated and lacks a complete implementation plan.",
+        "No minimum sample-size or confidence requirement is defined for stressed-cost expectancy.",
+        "The stressed-cost definition is ambiguous when using 1.5x assumptions versus the 90th percentile of logged spreads.",
+        "The affected files omit the governed promotion modules and experiment-registry interfaces that should enforce the gate.",
+        "The stated expected mechanism of improving throughput conflicts with adding a potentially rejecting validation gate.",
+        "No explicit proof is provided that research or council processes cannot place MT5 orders."
+      ],
+      "confidence": 0.94,
+      "model": null,
+      "reason": "The proposal is directionally safety-positive, but the evidence and scope are incomplete. It does not specify the exact promotion implementation, treatment of insufficient trade samples, cost units, or the full challenger population to be rescored. A stricter validated-state gate could also affect champion promotion despite the stated 'no champion impact.'",
+      "requested_revisions": [
+        "Provide the complete proposal and identify all exact files/functions changed, including the governed promotion path.",
+        "Define cost normalization, stress selection, slippage treatment, and behavior when recent spread data is insufficient.",
+        "Specify minimum trade counts and statistical handling for non-negative stressed expectancy.",
+        "Add tests covering promotion acceptance/rejection, missing economics, malformed registry records, and regression of existing safety gates.",
+        "State explicitly that only the governed champion-promotion scripts may apply the gate and that no research or council process gains order-execution capability.",
+        "Run and report the required baseline and post-change pytest counts before approval."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

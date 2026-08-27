@@ -1,0 +1,109 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_1900",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T19:02:23.415601+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_1900",
+    "current_evidence": "Proposal: Add a shadow-abstention reconciliation study to the validated-state gate as the single registered experiment for the next cycle. Hypothesis: candidates the firehose abstains from during low-confidence validated states have equal or better net expectancy than executed trades, which would me",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Proposal: Add a shadow-abstention reconciliation study to the validated-state gate as the single registered experiment for the next cycle. Hypothesis: candidates the firehose abstains from during low-confidence validated states have equal or better net expectancy than executed trades, which would mean the gate's confidence threshold is miscalibrated rather than protective. Method: for the next two weeks in MT5 DEMO only, log every abstained candidate's hypothetical entry/exit through the existin",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T19:00:03.976239+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Truncated method description leaves the data-capture mechanism, cost model, and comparison design unspecified",
+        "Ambiguity between 'hypothetical entry/exit' shadow logging and falsification language about 'exploration trades' - must confirm zero order_send() calls from the study under all branches",
+        "Raw net expectancy alone cannot distinguish a miscalibrated threshold from a correctly protective one; risk-adjusted comparison (variance, tail loss, drawdown profile) is required",
+        "Selection bias: abstained candidates occur under different regime/confidence conditions than executed trades; without matched-opportunity conditioning, outcome differences are confounded",
+        "Two weeks of low-confidence validated states may produce too few abstentions for statistical power; no minimum-sample or interim-checkpoint criterion is pre-registered",
+        "Affected files include bot/ai_council/ - proposal must guarantee no changes to champion promotion logic, trading YAML, or gate thresholds as part of this experiment",
+        "Hypothetical fills need an explicitly defined cost basis (decision-time spread plus slippage assumption), applied identically to both arms"
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "The core idea is sound and policy-aligned: reconciling abstention behavior against counterfactual outcomes is exactly the kind of calibration evidence the validated-state gate lacks, and a shadow study in MT5 DEMO with no champion impact fits the research-only mandate. However, the submitted spec is incomplete (method text is truncated mid-sentence) and internally ambiguous: the method describes purely hypothetical logging of abstained candidates, while the tests and falsification criteria reference 'exploration trades' and 'exploration lifecycle,' leaving unclear whether any actual DEMO orders would ever be placed by or derived from this study. Research components must never call mt5.order_send(), so that boundary must be made explicit before approval. Additionally, 'equal or better net expectancy' is insufficient to conclude the confidence threshold is miscalibrated rather than protective - equal raw expectancy with lower tail risk or variance still justifies abstention.",
+      "requested_revisions": [
+        "Complete the method section end-to-end: where candidates are captured, the hypothetical fill model, exit rules mirroring the executed-trade lifecycle, and the exact comparison statistic",
+        "Add an explicit read-only-broker guarantee: the study issues no orders, modifies no positions, and its outputs feed research reports only, with any future execution change requiring a separate governed proposal",
+        "Pre-register a risk-adjusted primary endpoint (e.g., EV per unit of tail loss on matched opportunity sets) instead of raw equal-or-better expectancy",
+        "Define a minimum abstention sample size and an interim checkpoint; if N is below threshold at week two, declare inconclusive or extend rather than conclude",
+        "Register the experiment in ExperimentRegistry with hypothesis, gates, and rollback (data purge plus config revert) before any data collection begins",
+        "Confirm via diff review that no changes touch PROTECTED_LIVE_YAML, promote.py gates, or intelligent_champion.json write paths"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "The method is truncated and does not explicitly state that it logs hypothetical outcomes only and never calls MT5 order execution or modifies positions.",
+        "Comparing abstained and executed candidates is selection-confounded; the analysis needs matched state/confidence cohorts and costed outcome definitions.",
+        "Entry, exit, spread, slippage, data-source, and missing-data handling are unspecified.",
+        "The experiment must be preregistered through ExperimentRegistry with immutable two-week criteria and no champion-promotion path."
+      ],
+      "confidence": 0.86,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "A DEMO-only, read-only shadow study is acceptable in principle, but the proposal lacks sufficient operational detail to verify it cannot affect execution or produce biased conclusions.",
+      "requested_revisions": [
+        "Explicitly scope implementation to read-only shadow logging with no mt5.order_send(), position modification, or execution-path changes.",
+        "Define hypothetical entry/exit rules, net-cost assumptions, timestamps, and handling for unavailable quotes.",
+        "Specify a matched/cohort-adjusted comparison and concrete success/falsification thresholds.",
+        "Register the single experiment before collection and confirm outputs cannot alter champion selection or risk parameters."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "The proposal text is truncated, including the execution/logging method.",
+        "Falsification criteria mention exploration trades, creating ambiguity with the stated shadow-only design.",
+        "No explicit guarantee that AI Council and research processes remain read-only and never call mt5.order_send().",
+        "No registry ID, candidate schema, cost/slippage model, exit rules, sample-size target, or statistical decision rule.",
+        "No explicit confirmation that intelligent_champion.json and promotion gates remain unaffected."
+      ],
+      "confidence": 0.97,
+      "model": null,
+      "reason": "The study is potentially safe, but the proposal is incomplete and lacks evidence that hypothetical abstention tracking cannot execute orders or affect promotion. Current PF=None and EV=None also provide no baseline for judging value.",
+      "requested_revisions": [
+        "Provide the complete proposal and exact implementation scope.",
+        "Define a shadow-only data path with an explicit no-order_send invariant and automated test.",
+        "Register the experiment in ExperimentRegistry with ID, owner, horizon, schema, and rollback procedure.",
+        "Specify hypothetical entry, exit, spread/slippage, and cost calculations without lookahead.",
+        "Define minimum sample size, confidence thresholds, and falsification criteria before collecting results.",
+        "Confirm no champion, live configuration, or broker-position impact and add tests proving those invariants."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

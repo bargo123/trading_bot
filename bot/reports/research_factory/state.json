@@ -1,0 +1,16 @@
+{
+  "generation": 8,
+  "champion": null,
+  "challenger": null,
+  "experiments": [],
+  "failed_hypotheses": [],
+  "hypothesis_registry": {},
+  "codex_calls": 0,
+  "codex_budget": 1,
+  "claude_available": true,
+  "market_state": "WEEKEND_RESEARCH",
+  "dataset_fingerprint": "344399b2db2a6b1dd7fdd0b0a3a876b1981763c438346560a912e4f225621b24",
+  "last_generation_status": "FAILED",
+  "last_generation_reason": "ML training failed: Target column profit_barrier_first must contain at least two classes after dropping non-finite supervised rows",
+  "last_update": "2026-08-25T02:40:38.807504+00:00"
+}

@@ -1,0 +1,1 @@
+Test a two-consecutive-scan persistence filter: permit a DEMO Firehose entry only when the validated-state gate remains valid on both scans. Accept the candidate only if sealed holdout results show at least a 10% improvement in net expectancy with no increase in maximum drawdown or trade costs versus the current champion; otherwise reject it and keep the champion unchanged.

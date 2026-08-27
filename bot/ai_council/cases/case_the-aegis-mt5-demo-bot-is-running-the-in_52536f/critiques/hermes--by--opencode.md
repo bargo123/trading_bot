@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal: it provides no hypothesis, methodology, metrics, or validation. It cannot support a trading decision and must not be treated as actionable council intelligence.

@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T18:52:48.305880+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4803c1\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.95,
+          "finished_utc": "2026-08-24T18:54:26.447569+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T18:54:14.499023+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T18:54:26.449569+00:00",
+        "text": "The proposal is directionally sound but underspecified: it does not define regime features, selection rules, sample sufficiency, or how the 10% threshold is statistically validated, leaving substantial data-snooping risk. \u201cIdentical costs\u201d must explicitly include spread, slippage, and execution assumptions across all regimes. It also needs walk-forward validation and confidence intervals, not just one sealed-holdout comparison, to show the gain is robust rather than noise."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4803c1\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 14.08,
+          "finished_utc": "2026-08-24T18:54:14.482019+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T18:54:00.406147+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T18:54:14.485020+00:00",
+        "text": "The 1.5\u00d7 spread/slippage rule is underspecified and potentially circular because \u201cpredicted net expectancy\u201d already depends on cost estimates whose calibration and uncertainty are not defined. A single sealed period with no pre-registered data boundaries, walk-forward validation, significance/confidence criteria, or lookahead audit cannot establish robustness; the trade-count and max-drawdown gates also permit noisy, economically insignificant improvements and unstable profit-factor comparisons. The proposal omits mandatory ExperimentRegistry recording and explicit confirmation that DEMO eligibility cannot reach live execution or modify protected champion/live configuration."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T18:54:51.149072+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_dff789",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_dff789 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_4803c1",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4803c1\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.53,
+        "finished_utc": "2026-08-24T18:53:09.525007+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T18:52:57.998691+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T18:53:09.527014+00:00",
+      "text": "Run a sealed-holdout test of stricter intelligent-firehose entry calibration: require predicted net expectancy to exceed estimated spread and slippage by 1.5x before a DEMO signal is eligible. Compare it with the current validated-state baseline over the same held-out period using net expectancy, profit factor, max drawdown, and trade count. Accept it only if net expectancy and profit factor improve without increasing max drawdown or reducing eligible trades by more than 30%; otherwise reject and retain the current champion."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4803c1\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 14.52,
+        "finished_utc": "2026-08-24T18:53:36.801327+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T18:53:22.276963+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T18:53:36.801327+00:00",
+      "text": "Test a volatility-regime-conditioned exit policy against the current firehose exit logic, using identical entries, costs, and sealed holdouts. It is successful only if it improves net expectancy by at least 10% without worsening maximum drawdown or failing the validated-state promotion gates. Otherwise, retain the current champion and record the challenger as rejected."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4803c1\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.77,
+        "finished_utc": "2026-08-24T18:54:51.149072+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T18:54:38.381376+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T18:54:51.149072+00:00",
+      "text": "Test a pre-registered volatility-regime-conditioned exit policy using label-independent features\u2014rolling realized volatility and ATR percentile\u2014with fixed regime thresholds selected only on training data. Compare it with the current firehose exit logic using identical entries, spread, slippage, execution, and cost assumptions, requiring at least 200 trades per regime and adequate coverage in each walk-forward fold. Accept the challenger only if walk-forward results and the sealed holdout show at least a 10% net-expectancy improvement, with the 95% paired-bootstrap confidence interval\u2019s lower bound above 10%, no increase in maximum drawdown, and all validated-state promotion gates passing. Otherwise, retain the current champion and record the challenger, metrics, confidence intervals, and rejection rationale."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4803c1\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.89,
+        "finished_utc": "2026-08-24T18:54:38.364476+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T18:54:26.473015+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T18:54:38.368519+00:00",
+      "text": "Pre-register cost calibration, uncertainty bounds, data boundaries, and a walk-forward sealed-holdout protocol; require lower-confidence predicted net expectancy to exceed independently estimated spread plus slippage by 1.5x. Record the experiment in `ExperimentRegistry` and audit all features, labels, and costs for lookahead. Compare against the frozen validated baseline across each holdout fold using net expectancy, profit factor, max drawdown, trade count, confidence intervals, and minimum economic-effect thresholds. Accept only if aggregate improvements are statistically supported, drawdown does not worsen, and eligible trades decline no more than 30%; otherwise retain the current champion. Signals remain DEMO-only and cannot place orders or alter protected live configuration or champion artifacts."
+    }
+  },
+  "status": "decided"
+}

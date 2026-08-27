@@ -1,0 +1,1 @@
+Test whether requiring two independent firehose signals before entry improves net expectancy versus the current single-signal baseline on sealed historical holdouts. Keep all existing cost assumptions and validated-state gates unchanged. Accept only if net expectancy improves by at least 10% with no increase in maximum drawdown; otherwise reject and retain the current champion.

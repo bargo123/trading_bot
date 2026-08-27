@@ -13,6 +13,10 @@ $LogFile = Join-Path $BotRoot "optimizer\keepalive.log"
 $PaperCfg = "config_mt5_demo_firehose_hw.yaml"
 $Mt5Path = "C:\Program Files\MetaTrader 5\terminal64.exe"
 $FirehoseStop = Join-Path $BotRoot "reports\FIREHOSE_STOP"
+$ShadowReload = Join-Path $ScriptDir "_shadow_exploration_reload_once.ps1"
+if (Test-Path $ShadowReload) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ShadowReload | Out-Null
+}
 
 function Write-Log([string]$msg) {
     $line = "{0} {1}" -f (Get-Date -Format "yyyy-MM-ddTHH:mm:ssK"), $msg

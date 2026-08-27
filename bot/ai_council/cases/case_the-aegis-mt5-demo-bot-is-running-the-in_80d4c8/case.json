@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-22T22:52:06.027096+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80d4c8\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 35.92,
+          "finished_utc": "2026-08-22T22:55:32.031114+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T22:54:56.115617+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T22:55:32.031114+00:00",
+        "text": "The cost model itself receives zero validation: p75 estimates spanning 0.5\u20137.2 pips imply wildly heterogeneous per-symbol samples, yet you report no sample sizes, no out-of-time check that costs are stationary, and no guarantee the measurement window doesn't overlap the evaluation window \u2014 textbook leakage dressed as realism. Acceptance on a single replayed cycle with bare \"positive expectancy,\" no minimum effect size, no multiple-comparison correction despite an empty validated set, and no block-bootstrap requirement means one lucky noise draw clears every gate you named. \"Identical features and gates\" is unmeasurable as written, because changing the cost model changes every gate outcome \u2014 specify the exact config diff and register the experiment in `ExperimentRegistry` or it didn't happen. And \"accepting the candidate\" must explicitly route through `research_promote_champion.py` with all `promote.py` gates passing; as drafted, this reads like an ungoverned side-door to champion promotion."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80d4c8\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 14.26,
+          "finished_utc": "2026-08-22T22:54:56.099717+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T22:54:41.843229+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T22:54:56.099717+00:00",
+        "text": "The top-3 \u201cnear misses\u201d are a cherry-picked, undefined subgroup, and reusing thresholds inferred from only two surviving states creates severe selection and overfitting risk; \u201cfreshly drawn\u201d data also lacks a specified independent time-split and multiple-testing correction. The \u226465% skip-rate target is confounded by opportunity mix, while 200 demo trades is an underpowered and unspecified validation sample with unclear cost, execution, and stopping rules; evaluating the sealed holdout before promotion risks contaminating it. Finally, \u201c200 additional closed demo trades\u201d implies placing trades, which violates AEGIS\u2019s absolute no-trading rule, even if the account is demo/read-only."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T22:56:27.897144+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_e49d21",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_e49d21 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_80d4c8",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80d4c8\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 68.64,
+        "finished_utc": "2026-08-22T22:53:25.119754+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T22:52:16.481309+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T22:53:25.129781+00:00",
+      "text": "Proposal: The measured evidence shows the validated-state gate is the sole throughput bottleneck \u2014 16,261 of 20,573 scanned opportunities (79%) were skipped exclusively for `state_not_in_validated_set`, because only 2 of 43 ML-shortlisted states survived validation (both asia/range/sell-like), while london alone absorbed 8,319 skips. I propose one governed experiment for the next cycle: take the top-3 near-miss shortlisted states that failed validation only marginally (e.g., london/newyork sell-side analogues of the surviving asia state), re-run them through the full `bot/aegis/research/promote.py` gate stack \u2014 cost-adjusted expectancy, profit-factor floor, and bootstrap p05 \u2014 on freshly drawn data, with any passing challenger evaluated first on the sealed holdout (`bot/research/sealed_holdouts.jsonl`) before any promotion decision. Falsifiable prediction: if these states genuinely carry edge, they pass the same gates that admitted the current two (bootstrap p05 \u2265 ~2.1 pips, PF \u2265 ~2.8 as in `validated_states.json`), and admitting them cuts the skip rate from 79% to \u226465% over the next ~2,000 opportunities without degrading realized net expectancy below zero across \u2265200 additional closed demo trades. If instead the re-tested states fail the gates again or their post-admission net expectancy on demo outcomes is \u22640 after 200 trades, the hypothesis \"the gate is rejecting real edge rather than noise\" is falsified and the validated-set expansion line is abandoned and recorded in `ExperimentRegistry` either way. This touches no code, no champion artifact, and stays inside the read-only MT5/demo research perimeter."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80d4c8\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 31.93,
+        "finished_utc": "2026-08-22T22:54:15.629779+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T22:53:43.696666+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T22:54:15.629779+00:00",
+      "text": "Test a symbol-specific cost model in strategy selection, replacing the flat 0.3-pip assumption with the measured p75 costs (0.5\u20137.2 pips); the current validated-state set is empty and the firehose baseline is negative (E = \u22120.0345, PF = 0.566). Replay the next cycle with identical features and gates, accepting the candidate only if costed holdout expectancy is positive, PF exceeds 1, and bootstrap p05 expectancy remains above zero. Otherwise reject the change and leave the champion untouched."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80d4c8\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 16.94,
+        "finished_utc": "2026-08-22T22:56:27.865419+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T22:56:10.929001+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T22:56:27.865419+00:00",
+      "text": "Estimate each symbol\u2019s p75 cost on a pre-registered training window, report sample sizes and confidence intervals, test out-of-time stationarity, and enforce a purge/embargo so the measurement window cannot overlap the holdout. Register the experiment in `ExperimentRegistry` with the exact config diff\u2014replace only the flat `0.3`-pip cost lookup with the symbol-specific p75 table; keep features and all other gates unchanged\u2014and pre-register one primary comparison with Holm correction at \u03b1=0.05 for any symbol-level exploratory tests. Replay the disjoint holdout using a stationary block bootstrap, accepting only if incremental expectancy versus the current baseline is at least +0.02 per trade, PF is at least 1.10, and corrected block-bootstrap p05 incremental expectancy remains above zero. Any promotion must occur exclusively through `research_promote_champion.py`, after every `promote.py` gate passes; otherwise reject the challenger, record the result or failure, and leave `intel/intelligent_champion.json` untouched."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80d4c8\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 38.84,
+        "finished_utc": "2026-08-22T22:56:10.905185+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T22:55:32.061166+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T22:56:10.907193+00:00",
+      "text": "I propose one pre-registered experiment: define candidates mechanically before any evaluation \u2014 every ML-shortlisted state rejected by validation with bootstrap p05 within a fixed 0.5-pip tolerance of the configured floor and PF \u2265 the promote.py floor, ranked by p05 shortfall, capped at 3 \u2014 with gate thresholds taken from promote.py's existing configuration (never inferred from the two surviving states), tested on a temporally independent split (all bars after a pre-declared cutoff, e.g., 2026-06-30, untouched by any prior fit or scan) with Holm correction across the candidate family. This cycle reads the sealed holdout zero times: if any candidate passes, promotion proceeds solely through the governed path where `research_promote_champion.py`/promote.py consume the holdout exactly once per their existing protocol, so no contamination occurs during hypothesis testing. Endpoints drop raw skip-rate targets as confounded by mix; success requires each admitted state to show positive cost-adjusted net expectancy on the held-out temporal split and, separately, on the next 200 closed outcomes passively logged by the existing runner (no orders placed, MT5 strictly read-only), evaluated once at n=200 under a pre-specified stopping rule with costs from the runner's spread/slippage assumptions. If no candidate passes the corrected gates, or realized net expectancy \u2264 0 at the checkpoint, the \"gate rejects real edge\" hypothesis is declared falsified and the validated-set-expansion line is abandoned; both branches are written to `ExperimentRegistry` before any further work on this question."
+    }
+  },
+  "status": "decided"
+}

@@ -1,0 +1,109 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_0839",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T08:41:44.777118+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_0839",
+    "current_evidence": "Proposal: Using the newly reconciled broker-triggered-exit telemetry, measure per-trade execution slippage on the DEMO outcome log (signal-time quote vs. actual fill, plus stop-loss fill vs. modeled stop) across the next ~200 closed firehose trades, and test the hypothesis that slippage-adjusted exp",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Proposal: Using the newly reconciled broker-triggered-exit telemetry, measure per-trade execution slippage on the DEMO outcome log (signal-time quote vs. actual fill, plus stop-loss fill vs. modeled stop) across the next ~200 closed firehose trades, and test the hypothesis that slippage-adjusted expectancy is materially below the champion's modeled expectancy (e.g., median adverse slippage exceeding one spread-width reduces mean R by \u22650.05). This is falsifiable: if measured slippage-adjusted exp",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T08:39:50.304250+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Hypothesis and falsification criteria are truncated mid-sentence, so the acceptance/rejection rule cannot be evaluated as written",
+        "Compound criterion mixes two distinct statistics (median adverse slippage > 1 spread-width AND mean R reduction >= 0.05) without specifying the logical link or which is primary",
+        "No stopping rule: '~200 closed trades' lacks a fixed-N commitment and interim-look policy, creating optional-stopping/peeking risk",
+        "Newly reconciled broker-triggered-exit telemetry may have systematic gaps (partial closes, missing signal-time quotes, clock skew between signal timestamps and fill records); no data-quality gate is stated",
+        "Slippage normalized against which spread \u2014 contemporaneous signal-time spread or the runner's static spread assumption? Ambiguity here can manufacture or erase the effect",
+        "~200 trades will span multiple symbols/sessions/regimes; pooled slippage may mask or fabricate the effect without pre-specified segmentation",
+        "'Affected files: bot/intel/' is vague; intel/ contains runtime artifacts governed elsewhere \u2014 writes should be scoped to research reports + ExperimentRegistry"
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "The underlying idea is sound, safe, and well-aligned with AEGIS goals: it is an observational, read-only slippage audit over DEMO firehose trades using the newly reconciled broker-triggered-exit telemetry, with no changes to the execution path, risk config, live YAML, or champion gating. However, the proposal as submitted is materially incomplete \u2014 both current_evidence and proposed_change truncate mid-sentence ('slippage-adjusted exp\u2026'), leaving the exact hypothesis, decision rule, and falsification criteria unspecified. Pre-registering an incomplete falsification rule invites post-hoc threshold selection, which conflicts with the lab's no-fabrication/no-lookahead discipline. Fixable with a precise resubmission; no safety objection.",
+      "requested_revisions": [
+        "Resubmit with complete, untruncated hypothesis and falsification-criteria text",
+        "Pre-register the full analysis plan in ExperimentRegistry BEFORE including any trade: primary endpoint, test statistic, one-sided alpha, power/sample-size justification for N\u2248200",
+        "Decompose into two separately specified tests: (1) median adverse slippage in spread-widths, (2) slippage-adjusted mean R minus modeled mean R; state the decision rule for each",
+        "Add a data-quality gate: report signal-time-quote capture rate, timestamp-alignment checks, and % of trades excluded with reasons before computing any statistic",
+        "Specify spread normalization: use contemporaneous signal-time bid/ask spread as primary, runner's assumed spread as sensitivity check",
+        "Pre-specify segmentation (symbol, session, volatility bucket) and commit that the headline result is the pre-registered aggregate, with segments exploratory-only",
+        "Confirm read-only scope explicitly: no mt5.order_send() calls, no changes to execution/risk/champion-gating code, outputs limited to bot/reports/research/ and the experiment registry"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Signal-time quote and actual-fill timestamps/sides must be normalized to avoid biased slippage estimates.",
+        "Stop-loss fills need a defined modeled-stop reference and treatment for gaps, partial fills, and broker-triggered exits.",
+        "~200 trades may be underpowered; median adverse slippage and mean-R thresholds require confidence intervals and pre-registration.",
+        "Affected paths include runtime intel/council areas; research collection must remain read-only and must not call MT5 order APIs or alter risk/cadence."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal is research-only and DEMO-scoped, but its truncated specifications do not define the telemetry schema, fill/quote alignment, cost model, statistical decision rule, or safeguards against changing execution behavior.",
+      "requested_revisions": [
+        "Provide a concrete read-only experiment specification with fields, timestamp tolerance, side-aware slippage formulas, missing-data rules, and net-cost assumptions.",
+        "Pre-register sample size, primary/secondary metrics, confidence intervals, and pass/fail criteria before collecting outcomes.",
+        "State explicitly that no execution settings, position sizing, champion artifact, or broker positions will be modified; record the experiment through ExperimentRegistry.",
+        "Add tests using synthetic market, stop, partial-fill, and missing-telemetry cases."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Proposal text is incomplete, including the hypothesis and expectancy calculation.",
+        "No precise definition of signal-time quote, actual fill, modeled stop, spread/slippage costs, or aggregation/statistical test.",
+        "The proposed ~200 trades lacks a clear start condition, ownership, stopping rule, and handling of missing or broker-triggered-exit telemetry.",
+        "\"Tiny DEMO risk only\" is not an adequate risk control; no explicit confirmation of required MT5 DEMO gates or single execution-owner enforcement.",
+        "No explicit ExperimentRegistry record or confirmation that the champion remains unchanged regardless of results."
+      ],
+      "confidence": 0.97,
+      "model": null,
+      "reason": "The experiment is directionally safe and appropriately falsifiable, but the proposal is truncated and lacks sufficient implementation detail to approve testing. It must explicitly guarantee research-only telemetry analysis, DEMO-only execution if any trades are involved, registry recording, cost/lookahead controls, and no champion promotion.",
+      "requested_revisions": [
+        "Provide the complete proposal and a precise measurement specification for all slippage fields and units.",
+        "Define the cost-adjusted expectancy formula, baseline champion expectancy, sample-size rationale, confidence intervals or decision thresholds, and missing-data treatment.",
+        "State that all experiments are recorded in ExperimentRegistry and that no research or council process may call mt5.order_send().",
+        "If exploration trades are required, explicitly enforce mode=mt5_demo, allow_live=false, paper_trading_enabled=true, dry_run=false, DEMO-account checks, and exactly one broker-execution owner.",
+        "Define the 200-trade window, stopping/falsification rules, rollback behavior, and explicit prohibition on champion promotion or live-config changes."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

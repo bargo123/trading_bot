@@ -1,0 +1,1 @@
+This is not a proposal; it is an unsupported-model error with no strategy, hypothesis, metrics, or validation plan. No safety or execution assessment is possible until a supported model and reproducible experiment specification are provided.

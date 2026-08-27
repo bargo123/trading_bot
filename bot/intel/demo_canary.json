@@ -1,27 +1,27 @@
 {
-  "created_utc": "2026-08-24T20:18:45.558875+00:00",
-  "dataset_hash": "fc2ed8d632100a2e266b4783d4668968ab08c62faeb24866261c3252eacc7e47",
-  "expires_utc": "2026-08-31T20:18:45.558875+00:00",
-  "index_file_sha256": "7502a20ca0f8ae9d91acd1e2a2ff9e03c772a66fd2ad7f0b5a7608e8c8b82d76",
+  "created_utc": "2026-08-27T11:01:01.923383+00:00",
+  "dataset_hash": "e8657b8fe66596b28929dcaef59dafff720a8bf091bc6d4b94bba92c84265785",
+  "expires_utc": "2026-09-03T11:01:01.923383+00:00",
+  "index_file_sha256": "72c498fde6cd550c24d7393f1fcce136e499ff6d59ce1f978bae2cf8439e25dd",
   "metrics": {
-    "bootstrap_p05_validate": 0.43366222141390987,
-    "expectancy_validate": 1.8242424242422526,
+    "bootstrap_p05_validate": 3.94149191082299,
+    "expectancy_validate": 4.93333333333335,
     "n_losses_validate": 9,
-    "n_validate": 33,
-    "profit_factor_validate": 3.0269360269358727
+    "n_validate": 84,
+    "profit_factor_validate": 19.666666666665026
   },
   "opportunity": {
-    "cost_pips": 1.2,
+    "cost_pips": 0.7,
     "level": "A",
     "regime": "trend",
     "session": "asia",
     "side": "buy",
     "strategy_family": "none",
     "structure": "none",
-    "symbol": "GBPUSD"
+    "symbol": "AUDJPY"
   },
   "risk_fraction": 0.08,
   "schema": "demo_canary.v1",
-  "strategy_id": "canary_GBPUSD_trend_none_asia_buy",
-  "validation_hash": "3967eeb1a08577fc"
+  "strategy_id": "canary_AUDJPY_trend_none_asia_buy",
+  "validation_hash": "6d98f120a443f990"
 }

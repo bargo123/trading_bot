@@ -1,0 +1,1 @@
+Run a sealed-holdout experiment that raises the validated-state minimum sample threshold by 25% and compares net expectancy, drawdown, and trade count against the current gate. Accept it only if holdout net expectancy improves without increasing maximum drawdown or reducing qualified signals by more than 20%; otherwise reject it.

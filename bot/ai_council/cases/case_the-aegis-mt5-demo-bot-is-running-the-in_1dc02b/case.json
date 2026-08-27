@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T15:39:34.157486+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1dc02b\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.84,
+          "finished_utc": "2026-08-24T15:41:24.400439+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T15:41:12.558846+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T15:41:24.400439+00:00",
+        "text": "\u201cIndependent\u201d signals and the baseline expectancy are undefined, making the claimed 10% improvement unmeasurable and easy to optimize retrospectively. A 50-trade holdout is too small to establish a reliable expectancy or maximum-drawdown comparison, and no confidence intervals, multiple-testing controls, or regime-stratified validation are required. Testing many signal pairs before evaluating one sealed holdout still creates substantial selection bias."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1dc02b\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.68,
+          "finished_utc": "2026-08-24T15:41:12.542874+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T15:41:00.865877+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T15:41:12.544884+00:00",
+        "text": "The session-of-day interaction can still be overfit if its definition, bins, or thresholds are selected after inspecting historical outcomes; registration alone does not prevent that. \u201cValidated-state signal\u201d and the predefined expectancy/trade-count thresholds are unspecified, and requiring both metrics to exceed the champion lacks uncertainty estimates, statistical significance, and robustness checks across time and instruments. A single sealed holdout may be too noisy to establish superiority, while increased trade count can reflect regime-specific churn rather than genuine improvement."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T15:41:52.159651+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_46db48",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_46db48 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_1dc02b",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1dc02b\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.09,
+        "finished_utc": "2026-08-24T15:39:55.423779+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T15:39:44.334300+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T15:39:55.423779+00:00",
+      "text": "Run a registered, sealed-holdout experiment that adds a session-of-day interaction to the validated-state signal and rejects it unless net expectancy improves over the current champion after spread/slippage. Use only historical/demo-derived bars, with identical entry, exit, and risk assumptions. Accept the candidate only if the holdout net expectancy and trade count both exceed the champion\u2019s by predefined thresholds; otherwise retain the champion unchanged."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1dc02b\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 17.4,
+        "finished_utc": "2026-08-24T15:40:35.517378+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T15:40:18.121074+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T15:40:35.517378+00:00",
+      "text": "Test a research-only \u201ctwo-confirmation\u201d admission rule: allow a setup through the validated-state gate only when two independent firehose signals agree on direction and regime. On a sealed, registry-recorded holdout, this candidate succeeds only if cost-adjusted expectancy improves by at least 10% with no worse maximum drawdown and at least 50 trades; otherwise reject it. No champion or live configuration should be changed."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1dc02b\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 15.37,
+        "finished_utc": "2026-08-24T15:41:52.127933+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T15:41:36.756997+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T15:41:52.127933+00:00",
+      "text": "Test one pre-registered, research-only two-confirmation rule whose signals come from disjoint feature families and have no shared label-derived inputs, with independence defined before evaluation by a fixed residual-correlation threshold. Define baseline expectancy as the existing validated-state gate\u2019s cost-adjusted per-trade expectancy, using identical spread, slippage, entry, and exit assumptions on the same sealed holdout. Require at least 200 holdout trades, regime-stratified results with pre-specified minimum counts, and a 95% bootstrap confidence interval whose lower bound for relative expectancy improvement is at least 10%, while maximum drawdown is no worse than baseline. If candidate pairs are screened, selection must occur only on a separate development set with a pre-registered multiplicity correction; otherwise evaluate the single sealed pair, reject it if any gate fails, and change no champion or live configuration."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1dc02b\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.31,
+        "finished_utc": "2026-08-24T15:41:36.739243+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T15:41:24.432401+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T15:41:36.740995+00:00",
+      "text": "Pre-register the validated-state definition, session bins, interaction form, costs, and decision thresholds before inspecting candidate outcomes. Evaluate only historical/demo-derived bars using identical entry, exit, and risk assumptions, with rolling time splits and instrument-level holdouts in addition to one final sealed holdout. Promote only if net expectancy improvement is statistically supported with confidence intervals, remains positive across robustness checks, and does not increase turnover or drawdown beyond pre-specified limits. Trade count is reported as a diagnostic, not a promotion requirement; otherwise retain the current champion unchanged."
+    }
+  },
+  "status": "decided"
+}

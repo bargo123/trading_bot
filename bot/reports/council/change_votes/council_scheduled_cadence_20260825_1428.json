@@ -1,0 +1,95 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_1428",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T14:30:22.426795+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_1428",
+    "current_evidence": "Candidate: add a post-invalidation cooldown to the validated-state gate. Hypothesis: losses cluster because the gate currently re-arms immediately at the same validation level that just failed, so requiring either a short cooldown (e.g., 15 minutes) or one confirmation bar before re-arm will break l",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate: add a post-invalidation cooldown to the validated-state gate. Hypothesis: losses cluster because the gate currently re-arms immediately at the same validation level that just failed, so requiring either a short cooldown (e.g., 15 minutes) or one confirmation bar before re-arm will break losing streaks without meaningfully reducing opportunity set. Falsifiable test: offline replay of the existing DEMO outcome/fill logs through both gate variants (no code deployed, no orders), comparing",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/2)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T14:28:47.688378+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 2,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "raw": "{\"vote\": \"REVISE_AND_RESUBMIT\",\n \"confidence\": 0.62,\n \"reason\": \"The core idea \u2014 breaking loss clusters by delaying re-arm after validation failure \u2014 is mechanistically plausible and risk-reducing (it adds a gate rather than removing one), and the proposed offline log replay touches no broker path, no protected config, and no champion state, so it is safety-compatible with AGENTS.md. However, the ",
+      "reason": "unparseable vote: ''",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "PF and EV are unavailable.",
+        "The evidence and proposed-change fields are truncated.",
+        "A cooldown can reduce opportunities and mask rather than solve invalidation causes.",
+        "OOS comparison must be costed and time-ordered, with no label leakage.",
+        "No runtime deployment or champion promotion should occur from this experiment alone."
+      ],
+      "confidence": 0.86,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "Offline, no-order replay is appropriate, but the proposal is incomplete: it truncates key test details and does not define the cooldown variant, confirmation-bar semantics, datasets, cost model, sample thresholds, or acceptance criteria.",
+      "requested_revisions": [
+        "Specify exact gate state transitions, cooldown duration(s), confirmation-bar definition, and reset conditions.",
+        "Define offline replay period, instruments, fill/spread/slippage assumptions, and minimum sample size.",
+        "Pre-register primary metrics: net expectancy, profit factor, drawdown, trade count, losing-streak distribution, and opportunity-cost bounds.",
+        "Use chronological train/validation/OOS splits and record the experiment in ExperimentRegistry.",
+        "Keep the test read-only with no MT5 order submission; require governed promotion gates for any later deployment."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Current evidence and proposed comparison are truncated/incomplete.",
+        "No minimum sample size or statistical confidence requirement.",
+        "Cooldown duration and confirmation-bar logic are not precisely defined.",
+        "No explicit spread, slippage, and latency cost assumptions.",
+        "No out-of-sample or sealed-holdout procedure is specified.",
+        "The success claim conflicts with the likely reduction in opportunity frequency.",
+        "ExperimentRegistry recording is not explicitly required."
+      ],
+      "confidence": 0.95,
+      "model": null,
+      "reason": "The proposal is safety-compatible as an offline, no-order experiment, but evidence and test criteria are incomplete. The cooldown may reduce opportunity throughput, and the proposal does not specify sample size, exact variants, cost model, holdout protocol, or acceptance thresholds.",
+      "requested_revisions": [
+        "Define exact gate variants, cooldown timing, confirmation-bar rules, and affected state transitions.",
+        "Specify the replay dataset, date boundaries, minimum sample size, and sealed out-of-sample holdout.",
+        "Report costed expectancy, drawdown, loss clustering, trade count, opportunity capture, and confidence intervals for each variant.",
+        "Define pre-registered pass/fail thresholds and require ExperimentRegistry recording before execution.",
+        "State explicitly that no runtime deployment, champion promotion, or MT5 order submission is permitted until a separately governed review."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

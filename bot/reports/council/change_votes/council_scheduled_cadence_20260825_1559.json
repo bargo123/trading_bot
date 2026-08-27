@@ -1,0 +1,94 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_1559",
+  "degraded_real_council": false,
+  "final_decision": "APPROVED_FOR_TEST",
+  "finished_utc": "2026-08-25T16:01:49.987687+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_1559",
+    "current_evidence": "Test whether the rapid-invalidation/scratch exit \u2014 not entry selection \u2014 dominates the loss tail now that the global daily halt is intentionally absent on the DEMO firehose. Using the universal fast-edge shadow replay already committed plus logged DEMO closes in the experiment registry/outcome log, ",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Test whether the rapid-invalidation/scratch exit \u2014 not entry selection \u2014 dominates the loss tail now that the global daily halt is intentionally absent on the DEMO firehose. Using the universal fast-edge shadow replay already committed plus logged DEMO closes in the experiment registry/outcome log, bucket trades by time-to-scratch and compare net-of-spread expectancy and 95th-percentile adverse excursion for the incumbent scratch rule versus \u00b150% tighter and looser thresholds on sealed holdout w",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "majority APPROVE_FOR_TEST (2/3); implementation authorised as CHALLENGER/EXPERIMENT only",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T15:59:05.439877+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 2,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 1
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "raw": "{\"vote\": \"REVISE_AND_RESUBMIT\", \"confidence\": 0.72, \"reason\": \"The underlying question is legitimate, safe, and well-scoped: attributing the DEMO loss tail to the scratch-exit rule versus entry selection is exactly the kind of read-only retrospective analysis the research layer exists for. It touches no broker mutation, no config change, and no live exposure, so no safety objection. However, the p",
+      "reason": "unparseable vote: ''",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "The proposed change text is truncated and does not fully specify the sealed-holdout methodology.",
+        "No minimum sample size, confidence interval, or multiple-comparison control is defined for the three scratch thresholds.",
+        "The baseline scratch rule, threshold units, adverse-excursion definition, and spread/slippage assumptions are unspecified.",
+        "Logged DEMO closes may be selection-biased and must be separated from shadow-replay evidence.",
+        "No explicit guarantee states that this experiment cannot alter champion, runtime exits, order execution, or protected trading configuration."
+      ],
+      "confidence": 0.88,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "A read-only, sealed-holdout exit experiment is appropriate for DEMO research, but the proposal is incomplete and does not define sufficient acceptance controls to support a reliable conclusion.",
+      "requested_revisions": [
+        "Specify the exact incumbent, tighter, and looser scratch thresholds and their units.",
+        "Define sealed train/validation/holdout splits, minimum sample requirements, cost model, and statistical decision criteria.",
+        "Report expectancy, 95th-percentile adverse excursion, drawdown/tail-loss measures, and confidence intervals net of costs.",
+        "Record the experiment in ExperimentRegistry and preserve all rejected results.",
+        "State explicitly that execution behavior, champion artifacts, and protected MT5 DEMO configuration remain unchanged unless a separate governed promotion passes."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "concerns": [
+        "Accuracy of spread and slippage modeling in the net-of-spread expectancy calculation for rapid scratches.",
+        "Potential for scratch threshold overfitting if the DEMO period has anomalous volatility."
+      ],
+      "confidence": 0.95,
+      "model": null,
+      "reason": "The proposal addresses a logical hypothesis regarding exit efficiency following the removal of the global daily halt. Using shadow replay for empirical validation of scratch thresholds on DEMO is a low-risk, high-signal methodology for optimizing the loss tail without impacting live production.",
+      "requested_revisions": [],
+      "vote": "APPROVE_FOR_TEST"
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "The proposal text is truncated and does not specify sample-size or statistical-confidence requirements.",
+        "Any exploration trades must be placed only by the designated broker paper runner after all DEMO safety gates pass.",
+        "Results must be recorded in ExperimentRegistry and must not tune or evaluate thresholds on the same sealed holdout data."
+      ],
+      "confidence": 0.87,
+      "model": null,
+      "reason": "The proposal is a bounded research experiment with no champion impact or live exposure, and it evaluates exits using costed metrics on sealed holdout data. It may proceed only through the governed DEMO execution path and without protected configuration changes.",
+      "requested_revisions": [
+        "Provide the complete proposal, including the exact sealed-holdout window, threshold definitions, minimum sample sizes, and pass/fail decision rules.",
+        "Explicitly state that research and council processes cannot call mt5.order_send() and that no champion promotion or trading-config changes are authorized."
+      ],
+      "vote": "APPROVE_FOR_TEST"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

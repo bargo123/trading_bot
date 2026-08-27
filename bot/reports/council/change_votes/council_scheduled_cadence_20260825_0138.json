@@ -1,0 +1,106 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_0138",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T01:40:59.748717+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_0138",
+    "current_evidence": "Candidate: audit the validated-state gate's short-horizon labels for broker-server timestamp misalignment before any new strategy work. Hypothesis: since the recent demo deal-watermark timezone shift, a measurable fraction of outcome labels for deals spanning the daily server rollover (or weekend ga",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate: audit the validated-state gate's short-horizon labels for broker-server timestamp misalignment before any new strategy work. Hypothesis: since the recent demo deal-watermark timezone shift, a measurable fraction of outcome labels for deals spanning the daily server rollover (or weekend gap) are computed on windows offset by 2\u20133 hours, systematically inflating apparent win rate and feeding the validated-state gate biased features. Falsification test: recompute ~90 days of outcome_log e",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T01:38:51.319562+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Falsification criterion does not map to the hypothesis; exploration-trade expectancy is confounded by market conditions, spread regime, and strategy edge, isolating none of them",
+        "Proposal text is truncated mid-specification (both hypothesis tail 'weekend ga...' and falsification-test tail 'outcome_log e...'), so the exact recomputation methodology is unverifiable",
+        "bot/ai_council/ in affected_files implies potential changes to gate/council logic; an audit's findings must not directly mutate validated-state gate inputs without separate governed review",
+        "'2-3 hours' offset framing ignores DST: most MT5 broker servers (EET-based) shift between UTC+2 and UTC+3 seasonally, so the offset convention is time-varying and must be pinned exactly, including across DST transition dates within the 90-day window",
+        "Problem statement shows PF=None, EV=None - no baseline metrics exist, creating temptation to convert audit findings into immediate strategy pivots without fresh validation"
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "The underlying idea is sound, low-risk, and well-motivated: the recent demo deal-watermark timezone fix (commit lineage) makes a plausible case that short-horizon outcome labels spanning server rollover/weekend gaps were computed on offset windows, and auditing label integrity before new strategy work is correct sequencing. However, the proposal as written contains an internal inconsistency: the hypothesis concerns systematic label-window bias, but the falsification criterion ('negative costed expectancy after exploration trades') would neither confirm nor refute timestamp misalignment - expectancy can be negative for many reasons unrelated to label offsets, and the audit itself need not involve exploration trades. Run as specified, the test cannot falsify the stated hypothesis.",
+      "requested_revisions": [
+        "Replace falsification criteria with a direct test of the hypothesis: recompute ~90 days of short-horizon labels under both the legacy (naive/local) and corrected broker-server-time conventions; report (a) fraction of rollover-spanning deals whose label window shifts by >=2h, (b) win-rate/PF delta between conventions on the affected subset vs unaffected subset; declare bias confirmed only if the affected-subset delta exceeds a pre-stated threshold (e.g., >=5 percentage points)",
+        "Publish the complete, untruncated test specification: exact label window definitions, broker server-timezone convention and DST handling, per-symbol applicability, minimum sample sizes, and pre-registered accept/reject thresholds",
+        "Immutability guarantee: original bot/intel/outcome_log.jsonl remains untouched; corrected labels are emitted to a separate versioned artifact with provenance metadata; no silent mixing of corrected and legacy label series",
+        "Register the audit in ExperimentRegistry before execution and record the null result honestly if bias is not detected",
+        "Explicitly scope the audit process as research-read-only (no mt5.order_send(), no position mutation), consistent with existing safety rules, and state this in the revised proposal",
+        "Split deliverables: (1) audit findings report, (2) separate follow-up proposal for any validated-state gate remediation, each independently reviewable"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "No precise broker/server timestamp source, timezone convention, or watermark-change date is defined.",
+        "The proposed falsification criterion concerns trading expectancy rather than the timestamp-label hypothesis.",
+        "Recomputing historical labels could affect validated-state inputs; preservation, versioning, and no-runtime-mutation controls are not specified.",
+        "Affected files are overly broad and no experiment-registry record or concrete OOS comparison is specified."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposed audit is read-only and appropriate, but the evidence, exact data scope, and acceptance criteria are truncated and insufficiently specified for reproducible validation.",
+      "requested_revisions": [
+        "Define the authoritative timestamp fields, timezone normalization rule, affected date range, and expected 2-3 hour offset signatures.",
+        "Specify a read-only, versioned label recomputation with before/after confusion counts and per-rollover/weekend analysis.",
+        "Use falsification criteria tied to label alignment, such as no material change in independently reconciled short-horizon outcomes.",
+        "Record the experiment in ExperimentRegistry and ensure no champion, runtime feature, or broker-execution mutation occurs until governed validation passes."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "No exact files, timestamp source, timezone convention, or recomputation procedure are specified.",
+        "No sample-size, acceptance threshold, or quantified misalignment criterion is provided.",
+        "ExperimentRegistry recording and baseline pytest results are omitted.",
+        "Exploration trades are unnecessary before an offline label audit and could bias conclusions.",
+        "Must guarantee no MT5 order submission, live-config edits, or champion promotion."
+      ],
+      "confidence": 0.98,
+      "model": null,
+      "reason": "The audit is directionally safe, but the proposal lacks a precise offline validation protocol and conflates label-quality falsification with exploration-trade expectancy. It must prove timestamp alignment before any trading or throughput changes.",
+      "requested_revisions": [
+        "Specify the exact read-only inputs and broker-server timestamp normalization, including rollover and weekend handling.",
+        "Recompute the defined 90-day sample with paired old/new labels and report mismatch rates, PF, EV, and confidence intervals net of costs.",
+        "Define explicit pass/fail thresholds and require baseline/full test results before proceeding.",
+        "Record the experiment and all failures in ExperimentRegistry; do not use exploration trades as the initial falsification test.",
+        "State that only the governed DEMO execution owner may place orders, with no changes to live YAML or champion artifacts."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

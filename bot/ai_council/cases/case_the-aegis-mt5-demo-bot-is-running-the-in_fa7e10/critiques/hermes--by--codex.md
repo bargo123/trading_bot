@@ -1,0 +1,1 @@
+This is not a testable strategy proposal but an opaque API error, so it provides no hypothesis, data, metrics, or executable decision rule to evaluate. It also omits root-cause diagnosis and recovery safeguards—such as model availability checks, fallback behavior, and fail-closed handling—creating a risk of silently skipped research or uncontrolled substitution.

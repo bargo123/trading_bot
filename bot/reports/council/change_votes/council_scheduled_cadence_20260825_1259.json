@@ -1,0 +1,108 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_1259",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T13:01:57.304039+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_1259",
+    "current_evidence": "Candidate improvement: convert the validated-state gate from a fixed-threshold accept/reject into a calibrated abstention-margin rule \u2014 require the validator's posterior margin between its top-1 and top-2 regime/state hypotheses to exceed a cutoff derived from historical calibration data before auth",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate improvement: convert the validated-state gate from a fixed-threshold accept/reject into a calibrated abstention-margin rule \u2014 require the validator's posterior margin between its top-1 and top-2 regime/state hypotheses to exceed a cutoff derived from historical calibration data before authorizing entry, and abstain otherwise. Falsifiable test: replay the firehose's logged decision stream through the offline evaluation harness, sweep the margin cutoff, and compare net-of-spread/slippage",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T12:59:26.727134+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 1,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Mechanism mismatch: a margin-abstention gate typically REDUCES accepted-trade throughput while raising selectivity; 'improve exploration/validation throughput' is the wrong headline target and could rationalize gate-loosening. Success must be judged on net-of-cost expectancy and tail behavior, not trade count.",
+        "Cutoff-sweep overfitting: sweeping the margin cutoff on the same logged decision stream that will judge it invites selection bias; no calibration/OOS separation is specified.",
+        "Margin is undefined: which model produces the posterior, whether its probabilities are calibrated (Platt/isotonic), and how the degenerate binary case is handled (top-2 margin = |2p-1| collapses to a confidence threshold) are all unstated.",
+        "Baseline PF=None, EV=None means there is no measured reference point; before/after claims need an explicit baseline-measurement protocol on the same replay window.",
+        "affected_files names bot/intel/, which holds runtime artifacts including intelligent_champion.json; code belongs in module layers, and artifact writes must remain exclusively behind the governed promote scripts.",
+        "A more permissive authorization rule increases DEMO trade count; unweighted ingestion of lower-quality exploration outcomes could contaminate the outcome log and bias future calibration and promotion decisions."
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "This is a research-scoped, offline-first, reversible change to validation-gate logic. It does not touch DEMO-account verification, allow_live, mode, protected trading YAML, per-trade risk sizing, or the governed champion-promotion path, so no safety rule is implicated. The proposed falsification loop (replay logged decisions, sweep cutoff, compare net of spread/slippage) is exactly how a gate change should be evaluated before any runtime effect. Approval is for the offline test phase only; the identified methodology gaps must be closed before the margin rule could ever gate real authorizations.",
+      "requested_revisions": [
+        "Select the margin cutoff ONLY on a time-respecting calibration window; evaluate once on untouched OOS segments (walk-forward preferred); never tune against the evaluation segment.",
+        "Use an identical cost model on both sides of the comparison, matching the runner's spread/slippage assumptions; report all results net of costs.",
+        "Specify the margin definition: source model, recalibration method, and explicit handling of the degenerate binary top-2 case.",
+        "Register the experiment in ExperimentRegistry before running; log failures and negative results honestly.",
+        "Define success as: OOS net expectancy >= fixed-gate baseline AND no degradation in tail metrics (max drawdown, worst losing streak); additionally report acceptance-rate and coverage deltas per regime so throughput/selectivity effects are visible.",
+        "Declare out of scope in the experiment spec: writes to intelligent_champion.json, any protected trading YAML, DEMO-account verification logic, and EV/spread/OMS/total-drawdown gates; revert-on-failure applies to gate code, not to safety checks."
+      ],
+      "vote": "APPROVE_FOR_TEST"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Historical calibration may leak future outcomes or reuse the same stream for cutoff selection and OOS evaluation.",
+        "A margin cutoff can improve conditional metrics by abstaining excessively; coverage, opportunity cost, and minimum-trade requirements are unspecified.",
+        "'Improve exploration/validation throughput' conflicts with a stricter abstention gate and needs a measurable target.",
+        "Negative expectancy alone is insufficient falsification; degradation versus baseline, calibration stability, tail loss, and regime-specific behavior also matter.",
+        "Affected runtime paths must not permit Council or research processes to submit MT5 orders."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The abstention-margin concept is testable and can reduce low-confidence entries, but the proposal lacks a defined calibration protocol, leakage controls, objective selection rule, and impact analysis on trade coverage and risk. No safety veto applies if implemented offline and kept outside broker execution until governed validation passes.",
+      "requested_revisions": [
+        "Specify time-ordered train/calibration/OOS splits, including all spread and slippage assumptions and a no-lookahead guarantee.",
+        "Predefine cutoff-selection objective, minimum OOS sample size, baseline comparator, coverage floor, and regime-stratified acceptance criteria.",
+        "Report net expectancy, PF, drawdown/tail loss, trade count, abstention rate, and confidence intervals versus the fixed-threshold baseline.",
+        "Keep implementation research-only until experiment registry records a successful costed OOS result and governed promotion gates pass.",
+        "Document that the change cannot bypass existing DEMO account, risk, OMS, EV, spread, and execution gates."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "No historical calibration dataset, posterior reliability analysis, or proposed cutoff is provided.",
+        "No net-of-spread/slippage results or baseline comparison are included.",
+        "The affected runtime files could alter authorization behavior despite the claimed safety impact of none.",
+        "No explicit confirmation of experiment registry recording, DEMO-only enforcement, or preservation of champion governance."
+      ],
+      "confidence": 0.93,
+      "model": null,
+      "reason": "The proposal is potentially valid but lacks calibration evidence, cutoff selection methodology, and proof that all existing risk and execution gates remain unchanged. Runtime entry authorization should not change based solely on an unvalidated offline hypothesis.",
+      "requested_revisions": [
+        "Run and report the offline cutoff sweep against the logged decision stream with costed metrics, sample sizes, confidence intervals, and comparison to the current gate.",
+        "Specify calibration methodology, data split, anti-lookahead controls, and the selected abstention cutoff.",
+        "Demonstrate that broker, quote, spread, EV, OMS, drawdown, DEMO-account, and execution-owner safeguards remain mandatory and unchanged.",
+        "Register the experiment and add regression/OOS tests proving no champion promotion or live execution path is affected.",
+        "Resubmit with explicit rollback criteria tied to measured degradation or unsafe authorization behavior."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_1007",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T10:09:24.078755+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_1007",
+    "current_evidence": "Proposal: Leverage the newly instrumented halted-scan telemetry (recent commits recording halted Firehose scans and exposing them in the heartbeat) to test whether the validated-state gate is protective or merely restrictive: over the next 10 trading days of DEMO operation, log for every firehose sc",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Proposal: Leverage the newly instrumented halted-scan telemetry (recent commits recording halted Firehose scans and exposing them in the heartbeat) to test whether the validated-state gate is protective or merely restrictive: over the next 10 trading days of DEMO operation, log for every firehose scan both its gate disposition (passed/halted) and the cost-adjusted counterfactual outcome the setup would have produced had it traded, using the existing runner spread/slippage assumptions. Falsifiabl",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/2)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T10:07:06.891302+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 2,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "raw": "API call failed after 3 retries: HTTP 503: Error from provider (Console): Upstream request failed: Endpoint is unavailable.",
+      "reason": "unparseable vote: ''",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Ambiguity between shadow counterfactual logging vs. actual 'exploration trades' on halted setups; the latter would bypass the validated-state gate outside the governed run_broker_paper.py path",
+        "'proposed_change', 'current_evidence', and falsification criteria are truncated mid-sentence - incomplete specification",
+        "Counterfactual outcome computation risks lookahead bias; methodology (entry/exit rules frozen at scan time, runner spread/slippage applied) must be pre-registered before data collection",
+        "affected_files includes bot/ai_council/; council components must remain strictly read-only regarding broker execution",
+        "No explicit ExperimentRegistry entry mentioned despite being mandatory"
+      ],
+      "confidence": 0.82,
+      "model": "opencode/x-preview-f-free",
+      "reason": "Core idea is sound and valuable: using the new halted-scan telemetry to measure whether the validated-state gate blocks profitable setups, via cost-adjusted counterfactual logging on DEMO, is legitimate read-side research with trivial rollback. However, the proposal is internally inconsistent about whether halted setups are actually traded: 'proposed_change' describes counterfactual simulation ('had it traded'), while 'falsification_criteria' references 'negative costed expectancy after exploration trades', implying real DEMO orders placed on gate-halted setups. Trading around a protective gate violates the AGENTS.md rule that all orders pass the full strategy/risk/economics gate stack and that no trades be forced merely to demonstrate execution. This ambiguity must be resolved before approval.",
+      "requested_revisions": [
+        "State explicitly: zero mt5.order_send() calls for gate-halted setups; the experiment is pure shadow/counterfactual logging only",
+        "Provide complete, untruncated proposed_change, evidence, and falsification criteria",
+        "Pre-register the counterfactual simulation methodology (entry rule, exit rule, cost model) before the 10-day collection window begins",
+        "Register the experiment in ExperimentRegistry under change_id council_scheduled_cadence_20260825_1007",
+        "Scope bot/ai_council/ changes to telemetry reads only; confirm no execution-path edits",
+        "Define halt-vs-pass sample accounting so the comparison isn't confounded by regime drift over the 10 days"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Explicitly prohibit research or council processes from calling mt5.order_send() or modifying positions.",
+        "If DEMO exploration trades are intended, specify that only the governed broker runner may place them and require all existing DEMO safety and risk gates without increasing configured risk.",
+        "Define the counterfactual schema, cost assumptions, minimum sample size, statistical evaluation, and go/no-go thresholds.",
+        "Clarify the 10-trading-day window, handling of halted scans, and ensure no champion or live-config impact."
+      ],
+      "confidence": 0.95,
+      "model": null,
+      "reason": "The telemetry and counterfactual study is potentially safe and useful, but the proposal is ambiguous about whether exploratory trades will be placed and lacks measurable sample, analysis, and stopping criteria.",
+      "requested_revisions": [
+        "State explicitly whether this is telemetry-only or includes DEMO orders.",
+        "Add governed execution and fail-closed requirements if orders are included.",
+        "Add concrete measurement, sample-size, falsification, and rollback criteria.",
+        "Confirm experiment registration and immutable live configuration/champion isolation."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

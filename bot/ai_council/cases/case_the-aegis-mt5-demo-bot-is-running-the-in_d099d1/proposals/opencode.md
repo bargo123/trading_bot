@@ -1,0 +1,1 @@
+Run a sealed-holdout experiment that adds a short-horizon volatility-regime feature to the validated-state gate and compare net post-cost expectancy against the current gate. Promote it only if it improves holdout expectancy and drawdown without increasing trade risk or false-positive entry rate; otherwise reject it.

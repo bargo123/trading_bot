@@ -1,0 +1,218 @@
+{
+  "created_utc": "2026-08-24T09:10:43.640355+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_76e56f\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 10.67,
+          "finished_utc": "2026-08-24T09:13:04.781138+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T09:12:54.113122+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T09:13:04.781138+00:00",
+        "text": "Two confirmations may reduce coverage enough to make apparent expectancy gains a low-sample artifact, so require confidence intervals and regime- and instrument-stratified holdout results. \u201cQualifying\u201d and the current drawdown limit are undefined, making the gate non-reproducible and allowing tuning against the sealed holdout. Coverage must have a predeclared minimum, and the candidate must be recorded and rejected without altering the champion unless all governed promotion gates pass."
+      }
+    ],
+    "gemini": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_76e56f\\critiques\\gemini--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 10.98,
+          "finished_utc": "2026-08-24T09:12:40.980913+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T09:12:30.004960+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T09:12:40.980913+00:00",
+        "text": "The 12% Profit Factor target and 300-trade threshold are arbitrary without pre-registered confidence intervals, regime-stratified holdouts, or multiple-testing controls, inviting overfitting. ATR is an indirect proxy for tick velocity and slippage; the proposal must measure actual executable spread/slippage and define the data source, latency, and cost model. It also improperly proposes modifying a validated-state gate before isolated research validation, and \u201cprice-action clarity\u201d is an unmeasurable post-hoc claim."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_76e56f\\critiques\\gemini--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 13.1,
+          "finished_utc": "2026-08-24T09:12:54.107636+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T09:12:41.008205+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T09:12:54.107636+00:00",
+        "text": "The two-sigma M1-ATR trigger, 12% Profit Factor target, and 300-trade minimum are arbitrary and invite overfitting without pre-registered parameters, regime-stratified validation, costs, or an untouched holdout. \u201cTick-velocity events,\u201d widened slippage, and \u201cnoise\u201d trades are not operationally defined or measurable from the proposal, and demo-account observations cannot establish live execution degradation. Implementing VAST in the validated-state gate risks violating the research-only boundary unless isolated from immutable live YAML and runtime paths; even a passing result would not validate the broad causal claim that price-action clarity is a prerequisite."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_76e56f\\critiques\\opencode--by--gemini.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 8.99,
+          "finished_utc": "2026-08-24T09:12:18.856419+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "Google",
+          "returncode": 0,
+          "started_utc": "2026-08-24T09:12:09.863802+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T09:12:18.872347+00:00",
+        "text": "The proposal\u2019s reliance on \"estimated\" slippage is a critical failure point, as these metrics rarely reflect real-market latency and order-book thinness during high-volatility events. By mandating an arbitrary 10% expectancy boost without defining a minimum sample size, you risk promoting high-variance noise that appears superior in holdouts but collapses under live execution. Additionally, the lack of a walk-forward stress test for shifting liquidity regimes makes this \"sealed\" experiment a recipe for overfitting to static historical spreads."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_76e56f\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.09,
+          "finished_utc": "2026-08-24T09:12:29.973113+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T09:12:18.888003+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T09:12:29.973113+00:00",
+        "text": "The proposal risks overfitting by tuning an EV margin and judging success on a single sealed holdout, while the arbitrary 10% improvement and unchanged maximum drawdown thresholds lack statistical justification. Spread/slippage estimates may be optimistic or regime-specific, and \u201cvalidated-state signal\u201d and \u201cnet expectancy improves\u201d are insufficiently defined for reproducible measurement, including confidence intervals and minimum trade count. It also omits robustness checks across instruments, time periods, and stress-cost scenarios, so a holdout win could be noise rather than a safe improvement."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T09:13:51.473014+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_c5a9ba",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 5,
+      "n_proposals": 3,
+      "n_revisions": 3,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_c5a9ba for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_76e56f",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_76e56f\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 10.06,
+        "finished_utc": "2026-08-24T09:11:04.165228+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T09:10:54.106702+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T09:11:04.165228+00:00",
+      "text": "Run a registered, sealed-holdout experiment that adds a minimum expected-value margin above estimated spread and slippage before a validated-state signal is eligible. Compare net expectancy, maximum drawdown, and trade count against the current gate; retain the change only if holdout net expectancy improves by at least 10% without increasing maximum drawdown."
+    },
+    {
+      "agent": "gemini",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_76e56f\\proposals\\gemini.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.77,
+        "finished_utc": "2026-08-24T09:11:24.022867+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "Google",
+        "returncode": 0,
+        "started_utc": "2026-08-24T09:11:10.248632+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T09:11:24.022867+00:00",
+      "text": "I propose implementing a \"Volatility-Adjusted Slippage Threshold\" (VAST) within the validated-state gate to automatically inhibit firehose signals when the M1 ATR exceeds its 20-day rolling mean by two standard deviations. This experiment will test the hypothesis that firehose performance on MT5 demo accounts degrades significantly during high tick-velocity events where execution slippage typically widens beyond the spread. The research cycle should measure whether this filter reduces the frequency of sub-1R \"noise\" trades as suggested by the risk management principles in Volman's *Understanding Price Action*. This proposal is falsifiable if the modified gate fails to produce a 12% improvement in the system's net Profit Factor over a minimum of 300 test trades. Success will validate that price-action clarity is a prerequisite for firehose execution efficiency."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_76e56f\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.58,
+        "finished_utc": "2026-08-24T09:11:44.656077+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T09:11:32.072179+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T09:11:44.656077+00:00",
+      "text": "Test a stricter validated-state gate that requires two consecutive qualifying confirmations before an intelligent-firehose signal is emitted. Evaluate it against the current gate on the sealed holdout, net of spread and slippage, using expectancy, drawdown, and signal coverage. Adopt the candidate only if expectancy improves without exceeding the current drawdown limit; otherwise reject and retain the current champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_76e56f\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 17.51,
+        "finished_utc": "2026-08-24T09:13:51.446097+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T09:13:33.937358+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T09:13:51.446097+00:00",
+      "text": "Test a stricter validated-state gate requiring two consecutive confirmations, where each confirmation satisfies the existing gate\u2019s unchanged, predeclared predicates and thresholds. Before opening the sealed holdout, register the candidate, define the current champion\u2019s governed drawdown limit, and set a minimum coverage of at least 70% of the current gate\u2019s coverage. Compare both gates net of spread and slippage on the sealed holdout, reporting 95% confidence intervals for expectancy, maximum drawdown, and coverage, with results stratified by instrument and market regime. Promote the candidate only if its expectancy improvement is statistically supported, its drawdown confidence bound remains within the predeclared limit, coverage meets the minimum, and every governed promotion gate passes; otherwise record and reject it without modifying the champion."
+    },
+    "gemini": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_76e56f\\revisions\\gemini.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.28,
+        "finished_utc": "2026-08-24T09:13:33.923692+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "Google",
+        "returncode": 0,
+        "started_utc": "2026-08-24T09:13:20.642301+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T09:13:33.923692+00:00",
+      "text": "I propose an isolated Research Factory experiment to evaluate a \"Volatility-Adjusted Slippage Threshold\" (VAST) that filters firehose signals when M1 ATR exceeds the 20-day mean by two standard deviations. This study will operationalize execution degradation by measuring actual slippage against rolling average spreads, utilizing regime-stratified holdout sets and Monte Carlo simulations to mitigate overfitting risks. We will prioritize identifying a statistically significant (p < 0.05) correlation between ATR spikes and execution costs, replacing arbitrary profit targets with objective slippage-to-spread ratios. The hypothesis is falsified if VAST fails to provide a measurable reduction in execution-sensitive trades without degrading the overall expectancy across diverse market regimes. By confining this to the research-only path, we ensure that validated-state gates remain immutable until the causal link between volatility-driven slippage and firehose efficiency is empirically established."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_76e56f\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.11,
+        "finished_utc": "2026-08-24T09:13:20.626520+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T09:13:09.518508+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T09:13:20.629869+00:00",
+      "text": "Run a registered experiment with pre-specified validated-state definitions, EV-margin candidates, costs, minimum trades, and confidence intervals. Use walk-forward, sealed holdouts across instruments and liquidity regimes, applying stress-cost scenarios calibrated to adverse volatility and thin-liquidity conditions. Retain a margin only if it delivers statistically supported net-expectancy improvement versus the current gate, meets the predeclared minimum sample size, and does not worsen maximum drawdown under any required stress scenario. Record all candidates, failures, and holdout results; do not promote results that fail robustness or execution-cost sensitivity checks."
+    }
+  },
+  "status": "decided"
+}

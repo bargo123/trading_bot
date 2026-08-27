@@ -1,0 +1,1 @@
+Test a research-only challenger that raises the validated-state gate’s minimum net expected value by 20% while leaving the current champion unchanged. Promote it only if, on a sealed holdout, it reduces net loss and drawdown without lowering risk-adjusted return or coverage by more than 15% versus the current gate. If these conditions fail, reject and retain the current champion.

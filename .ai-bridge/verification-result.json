@@ -1,0 +1,34 @@
+{
+  "mode": "finish_duplicate_owner_prelock",
+  "returncode": 125,
+  "restart_requested": false,
+  "current_watcher_pid": 12936,
+  "mt5": {
+    "ok": true,
+    "trade_mode": 0,
+    "server": "MetaQuotes-Demo",
+    "positions": 0
+  },
+  "authoritative_old_runner_pid": 8104,
+  "pre_runners": [],
+  "pre_watchers": [
+    {
+      "pid": 17928,
+      "cmd": "\"C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.venv\\Scripts\\python.exe\" -u scripts/research_fast_watcher.py --interval 1200 --council-every 3 "
+    },
+    {
+      "pid": 13504,
+      "cmd": "\"C:\\Users\\Zaid barghouthi\\AppData\\Local\\Programs\\Python\\Python312\\python.exe\" -u scripts/research_fast_watcher.py --interval 1200 --council-every 3 "
+    },
+    {
+      "pid": 15192,
+      "cmd": "\"C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.venv\\Scripts\\python.exe\" -u \"C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\scripts\\research_fast_watcher.py\""
+    },
+    {
+      "pid": 12936,
+      "cmd": "\"C:\\Users\\Zaid barghouthi\\AppData\\Local\\Programs\\Python\\Python312\\python.exe\" -u \"C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\scripts\\research_fast_watcher.py\""
+    }
+  ],
+  "stderr": "authoritative heartbeat PID missing from audited broker owners",
+  "elapsed_s": 1.14
+}

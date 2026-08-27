@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal, so it makes no measurable trading claim to evaluate. It lacks a reproducible request, provider documentation reference, fallback behavior, and validation that any replacement model preserves required safety and reliability constraints.

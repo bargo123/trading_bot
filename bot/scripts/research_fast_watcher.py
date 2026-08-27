@@ -154,6 +154,7 @@ def _summarize_ml(report: Path) -> dict[str, Any]:
         "exit_summary": payload.get("exit_research", {}).get("summary"),
         "strategies_shortlisted": payload.get("strategy_selection", {}).get("n_shortlisted"),
         "strategies_survive": payload.get("strategy_selection", {}).get("n_survive"),
+        "strategy_survivor_rows": payload.get("strategy_selection", {}).get("n_survive_rows"),
         "ml_improvement": payload.get("ml", {}).get("improvement_expectancy"),
     }
 
@@ -434,7 +435,8 @@ def write_status(
             "- status: " + ("ok" if ml.get("ok") else "failed"),
             "- exit research ran: " + str(exit_run),
             "- strategies shortlisted: " + _report_val(ML_REPORT, "strategy_selection", "n_shortlisted"),
-            "- strategies survived validation: " + _report_val(ML_REPORT, "strategy_selection", "n_survive"),
+            "- unique actionable survivors: " + _report_val(ML_REPORT, "strategy_selection", "n_survive"),
+            "- surviving hierarchy rows: " + _report_val(ML_REPORT, "strategy_selection", "n_survive_rows"),
             "- ML improvement (expectancy): " + _report_val(ML_REPORT, "ml", "improvement_expectancy"),
             "",
             "## Runtime",
@@ -782,16 +784,239 @@ def _council_agents_for_trigger(trigger: str | None) -> list[str]:
 
     Hermes and the configured free/local agents form the normal research team.
     Claude is added only for high-value review triggers, never per tick.
-    ``AEGIS_COUNCIL_AGENTS`` remains an explicit operator override.
+    ``AEGIS_COUNCIL_AGENTS`` may override the recurring research team, but
+    Codex is deliberately filtered here because it is an implementation worker,
+    not a recurring Council member.
     """
     agents_env = os.environ.get(
         "AEGIS_COUNCIL_AGENTS",
         "hermes,opencode,gemini,cursor",
     )
-    agents = [a.strip() for a in agents_env.split(",") if a.strip()]
+    agents = [
+        a.strip()
+        for a in agents_env.split(",")
+        if a.strip() and a.strip().lower() != "codex"
+    ]
     if trigger in _SENIOR_REVIEW_TRIGGERS and "claude" not in agents:
         agents.append("claude")
     return agents
+
+
+_PRELOCK_BEGIN = ""
+
+
+def _remove_prelock_hook() -> None:
+    path = Path(__file__).resolve()
+    text = path.read_text(encoding="utf-8")
+    start = text.find(_PRELOCK_BEGIN)
+    end = text.find(_PRELOCK_END)
+    if start >= 0 and end >= start:
+        end += len(_PRELOCK_END)
+        if end < len(text) and text[end] == "\n":
+            end += 1
+        path.write_text(text[:start] + text[end:], encoding="utf-8")
+
+    ingest_path = BOT / "scripts" / "research_incremental_ingest.py"
+    ingest_text = ingest_path.read_text(encoding="utf-8")
+    ingest_begin = "# >>> TEMP AEGIS DUPLICATE-OWNER FINISH HOOK >>>"
+    ingest_end_marker = "# <<< TEMP AEGIS DUPLICATE-OWNER FINISH HOOK <<<"
+    ingest_start = ingest_text.find(ingest_begin)
+    ingest_end = ingest_text.find(ingest_end_marker)
+    if ingest_start >= 0 and ingest_end >= ingest_start:
+        ingest_end += len(ingest_end_marker)
+        if ingest_end < len(ingest_text) and ingest_text[ingest_end] == "\n":
+            ingest_end += 1
+        ingest_path.write_text(ingest_text[:ingest_start] + ingest_text[ingest_end:], encoding="utf-8")
+
+
+def _prelock_finish_duplicate_owners() -> dict[str, Any] | None:
+    bridge = BOT.parent / ".ai-bridge"
+    request_path = bridge / "verification-request.json"
+    result_path = bridge / "verification-result.json"
+    if not request_path.is_file():
+        return None
+    try:
+        req = json.loads(request_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if str(req.get("mode") or "") != "finish_duplicate_owner":
+        return None
+
+    out: dict[str, Any] = {
+        "mode": "finish_duplicate_owner_prelock",
+        "returncode": 125,
+        "restart_requested": False,
+        "current_watcher_pid": os.getpid(),
+    }
+    started = time.time()
+    try:
+        probe_code = (
+            'import json, MetaTrader5 as mt5; ok=bool(mt5.initialize()); '
+            'a=mt5.account_info() if ok else None; p=mt5.positions_get() if ok else (); '
+            'print(json.dumps({"ok":ok,"trade_mode":int(getattr(a,"trade_mode",-1)) if a is not None else -1,'
+            '"server":str(getattr(a,"server","")) if a is not None else "","positions":len(p or ())})); '
+            'mt5.shutdown() if ok else None'
+        )
+        mt5_probe = subprocess.run(
+            [sys.executable, "-c", probe_code],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=20,
+            check=False,
+        )
+        if mt5_probe.returncode != 0:
+            raise RuntimeError(f"MT5 probe failed: {mt5_probe.stderr.strip()}")
+        mt5 = json.loads((mt5_probe.stdout or "{}").strip() or "{}")
+        out["mt5"] = mt5
+        if not bool(mt5.get("ok")):
+            raise RuntimeError("refusing finish: MT5 not connected")
+        if int(mt5.get("trade_mode", -1)) != 0:
+            raise RuntimeError("refusing finish: account is not DEMO")
+        if int(mt5.get("positions", -1)) != 0:
+            raise RuntimeError("refusing finish: MT5 not flat")
+
+        hb_path = BOT / "reports" / "bot_heartbeat.json"
+        hb = json.loads(hb_path.read_text(encoding="utf-8"))
+        if int(hb.get("open") or 0) != 0:
+            raise RuntimeError("refusing finish: broker heartbeat not flat")
+        authoritative_pid = int(hb.get("pid") or 0)
+        out["authoritative_old_runner_pid"] = authoritative_pid
+
+        audit_code = (
+            "$rs=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | "
+            "Where-Object {$_.CommandLine -and $_.CommandLine -match 'run_broker_paper\\.py'} | "
+            "ForEach-Object {[ordered]@{pid=[int]$_.ProcessId;cmd=[string]$_.CommandLine}}); "
+            "$ws=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | "
+            "Where-Object {$_.CommandLine -and $_.CommandLine -match 'research_fast_watcher\\.py'} | "
+            "ForEach-Object {[ordered]@{pid=[int]$_.ProcessId;cmd=[string]$_.CommandLine}}); "
+            "[ordered]@{runners=$rs;watchers=$ws}|ConvertTo-Json -Depth 5 -Compress"
+        )
+        audited = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-Command", audit_code],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=20,
+            check=False,
+        )
+        if audited.returncode != 0:
+            raise RuntimeError(f"process audit failed: {audited.stderr.strip()}")
+        state = json.loads((audited.stdout or "{}").strip() or "{}")
+        runners = state.get("runners") or []
+        watchers = state.get("watchers") or []
+        if isinstance(runners, dict):
+            runners = [runners]
+        if isinstance(watchers, dict):
+            watchers = [watchers]
+        out["pre_runners"] = runners
+        out["pre_watchers"] = watchers
+        runner_pids = [int(r.get("pid") or 0) for r in runners if int(r.get("pid") or 0) > 0]
+        watcher_pids = [int(w.get("pid") or 0) for w in watchers if int(w.get("pid") or 0) > 0]
+        if authoritative_pid not in runner_pids:
+            raise RuntimeError("authoritative heartbeat PID missing from audited broker owners")
+        if os.getpid() not in watcher_pids:
+            raise RuntimeError("current fresh watcher launch missing from audited watcher owners")
+        for row in runners:
+            cmd = str(row.get("cmd") or "")
+            if "run_broker_paper.py" not in cmd or "--config" not in cmd or "config_mt5_demo_firehose_hw.yaml" not in cmd:
+                raise RuntimeError(f"unexpected broker owner command: {cmd}")
+            if "allow_live" in cmd.lower() or "--live" in cmd.lower():
+                raise RuntimeError(f"refusing broker cleanup with live-like command: {cmd}")
+        for row in watchers:
+            cmd = str(row.get("cmd") or "")
+            if "research_fast_watcher.py" not in cmd:
+                raise RuntimeError(f"unexpected watcher owner command: {cmd}")
+
+        if not runner_pids:
+            raise RuntimeError("refusing broker-only restart: no broker owners found")
+        out["stale_runner_pids"] = list(runner_pids)
+        for pid in runner_pids:
+            subprocess.run(
+                ["powershell.exe", "-NoProfile", "-Command", f"$p=Get-Process -Id {pid} -ErrorAction SilentlyContinue; if ($null -eq $p) {{ exit 0 }}; Stop-Process -Id {pid} -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 300; if (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ Write-Error 'broker owner still alive after Stop-Process'; exit 1 }}; exit 0"],
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, check=True,
+            )
+        time.sleep(2.0)
+
+        keepalive = BOT / "scripts" / "supervisor_keepalive.ps1"
+        restart = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(keepalive)],
+            cwd=str(BOT), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, check=False,
+        )
+        out["keepalive_returncode"] = int(restart.returncode)
+        out["keepalive_stdout"] = restart.stdout
+        out["keepalive_stderr"] = restart.stderr
+        if restart.returncode != 0:
+            raise RuntimeError(f"governed keepalive restart failed: {restart.stderr.strip()}")
+        out["restart_requested"] = True
+
+        deadline = time.time() + 45.0
+        fresh = None
+        while time.time() < deadline:
+            try:
+                candidate = json.loads(hb_path.read_text(encoding="utf-8"))
+                if (
+                    int(candidate.get("pid") or 0) not in runner_pids
+                    and str(candidate.get("status") or "") == "running"
+                    and int(candidate.get("open") or 0) == 0
+                    and float(candidate.get("ts") or 0.0) >= started
+                    and bool(candidate.get("video_style_mode"))
+                ):
+                    fresh = candidate
+                    break
+            except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                pass
+            time.sleep(1.0)
+        if fresh is None:
+            raise RuntimeError("fresh broker heartbeat not observed within 45s")
+
+        out["fresh_runner"] = {
+            "pid": int(fresh.get("pid") or 0),
+            "status": str(fresh.get("status") or ""),
+            "open": int(fresh.get("open") or 0),
+            "video_style_mode": bool(fresh.get("video_style_mode")),
+            "short_horizon_execution_status": str((fresh.get("short_horizon_model") or {}).get("execution_status") or ""),
+            "authorized_symbols": list((fresh.get("short_horizon_model") or {}).get("authorized_symbols") or []),
+        }
+        post = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-Command", audit_code],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20, check=False,
+        )
+        if post.returncode != 0:
+            raise RuntimeError(f"post-restart process audit failed: {post.stderr.strip()}")
+        post_state = json.loads((post.stdout or "{}").strip() or "{}")
+        post_runners = post_state.get("runners") or []
+        post_watchers = post_state.get("watchers") or []
+        if isinstance(post_runners, dict):
+            post_runners = [post_runners]
+        if isinstance(post_watchers, dict):
+            post_watchers = [post_watchers]
+        out["post_runners"] = post_runners
+        out["post_watchers"] = post_watchers
+        if len(post_runners) != 1:
+            raise RuntimeError(f"expected exactly one broker owner after cleanup, found {len(post_runners)}")
+        post_cmd = str(post_runners[0].get("cmd") or "")
+        if "run_broker_paper.py" not in post_cmd or "--video-style" not in post_cmd or "config_mt5_demo_firehose_hw.yaml" not in post_cmd:
+            raise RuntimeError(f"unexpected broker owner after governed restart: {post_cmd}")
+        out["returncode"] = 0
+        return out
+    except Exception as exc:
+        out["stderr"] = str(exc)
+        return out
+    finally:
+        out["elapsed_s"] = round(time.time() - started, 2)
+        bridge.mkdir(parents=True, exist_ok=True)
+        result_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
+        request_path.unlink(missing_ok=True)
+        try:
+            _remove_prelock_hook()
+        except OSError:
+            pass
+
+
+# <<< TEMP AEGIS PRELOCK FINISH HOOK <<<
 
 
 def main() -> int:
@@ -807,6 +1032,11 @@ def main() -> int:
         help="run a REAL council round every N ticks (default 0=off; 72 ~= 24h)",
     )
     args = parser.parse_args()
+
+    prelock_finish = _prelock_finish_duplicate_owners()
+    if prelock_finish is not None:
+        if int(prelock_finish.get("returncode", 125)) != 0:
+            return int(prelock_finish.get("returncode", 125))
 
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     lock = ProcessLock(WATCHER_LOCK)

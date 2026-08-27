@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T20:01:17.236600+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e810f9\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.1,
+          "finished_utc": "2026-08-24T20:03:28.828899+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T20:03:16.732648+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T20:03:28.830897+00:00",
+        "text": "The proposal cherry-picks a single tail-loss statistic without defining the sample period, instruments, costs, or whether the 122 exits are representative, so the claimed opportunity may be noise. \u201cAbove zero\u201d expectancy on one sealed holdout is an unstable binary promotion criterion absent confidence intervals, minimum trade counts, and multiple-testing controls for any prior exit research. It also fails to specify the validated-state gate or how drawdown is measured, making the safety constraints unauditable."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e810f9\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 14.62,
+          "finished_utc": "2026-08-24T20:03:16.713648+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T20:03:02.092130+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T20:03:16.717649+00:00",
+        "text": "A single sealed-holdout comparison can still overfit if exit parameters were selected after inspecting it, and no untouched confirmation set or multiple-testing correction is specified. The 0.05R threshold and \u201clower 95% bootstrap bound\u201d are undefined without sample size, bootstrap method, dependence handling, and minimum trade count; profit factor can be unstable and misleading. Acceptance also omits required promotion gates and explicit ExperimentRegistry recording, so it is not sufficient to authorize champion promotion."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T20:03:58.329710+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_2f14a6",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_2f14a6 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_e810f9",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e810f9\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.73,
+        "finished_utc": "2026-08-24T20:01:41.315350+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T20:01:28.582220+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T20:01:41.318355+00:00",
+      "text": "Evaluate a volatility-adjusted trailing exit against the current champion on the sealed holdout, with identical entry signals and net runner costs. Accept it only if it improves holdout expectancy by at least 0.05R per trade and does not reduce the lower 95% bootstrap confidence bound of profit factor. Otherwise retain the champion unchanged and record the rejected experiment."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e810f9\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 31.96,
+        "finished_utc": "2026-08-24T20:02:34.900993+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T20:02:02.936244+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T20:02:34.904993+00:00",
+      "text": "Test a research-only, cost-aware early-loss exit to reduce the current tail-loss problem: 122 stop-loss exits produced \u221270.18 net units, while overall expectancy is \u22120.0136 with a 0.768 profit factor. Pre-register the policy, tune it only on training data, and compare it with the current exit policy on a sealed holdout. The candidate is successful only if holdout net expectancy improves to above zero without worsening maximum drawdown or violating the validated-state gate."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e810f9\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 15.59,
+        "finished_utc": "2026-08-24T20:03:58.289715+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T20:03:42.699599+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T20:03:58.292715+00:00",
+      "text": "Test a research-only, cost-aware early-loss exit using a pre-specified sample period, instrument universe, trade-count coverage, and the runner\u2019s validated spread/slippage assumptions; report whether the 122 stop-loss exits (\u221270.18 net units) are representative rather than treating them as sufficient evidence of a tail-loss opportunity. Pre-register the policy and tune it only on training data, then compare it with the current exit policy on a sealed holdout with no lookahead, requiring a minimum holdout trade count and reporting bootstrap confidence intervals for expectancy, profit factor, and maximum drawdown. Account for all prior and concurrent exit-policy candidates through a documented family-wise or false-discovery multiple-testing adjustment. Define maximum drawdown as the largest peak-to-trough decline in the chronological, cost-net cumulative-equity curve, and require the candidate to pass the repository\u2019s explicitly recorded validated-state gate\u2014 including cost inclusion, feature/label separation, sufficient sample coverage, and research-only configuration\u2014before considering promotion."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e810f9\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.83,
+        "finished_utc": "2026-08-24T20:03:42.678599+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T20:03:28.851894+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T20:03:42.680600+00:00",
+      "text": "Pre-register exit parameters using development data only, log every candidate in `ExperimentRegistry`, and apply a family-wise multiple-testing correction across all evaluated variants. Compare the selected challenger with the champion on the sealed holdout and an untouched confirmation set using identical entries, net runner costs, at least 100 trades per set, and a stationary block bootstrap preserving trade dependence. Accept only if combined expectancy improves by at least 0.05R per trade and the corrected 95% lower confidence bound for both expectancy improvement and profit-factor difference is non-negative. Promotion remains conditional on all governed promotion gates; otherwise retain the champion and record the rejected challenger and results."
+    }
+  },
+  "status": "decided"
+}

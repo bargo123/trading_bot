@@ -1,0 +1,1 @@
+Test a challenger that requires two consecutive validated-state signals with the same direction before entry, while retaining all existing spread, EV, and risk gates. Evaluate it only on sealed holdout trades against the current champion, net of existing cost assumptions. Promote nothing unless it improves net expectancy and does not worsen maximum drawdown or tail-loss metrics.

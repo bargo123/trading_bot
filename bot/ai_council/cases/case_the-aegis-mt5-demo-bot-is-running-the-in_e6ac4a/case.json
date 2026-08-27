@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-24T14:33:38.294603+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-24T14:35:18.147980+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_1f441a",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_1f441a for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_e6ac4a",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e6ac4a\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.92,
+        "finished_utc": "2026-08-24T14:34:01.334461+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T14:33:49.411663+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T14:34:01.334461+00:00",
+      "text": "Run a sealed-holdout study of an Asia-session sell filter requiring above-median spread compression and declining 15-minute ATR before entry. Compare net expectancy, drawdown, and trade count against the current champion under identical cost assumptions; advance only if the holdout improves net expectancy by at least 10% without increasing maximum drawdown or reducing sample size below 100 trades."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

@@ -1,0 +1,108 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_0535",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T05:36:56.472209+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_0535",
+    "current_evidence": "Candidate for next cycle: quantify the cost of conservatism in the validated-state gate by having the research side log every signal the gate rejects along with its counterfactual outcome simulated through the existing paper-path economics (net of the runner's spread/slippage assumptions) \u2014 no MT5 c",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate for next cycle: quantify the cost of conservatism in the validated-state gate by having the research side log every signal the gate rejects along with its counterfactual outcome simulated through the existing paper-path economics (net of the runner's spread/slippage assumptions) \u2014 no MT5 calls, no live-YAML or champion changes. Falsifiable hypothesis: over four weeks of firehose operation, the rejected population's mean counterfactual EV per trade shows a 95% bootstrap lower bound at o",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T05:35:16.852105+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Falsifiable hypothesis is cut off mid-sentence; the bootstrap lower-bound threshold, sample-size floor, and alpha are unspecified, making the success criterion non-falsifiable as written",
+        "bot/intel/ holds governed runtime state (intelligent_champion.json, analogue_index.json, outcome_log.jsonl); 'affected_files: bot/intel/' without named new paths risks accidental writes to protected artifacts",
+        "Counterfactual EV for rejected signals embeds a capacity/selection bias: had the gate admitted them, portfolio, spread-widening, and concurrency constraints would have changed fills, so raw mean counterfactual EV likely overstates the true cost of conservatism",
+        "No commitment to register the observation window in ExperimentRegistry before collection starts (rule 4)",
+        "Four weeks of every-rejection logging plus post-hoc mean testing invites multiple-testing drift unless the hypothesis and analysis code are frozen up front",
+        "Risk field says 'tiny DEMO risk only' but the design proposes no execution at all; mislabeling implies confusion about scope"
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "The core idea is sound and safe: measuring validated-state-gate conservatism via counterfactual replay through existing paper-path economics is read-only research that generates exactly the PF/EV evidence currently missing, touches no governed artifact, and makes zero MT5 mutations. However, the proposal text is truncated mid-hypothesis ('95% bootstrap lower bound at o...'), leaving the acceptance threshold undefined, and it omits several mandatory governance steps from AGENTS.md (ExperimentRegistry registration, artifact-path isolation inside bot/intel/, which contains governed runtime files). Those gaps are fixable but material.",
+      "requested_revisions": [
+        "Restore the full truncated hypothesis with explicit numeric criterion: e.g. 95% bootstrap lower bound of mean counterfactual net EV per trade > $X across >= N rejected signals over 4 weeks, alpha and seed fixed in advance",
+        "Name the exact new artifact paths (e.g. bot/intel/research/rejected_signal_counterfactuals.jsonl) and affirmatively state that intelligent_champion.json, analogue_index.json, outcome_log.jsonl, and all PROTECTED_LIVE_YAML entries remain unwritten",
+        "Add explicit ExperimentRegistry registration step before the first collected signal",
+        "State that the counterfactual simulator imports the runner's existing cost/economics module rather than reimplementing spread/slippage, so costs cannot silently diverge",
+        "Report results both unconstrained and under a simple portfolio-conacity constraint (max concurrent positions / one-signal-at-a-time) to bound selection bias",
+        "Declare the deliverable as analysis-only: no automatic gate-parameter relaxation follows from positive results; any gate change enters its own promotion cycle through promote.py gates"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "The proposed 95% bootstrap lower-bound threshold is truncated and unspecified.",
+        "Counterfactual fill, exit, horizon, spread, slippage, and signal de-duplication rules are not defined.",
+        "Four weeks may yield an underpowered or regime-specific rejected-signal sample.",
+        "Affected files omit the required experiment registry and immutable research artifact locations.",
+        "'tiny DEMO risk' conflicts with the stated no-MT5-calls design and should be removed."
+      ],
+      "confidence": 0.91,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal is research-only and explicitly excludes MT5 calls, live YAML, and champion changes, but its success threshold and measurement design are incomplete.",
+      "requested_revisions": [
+        "Specify the complete, pre-registered hypothesis threshold, sample-size/minimum-trade rule, bootstrap method, and multiple-testing policy.",
+        "Define the counterfactual simulation contract using existing paper-path economics, including entry timestamp, fill assumptions, exit logic, holding horizon, and unavailable-data handling.",
+        "Record the experiment through ExperimentRegistry and store rejected-signal logs separately from runtime/champion artifacts.",
+        "Add tests proving the instrumentation cannot invoke MT5 APIs, mutate broker positions, write protected YAML, or promote a champion.",
+        "Define OOS splits and reporting for selection bias, regime stratification, and negative/insufficient-evidence outcomes."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Specify the complete EV threshold and acceptance criteria, including minimum sample size and bootstrap methodology.",
+        "Guarantee rejected-signal outcomes use only information available after the signal and remain net of spread/slippage without lookahead leakage.",
+        "Require ExperimentRegistry recording, bounded storage, and explicit tests for logging, lifecycle behavior, and OOS validation.",
+        "Prove the change cannot call mt5.order_send(), modify live YAML, alter champion artifacts, or affect the designated execution owner.",
+        "The stated 'tiny DEMO risk only' conflicts with the claimed absence of MT5 calls and should be corrected."
+      ],
+      "confidence": 0.96,
+      "model": null,
+      "reason": "The research-only direction is potentially safe, but the proposal is incomplete and its falsifiable hypothesis is truncated. Approval requires precise statistical and implementation gates before testing.",
+      "requested_revisions": [
+        "Provide the complete falsifiable hypothesis and four-week evaluation protocol.",
+        "Document the rejected-signal schema, counterfactual paper-path calculation, data-retention limits, and deduplication behavior.",
+        "Add regression tests proving research-side logging is read-only with respect to broker execution, live configuration, and champion promotion.",
+        "Record the experiment and failure outcomes through ExperimentRegistry, with rollback limited to the research instrumentation."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

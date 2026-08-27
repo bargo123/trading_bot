@@ -1,0 +1,1 @@
+Run a sealed-holdout experiment that adds a volatility-regime filter to reject signals when rolling ATR is above its 90th percentile. Accept it only if net expectancy improves by at least 0.05R per trade and drawdown does not increase on the holdout; otherwise retain the current champion unchanged.

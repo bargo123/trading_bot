@@ -403,12 +403,27 @@ def hierarchical_strategy_selection(
         reverse=True,
     )[:max_candidates]
     survivors = [o for o in final if o["survives_validate"]]
+    # A and B are hierarchical evidence views and can describe the exact same
+    # runtime-actionable symbol/state/side. Count unique actionable states in
+    # the headline metric so the watcher does not report those views as two
+    # independent strategies. Preserve the raw row count for auditability.
+    survivor_action_keys = {
+        (
+            str(o.get("symbol") or ""),
+            str(o.get("regime") or ""),
+            str(o.get("structure") or ""),
+            str(o.get("session") or ""),
+            str(o.get("side") or ""),
+        )
+        for o in survivors
+    }
     return {
         "shortlist_frac": float(shortlist_frac),
         "n_level_a_states": len(level_a),
         "n_level_b_states": len(level_b),
         "n_opportunities": len(final),
-        "n_survive": len(survivors),
+        "n_survive": len(survivor_action_keys),
+        "n_survive_rows": len(survivors),
         "opportunities": final,
     }
 
@@ -848,6 +863,7 @@ def main() -> int:
         "n_shortlisted": hier.get("n_level_b_states"),
         "n_validated": hier.get("n_opportunities"),
         "n_survive": hier.get("n_survive"),
+        "n_survive_rows": hier.get("n_survive_rows"),
         "cost_model": cost_model,
         "hierarchical": True,
     }
@@ -874,6 +890,7 @@ def main() -> int:
             "n_level_b_states": hier.get("n_level_b_states"),
             "n_opportunities": hier.get("n_opportunities"),
             "n_survive": hier.get("n_survive"),
+            "n_survive_rows": hier.get("n_survive_rows"),
         },
         "dataset_hash": dataset_hash,
         "config_hash": config_hash,

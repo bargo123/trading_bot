@@ -1,0 +1,47 @@
+{
+  "created_utc": "2026-08-25T00:15:00.863912+00:00",
+  "critiques": {},
+  "decision": null,
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_2dc633",
+  "mode": "REAL",
+  "phase": "proposal",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2dc633\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 36.84,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T00:15:38.351336+00:00",
+      "text": "Proposal: Audit the validated-state gate for overfit decay by measuring, across all recorded challengers in bot/research/experiments.sqlite and bot/research/sealed_holdouts.jsonl, the ratio of sealed-holdout net Sharpe to pre-promotion backtest net Sharpe for every promoted champion. Hypothesis: if the median holdout/backtest ratio is below ~0.5 (or more than half of promoted champions flip negative on their sealed holdout), the current gate is admitting in-sample artifacts rather than durable edge. Falsification test for the candidate fix: require challengers to pass an embargoed walk-forward split (train/validation chronologically separated with an embargo window at least one label horizon long) before promotion, then confirm on the next N sealed holdouts that the median ratio rises above 0.7 while trade frequency does not collapse below the runner's minimum sample threshold. All measurement is read-only against existing research artifacts, uses net-of-spread outcomes already logged by the runner, and touches neither live YAML nor intel/intelligent_champion.json; if the audit shows ratios already above 0.7, the candidate is rejected and the gate stands."
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2dc633\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.23,
+        "finished_utc": "2026-08-25T00:16:01.113662+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-25T00:15:49.879537+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T00:16:01.124779+00:00",
+      "text": "Test a stricter entry filter requiring spread to be below the rolling 25th percentile for that symbol/session. Evaluate it on sealed holdouts net of existing spread and slippage assumptions; reject it unless it improves validated-state expectancy and profit factor without reducing trade count by more than 30%. Run research-only simulations and retain the result in the experiment registry."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "open"
+}

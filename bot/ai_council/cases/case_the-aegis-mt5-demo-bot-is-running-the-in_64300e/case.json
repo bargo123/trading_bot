@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-24T03:41:07.719610+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-24T03:43:13.744133+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_c1a7a7",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_c1a7a7 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_64300e",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_64300e\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.02,
+        "finished_utc": "2026-08-24T03:41:28.511594+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T03:41:17.489071+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T03:41:28.513588+00:00",
+      "text": "Test a volatility-regime filter that suppresses entries when 20-bar ATR is above the 90th percentile of the prior 500 bars. Evaluate it on sealed holdouts net of existing spread and slippage assumptions, requiring a positive improvement in expectancy and no increase in maximum drawdown versus the validated champion. Reject the candidate if either metric fails."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

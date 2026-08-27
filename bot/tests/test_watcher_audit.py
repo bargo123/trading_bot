@@ -67,6 +67,26 @@ def test_staleness_detects_stale_journal(monkeypatch, tmp_path):
     assert any(a.startswith("journal_stale") for a in report["alerts"])
 
 
+def test_ml_summary_distinguishes_unique_survivors_from_hierarchical_rows(tmp_path):
+    report = tmp_path / "ml_pipeline.json"
+    report.write_text(
+        json.dumps({
+            "strategy_selection": {
+                "n_shortlisted": 43,
+                "n_survive": 1,
+                "n_survive_rows": 2,
+            },
+            "ml": {"improvement_expectancy": 0.5},
+        }),
+        encoding="utf-8",
+    )
+
+    summary = w._summarize_ml(report)
+
+    assert summary["strategies_survive"] == 1
+    assert summary["strategy_survivor_rows"] == 2
+
+
 def test_watcher_uses_singleton_lock(tmp_path, monkeypatch):
     """Second watcher instance must be refused by the lock (CYCLE_ALREADY_RUNNING)."""
     lock = w.ProcessLock(tmp_path / "watcher.lock")

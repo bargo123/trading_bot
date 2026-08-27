@@ -1,0 +1,106 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_0029",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T00:30:54.487749+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_0029",
+    "current_evidence": "Candidate improvement: add a cost-stress revalidation step to the validated-state gate for the next research cycle. Hypothesis: the current gate can promote challengers whose net edge after the runner's assumed spread/slippage is small enough that realistic cost variation flips them negative, meanin",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate improvement: add a cost-stress revalidation step to the validated-state gate for the next research cycle. Hypothesis: the current gate can promote challengers whose net edge after the runner's assumed spread/slippage is small enough that realistic cost variation flips them negative, meaning some promotions are cost-noise artifacts rather than durable edges. Test: using only existing records (sealed holdouts in bot/research/sealed_holdouts.jsonl, the sitting champion spec, and logged ou",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T00:29:16.258595+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Hypothesis/test description is truncated ('...flips them negative, meanin', '...logged ou'); the exact stress procedure is unspecified.",
+        "affected_files lists bot/intel/ and bot/ai_council/, but promotion-gate logic lives under bot/aegis/research/ (promote.py); bot/intel/ is a runtime-artifact directory, not a code-change target.",
+        "Unclear whether a sitting champion failing cost-stress would be demoted; intelligent_champion.json may only be written via the governed promotion scripts after all gates pass - any revalidation must route through that path, not a side channel.",
+        "Stress parameters (spread/slippage multipliers, pass/fail thresholds, minimum sample size) are undefined; post-hoc threshold selection would reintroduce the very cost-noise artifact being tested.",
+        "Reusing existing records (sealed_holdouts.jsonl, outcome logs) must avoid label leakage and must be registered in ExperimentRegistry like every experiment."
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "The core idea is sound and safety-aligned: cost-stress revalidation of promoted challengers directly enforces the existing 'outcomes must be net of spread/slippage' rule and can only tighten the gate, never loosen one. No MT5 execution, live-YAML, or DEMO-check surface is touched, so there is no safety violation. However, the proposal is materially incomplete (evidence and test fields are truncated mid-sentence) and the declared affected files do not match where gate logic lives, so it cannot be approved for test as specified.",
+      "requested_revisions": [
+        "Complete the hypothesis and test specification end-to-end, including data sources, stress grid (e.g., 1x-3x assumed spread/slippage), and pre-declared pass/fail thresholds.",
+        "Correct affected_files to name the actual gate module(s) (bot/aegis/research/promote.py or equivalent) and justify or drop bot/intel/.",
+        "State explicitly that no governed promotion path is bypassed and specify how a champion that fails revalidation is handled (governed demotion/re-run, never direct artifact writes).",
+        "Confirm research components remain read-only toward MT5 and live YAML, and record the run via ExperimentRegistry with honest failure reporting."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Proposed change and evidence are truncated; exact stress scenarios, acceptance thresholds, and data handling are unspecified.",
+        "Affected files omit the governed promotion/validation code likely required for a validated-state gate change.",
+        "No explicit assurance that stress tests use runner-consistent spread/slippage assumptions and sealed holdouts without lookahead.",
+        "'No champion impact' conflicts with a promotion-gate change unless scope is strictly research-only and promotion remains governed."
+      ],
+      "confidence": 0.91,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "Cost-stress validation is directionally sound, but the proposal is incomplete and cannot be evaluated for correct implementation or governance compliance.",
+      "requested_revisions": [
+        "Specify deterministic cost-stress scenarios, thresholds, minimum sample requirements, and pass/fail behavior.",
+        "Identify exact modules and confirm no live YAML, runner configuration, or broker execution path is modified.",
+        "Define holdout isolation, cost model provenance, experiment-registry recording, and tests proving no lookahead.",
+        "State that failed stress validation records a rejected challenger and cannot promote or overwrite the champion."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Proposal text is incomplete/truncated.",
+        "No exact files, functions, or gate logic are identified.",
+        "Cost-stress ranges, thresholds, and statistical criteria are unspecified.",
+        "No explicit ExperimentRegistry record or baseline test-count requirement is stated.",
+        "The claim of no champion impact needs enforcement and verification.",
+        "Any exploration trades must use only the designated governed MT5 DEMO execution owner."
+      ],
+      "confidence": 0.94,
+      "model": null,
+      "reason": "The hypothesis is plausible and research-scoped, but the proposal lacks a complete implementation plan and sufficient safeguards to approve testing. It does not specify the exact cost-stress assumptions, pass/fail thresholds, registry records, or how champion promotion and DEMO execution remain governed.",
+      "requested_revisions": [
+        "Provide the complete proposal and precise implementation scope.",
+        "Define cost perturbation ranges, stress methodology, minimum sample sizes, and rejection thresholds.",
+        "Guarantee that the change cannot promote or alter the champion without the existing governed promotion gates.",
+        "State how ExperimentRegistry records the experiment, outcomes, and failures.",
+        "Confirm research processes cannot call mt5.order_send() and that execution remains limited to bot/scripts/run_broker_paper.py.",
+        "Run and report the baseline and post-change pytest results plus exploration/OOS validation results."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

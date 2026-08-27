@@ -1,0 +1,18 @@
+{
+  "generation": 8,
+  "champion": null,
+  "total_experiments": 0,
+  "rejected": 0,
+  "challengers": 0,
+  "champions": 0,
+  "failed_hypotheses": [],
+  "dataset_fingerprint": "344399b2db2a6b1dd7fdd0b0a3a876b1981763c438346560a912e4f225621b24",
+  "codex": {
+    "used": 0,
+    "limit": 1,
+    "remaining": 1,
+    "status": "AVAILABLE"
+  },
+  "claude_available": true,
+  "final_generation": 8
+}

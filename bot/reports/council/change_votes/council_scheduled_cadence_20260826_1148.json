@@ -1,0 +1,110 @@
+{
+  "change_id": "council_scheduled_cadence_20260826_1148",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-26T11:50:19.163500+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260826_1148",
+    "current_evidence": "Counterfactual rejection audit of the validated-state gate: during the next research cycle, log every firehose candidate state the gate rejects (stale quote, unvalidated feature state, etc.), then offline-replay each rejected state through the current champion's entry/exit logic to compute its count",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Counterfactual rejection audit of the validated-state gate: during the next research cycle, log every firehose candidate state the gate rejects (stale quote, unvalidated feature state, etc.), then offline-replay each rejected state through the current champion's entry/exit logic to compute its counterfactual net EV after realistic spread/slippage, benchmarked against the realized net EV of admitted trades over the same sessions. Falsifiable hypothesis: the rejected population's mean counterfactu",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T11:48:20.102521+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Falsification criteria text is incomplete ('mean counterfactu...'); the hypothesis lacks a numeric threshold, minimum sample size, and statistical power plan",
+        "Selection bias: the rejected population is non-random and rejected for cause; counterfactual fills on stale quotes are optimistically biased upward and must be treated as an upper bound, never as standalone justification for relaxing the validated-state gate later",
+        "Mechanism mismatch: this change cannot improve throughput in its own cycle; claiming so misframes what success looks like",
+        "Lookahead risk in offline replay: features must be reconstructed from point-in-time snapshots captured at rejection time, never recomputed from later data",
+        "Logging in the firehose hot path could alter runtime timing/behavior; the gate must be bit-for-bit unchanged whether the audit is enabled or disabled",
+        "Champion drift: replaying against 'the current champion' is ambiguous across a multi-session cycle; results must pin a specific champion artifact",
+        "No explicit commitment to ExperimentRegistry recording, which is mandatory under repo rules"
+      ],
+      "confidence": 0.78,
+      "model": "x-preview-f-free",
+      "reason": "The core design is sound and safe: a strictly observational counterfactual rejection audit (log rejected candidate states, offline-replay through the pinned champion, cost realistically, benchmark against admitted trades in the same sessions) involves no order path changes, no gate modification, and no live exposure, so it clears all MT5/research safety rules. However, the proposal has material defects: the falsifiable hypothesis is truncated mid-statement, the declared mechanism ('improve exploration/validation throughput') mismatches what the change actually does (an audit produces evidence, not throughput), and the methodology as written would systematically overstate rejected-trade EV because states rejected for cause (stale quotes, unvalidated features) have exactly the prices/features the gate deemed untrustworthy - naive replay assumes fills at prices that may not have been executable.",
+      "requested_revisions": [
+        "Complete the falsifiable hypothesis with an explicit numeric criterion (e.g., rejected-population mean counterfactual net EV minus admitted-population realized net EV > X with N >= M samples and bootstrap CI excluding zero)",
+        "Add a conservative execution model: exclude stale-quote rejections from the fillable set (or price them with a wide uncertainty band) and report rejection-reason strata separately; label all counterfactual EV as an upper bound",
+        "Pin the champion artifact (hash of intel/intelligent_champion.json content) at audit start and attribute all replay results to that hash",
+        "Guarantee observational purity: async bounded logging, zero writes to gate/order/config paths, plus a test asserting identical gate decisions with the audit on vs off",
+        "Reframe expected_mechanism as 'produce calibrated evidence about gate strictness for a future proposal'; explicitly state this audit cannot authorize gate relaxation",
+        "Register the experiment in ExperimentRegistry before the cycle starts and define benchmark comparability: same sessions, identical spread/slippage assumptions, paired per-session comparison of both populations"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "The falsifiable hypothesis is incomplete.",
+        "Replay timing, entry/exit assumptions, spread/slippage model, and treatment of unavailable/stale quotes are unspecified.",
+        "The proposed affected paths could include runtime code; collection and replay must remain strictly read-only and must never submit or alter broker orders.",
+        "Comparison to admitted trades needs session, symbol, direction, and opportunity-set matching to avoid selection bias.",
+        "Rejected states must be immutable, timestamped records with feature/quote validation reasons and versioned champion/config identifiers."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "A read-only counterfactual audit is compatible with DEMO safety, but the proposal is truncated and lacks a precise, reproducible replay specification needed to prevent lookahead and fabricated expectancy.",
+      "requested_revisions": [
+        "Provide the complete hypothesis and explicit pass/fail thresholds, minimum sample size, and confidence methodology.",
+        "Specify a timestamp-causal replay protocol: only data available at each rejected-state timestamp, no label leakage, realistic cost model identical to the runner, and deterministic entry/exit rules.",
+        "State that instrumentation is observational only, cannot change validation decisions, risk, champion selection, or execution, and cannot call MT5 order APIs.",
+        "Define a versioned schema and retention/redaction policy for rejected-state logs, including rejection reason, quote age, feature-state status, champion hash, and execution-cost assumptions.",
+        "Add tests for no execution side effects, causal replay/no-lookahead, correct rejection-reason capture, and OOS reporting; register the experiment before running it."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "The proposed change text and falsifiable hypothesis are truncated.",
+        "Counterfactual replay methodology, data schema, and cost assumptions are unspecified.",
+        "No explicit guarantee that rejected states remain read-only and cannot reach mt5.order_send().",
+        "Tests are too broad; required assertions and baseline comparisons are not defined.",
+        "The falsification criterion does not clearly distinguish rejected-population results from admitted-trade results."
+      ],
+      "confidence": 0.96,
+      "model": null,
+      "reason": "The audit is safety-compatible and does not appear to affect champion promotion or broker execution, but the proposal is incomplete and lacks sufficient implementation and evaluation detail for approval.",
+      "requested_revisions": [
+        "Provide the complete hypothesis and acceptance/rejection thresholds.",
+        "Specify logged fields, retention, privacy considerations, and the exact replay procedure.",
+        "Explicitly enforce research-only execution with no broker mutation or champion impact.",
+        "Define deterministic tests covering stale quotes, unvalidated features, replay costs, and admitted-trade benchmarking.",
+        "State how experiment registration and failure recording will be performed."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

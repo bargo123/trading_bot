@@ -1,3 +1,3 @@
-2026-08-12 14:30:10,715 INFO MT5 connected login=5054369732 server=MetaQuotes-Demo company=MetaQuotes Ltd. demo=True
-2026-08-12 14:30:10,718 INFO Connected engine=mt5 account=5054369732 equity=100.00 paper=True qty=0.01
-2026-08-12 14:30:10,848 INFO No signal @ 2026-08-12 21:00:00+00:00 close=1.15211
+version https://git-lfs.github.com/spec/v1
+oid sha256:558ad8edd2409d01c58281ed589e772a41ad208dc059b1ec0e74fb6c4abc87c9
+size 304

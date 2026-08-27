@@ -1,0 +1,41 @@
+{
+  "created_utc": "2026-08-24T17:49:43.283611+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-24T17:51:42.541631+00:00",
+    "decision": "no_change",
+    "evidence": {
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "DUPLICATE_FAILED_HYPOTHESIS"
+    },
+    "rationale": "REAL: candidate hypothesis overlaps prior record council_the-aegis-mt5-demo-bot-is-running-the-in_1f441a (queued, overlap 0.59); not re-tested"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_aaf7c9",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aaf7c9\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.6,
+        "finished_utc": "2026-08-24T17:50:05.494494+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T17:49:53.894518+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T17:50:05.496494+00:00",
+      "text": "Run a registered holdout experiment that adds an Asia-session sell filter requiring negative 1-hour momentum and below-20-period moving-average price before entry. Compare net expectancy, drawdown, and trade count against the current validated champion under identical spread and slippage assumptions. Reject the candidate unless sealed-holdout net expectancy improves while maximum drawdown does not increase."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

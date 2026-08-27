@@ -249,7 +249,7 @@ def firehose_can_add(
     if int(open_total) >= int(max_positions):
         return False
     interval = float(clip_interval_s or 0.0)
-    if interval > 0 and last_entry_age_s is not None and float(last_entry_age_s) < interval:
+    if held_sides and interval > 0 and last_entry_age_s is not None and float(last_entry_age_s) < interval:
         return False
     n = len(held_sides)
     if n <= 0:

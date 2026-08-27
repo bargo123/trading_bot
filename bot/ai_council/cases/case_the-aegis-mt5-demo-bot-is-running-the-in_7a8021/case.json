@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T08:01:17.389159+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7a8021\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.38,
+          "finished_utc": "2026-08-24T08:05:44.164451+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T08:05:31.785028+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T08:05:44.174894+00:00",
+        "text": "The two-observation rule may overfit a transient historical pattern unless its threshold is fixed before testing and validated across multiple time periods, not one sealed holdout. \u201cTrade-count stability\u201d is undefined and can conceal a strategy that reduces trades to improve expectancy; define a measurable tolerance and require confidence intervals or resampling. The proposal also omits failure handling for delayed entries and proof that the validated-state inputs cannot leak future information."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7a8021\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 10.35,
+          "finished_utc": "2026-08-24T08:05:31.777868+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T08:05:21.424454+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T08:05:31.777868+00:00",
+        "text": "The 25% increase is arbitrary and may overfit to a single holdout, especially without predefined power, confidence intervals, significance criteria, or regime-separated validation. \u201cImproves expectancy\u201d and \u201ccurrent gate baseline\u201d are undefined, so the result is not reproducible or auditable; trade-count retention also does not establish robustness or risk control. The proposal lacks safeguards against repeated threshold testing, multiple comparisons, and degradation in drawdown, calibration, tail risk, or costs beyond the assumed spread/slippage."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T08:06:07.776571+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_40aec4",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_40aec4 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_7a8021",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7a8021\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.58,
+        "finished_utc": "2026-08-24T08:01:38.831004+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T08:01:27.247202+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T08:01:38.831004+00:00",
+      "text": "Run a registered holdout experiment that raises the validated-state minimum sample threshold by 25% before intelligent signals are eligible. Accept it only if net holdout expectancy improves while trade count remains at least 80% of the current gate baseline after identical spread and slippage assumptions. Reject it if either condition fails."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7a8021\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.07,
+        "finished_utc": "2026-08-24T08:04:55.833298+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T08:04:43.759761+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T08:04:55.835307+00:00",
+      "text": "Test a research-only challenger that requires the validated-state gate to remain true for two consecutive observations before accepting an entry, targeting false state transitions. Evaluate it against the current champion on a sealed, untouched holdout with spread/slippage costs included. Promote only if it improves net expectancy and does not worsen maximum drawdown or trade-count stability; otherwise retain the current champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7a8021\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.36,
+        "finished_utc": "2026-08-24T08:06:07.738909+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T08:05:56.376897+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T08:06:07.738909+00:00",
+      "text": "Test a research-only challenger with the two-consecutive-observation threshold fixed before evaluation, and verify that validated-state inputs are computed strictly from information available at each decision time with no label or future-data leakage. Compare it with the current champion across multiple time periods and a sealed, untouched holdout, including spread/slippage costs, while recording delayed-entry frequency, missed opportunities, and adverse price movement after delayed signals. Promote only if resampling-based confidence intervals support improved net expectancy, maximum drawdown is not worse, and trade count remains within a predefined tolerance (for example, \u00b110% of the champion\u2019s count across each evaluation period); otherwise retain the current champion. All failures, inconclusive results, and delayed-entry effects must be recorded in the experiment registry."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7a8021\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.18,
+        "finished_utc": "2026-08-24T08:05:56.359452+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T08:05:44.181220+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T08:05:56.360097+00:00",
+      "text": "Run one preregistered, regime-stratified sealed-holdout experiment comparing the current validated-state threshold with a single 25%-higher threshold, justified as a conservative sample-quality sensitivity test. Define baseline metrics from the frozen current gate and require a statistically significant, cost-net expectancy improvement with bootstrap confidence intervals, at least 80% trade retention, and no material degradation in maximum drawdown, tail loss, calibration, or per-trade costs under identical spread, slippage, and stress-cost assumptions. Apply the decision rule once, record all parameters and results in the experiment registry, and reject the challenger if any primary robustness gate fails."
+    }
+  },
+  "status": "decided"
+}

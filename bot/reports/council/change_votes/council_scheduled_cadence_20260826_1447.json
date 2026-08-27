@@ -1,0 +1,77 @@
+{
+  "change_id": "council_scheduled_cadence_20260826_1447",
+  "degraded_real_council": true,
+  "final_decision": "DEGRADED_REAL_COUNCIL",
+  "finished_utc": "2026-08-26T14:48:36.562709+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260826_1447",
+    "current_evidence": "HTTP 401: Model x-preview-f-free is not supported",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "HTTP 401: Model x-preview-f-free is not supported",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "fewer than two members voted; not a multi-agent decision",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T14:47:19.405200+00:00",
+  "totals": {
+    "abstain": 1,
+    "approve_for_test": 0,
+    "counted": 1,
+    "reject": 0,
+    "revise_and_resubmit": 0
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "raw": "HTTP 401: Model x-preview-f-free is not supported",
+      "reason": "unparseable vote: ''",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "opencode",
+      "reason": "non-zero exit 1",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Unsupported model configuration is unresolved.",
+        "Expected mechanism cannot be evaluated.",
+        "No measurable success thresholds or costed baseline are specified.",
+        "The claim of tiny DEMO risk does not replace required governance and execution-gate evidence."
+      ],
+      "confidence": 0.99,
+      "model": null,
+      "reason": "The proposal does not describe an actionable change; both current evidence and proposed change are the same HTTP 401 model-support error. No implementation details, affected behavior, baseline metrics, or validation results are provided.",
+      "requested_revisions": [
+        "Identify the actual proposed code or configuration change.",
+        "Replace the unsupported model with a validated, permitted model or document the intended fallback.",
+        "Provide baseline and expected throughput/quality metrics.",
+        "Define explicit OOS validation gates, cost assumptions, and rollback verification.",
+        "Confirm no research component can submit MT5 orders and that champion promotion remains unaffected."
+      ],
+      "vote": "ABSTAIN_INSUFFICIENT_EVIDENCE"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

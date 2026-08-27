@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T16:47:41.222490+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_39a9c7\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 13.96,
+          "finished_utc": "2026-08-23T16:51:35.560841+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T16:51:21.603846+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T16:51:35.570115+00:00",
+        "text": "\u201cFalse activations,\u201d net expectancy, and coverage are undefined, inviting post-hoc metric selection. A single sealed holdout is insufficient for a persistence rule prone to regime-specific overfitting; require pre-registered thresholds, confidence intervals, and rolling or multiple out-of-sample validations. The proposal also omits sample-size and drawdown/tail-risk gates, so a marginal expectancy improvement could mask an unacceptable risk profile."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_39a9c7\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.42,
+          "finished_utc": "2026-08-23T16:51:21.587758+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T16:51:09.169428+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T16:51:21.587758+00:00",
+        "text": "A single sealed holdout can still be overfit if the threshold or evaluation window was chosen after inspecting repeated preliminary results, and the proposal specifies no untouched validation, multiple-testing control, or confidence intervals. \u201cPositive net expectancy improvement\u201d and \u201cno drawdown increase\u201d are undefined without a minimum effect size, statistical test, sample-size/power requirement, and drawdown methodology. Identical modeled costs do not establish that spread/slippage assumptions are realistic, and the comparison may be confounded if the threshold changes which signals are evaluated rather than measuring like-for-like opportunities."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T16:52:20.806380+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_24efb5",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_24efb5 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_39a9c7",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_39a9c7\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.41,
+        "finished_utc": "2026-08-23T16:48:02.163224+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T16:47:50.756532+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T16:48:02.163224+00:00",
+      "text": "Run a registered holdout experiment that adds a `validated_state` minimum-sample threshold before intelligent-firehose signal evaluation, comparing net expectancy and drawdown against the current gate under identical spread/slippage assumptions. Reject the candidate unless the sealed holdout shows positive net expectancy improvement and no drawdown increase. This is falsifiable from the recorded holdout metrics and requires no champion or runtime change."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_39a9c7\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 20.04,
+        "finished_utc": "2026-08-23T16:49:49.470503+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T16:49:29.435144+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T16:49:49.470503+00:00",
+      "text": "Test a two-consecutive-bar persistence requirement for the validated-state gate before generating an entry signal, using a sealed holdout and the existing spread/slippage assumptions. The candidate succeeds only if it reduces false activations while improving net expectancy and preserving coverage versus the current gate; otherwise reject it and leave the champion unchanged. Record the experiment and results in `ExperimentRegistry` without enabling live trading."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_39a9c7\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 30.88,
+        "finished_utc": "2026-08-23T16:52:20.772700+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T16:51:49.891202+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T16:52:20.772700+00:00",
+      "text": "Pre-register the definitions and thresholds before unsealing data: a false activation is a signal whose validated state fails within the existing entry-confirmation horizon, net expectancy is mean per-signal return after the current spread/slippage assumptions, and coverage is the share of eligible opportunities producing a signal. Evaluate the persistence rule across at least five chronological rolling out-of-sample windows plus one untouched final holdout, with at least 200 signals per arm overall and 50 per window. Accept it only if false activations fall by at least 10% with a 95% confidence interval excluding zero, net expectancy improves with its 95% confidence interval above zero, coverage declines by no more than 5%, and no window shows maximum drawdown or 99% loss-CVaR worsening by more than 10% versus the current gate. Record the preregistered protocol, sample counts, confidence intervals, risk metrics, and any failures in `ExperimentRegistry`; otherwise reject the challenger, leave the champion unchanged, and do not enable live trading."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_39a9c7\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 14.3,
+        "finished_utc": "2026-08-23T16:51:49.874650+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T16:51:35.578781+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T16:51:49.886950+00:00",
+      "text": "Pre-register the `validated_state` threshold, evaluation window, primary metrics, and a minimum practical net-expectancy improvement before any further analysis. Evaluate it on a sealed holdout once, retaining a separate untouched confirmation set; use block-bootstrap confidence intervals and a pre-specified one-sided test with multiple-testing correction for any tested thresholds, plus a power-based minimum sample requirement. Compare like-for-like eligible opportunities by recording both all baseline opportunities and those filtered by the threshold, with maximum peak-to-trough equity drawdown computed net of costs on the identical timestamp sequence. Calibrate spread/slippage assumptions against historical realized conditions and run pre-registered cost stress scenarios. Reject the candidate unless the sealed holdout and untouched confirmation set both meet the minimum net-expectancy effect size with statistical support and show no material drawdown increase under every required cost scenario; record the experiment without changing runtime or champion state."
+    }
+  },
+  "status": "decided"
+}

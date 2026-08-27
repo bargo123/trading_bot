@@ -1,0 +1,108 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_1729",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T17:31:22.741065+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_1729",
+    "current_evidence": "Candidate improvement: a spread-percentile abstention gate, tested shadow-first before any code change. Hypothesis: entries opened when the live spread at signal time falls in the top quartile of its own trailing distribution realize materially lower (possibly negative) mean net-of-cost EV than lowe",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate improvement: a spread-percentile abstention gate, tested shadow-first before any code change. Hypothesis: entries opened when the live spread at signal time falls in the top quartile of its own trailing distribution realize materially lower (possibly negative) mean net-of-cost EV than lower-quartile entries, so abstaining on them raises aggregate expectancy. Method: retrospectively bucket confirmed trades in the existing outcome_log.jsonl by entry-spread percentile, compare net expecta",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T17:29:44.934606+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 1,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "PF/EV are None for scheduled_cadence: there is no baseline evidence the trigger underperforms; the proposed gate addresses entry costs, not signal quality, and may not move aggregate outcomes.",
+        "Retrospective bucketing of confirmed trades is selection-biased: trades already survived every gate, and spread percentile will correlate with session/time-of-day/volatility regime, confounding the quartile comparison.",
+        "Trailing-distribution percentile is a lookahead hazard: it must be computed strictly from spread observations preceding each entry, with the window documented.",
+        "Sample-size risk: quartile splits on a young DEMO outcome log may yield too few trades per bucket for any significant expectancy difference.",
+        "expected_mechanism 'improve exploration/validation throughput' contradicts the design: abstention reduces trade count and thus likely reduces validation throughput while raising expectancy. Reconcile.",
+        "Falsification criterion references 'exploration trades', implying a live-ordering phase; as written the change is shadow-only, so falsification must be defined on the shadow/retrospective stage.",
+        "Data availability unverified: unclear whether entry-spread is reliably recorded in every outcome_log.jsonl row; if not, the retrospective test cannot run without logging-only instrumentation first."
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "Shadow-first, retrospective-only design on existing outcome_log.jsonl touches neither the execution owner path nor protected trading YAML, so no safety objection. The spread-cost hypothesis is sound microstructure reasoning and the falsification/rollback framing is honest. However the proposal ships with methodological gaps that would invalidate or bias the retrospective test if run as written, plus one internally inconsistent claim (expected_mechanism), so it needs one revision cycle before approval.",
+      "requested_revisions": [
+        "Verify entry-spread field coverage in outcome_log.jsonl first; if incomplete, resubmit with a logging-only instrumentation step (zero behavior change) as phase 1.",
+        "Specify the trailing spread-percentile computation precisely: window length, minimum history before first usable percentile, strict no-lookahead guarantee.",
+        "Add confounder controls: stratify or regress the quartile comparison by symbol and session/hour, or demonstrate spread percentile is not a proxy for time-of-day.",
+        "Define minimum samples per bucket (e.g. >=30) and require a bootstrap confidence interval on the top-vs-lower-quartile net-EV delta excluding zero before any behavior-affecting step is considered.",
+        "Correct expected_mechanism to reflect expectancy improvement at the cost of reduced trade count, and restate throughput expectations honestly.",
+        "Restate falsification_criteria on the shadow stage: negative costed expectancy delta between top-quartile and remaining buckets, with no DEMO orders placed during the test.",
+        "Confirm in writing that any future runtime adoption of the gate routes through the governed promote.py champion pipeline and never edits PROTECTED_LIVE_YAML or non-designated trading configs without operator authorization."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Trailing distribution window, symbol/session stratification, and percentile calculation are unspecified.",
+        "Outcome data must use only information available at entry and remain net of spread, slippage, commissions, and swaps.",
+        "Top-quartile comparison can be underpowered or confounded by volatility, time-of-day, liquidity regime, and signal type.",
+        "No code or champion promotion should occur until out-of-sample shadow results meet predeclared gates."
+      ],
+      "confidence": 0.88,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "Shadow-first research is appropriate, but the proposal lacks a precise, leakage-safe spread-percentile definition, minimum sample requirements, and precommitted decision criteria.",
+      "requested_revisions": [
+        "Define the causal, entry-time-only percentile feature, lookback window, minimum observations, missing-data behavior, and per-symbol/session handling.",
+        "Pre-register sample-size thresholds, net-EV/PF metrics, confidence intervals, and an OOS acceptance/falsification rule versus the existing baseline.",
+        "Record the experiment in ExperimentRegistry and preserve all buckets, including null/failed results.",
+        "Keep the initial implementation research-only/shadow-only; require governed promotion gates before any execution-path or champion change."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Current PF and EV are unavailable.",
+        "The proposal does not specify minimum sample sizes or statistical confidence thresholds.",
+        "Entry-spread percentile calculation and cost assumptions need precise definition.",
+        "All results must be recorded in ExperimentRegistry and validated out of sample."
+      ],
+      "confidence": 0.9,
+      "model": null,
+      "reason": "The proposal is explicitly shadow-first and retrospective, with no champion, broker, or live-config impact. It is suitable for controlled validation before any implementation.",
+      "requested_revisions": [
+        "Define minimum trade counts per percentile bucket and required confidence or effect-size thresholds.",
+        "Specify the trailing-window percentile calculation, timestamp alignment, and missing-data handling.",
+        "Report net-of-spread, slippage, and other runner costs consistently, with an untouched OOS holdout.",
+        "Confirm the experiment cannot call mt5.order_send(), alter trading YAML, or affect champion promotion.",
+        "Register the experiment and record null, negative, or failed results honestly."
+      ],
+      "vote": "APPROVE_FOR_TEST"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

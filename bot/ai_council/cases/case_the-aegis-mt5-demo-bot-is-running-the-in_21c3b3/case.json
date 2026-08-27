@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T10:14:50.968671+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_21c3b3\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.61,
+          "finished_utc": "2026-08-24T10:16:29.074800+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T10:16:17.468435+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T10:16:29.074800+00:00",
+        "text": "The 15% / 5% thresholds appear arbitrary and could select noise without confidence intervals, minimum sample sizes, or multiple-comparison controls. \u201cFalse-positive entry\u201d is undefined, making the primary claim unmeasurable and vulnerable to label leakage. A single sealed holdout may overfit through repeated challenger testing; require an untouched final holdout and explicit regime-stratified validation."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_21c3b3\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 10.55,
+          "finished_utc": "2026-08-24T10:16:17.445841+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T10:16:06.898057+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T10:16:17.446629+00:00",
+        "text": "The 90th-percentile ATR cutoff and the +0.05R acceptance threshold are arbitrary hyperparameters that invite overfitting, especially if selected after inspecting holdout results. \u201cNo drawdown increase\u201d is unmeasurable without a defined estimator, confidence bounds, and tolerance for sampling noise, while a single sealed holdout provides no evidence of stability across instruments, periods, or volatility regimes. The proposal also omits explicit registry recording, runner cost assumptions, minimum sample-size/power requirements, and confirmation that ATR is computed strictly without lookahead."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T10:16:57.752367+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_1d28ed",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_1d28ed for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_21c3b3",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_21c3b3\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.05,
+        "finished_utc": "2026-08-24T10:15:13.111319+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T10:15:02.056966+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T10:15:13.111319+00:00",
+      "text": "Run a sealed-holdout experiment that adds a volatility-regime filter to reject signals when rolling ATR is above its 90th percentile. Accept it only if net expectancy improves by at least 0.05R per trade and drawdown does not increase on the holdout; otherwise retain the current champion unchanged."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_21c3b3\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.1,
+        "finished_utc": "2026-08-24T10:15:40.446819+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T10:15:27.344433+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T10:15:40.446819+00:00",
+      "text": "Test a stricter validated-state gate that requires two consecutive validated bars before admitting a firehose signal, compared with the current one-bar gate. Record both variants in the experiment registry and evaluate them net of spread/slippage on a sealed holdout. Adopt the challenger only if it reduces false-positive entries by at least 15% without lowering holdout expectancy by more than 5%; otherwise reject it."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_21c3b3\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 16.73,
+        "finished_utc": "2026-08-24T10:16:57.704749+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T10:16:40.972816+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T10:16:57.720503+00:00",
+      "text": "Pre-register a comparison of the current one-bar gate and a two-consecutive-validated-bars gate, defining a false-positive entry as an admitted signal whose pre-specified outcome fails to meet the profitability criterion within the fixed evaluation horizon after spread and slippage. Determine the minimum sample size through a power analysis targeting a 15% relative false-positive reduction and a 5% expectancy non-inferiority margin, and report 95% confidence intervals for both endpoints. Validate on a sealed holdout stratified by pre-specified volatility, session, and trend regimes, applying multiplicity correction if additional challengers or subgroup tests are introduced. After selection, evaluate the locked winner once on an untouched final holdout that has not informed tuning or repeated challenger decisions. Adopt the stricter gate only if the final-holdout confidence bounds support the pre-registered reduction and non-inferiority criteria; otherwise reject it, with both outcomes recorded in the experiment registry."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_21c3b3\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.85,
+        "finished_utc": "2026-08-24T10:16:40.944949+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T10:16:29.091507+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T10:16:40.944949+00:00",
+      "text": "Pre-register ATR cutoff candidates, acceptance thresholds, and a no-lookahead rolling calculation before testing. Evaluate across sealed, instrument- and period-stratified holdouts using the runner's fixed spread/slippage costs, with minimum sample-size and confidence-bound requirements. Accept only if the pre-specified aggregate net-expectancy improvement is statistically supported and drawdown, estimated consistently with a defined tolerance interval, does not materially worsen; otherwise retain the champion. Record the complete design, costs, results, and rejection or promotion decision in the ExperimentRegistry."
+    }
+  },
+  "status": "decided"
+}

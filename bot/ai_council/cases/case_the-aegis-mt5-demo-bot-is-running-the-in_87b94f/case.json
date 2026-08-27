@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-22T21:45:52.236030+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_87b94f\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 31.58,
+          "finished_utc": "2026-08-22T21:49:33.382494+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T21:49:01.804432+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T21:49:33.382494+00:00",
+        "text": "The recency-weighting scheme is entirely unspecified\u2014half-life, decay form, and hyperparameters are left free, guaranteeing a search over variants whose repeated evaluations quietly burn the \"untouched\" holdout; without a one-look rule and pre-registration of the exact weights before unsealing, the 10%/5% thresholds are tuned-on-the-test-set by construction. Neither improvement claim is statistically grounded: 10% net expectancy gain is stated without relative-vs-absolute definition, minimum sample size, confidence interval, or significance test (drawdown deltas are notoriously noise-dominated), and \"false-positive entries\" has no operational definition against which a 5% reduction could even be measured. Validation is incomplete\u2014there's no walk-forward/CV requirement before the holdout, no confirmation that features derived from `outcome_log.jsonl` don't overlap the holdout period (data contamination via prior experiment logging), and simultaneous testing of two metrics invites multiplicity with no correction. Safety compliance is superficially adequate (registry, no promotion), but the sealing provenance\u2014who sealed the holdout, when, and whether the sealer saw prior results\u2014is unstated, which is exactly where leakage hides."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_87b94f\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 16.25,
+          "finished_utc": "2026-08-22T21:49:01.788772+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T21:48:45.540058+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T21:49:01.804432+00:00",
+        "text": "The experiment is not identifiable from exit-level records: without intratrade price paths, MFE/MAE, and timestamps, a counterfactual fixed invalidation cannot be reconstructed without lookahead or optimistic fills. The sealed holdout is underspecified\u2014there is no preregistered rule, untouched split, symbol/regime stratification, or multiple-testing control\u2014and the thresholds appear tuned to the observed sample. Expectancy units are unclear and the claimed +0.02 does not follow from payoff ratio alone once spread/slippage, stop execution, and changed win rates are included; the `n_survive=0` versus \u201c2 survivors\u201d contradiction also makes the proposed dataset and validation state untrustworthy until reconciled."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T21:51:20.019181+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_e22e6c",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_e22e6c for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_87b94f",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_87b94f\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 104.43,
+        "finished_utc": "2026-08-22T21:47:47.050679+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T21:46:02.621105+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T21:47:47.056386+00:00",
+      "text": "Proposal: Run an exit-geometry experiment on the next research cycle \u2014 use `exit_research` over the 2,518 reconciled demo exits in `outcome_learning.json` to test replacing the current manual-close-dominated exits (76% of closes are \"manual\") with a fixed asymmetric invalidation at \u22641\u00d7 the TP distance, then evaluate on the sealed holdout. Measured motivation: win rate is 67.5% yet expectancy is \u22120.012 with PF 0.77 because payoff_ratio is 0.34 (avg_loss \u22120.177 vs avg_win +0.060, tail loss 1.21 erasing ~20 wins), which is exactly the negative-expectancy geometry *Trade Your Way to Financial Freedom* warns about when losses are un-R-multiple-constrained. Falsifiable prediction: holding win rate \u226560%, raising payoff_ratio to \u22650.8 flips expectancy to >+0.02/trade net of measured costs (0.7\u20132.0 pips p75); if PF stays <1.0 on the holdout, the candidate is rejected and logged in the registry. Secondary check worth recording: reconcile why runtime `validated_states.json` reports n_survive=0 (empty set) while strategy_selection claims 2 survivors, since all 4,312 fires were EXPLORATION_FIRE on non-validated states. Research-only: no champion edit, no live YAML, no orders."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_87b94f\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.31,
+        "finished_utc": "2026-08-22T21:48:19.262706+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T21:48:05.949786+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T21:48:19.262706+00:00",
+      "text": "Test a recency-weighted validated-state gate that requires recent evidence to contribute more than older evidence, while keeping the current gate as the control. On a newly sealed, untouched holdout, the candidate must improve net expectancy by at least 10% and reduce false-positive entries by at least 5% without worsening maximum drawdown or cost assumptions. Record both results in the ExperimentRegistry; promote nothing unless all existing validation gates still pass."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_87b94f\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 48.8,
+        "finished_utc": "2026-08-22T21:51:19.986028+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T21:50:31.185461+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T21:51:19.986028+00:00",
+      "text": "Pre-register one fixed candidate before unsealing: exponential weights \\(w_i=2^{-\\mathrm{age}_i/30\\text{ days}}\\), with a 30-day half-life and no tunable hyperparameters; evaluate it once against the current gate control. Before holdout access, require five chronological walk-forward folds, an audit proving that features and labels\u2014including `outcome_log.jsonl` records\u2014end before the holdout start, and registry metadata naming the sealer, UTC seal time, data hash, commit, and attestation that no prior results were seen. On a holdout containing at least 200 eligible entries, define false positives as entries with a cost-adjusted non-positive outcome and require a relative net-expectancy gain of at least 10% and relative false-positive-rate reduction of at least 5%, with both co-primary tests passing Bonferroni-adjusted one-sided \\(\\alpha=.025\\) confidence bounds; require the one-sided 95% bound for maximum-drawdown change to show no worsening. Record the single holdout evaluation and all confidence intervals in the ExperimentRegistry, and promote nothing unless these criteria and every existing validation gate pass."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_87b94f\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 57.76,
+        "finished_utc": "2026-08-22T21:50:31.173943+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T21:49:33.414064+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T21:50:31.173943+00:00",
+      "text": "Revised proposal: Run the exit-geometry experiment only after two gates clear. Gate 1 (data trust): reconcile the n_survive=0 vs \"2 survivors\" contradiction across `validated_states.json`, strategy_selection, and `outcome_learning.json` \u2014 logged in ExperimentRegistry \u2014 before any evaluation, since the reconciliation determines which fires are even admissible. Gate 2 (identifiability): admit only exits with real open/close timestamps and per-trade MFE/MAE (or bars recoverable from MT5 between those timestamps); reconstruct each intratrade path from those bars alone and simulate the fixed \u22641\u00d7TP invalidation with adversarial fills \u2014 any bar touching the stop fills at the stop worsened by full measured spread plus the 2.0-pip p75 slippage, never better \u2014 excluding and counting unresolvable trades. Preregister in the registry before touching the holdout: one candidate only (invalidation at 1\u00d7 TP distance, fixed a priori, not tuned to this sample), a strictly time-ordered untouched split (final 20% by close time) with stratified reporting by symbol and session, and a primary endpoint of net expectancy in pips/trade computed from the simulated trade set itself \u2014 with win-rate degradation estimated from the MFE distribution (trades invalidated before their eventual MFE become losses) rather than assuming 67.5% holds \u2014 so the pass/fail call comes from simulation, not a payoff-ratio identity; any extra variants are labeled exploratory under Holm correction. If net expectancy \u22640 or PF <1.0 on the holdout, the candidate is rejected and sealed; research-only throughout: no champion edit, no live YAML, no orders."
+    }
+  },
+  "status": "decided"
+}

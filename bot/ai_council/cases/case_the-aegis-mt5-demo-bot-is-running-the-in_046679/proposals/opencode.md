@@ -1,0 +1,1 @@
+Test a tighter spread gate: reject entries when current spread exceeds the rolling 30-minute median by 25%. Evaluate it on sealed historical holdouts with identical signals, sizing, and slippage assumptions. Adopt it only if net expectancy improves and trade count remains at least 80% of the baseline without increasing maximum drawdown.

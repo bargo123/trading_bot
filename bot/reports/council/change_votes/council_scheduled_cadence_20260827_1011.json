@@ -1,0 +1,70 @@
+{
+  "change_id": "council_scheduled_cadence_20260827_1011",
+  "degraded_real_council": true,
+  "final_decision": "DEGRADED_REAL_COUNCIL",
+  "finished_utc": "2026-08-27T10:12:05.435887+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260827_1011",
+    "current_evidence": "HTTP 401: Model x-preview-f-free is not supported",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "HTTP 401: Model x-preview-f-free is not supported",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "fewer than two members voted; not a multi-agent decision",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-27T10:11:44.639819+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 1,
+    "reject": 0,
+    "revise_and_resubmit": 1
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "raw": "HTTP 401: Model x-preview-f-free is not supported",
+      "reason": "unparseable vote: ''",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "No concrete implementation or supported model identifier.",
+        "No evidence that the replacement preserves read-only research boundaries.",
+        "Test plan lacks reproducible acceptance criteria and costed OOS thresholds.",
+        "Affected files are too broad for review."
+      ],
+      "confidence": 0.97,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal is not a defined change: it repeats an unsupported-model HTTP 401 error instead of specifying a valid replacement, configuration scope, or validation plan.",
+      "requested_revisions": [
+        "Specify the exact supported model/provider and configuration changes.",
+        "Document fail-closed behavior for model errors and ensure no execution-path access.",
+        "Provide scoped file diff, rollback details, and measurable OOS/costed expectancy gates.",
+        "Confirm experiment registry recording and no champion promotion before governed validation passes."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "timed out after 90s",
+      "status": "TIMEOUT",
+      "vote": null
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

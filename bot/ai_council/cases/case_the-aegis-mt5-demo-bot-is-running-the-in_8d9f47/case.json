@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T17:57:32.154149+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_8d9f47\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 13.64,
+          "finished_utc": "2026-08-23T17:59:19.617749+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T17:59:05.979443+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T17:59:19.617749+00:00",
+        "text": "Per-state calibration can overfit sparse or non-stationary outcome slices; the proposal lacks minimum sample sizes, confidence intervals, and multiple-testing controls for selecting thresholds. \u201cLifecycle/regime state\u201d and the exact calibration protocol are unspecified, making leakage and reproducibility difficult to rule out. A single sealed holdout can itself be tuned against, so acceptance needs pre-registered state definitions and repeated walk-forward validation before any governed promotion."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_8d9f47\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.59,
+          "finished_utc": "2026-08-23T17:59:05.958190+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T17:58:54.367291+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T17:59:05.963012+00:00",
+        "text": "The fixed 30-minute and 0.25R thresholds are arbitrary hyperparameters that invite overfitting, especially if \u201cnon-trending validated-state\u201d is not precisely defined and independently frozen before testing. A single sealed-holdout comparison lacks uncertainty estimates, minimum sample requirements, and correction for prior candidate searches; profit factor and maximum drawdown can be highly unstable. The acceptance rule also permits economically weak results if trade count falls by up to 15%, and does not require robustness across instruments, regimes, or time periods."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T17:59:45.491238+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_1e1fae",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_1e1fae for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_8d9f47",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_8d9f47\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.04,
+        "finished_utc": "2026-08-23T17:57:52.614199+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T17:57:41.573909+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T17:57:52.614199+00:00",
+      "text": "Test a 30-minute post-entry time stop for non-trending validated-state setups, closing positions that fail to reach 0.25R unrealized profit within that window. Evaluate it only through the research registry on sealed holdouts, net of existing spread and slippage assumptions, against the current champion. Reject the candidate unless it improves net expectancy and profit factor while not increasing maximum drawdown or reducing trade count by more than 15%."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_8d9f47\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.42,
+        "finished_utc": "2026-08-23T17:58:28.494290+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T17:58:15.073691+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T17:58:28.494290+00:00",
+      "text": "Research state-conditional expected-value calibration: compare the current validated-state threshold with thresholds calibrated separately for each lifecycle/regime state using only prior closed outcomes and net spread/slippage costs. Register the experiment and evaluate both versions on a chronological sealed holdout. Accept the candidate only if it improves net expectancy by at least 10% without increasing maximum drawdown or reducing trade coverage by more than 20%; otherwise reject it and leave the champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_8d9f47\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 14.14,
+        "finished_utc": "2026-08-23T17:59:45.459571+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T17:59:31.319547+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T17:59:45.459571+00:00",
+      "text": "Research state-conditional expected-value calibration using pre-registered, immutable lifecycle/regime definitions and a fixed threshold grid; each state must have at least 100 prior closed outcomes, otherwise it uses the pooled validated-state threshold. Select thresholds only from expanding-window historical data, net of declared spread/slippage costs, with nested walk-forward validation and block-bootstrap 95% confidence intervals; control threshold/state selection with Holm\u2013Bonferroni correction. Register the protocol and experiment before execution, then evaluate both candidates across repeated chronological walk-forward folds and one untouched sealed holdout that is never used for tuning. Promote only if the candidate\u2019s holdout net expectancy improves by at least 10% with corrected evidence, maximum drawdown does not increase, and trade coverage falls by no more than 20%; otherwise record the result and leave the champion unchanged."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_8d9f47\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.65,
+        "finished_utc": "2026-08-23T17:59:31.303539+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T17:59:19.649217+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T17:59:31.303539+00:00",
+      "text": "Pre-register a precise, frozen definition of non-trending validated-state setups and a small, theory-bounded grid of time-stop and unrealized-R thresholds before analysis. Evaluate all candidates through the research registry using purged, sealed holdouts net of existing spread and slippage, with bootstrap confidence intervals and minimum trade counts specified in advance. Compare against the current champion across instruments, market regimes, and time partitions, applying a multiple-testing correction for the registered candidate set. Promote only a candidate with statistically credible improvement in net expectancy and profit factor, no material drawdown deterioration, and no economically unjustified loss of trade coverage."
+    }
+  },
+  "status": "decided"
+}
