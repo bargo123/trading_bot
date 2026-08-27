@@ -284,6 +284,9 @@ class _FakeEvidence:
 
 
 class _PositiveEvidence(_FakeEvidence):
+    # Exploration probability authority must come from the same executable
+    # quote/tick capture replay as the runner, not generic M1 structure.
+    provenance = "mt5_tick_replay"
     eligible = True
     analogue_n = 60
     analogue_n_losses = 12

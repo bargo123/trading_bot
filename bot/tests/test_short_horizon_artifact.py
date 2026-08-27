@@ -40,7 +40,10 @@ def _positive_captured_metrics(mean: float) -> dict[str, float | int]:
         "mean_captured_exit_return": mean,
         "captured_exit_lcb95_return": mean,
         "captured_exit_loss_count": 5,
-        "selected": 20,
+        "captured_exit_win_count": 995,
+        "captured_exit_win_rate": 0.995,
+        "captured_exit_win_lcb95": 0.985,
+        "selected": 1000,
     }
 
 
@@ -166,6 +169,21 @@ def test_execution_candidate_requires_minimum_observed_captured_losses():
 
     assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
     assert reason == "insufficient_captured_exit_loss_evidence"
+
+
+def test_execution_candidate_requires_captured_win_rate_target():
+    weak = _positive_captured_metrics(0.001)
+    weak["captured_exit_win_lcb95"] = 0.94
+    status, reason = _execution_status(
+        target_definition="captured_exit_replay",
+        decision_horizon_s=10,
+        test_metrics=weak,
+        sealed_metrics=_positive_captured_metrics(0.001),
+        sealed_by_horizon={"10": _positive_captured_metrics(0.001)},
+    )
+
+    assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
+    assert reason == "captured_exit_win_rate_lcb95_below_target"
 
 
 def test_decision_horizon_uses_fastest_validation_supported_horizon():

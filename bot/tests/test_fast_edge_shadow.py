@@ -3,7 +3,11 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-from research_fast_edge_shadow import primary_oos_metrics, select_research_symbols
+from research_fast_edge_shadow import (
+    _load_experiment_handoff,
+    primary_oos_metrics,
+    select_research_symbols,
+)
 
 from aegis.research.fast_edge_shadow import (
     SHADOW_HORIZONS_S,
@@ -32,13 +36,28 @@ def _quotes(periods: int = 180) -> pd.DataFrame:
 
 
 def test_shadow_horizons_cover_requested_fast_and_ceiling_windows():
-    assert SHADOW_HORIZONS_S == (1, 2, 3, 5, 8, 10, 15, 20, 30, 45)
+    assert SHADOW_HORIZONS_S == (1, 2, 3, 5, 8, 10, 15, 20)
 
 
 def test_research_symbol_filter_preserves_configured_order_and_rejects_unknowns():
     configured = ["EURUSD", "EURCAD", "GBPJPY"]
     assert select_research_symbols(configured, ["eurcad", "missing"]) == ["EURCAD"]
     assert select_research_symbols(configured, None) == configured
+
+
+def test_experiment_handoff_is_optional_and_research_only(tmp_path):
+    assert _load_experiment_handoff(tmp_path / "missing.json") is None
+    path = tmp_path / "handoff.json"
+    path.write_text(
+        '{"schema":"fast_edge_experiment_handoff.v1","execution_authority":"NONE",'
+        '"next_experiments":[{"id":"N1"}]}',
+        encoding="utf-8",
+    )
+    assert _load_experiment_handoff(path) == {
+        "schema": "fast_edge_experiment_handoff.v1",
+        "execution_authority": "NONE",
+        "next_experiments": [{"id": "N1"}],
+    }
 
 
 def test_segment_rates_use_full_oos_observation_window_not_sparse_group_span():

@@ -49,7 +49,7 @@ def _econ(**overrides):
         "commission_round_trip_usd": 0.0,
         "analogue_n": 100,
         "analogue_n_losses": 40,
-        "probability_provenance": "mt5_m1",
+        "probability_provenance": "mt5_tick_replay",
     }
     kwargs.update(overrides)
     return evaluate_trade_economics(**kwargs)
@@ -226,6 +226,12 @@ def test_no_evidence_and_no_supplied_probability_is_rejected():
     result = _econ(p_win=None, analogue_n=0, analogue_n_losses=0)
     assert not result.acceptable
     assert result.reason == "no_win_probability_evidence"
+
+
+def test_generic_m1_structural_evidence_cannot_authorize_seconds_probability():
+    result = _econ(probability_provenance="mt5_m1", p_win=0.99, analogue_n=100)
+    assert not result.acceptable
+    assert result.reason == "probability_provenance_untrusted"
 
 
 def test_zero_size_is_rejected():

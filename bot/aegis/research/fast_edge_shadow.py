@@ -26,7 +26,7 @@ from aegis.research.short_horizon_artifact import _feature_frame
 from aegis.intel.trade_controller import TradeController
 
 
-SHADOW_HORIZONS_S = (1, 2, 3, 5, 8, 10, 15, 20, 30, 45)
+SHADOW_HORIZONS_S = (1, 2, 3, 5, 8, 10, 15, 20)
 SHADOW_THRESHOLDS = (0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.925, 0.95, 0.975, 0.99)
 SPREAD_VOL_GATE_THRESHOLDS = tuple(
     (spread_to_realized, spread_to_micro)
@@ -188,7 +188,12 @@ def replay_executable_path(
         if replay.get("status") != "REPLAYED":
             raise ValueError(str(replay.get("reason") or "quote replay unavailable"))
         signed = bid - entry if side == "buy" else entry - ask
-        first_green_index = next((i for i, value in enumerate(signed) if value > 0.0), None)
+        replay_actions = list(replay.get("actions") or [])
+        first_green_index = next(
+            (i for i, action in enumerate(replay_actions)
+             if float(action.get("net_pnl_usd", 0.0)) > 0.0),
+            None,
+        )
         first_failure_index = next((i for i, value in enumerate(signed) if value <= -3.0 * entry_spread), None)
         captured_time = float(replay["captured_exit_time_s"])
         return {
@@ -196,8 +201,8 @@ def replay_executable_path(
             "captured_exit_return": float(replay["captured_exit_net_pnl"]) / entry_mid if entry_mid > 0 else np.nan,
             "captured_exit_reason": str(replay["captured_exit_reason"]),
             "captured_exit_action": str(replay.get("captured_exit_action") or "TIMEOUT"),
-            "terminal_net_pnl": float(signed[-1]),
-            "terminal_return": float(signed[-1]) / entry_mid if entry_mid > 0 else np.nan,
+            "terminal_net_pnl": float(replay["terminal_net_pnl"]),
+            "terminal_return": float(replay["terminal_net_pnl"]) / entry_mid if entry_mid > 0 else np.nan,
             "mfe": float(np.max(signed)),
             "mae": float(np.min(signed)),
             "tail_loss": bool(np.min(signed) <= -3.0 * entry_spread),
@@ -218,7 +223,8 @@ def replay_executable_path(
             "winner_giveback": bool(np.max(signed) > 0.0 and float(replay["captured_exit_net_pnl"]) < np.max(signed)),
             "first_profitable_executable_close": bool(first_green_index is not None),
             "first_profitable_close_net_pnl": (
-                float(signed[first_green_index]) if first_green_index is not None else None
+                float(replay_actions[first_green_index]["net_pnl_usd"])
+                if first_green_index is not None else None
             ),
             "future_path_observed_n": int(len(replay.get("actions") or [])),
             "exit_policy": exit_policy,

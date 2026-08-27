@@ -22,7 +22,7 @@ def _quotes() -> pd.DataFrame:
 
 
 def test_default_horizons_are_seconds_first():
-    assert DEFAULT_HORIZONS_S == (3, 5, 8, 10, 15, 20, 30, 45)
+    assert DEFAULT_HORIZONS_S == (1, 2, 3, 5, 8, 10, 15, 20)
 
 
 def test_labels_are_cost_aware_and_directional():

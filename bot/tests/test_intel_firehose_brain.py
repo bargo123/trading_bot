@@ -329,7 +329,7 @@ def test_brain_can_fire_with_bootstrap_analogues(tmp_path):
         json.dumps(
             {
                 "schema": "analogue_index.v1",
-                "provenance": "mt5_m1",
+                "provenance": "mt5_tick_replay",
                 "outcome_unit": "usd",
                 "records": records,
             }
@@ -581,7 +581,7 @@ def _gated_brain(tmp_path, signature, allow_states, n=80):
         json.dumps(
             {
                 "schema": "analogue_index.v1",
-                "provenance": "mt5_m1",
+                "provenance": "mt5_tick_replay",
                 "outcome_unit": "usd",
                 "records": records,
             }
@@ -664,7 +664,7 @@ def test_gate_off_preserves_legacy_bootstrap(tmp_path):
         json.dumps(
             {
                 "schema": "analogue_index.v1",
-                "provenance": "mt5_m1",
+                "provenance": "mt5_tick_replay",
                 "outcome_unit": "usd",
                 "records": records,
             }
@@ -714,7 +714,7 @@ def test_gate_uses_exact_state_evidence_not_fuzzy_pool(tmp_path):
         json.dumps(
             {
                 "schema": "analogue_index.v1",
-                "provenance": "mt5_m1",
+                "provenance": "mt5_tick_replay",
                 "outcome_unit": "usd",
                 "records": exact_records + polluted,
             }
@@ -777,7 +777,7 @@ def test_bootstrap_research_stage_cannot_trade(tmp_path):
     allow_states = [{k: signature[k] for k in ("regime", "structure", "session", "side")}]
     records = _positive_records(n=80, signature=signature)
     index = tmp_path / "analogue_index.json"
-    index.write_text(json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_m1",
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "provenance": "mt5_tick_replay",
                                  "outcome_unit": "usd", "records": records}), encoding="utf-8")
     allowlist = _validated_allowlist(tmp_path, allow_states)
     cfg = _bootstrap_cfg(

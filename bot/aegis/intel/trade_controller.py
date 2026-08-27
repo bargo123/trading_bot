@@ -212,14 +212,15 @@ class TradeController:
                 break
 
         last_timestamp, last_bid, last_ask = future[-1]
+        endpoint_mark = last_bid if normalized_side == "buy" else last_ask
+        endpoint_signed = (endpoint_mark - entry) * direction
+        endpoint_net = endpoint_signed * unit - slippage * unit - commission
         if terminal is None:
-            mark = last_bid if normalized_side == "buy" else last_ask
-            final_signed = (mark - entry) * direction
             terminal = {
                 "time_s": last_timestamp - start,
                 "reason": "timeout",
                 "action": "TIMEOUT",
-                "net_pnl_usd": final_signed * unit - slippage * unit - commission,
+                "net_pnl_usd": endpoint_net,
             }
         max_favorable = max(signed_prices) * unit - slippage * unit - commission
         max_adverse = min(signed_prices) * unit - slippage * unit - commission
@@ -230,7 +231,9 @@ class TradeController:
             "captured_exit_reason": str(terminal["reason"]),
             "captured_exit_action": str(terminal.get("action") or "TIMEOUT"),
             "captured_exit_time_s": float(terminal["time_s"]),
-            "terminal_net_pnl": captured,
+            # Terminal means the last observed executable quote, even when the
+            # controller captured earlier. Both values use the same costs.
+            "terminal_net_pnl": float(endpoint_net),
             "mfe_net_pnl": float(max_favorable),
             "mae_net_pnl": float(max_adverse),
             "time_to_green_s": first_green_s,

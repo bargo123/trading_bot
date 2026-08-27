@@ -14,8 +14,11 @@ import pandas as pd
 
 from aegis.intel.broker_math import BrokerSymbolSpec
 from aegis.intel.paths import BOT_ROOT, resolve_bot_path
-from aegis.research.short_horizon import point_in_time_features
-from aegis.research.short_horizon_artifact import MIN_CAPTURED_EXIT_LOSSES
+from aegis.research.short_horizon import DEFAULT_HORIZONS_S, point_in_time_features
+from aegis.research.short_horizon_artifact import (
+    MIN_CAPTURED_EXIT_LOSSES,
+    MIN_CAPTURED_EXIT_WIN_LCB95,
+)
 from aegis.research_factory.ml_pipeline import MLPipeline
 
 
@@ -106,7 +109,9 @@ def execution_candidate_has_current_promotion_policy(metadata: Mapping[str, Any]
     try:
         return (
             int(policy.get("min_captured_exit_losses") or 0) >= MIN_CAPTURED_EXIT_LOSSES
+            and float(policy.get("min_captured_exit_win_lcb95")) >= MIN_CAPTURED_EXIT_WIN_LCB95
             and policy.get("requires_positive_test_and_sealed_lcb95") is True
+            and policy.get("requires_captured_win_rate_lcb95") is True
         )
     except (TypeError, ValueError):
         return False
@@ -152,6 +157,14 @@ class ShortHorizonPredictor:
             missing = [key for key in required if not metadata.get(key)]
             if missing:
                 self.status, self.reason = "invalid_artifact", "missing:" + ",".join(missing)
+                return
+            try:
+                artifact_horizons = {int(value) for value in metadata["horizons_s"]}
+            except (TypeError, ValueError):
+                self.status, self.reason = "invalid_artifact", "horizons_invalid"
+                return
+            if not artifact_horizons or not artifact_horizons.issubset(set(DEFAULT_HORIZONS_S)):
+                self.status, self.reason = "invalid_artifact", "unsupported_horizon_set"
                 return
             if (
                 self.execution_status == "EXECUTION_CANDIDATE"
@@ -281,6 +294,10 @@ class ShortHorizonPredictor:
                 lower = float(prediction.get("expected_net_pnl_lcb95"))
                 if lower != lower or lower <= 0.0:
                     return False
+            if prediction.get("execution_status") == "EXECUTION_CANDIDATE":
+                capture_lcb = float(prediction.get("p_captured_win_lcb95"))
+                if capture_lcb < MIN_CAPTURED_EXIT_WIN_LCB95:
+                    return False
         except (TypeError, ValueError):
             return False
         return True
@@ -327,9 +344,10 @@ class ShortHorizonPredictor:
         ranking = sorted(
             eligible,
             key=lambda side: (
-                float(predictions[side].get("expected_net_pnl") or 0.0),
+                float(predictions[side].get("p_captured_win_lcb95") or 0.0),
                 float(predictions[side].get("probability") or 0.0),
                 -float(predictions[side].get("uncertainty") or 1.0),
+                float(predictions[side].get("expected_net_pnl") or 0.0),
             ),
             reverse=True,
         )
@@ -474,6 +492,8 @@ class ShortHorizonPredictor:
                     "threshold": horizon_threshold,
                     "abstain_reason": abstain_reason,
                     "model_disagreement": model_disagreement,
+                    "p_captured_win": None,
+                    "p_captured_win_lcb95": None,
                 }
             if not by_horizon:
                 return self._fail_closed_prediction("decision_horizon_missing")
@@ -552,6 +572,10 @@ class ShortHorizonPredictor:
                     "expected_captured_exit_return_lcb95": (
                         expected_lcb_return if captured_exit_mode else None
                     ),
+                    "p_captured_win": metrics.get("captured_exit_win_rate") if captured_exit_mode else None,
+                    "p_captured_win_lcb95": (
+                        metrics.get("captured_exit_win_lcb95") if captured_exit_mode else None
+                    ),
                     "expected_harvest_return": expected_return if harvest_mode else None,
                     "expected_harvest_return_lcb95": expected_lcb_return if harvest_mode else None,
                     "prediction_reason": horizon_prediction.get(
@@ -589,6 +613,24 @@ class ShortHorizonPredictor:
                 else selected_oos.get("harvest_lcb95_return") if harvest_mode
                 else selected_oos.get("expectancy_lcb95_return")
             )
+            p_captured_win = (
+                selected_oos.get("captured_exit_win_rate")
+                if captured_exit_mode else None
+            )
+            p_captured_win_lcb95 = (
+                selected_oos.get("captured_exit_win_lcb95")
+                if captured_exit_mode else None
+            )
+            if self.execution_status == "EXECUTION_CANDIDATE":
+                try:
+                    if float(p_captured_win_lcb95) < MIN_CAPTURED_EXIT_WIN_LCB95:
+                        return self._fail_closed_prediction(
+                            "captured_win_rate_lcb95_unproven"
+                        )
+                except (TypeError, ValueError):
+                    return self._fail_closed_prediction(
+                        "captured_win_rate_lcb95_unproven"
+                    )
             expected_net = None
             expected_net_lcb95 = None
             if broker_spec is not None or quantity is not None:
@@ -644,6 +686,8 @@ class ShortHorizonPredictor:
                 "expected_harvest_return_lcb95": expected_lcb_return if harvest_mode else None,
                 "expected_captured_exit_return": expected_return if captured_exit_mode else None,
                 "expected_captured_exit_return_lcb95": expected_lcb_return if captured_exit_mode else None,
+                "p_captured_win": p_captured_win,
+                "p_captured_win_lcb95": p_captured_win_lcb95,
                 "tail_loss_probability": selected_oos.get("tail_loss_rate"),
                 "expected_mfe": selected_oos.get("expected_mfe"),
                 "expected_mae": selected_oos.get("expected_mae"),

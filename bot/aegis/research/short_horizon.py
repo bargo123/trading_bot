@@ -17,7 +17,7 @@ import pandas as pd
 from aegis.research.dataset import assert_no_lookahead
 
 
-DEFAULT_HORIZONS_S = (3, 5, 8, 10, 15, 20, 30, 45)
+DEFAULT_HORIZONS_S = (1, 2, 3, 5, 8, 10, 15, 20)
 SYMBOL_FEATURE_BUCKETS = 32
 SHORT_HORIZON_LABEL_COLUMNS = (
     "entry_time",

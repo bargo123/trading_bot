@@ -22,7 +22,7 @@ import math
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping
 
-from aegis.intel.analogue_store import is_measured_provenance
+from aegis.intel.analogue_store import is_executable_capture_provenance
 
 # A reward smaller than the invalidation distance is the structural signature of the
 # high-win-rate / negative-expectancy failure. 1.0R is a floor, not a target.
@@ -257,7 +257,7 @@ def evaluate_trade_economics(
     payoff_ratio = expected_win_usd / expected_loss_usd if expected_loss_usd > 0 else None
 
     provenance = str(probability_provenance or "unknown")
-    if (p_win is not None or int(analogue_n) > 0) and not is_measured_provenance(provenance):
+    if (p_win is not None or int(analogue_n) > 0) and not is_executable_capture_provenance(provenance):
         return _reject(
             "probability_provenance_untrusted",
             entry=entry,

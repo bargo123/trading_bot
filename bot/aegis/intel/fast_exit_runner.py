@@ -61,7 +61,7 @@ class FastExitContext:
     spread_normal: Optional[bool] = None
     harvest_policy: Optional[HarvestPolicy] = None
     short_horizon_prediction: Optional[Mapping[str, Any]] = None
-    expected_initial_friction_pips: float = 0.0
+    expected_initial_friction_pips: Optional[float] = None
 
 
 class MissingLiquidationMarkError(Exception):
@@ -381,6 +381,9 @@ def initial_friction_for_context(
     charged again as an observed exit cost. Slippage and commission are the
     only additional round-trip costs used by the harvester.
     """
+    explicit_pips = _finite_nonnegative(ctx.expected_initial_friction_pips)
+    if explicit_pips is not None:
+        return explicit_pips, explicit_pips * max(float(pip), 0.0)
     meta = ctx.ticket_meta
     spread_price = 0.0
     if meta is not None and isinstance(meta.cost_evidence, Mapping):

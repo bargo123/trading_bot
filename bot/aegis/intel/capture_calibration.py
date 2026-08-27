@@ -11,7 +11,7 @@ import math
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from aegis.intel.analogue_store import is_measured_provenance
+from aegis.intel.analogue_store import is_executable_capture_provenance
 from aegis.intel.trade_economics import wilson_lower_bound
 
 
@@ -71,7 +71,7 @@ def authorize_capture_probability(
     probability = wins / n
     lower = wilson_lower_bound(wins=wins, n=n)
     distance = None if lower is None else max(0.0, required - lower)
-    if not is_measured_provenance(origin):
+    if not is_executable_capture_provenance(origin):
         return CaptureAuthorization(
             False, "capture_evidence_not_measured", probability, lower, required,
             n, wins, source, origin, distance,

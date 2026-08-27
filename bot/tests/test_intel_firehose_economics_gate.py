@@ -18,7 +18,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from aegis.intel.analogue_store import AnalogueStore, is_measured_provenance
+from aegis.intel.analogue_store import (
+    AnalogueStore,
+    is_executable_capture_provenance,
+    is_measured_provenance,
+)
 from aegis.intel.firehose_brain import IntelligentFirehoseBrain
 from aegis.intel.state_runtime import build_runtime_state, runtime_signature
 
@@ -198,7 +202,7 @@ def test_structural_one_pip_target_over_thirty_pip_stop_is_priced_and_refused(tm
     frame = _ramp_into_resistance()
     signature = _signature_for(frame, "buy")
     records = _measured_records(signature, n=60)
-    brain = _brain(_index(tmp_path, records, provenance="mt5_m1"))
+    brain = _brain(_index(tmp_path, records, provenance="mt5_tick_replay"))
     decision = _decide(brain, frame)
 
     econ = decision.journal
@@ -218,7 +222,7 @@ def test_high_historical_win_rate_does_not_rescue_destructive_geometry(tmp_path)
     signature = _signature_for(frame, "buy")
     # 1 loss in 12 -> 91.7% win rate, and a positive expectancy in the sample.
     records = _measured_records(signature, n=120, wins_per_loss=11)
-    brain = _brain(_index(tmp_path, records, provenance="mt5_m1"))
+    brain = _brain(_index(tmp_path, records, provenance="mt5_tick_replay"))
     decision = _decide(brain, frame)
     assert decision.action != "fire"
     assert decision.journal["econ_ok"] is False
@@ -235,7 +239,7 @@ def test_firehose_still_fires_on_good_geometry_with_measured_evidence(tmp_path):
     frame = _basing_above_support()
     signature = _signature_for(frame, "buy")
     records = _measured_records(signature, n=80)
-    brain = _brain(_index(tmp_path, records, provenance="mt5_m1"))
+    brain = _brain(_index(tmp_path, records, provenance="mt5_tick_replay"))
     decision = _decide(brain, frame)
 
     econ = decision.journal
@@ -252,7 +256,7 @@ def test_firehose_still_fires_on_good_geometry_with_measured_evidence(tmp_path):
 def test_fire_decision_reports_costs_and_probability_provenance(tmp_path):
     frame = _basing_above_support()
     signature = _signature_for(frame, "buy")
-    brain = _brain(_index(tmp_path, _measured_records(signature, n=80), provenance="mt5_m1"))
+    brain = _brain(_index(tmp_path, _measured_records(signature, n=80), provenance="mt5_tick_replay"))
     decision = _decide(brain, frame)
     econ = decision.journal
     # Cost is charged from the live spread at the size actually being sent.
@@ -269,7 +273,7 @@ def test_fire_size_comes_from_validated_risk_not_a_fixed_clip(tmp_path):
     """order_quantity is a fallback, not the size of every trade."""
     frame = _basing_above_support()
     signature = _signature_for(frame, "buy")
-    brain = _brain(_index(tmp_path, _measured_records(signature, n=80), provenance="mt5_m1"))
+    brain = _brain(_index(tmp_path, _measured_records(signature, n=80), provenance="mt5_tick_replay"))
     decision = _decide(brain, frame)
     assert decision.action == "fire"
     assert decision.journal["size_ok"] is True
@@ -283,7 +287,7 @@ def test_edge_sizing_can_be_disabled_back_to_the_fixed_clip(tmp_path):
     frame = _basing_above_support()
     signature = _signature_for(frame, "buy")
     brain = _brain(
-        _index(tmp_path, _measured_records(signature, n=80), provenance="mt5_m1"),
+        _index(tmp_path, _measured_records(signature, n=80), provenance="mt5_tick_replay"),
         intelligent_edge_sizing=False,
     )
     decision = _decide(brain, frame)
@@ -305,7 +309,7 @@ def test_synthetic_proxy_evidence_cannot_authorise_a_fire(tmp_path):
     signature = _signature_for(frame, "buy")
     records = _measured_records(signature, n=80)
 
-    real = _decide(_brain(_index(tmp_path, records, provenance="mt5_m1"),
+    real = _decide(_brain(_index(tmp_path, records, provenance="mt5_tick_replay"),
                           intelligent_exploration_enabled=False), frame)
     proxy = _decide(_brain(_index(tmp_path, records, provenance="research_proxy"),
                            intelligent_exploration_enabled=False), frame)
@@ -330,7 +334,10 @@ def test_synthetic_evidence_is_allowed_only_behind_an_explicit_opt_in(tmp_path):
     # evaluated but can never authorise a demo order (P2 governance).
     decision = _decide(brain, frame)
     assert decision.action != "fire"
-    assert decision.reason.startswith("shadow:not_trading_stage:")
+    # Synthetic/proxy evidence is not admitted to executable economics, even
+    # when the offline-only opt-in is present.  The explicit economics veto is
+    # the fail-closed result; it must not become a shadow or DEMO order intent.
+    assert decision.reason == "trade_economics:no_win_probability_evidence"
 
 
 def test_provenance_classification():
@@ -338,6 +345,9 @@ def test_provenance_classification():
         assert not is_measured_provenance(label)
     for label in ("mt5_m1", "mt5_demo_history"):
         assert is_measured_provenance(label)
+    assert not is_executable_capture_provenance("mt5_m1")
+    assert not is_executable_capture_provenance("mt5_demo_history")
+    assert is_executable_capture_provenance("mt5_tick_replay")
 
 
 def test_store_reads_provenance_from_index(tmp_path):

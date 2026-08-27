@@ -12,7 +12,12 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 
 from aegis.engines import PositionSnapshot
-from aegis.intel.analogue_store import AnalogueEvidence, AnalogueStore, is_measured_provenance
+from aegis.intel.analogue_store import (
+    AnalogueEvidence,
+    AnalogueStore,
+    is_executable_capture_provenance,
+    is_measured_provenance,
+)
 from aegis.intel.capture_calibration import authorize_capture_probability
 from aegis.intel.exploration import (
     ExperimentStore,
@@ -623,7 +628,7 @@ def _bootstrap_from_evidence(cfg: Mapping[str, Any], evidence: Any,
     """
     if not bool(cfg.get("intelligent_firehose_bootstrap", False)):
         return None
-    measured = is_measured_provenance(getattr(evidence, "provenance", "unknown"))
+    measured = is_executable_capture_provenance(getattr(evidence, "provenance", "unknown"))
     if not measured:
         if bool(cfg.get("intelligent_allow_synthetic_evidence", False)):
             # Explicit opt-in exists only for offline tests and shadow research.
@@ -1362,7 +1367,7 @@ class IntelligentFirehoseBrain:
                     )
                 except Exception:
                     candidate_evidence = None
-            measured_candidate_evidence = is_measured_provenance(
+            measured_candidate_evidence = is_executable_capture_provenance(
                 getattr(candidate_evidence, "provenance", "unknown")
             )
             authority_probability = None
@@ -2169,7 +2174,7 @@ class IntelligentFirehoseBrain:
         ``no_win_probability_evidence`` rather than assuming a favourable one.
         """
         evidence_provenance = str(getattr(evidence, "provenance", "unknown") or "unknown")
-        measured = is_measured_provenance(evidence_provenance)
+        measured = is_executable_capture_provenance(evidence_provenance)
         analogue_n = int(getattr(evidence, "analogue_n", 0) or 0) if measured else 0
         analogue_losses = int(getattr(evidence, "analogue_n_losses", 0) or 0) if measured else 0
         return evaluate_trade_economics(

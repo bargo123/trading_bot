@@ -614,6 +614,12 @@ class TestFirehoseHarvestAdapter:
         assert verdict["action"] == "ABORT"
         assert verdict["reason"] == "remaining_ev_negative"
 
+    def test_explicit_ticket_friction_is_used_for_lifecycle_decisions(self):
+        ctx = TestFastExitProductionHelper().create_context()
+        ctx.expected_initial_friction_pips = 2.5
+        verdict = evaluate_fast_exit(ctx)
+        assert verdict["expected_initial_friction_pips"] == pytest.approx(2.5)
+
     def test_remaining_ev_estimate_is_costed_and_point_in_time(self):
         value, status = estimate_remaining_ev(
             side="buy", entry_price=1.10000, current_mark=1.10100,

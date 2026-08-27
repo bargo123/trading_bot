@@ -38,3 +38,24 @@ def test_trade_controller_exposes_auditable_hold_explanation():
     assert decision["action"] == "HOLD"
     assert decision["why_hold"] == "pnl is progressing; momentum remains positive"
     assert decision["why_exit"] == ""
+
+
+def test_replay_keeps_terminal_endpoint_distinct_from_earlier_captured_exit():
+    replay = TradeController().replay_quote_path(
+        quotes=[
+            {"time": 0.0, "bid": 1.09999, "ask": 1.10001},
+            {"time": 1.0, "bid": 1.10010, "ask": 1.10012},
+            {"time": 2.0, "bid": 1.09980, "ask": 1.09982},
+        ],
+        side="buy",
+        horizon_s=3,
+        target_price=1.10005,
+        stop_price=1.09993,
+        pip_size=0.0001,
+        slippage_price=0.00001,
+        usd_per_price_unit=100000.0,
+    )
+
+    assert replay["captured_exit_action"] == "HARVEST"
+    assert replay["captured_exit_net_pnl"] > 0.0
+    assert replay["terminal_net_pnl"] < 0.0

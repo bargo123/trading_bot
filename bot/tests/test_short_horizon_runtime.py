@@ -46,13 +46,15 @@ def test_execution_candidate_loader_rejects_empty_authorized_symbols(tmp_path: P
           \"target_definition\": \"captured_exit_replay\",
           \"dataset_hash\": \"dataset\",
           \"validation_hash\": \"validation\",
-          \"horizons_s\": [10],
-          \"decision_horizon_s\": 10,
+          \"horizons_s\": [1, 2],
+          \"decision_horizon_s\": 2,
           \"authorized_symbols\": [],
           \"oos\": {\"sealed_by_symbol_horizon\": {}},
           \"promotion_policy\": {
             \"min_captured_exit_losses\": 10,
-            \"requires_positive_test_and_sealed_lcb95\": true
+            \"min_captured_exit_win_lcb95\": 0.95,
+            \"requires_positive_test_and_sealed_lcb95\": true,
+            \"requires_captured_win_rate_lcb95\": true
           }
         }""",
         encoding="utf-8",
@@ -158,6 +160,8 @@ def test_captured_exit_artifact_uses_captured_oos_expectancy_for_runtime_ev(tmp_
                 "10": {
                     "mean_captured_exit_return": 0.001,
                     "captured_exit_lcb95_return": 0.0005,
+                    "captured_exit_win_rate": 0.995,
+                    "captured_exit_win_lcb95": 0.985,
                 }
             },
             "sealed_by_symbol_horizon": {
@@ -165,6 +169,8 @@ def test_captured_exit_artifact_uses_captured_oos_expectancy_for_runtime_ev(tmp_
                     "10": {
                         "mean_captured_exit_return": 0.002,
                         "captured_exit_lcb95_return": 0.001,
+                        "captured_exit_win_rate": 0.995,
+                        "captured_exit_win_lcb95": 0.985,
                     }
                 }
             },
@@ -341,6 +347,8 @@ def test_runtime_compares_buy_and_sell_and_selects_best_positive_side(tmp_path: 
                     "10": {
                         "mean_captured_exit_return": 0.001,
                         "captured_exit_lcb95_return": 0.0005,
+                        "captured_exit_win_rate": 0.995,
+                        "captured_exit_win_lcb95": 0.985,
                     }
                 }
             }
@@ -415,6 +423,8 @@ def test_runtime_ev_uses_broker_native_usd_tick_value_for_jpy_pair(tmp_path: Pat
                     "10": {
                         "mean_captured_exit_return": 0.0001,
                         "captured_exit_lcb95_return": 0.00005,
+                        "captured_exit_win_rate": 0.995,
+                        "captured_exit_win_lcb95": 0.985,
                     }
                 }
             }

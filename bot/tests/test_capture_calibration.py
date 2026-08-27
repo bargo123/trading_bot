@@ -9,14 +9,14 @@ def test_authorization_uses_geometry_breakeven_not_fixed_probability_floor():
         observations=20,
         breakeven_probability=0.20,
         evidence_source="measured_analogue",
-        provenance="mt5_m1",
+        provenance="mt5_tick_replay",
     )
     high_payoff = authorize_capture_probability(
         successes=12,
         observations=20,
         breakeven_probability=0.70,
         evidence_source="measured_analogue",
-        provenance="mt5_m1",
+        provenance="mt5_tick_replay",
     )
 
     assert low_payoff.required_probability == 0.20
@@ -36,7 +36,7 @@ def test_high_payoff_does_not_rescue_a_thin_or_weak_capture_sample():
         observations=20,
         breakeven_probability=0.20,
         evidence_source="measured_analogue",
-        provenance="mt5_m1",
+        provenance="mt5_tick_replay",
     )
 
     assert result.authorized is False
@@ -51,7 +51,7 @@ def test_insufficient_observations_fail_closed_even_when_point_estimate_is_high(
         observations=10,
         breakeven_probability=0.20,
         evidence_source="measured_analogue",
-        provenance="mt5_m1",
+        provenance="mt5_tick_replay",
     )
 
     assert result.authorized is False
@@ -76,7 +76,7 @@ def test_unmeasured_or_invalid_evidence_cannot_authorize_capture():
         observations=20,
         breakeven_probability=None,
         evidence_source="measured_analogue",
-        provenance="mt5_m1",
+        provenance="mt5_tick_replay",
     )
     assert invalid.authorized is False
     assert invalid.reason == "capture_breakeven_unavailable"

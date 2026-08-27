@@ -24,10 +24,12 @@ from aegis.research.registry import DuplicateExperimentError, ExperimentRegistry
 from aegis.research_factory.evaluation import record_outcome
 from aegis.research_factory.ml_pipeline import MLPipeline, ModelConfig
 from aegis.intel.trade_controller import TradeController
+from aegis.intel.trade_economics import wilson_lower_bound
 
 
 ARTIFACT_SCHEMA = "short_horizon_ensemble.v1"
 MIN_CAPTURED_EXIT_LOSSES = 5  # align with the repo's sampled-loss promotion standard
+MIN_CAPTURED_EXIT_WIN_LCB95 = 0.95
 
 
 @dataclass(frozen=True)
@@ -428,7 +430,7 @@ def build_quote_training_frame(
                             if captured_reason == "harvest" and captured_index is not None
                             else None
                         )
-                        terminal = float(signed[-1])
+                        terminal = float(shared_replay["terminal_net_pnl"])
                         mfe = float(shared_replay["mfe_net_pnl"])
                         mae = float(shared_replay["mae_net_pnl"])
                         time_to_profit = shared_replay.get("time_to_green_s")
@@ -608,6 +610,11 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
     )
     p95_loss = float(np.quantile(captured_losses, 0.05)) if len(captured_losses) else None
     p99_loss = float(np.quantile(captured_losses, 0.01)) if len(captured_losses) else None
+    captured_win_count = int(len(captured_wins))
+    captured_observation_count = int(len(finite_selected_captured))
+    captured_win_lcb95 = wilson_lower_bound(
+        wins=captured_win_count, n=captured_observation_count
+    )
     confidence_bands: dict[str, dict[str, Any]] = {}
     for lower, upper in (
         (0.50, 0.60), (0.60, 0.70), (0.70, 0.80), (0.80, 0.90),
@@ -662,6 +669,12 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
             if len(finite_selected_captured) else None
         ),
         "captured_exit_profit_factor": captured_profit_factor,
+        "captured_exit_win_count": captured_win_count,
+        "captured_exit_win_rate": (
+            float(captured_win_count / captured_observation_count)
+            if captured_observation_count else None
+        ),
+        "captured_exit_win_lcb95": captured_win_lcb95,
         "captured_exit_loss_count": int(len(captured_losses)),
         "p95_loss_return": p95_loss,
         "p99_loss_return": p99_loss,
@@ -822,6 +835,14 @@ def _execution_status(
         except (TypeError, ValueError):
             return False
 
+    def meets_win_rate_target(metrics: Mapping[str, Any] | None) -> bool:
+        if not isinstance(metrics, Mapping):
+            return False
+        try:
+            return float(metrics.get("captured_exit_win_lcb95")) >= MIN_CAPTURED_EXIT_WIN_LCB95
+        except (TypeError, ValueError):
+            return False
+
     if not positive(test_metrics) or not positive(sealed_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", (
             "test_or_sealed_captured_exit_oos_not_positive"
@@ -833,6 +854,10 @@ def _execution_status(
     if not enough_losses(test_metrics) or not enough_losses(sealed_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", (
             "insufficient_captured_exit_loss_evidence"
+        )
+    if not meets_win_rate_target(test_metrics) or not meets_win_rate_target(sealed_metrics):
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", (
+            "captured_exit_win_rate_lcb95_below_target"
         )
     horizon_metrics = sealed_by_horizon.get(str(int(decision_horizon_s)))
     if not positive(horizon_metrics):
@@ -846,6 +871,10 @@ def _execution_status(
     if not enough_losses(horizon_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", (
             "insufficient_captured_exit_loss_evidence"
+        )
+    if not meets_win_rate_target(horizon_metrics):
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", (
+            "captured_exit_win_rate_lcb95_below_target"
         )
     return "EXECUTION_CANDIDATE", (
         "positive_test_sealed_decision_horizon_captured_exit_oos"
@@ -917,6 +946,7 @@ def _authorized_symbols(
             return (
                 int(metrics.get("selected") or 0) >= int(min_selected)
                 and int(metrics.get("captured_exit_loss_count") or 0) >= MIN_CAPTURED_EXIT_LOSSES
+                and float(metrics.get("captured_exit_win_lcb95")) >= MIN_CAPTURED_EXIT_WIN_LCB95
                 and float(metrics.get(mean_key)) > 0.0
                 and float(metrics.get(lcb_key)) > 0.0
             )
@@ -1181,7 +1211,9 @@ def train_and_publish(
             "model_count": len(pipeline.models),
             "promotion_policy": {
                 "min_captured_exit_losses": MIN_CAPTURED_EXIT_LOSSES,
+                "min_captured_exit_win_lcb95": MIN_CAPTURED_EXIT_WIN_LCB95,
                 "requires_positive_test_and_sealed_lcb95": True,
+                "requires_captured_win_rate_lcb95": True,
             },
             "exit_policy": {
                 "name": "captured_exit_replay_v1",
@@ -1208,6 +1240,9 @@ def train_and_publish(
                 "OOS_PRECISION": sealed_metrics.get("precision"),
                 "OOS_CAPTURED_EXPECTANCY": sealed_metrics.get("mean_captured_exit_return"),
                 "OOS_CAPTURED_PF": sealed_metrics.get("captured_exit_profit_factor"),
+                "P_CAPTURED_WIN": sealed_metrics.get("captured_exit_win_rate"),
+                "P_CAPTURED_WIN_LCB95": sealed_metrics.get("captured_exit_win_lcb95"),
+                "TARGET_CAPTURE_WIN_RATE_LCB95": MIN_CAPTURED_EXIT_WIN_LCB95,
                 "P95_LOSS": sealed_metrics.get("p95_loss_return"),
                 "P99_LOSS": sealed_metrics.get("p99_loss_return"),
                 "CALIBRATION_ECE": sealed_metrics.get("calibration_ece"),

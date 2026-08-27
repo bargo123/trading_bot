@@ -71,10 +71,25 @@ def _lower_bound(values: Sequence[float]) -> float | None:
 #: trusted as real either.
 SYNTHETIC_PROVENANCE = frozenset({"synthetic_proxy", "research_proxy", "synthetic_fixture", "unknown"})
 
+# Only an explicitly quote/tick-replayed capture dataset can provide execution
+# probability for a seconds-horizon order. ``mt5_m1`` is real market history,
+# but its structural outcomes are not the live executable captured-exit label.
+EXECUTABLE_CAPTURE_PROVENANCE = frozenset({
+    "mt5_tick_replay",
+    "mt5_quote_replay",
+    "mt5_demo_tick_replay",
+    "mt5_demo_quote_replay",
+})
+
 
 def is_measured_provenance(provenance: str | None) -> bool:
     """True only for evidence built from real market history."""
     return str(provenance or "unknown") not in SYNTHETIC_PROVENANCE
+
+
+def is_executable_capture_provenance(provenance: str | None) -> bool:
+    """True only for evidence replayed with executable quote/tick exits."""
+    return str(provenance or "unknown").strip().lower() in EXECUTABLE_CAPTURE_PROVENANCE
 
 
 class AnalogueStore:
