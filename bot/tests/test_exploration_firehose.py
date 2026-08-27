@@ -407,6 +407,12 @@ def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
             'low': [1.09999] * 5,
             'close': [1.10] * 4 + [1.10001],
             'volume': [100] * 5}),
+        short_horizon_prediction={
+            'selected_side': mc.side,
+            'calibration_status': 'calibrated', 'abstain': False,
+            'probability': 0.70, 'threshold': 0.95, 'decision': True,
+            'expected_net_pnl': 0.01, 'decision_horizon_s': mc.max_hold_s,
+        },
         state={'structure': {'M15': {'kind': 'retest',
                'support': 1.09950, 'resistance': 1.10000}},
                'multi_timeframe': {'M5': {'direction': 'down'},
@@ -423,6 +429,7 @@ def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
     authorization = low_result.journal['capture_authorization']
     assert authorization['probability'] < 0.50
     assert authorization['lower_95'] >= authorization['required_probability']
+    assert low_result.journal['candidate_model_rejections']
 
     brain.outcome_memory.should_suppress = lambda features: True
     blocked_result, blocked_skip = brain._maybe_explore(
@@ -880,8 +887,8 @@ def test_undercovered_state_reaches_exploration_without_legacy_geometry(tmp_path
     assert decision.action == "fire"
 
 
-def test_short_horizon_abstention_still_reaches_bounded_exploration(tmp_path, monkeypatch):
-    """Uncertainty may classify exploration, but must not bypass its gates."""
+def test_sub_95_candidate_falls_through_to_bounded_exploration(tmp_path, monkeypatch):
+    """The 95% optimization target is not a global Firehose halt."""
     from aegis.intel import firehose_brain as fb
     from aegis.intel.firehose_brain import DemoDecision, IntelligentFirehoseBrain
 
@@ -941,14 +948,32 @@ def test_short_horizon_abstention_still_reaches_bounded_exploration(tmp_path, mo
         actual_ask=float(row["close"]) + 0.00005,
         video_style=True,
         short_horizon_prediction={
-            "calibration_status": "calibrated", "abstain": True,
-            "abstain_reason": "uncertainty_high", "uncertainty": 0.45,
-            "model_agreement": 2 / 3,
+            "calibration_status": "calibrated", "abstain": False,
+            "probability": 0.70, "threshold": 0.95, "decision": True,
+            "expected_net_pnl": 0.01, "uncertainty": 0.20,
+            "model_agreement": 1.0,
         },
     )
 
-    assert not invoked, "predictive abstention must not create an exploration order intent"
-    assert decision.action == "skip"
+    assert invoked, "a sub-95% candidate must fall through to exploration"
+    assert decision.action == "fire"
+
+    invoked.clear()
+    abstained = brain.evaluate(
+        symbol="EURUSD", row=row, completed_m1=frame.iloc[:-1], positions=[], equity=100.0,
+        pip=0.0001, core_side="buy", spread_price=0.0001,
+        entry_price=float(row["close"]), actual_bid=float(row["close"]) - 0.00005,
+        actual_ask=float(row["close"]) + 0.00005,
+        video_style=True,
+        short_horizon_prediction={
+            "calibration_status": "calibrated", "abstain": True,
+            "abstain_reason": "uncertainty_high", "probability": 0.70,
+            "threshold": 0.95, "uncertainty": 0.40, "model_agreement": 2 / 3,
+        },
+    )
+
+    assert invoked, "candidate ABSTAIN must not globally halt exploration"
+    assert abstained.action == "fire"
 
 
 def test_rejection_report_keeps_reason_without_fabricating_ev(tmp_path):

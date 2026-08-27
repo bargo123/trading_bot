@@ -321,6 +321,28 @@ def test_video_predictor_unavailable_produces_zero_order_intent(tmp_path):
     assert decision.reason == "short_horizon_prediction_missing"
     assert decision.quantity == 0.0
 
+
+def test_firehose_snapshot_exposes_active_search_telemetry(tmp_path):
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "records": []}), encoding="utf-8")
+    brain = IntelligentFirehoseBrain({
+        "analogue_index_path": str(index),
+        "intelligent_exploration_enabled": True,
+    })
+
+    funnel = brain.snapshot()["funnel"]
+
+    assert funnel["FIREHOSE_ACTIVE"] is True
+    assert funnel["VALIDATED_CANDIDATES"] == 0
+    assert funnel["EXPLORATION_CANDIDATES"] == 0
+    assert funnel["BEST_BUY_SCORE"] is None
+    assert funnel["BEST_SELL_SCORE"] is None
+    assert funnel["BEST_AVAILABLE_SYMBOL"] is None
+    assert funnel["BEST_AVAILABLE_SIDE"] is None
+    assert funnel["BEST_AVAILABLE_HORIZON"] is None
+    assert funnel["BEST_AVAILABLE_MECHANISM"] is None
+    assert funnel["WHY_NO_ORDER"] is None
+
 def test_brain_can_fire_with_bootstrap_analogues(tmp_path):
     m1_for_signature = _m1()
     records = _positive_records(n=40, signature=_signature_for_m1(m1_for_signature.iloc[:-1]))

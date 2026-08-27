@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import time
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
@@ -721,6 +722,12 @@ class IntelligentFirehoseBrain:
             "p_green": None,
             "reason": None,
         }
+        self._search_telemetry: dict[str, Any] = {
+            "best_buy_score": None,
+            "best_sell_score": None,
+            "best_available": {},
+            "why_no_order": None,
+        }
         self._seen_hypotheses: dict[str, float] = {}
         self._stage_events: dict[str, list[float]] = {
             "candidate": [], "shadow": [], "exploration_fire": [],
@@ -747,6 +754,7 @@ class IntelligentFirehoseBrain:
             "uncertainty_reject": 0,
             "model_disagreement": 0,
             "tail_reject": 0,
+            "validated_candidates": 0,
             "short_horizon_probability_reject": 0,
             "short_horizon_expected_value_reject": 0,
             "short_horizon_missing": 0,
@@ -768,6 +776,41 @@ class IntelligentFirehoseBrain:
     def _note_skip(self, reason: str) -> None:
         reasons = self.counts.setdefault("skip_reasons", {})
         reasons[reason] = int(reasons.get(reason, 0)) + 1
+
+    def _reset_search_telemetry(self) -> None:
+        self._search_telemetry = {
+            "best_buy_score": None,
+            "best_sell_score": None,
+            "best_available": {},
+            "why_no_order": None,
+        }
+
+    def _record_search_score(
+        self, candidate: Any, expected_net_value_usd: float | None, *, available: bool = False,
+    ) -> None:
+        """Record comparable candidate scores without changing any gate."""
+        try:
+            score = float(expected_net_value_usd)
+        except (TypeError, ValueError, OverflowError):
+            return
+        if not math.isfinite(score):
+            return
+        side = str(getattr(candidate, "side", "") or "").lower()
+        if side in {"buy", "sell"}:
+            key = f"best_{side}_score"
+            current = self._search_telemetry.get(key)
+            if current is None or score > float(current):
+                self._search_telemetry[key] = score
+        if available:
+            current = self._search_telemetry.get("best_available") or {}
+            if not current or score > float(current.get("score", float("-inf"))):
+                self._search_telemetry["best_available"] = {
+                    "symbol": str(getattr(candidate, "symbol", "") or "").upper(),
+                    "side": side,
+                    "horizon_s": int(getattr(candidate, "max_hold_s", 0) or 0),
+                    "mechanism": str(getattr(candidate, "family", "") or ""),
+                    "score": score,
+                }
 
     def _search_horizons(self) -> tuple[int, ...]:
         from aegis.intel.fast_firehose import SEARCH_HORIZONS_S
@@ -1282,6 +1325,7 @@ class IntelligentFirehoseBrain:
         # variant. The candidate owns its geometry before any gate is scored.
         viable: list[tuple[Any, dict[str, Any], TradeEconomics, Any, Any, float | None, dict[str, Any]]] = []
         all_rejections: list[str] = []
+        candidate_model_rejections: list[dict[str, str]] = []
         spec = symbol_spec or {}
         for mc in search_cands:
             spec_tick_val = (symbol_spec or {}).get("trade_tick_value")
@@ -1323,30 +1367,32 @@ class IntelligentFirehoseBrain:
                     p_green = float(candidate_prediction.get("probability"))
                 except (TypeError, ValueError):
                     p_green = None
+            model_gate_reason: str | None = None
             if short_horizon_prediction is not None:
                 if not shadow_probe:
                     if candidate_prediction is None:
-                        reason = "horizon_prediction_missing"
-                        all_rejections.append(reason)
-                        candidate_evaluations.append(self._record_search_evaluation(
-                            candidate=mc, reasons=[reason], p_green=p_green,
-                        ))
-                        continue
-                    candidate_ok, candidate_reason = short_horizon_gate(
-                        candidate_prediction,
-                        min_probability=(
-                            float(self.cfg["short_horizon_min_probability"])
-                            if self.cfg.get("short_horizon_min_probability") is not None
-                            else None
-                        ),
-                    )
-                    if not candidate_ok:
-                        reason = f"horizon_prediction:{candidate_reason}"
-                        all_rejections.append(reason)
-                        candidate_evaluations.append(self._record_search_evaluation(
-                            candidate=mc, reasons=[reason], p_green=p_green,
-                        ))
-                        continue
+                        model_gate_reason = "horizon_prediction_missing"
+                    else:
+                        candidate_ok, candidate_reason = short_horizon_gate(
+                            candidate_prediction,
+                            min_probability=(
+                                float(self.cfg["short_horizon_min_probability"])
+                                if self.cfg.get("short_horizon_min_probability") is not None
+                                else None
+                            ),
+                        )
+                        if not candidate_ok:
+                            model_gate_reason = f"horizon_prediction:{candidate_reason}"
+            if model_gate_reason is not None:
+                # This is a candidate-level model result. It remains useful
+                # telemetry, but it must not prevent the independent DEMO
+                # exploration lane from evaluating the same priced candidate.
+                candidate_model_rejections.append({
+                    "variant_id": str(getattr(mc, "variant_id", "") or ""),
+                    "side": str(getattr(mc, "side", "") or ""),
+                    "horizon_s": str(int(getattr(mc, "max_hold_s", 0) or 0)),
+                    "reason": model_gate_reason,
+                })
             evidence_needs_horizon = (
                 isinstance(candidate_evidence, AnalogueEvidence)
                 and getattr(candidate_evidence, "horizon_s", None) != int(mc.max_hold_s)
@@ -1462,6 +1508,7 @@ class IntelligentFirehoseBrain:
                 evidence=candidate_evidence,
                 p_win=p_green,
             )
+            self._record_search_score(mc, candidate_econ.expected_net_value_usd)
             if not candidate_econ.acceptable:
                 reason = str(candidate_econ.reason or "net_ev_rejected")
                 all_rejections.append(reason)
@@ -1545,6 +1592,9 @@ class IntelligentFirehoseBrain:
                     expected_net_value_usd=candidate_econ.expected_net_value_usd,
                 ))
                 continue
+            self._record_search_score(
+                mc, candidate_econ.expected_net_value_usd, available=True,
+            )
             viable.append((
                 mc, sizing_preview, candidate_econ, candidate_evidence,
                 capture_authorization, shadow_model_probability, memory_summary,
@@ -1553,6 +1603,7 @@ class IntelligentFirehoseBrain:
             self._last_exploration_micro_diagnostics = {
                 **self._last_exploration_micro_diagnostics,
                 "candidate_evaluations": candidate_evaluations,
+                "candidate_model_rejections": candidate_model_rejections,
                 "best_rejected_candidate": dict(self._best_rejected_candidate),
             }
             return None, f"exploration_economics_rejected:{all_rejections[0] if all_rejections else 'unknown'}"
@@ -1574,9 +1625,20 @@ class IntelligentFirehoseBrain:
             mc, sizing_preview, exploration_econ, candidate_evidence,
             capture_authorization, shadow_model_probability, memory_summary,
         ) = viable[0]
+        self._search_telemetry["best_available"] = {
+            "symbol": str(getattr(mc, "symbol", "") or "").upper(),
+            "side": str(getattr(mc, "side", "") or "").lower(),
+            "horizon_s": int(getattr(mc, "max_hold_s", 0) or 0),
+            "mechanism": str(getattr(mc, "family", "") or ""),
+            "score": (
+                None if exploration_econ.expected_net_value_usd is None
+                else float(exploration_econ.expected_net_value_usd)
+            ),
+        }
         self._last_exploration_micro_diagnostics = {
             **self._last_exploration_micro_diagnostics,
             "candidate_evaluations": candidate_evaluations,
+            "candidate_model_rejections": candidate_model_rejections,
             "best_rejected_candidate": dict(self._best_rejected_candidate),
             "selected_variant_id": str(getattr(mc, "variant_id", "")),
         }
@@ -2000,10 +2062,12 @@ class IntelligentFirehoseBrain:
 
         funnel = {
             # Truthful broker funnel names. Brain intent is never FIRES/FILLS.
+            "FIREHOSE_ACTIVE": True,
             "SCANS": int(self.counts.get("scans", 0)),
             "MICRO_CANDIDATES": int(self.counts.get("micro_candidates", self.counts.get("candidates", 0))),
             "BOOK_SUPPORTED": int(self.counts.get("book_supported", 0)),
             "VALIDATED_MATCH": int(self.counts.get("validated_match", 0)),
+            "VALIDATED_CANDIDATES": int(self.counts.get("validated_candidates", 0)),
             "EXPLORATION_ELIGIBLE": int(self.counts.get("exploration_eligible", 0)),
             "EXPLORATION_CANDIDATES": int(
                 self.counts.get("exploration_candidates", 0)
@@ -2049,6 +2113,21 @@ class IntelligentFirehoseBrain:
             "MECHANISMS_ACTUALLY_GENERATING_CANDIDATES": len(
                 self._search_mechanisms_generating_seen
             ),
+            "BEST_BUY_SCORE": self._search_telemetry.get("best_buy_score"),
+            "BEST_SELL_SCORE": self._search_telemetry.get("best_sell_score"),
+            "BEST_AVAILABLE_SYMBOL": (
+                self._search_telemetry.get("best_available", {}).get("symbol")
+            ),
+            "BEST_AVAILABLE_SIDE": (
+                self._search_telemetry.get("best_available", {}).get("side")
+            ),
+            "BEST_AVAILABLE_HORIZON": (
+                self._search_telemetry.get("best_available", {}).get("horizon_s")
+            ),
+            "BEST_AVAILABLE_MECHANISM": (
+                self._search_telemetry.get("best_available", {}).get("mechanism")
+            ),
+            "WHY_NO_ORDER": self._search_telemetry.get("why_no_order"),
             "SPREAD_FAIL": int(self.counts.get("spread_fail", 0)),
             "GEOMETRY_FAIL": int(self.counts.get("geometry_fail", 0)),
             "RISK_FAIL": int(self.counts.get("risk_fail", 0)),
@@ -2220,7 +2299,7 @@ class IntelligentFirehoseBrain:
     ) -> DemoDecision:
         clip_qty = float(self.cfg.get("order_quantity", 0.01))
         clip_risk = max(self._risk_budget * float(self.cfg.get("intelligent_risk_fraction", 0.08)) / 5.0, 0.01)
-        predictive_veto = False
+        self._reset_search_telemetry()
         exploration_shadow_model_probe = False
         self.counts["scans"] = int(self.counts.get("scans", 0)) + 1
         self.memory.sync_from_positions(symbol, positions, clip_risk)
@@ -2280,10 +2359,12 @@ class IntelligentFirehoseBrain:
             spread_pips = abs(float(spread_price)) / max(float(pip), 1e-12)
             if measured_spread is None:
                 self._note_skip("spread_policy_no_measured_evidence")
+                self._search_telemetry["why_no_order"] = "spread_policy_no_measured_evidence"
                 self.counts["skip"] += 1
                 return DemoDecision("skip", "spread_policy_no_measured_evidence", side=side)
             if not measured_spread.allows(spread_pips):
                 self._note_skip("spread_above_measured_session_limit")
+                self._search_telemetry["why_no_order"] = "spread_above_measured_session_limit"
                 self.counts["skip"] += 1
                 return DemoDecision("skip", "spread_above_measured_session_limit", side=side)
         self.regime_by_symbol[str(symbol).upper()] = str(
@@ -2400,7 +2481,7 @@ class IntelligentFirehoseBrain:
         short_horizon_journal: dict[str, Any] = {}
         if video_candidate is not None:
             # Preserve candidate discovery telemetry even when the calibrated
-            # short-horizon model vetoes the entry before exploration runs.
+            # short-horizon model abstains on this candidate.
             self.counts["micro_candidates"] = int(
                 self.counts.get("micro_candidates", 0)
             ) + 1
@@ -2425,7 +2506,6 @@ class IntelligentFirehoseBrain:
             fire = ThesisFireDecision(
                 "skip", "short_horizon_prediction_missing", fire.expected_net_value
             )
-            predictive_veto = True
         elif short_horizon_prediction is not None:
             calibration_status = str(short_horizon_prediction.get("calibration_status") or "")
             if calibration_status == "calibrated":
@@ -2495,7 +2575,6 @@ class IntelligentFirehoseBrain:
                     self.counts["shadow_reject_validated"] = int(
                         self.counts.get("shadow_reject_validated", 0)
                     ) + 1
-                predictive_veto = bool(video_style) and not exploration_shadow_model_probe
                 diagnostic_reason = str(
                     short_horizon_prediction.get("abstain_reason")
                     or prediction_reason
@@ -2648,13 +2727,14 @@ class IntelligentFirehoseBrain:
             "state_not_in_validated_set",       # UNDERCOVERED_STATE
             "unacceptable_uncertainty",         # UNCERTAIN_PLAUSIBLE_MECHANISM
             "short_horizon_abstain",            # UNCERTAIN_PLAUSIBLE_MECHANISM
+            "short_horizon_prediction_missing", # candidate-level model gap
+            "short_horizon_not_calibrated",     # candidate-level model gap
             "insufficient_analogue_evidence",   # INSUFFICIENT_EVIDENCE
             "shadow:not_trading_stage",         # research-stage demand
         )
         fire_base = str(fire.reason or "").split(":", 1)[0]
         exploration_classified = (
             fire.action == "skip"
-            and not predictive_veto
             # Shadow-only status can classify an undercovered opportunity. It
             # may bypass the *validated lane's* missing-evidence result only so
             # the independent exploration lane can evaluate its own measured
@@ -2671,6 +2751,7 @@ class IntelligentFirehoseBrain:
             and (
                 exploration_shadow_model_probe
                 or fire_base in _EXPLORATION_ALLOWED_BASES
+                or fire_base.startswith("short_horizon")
                 or str(fire.reason or "").startswith("shadow:")
             )
         )
@@ -2817,6 +2898,10 @@ class IntelligentFirehoseBrain:
         self.counts[mapped] = int(self.counts.get(mapped, 0)) + 1
         if mapped == "skip":
             self._note_skip(str(action.reason))
+            self._search_telemetry["why_no_order"] = str(
+                (exploration_journal or {}).get("exploration_skip")
+                or action.reason
+            )
         if mapped == "fire" and strategy is not None:
             # Validated-stage fires (exploration fires return earlier).
             if strategy.promotion_stage == "DEMO_CANARY":
@@ -2825,6 +2910,10 @@ class IntelligentFirehoseBrain:
             elif strategy.promotion_stage == "DEMO_CHAMPION":
                 self.counts["champion_fire"] = int(self.counts.get("champion_fire", 0)) + 1
                 self._note_stage("champion_fire")
+        if mapped in {"fire", "scale"}:
+            self.counts["validated_candidates"] = int(
+                self.counts.get("validated_candidates", 0)
+            ) + 1
         exposure = exposure_snapshot(positions)
         journal = {
             "brain": "intelligent_firehose",
@@ -2862,7 +2951,7 @@ class IntelligentFirehoseBrain:
             # actually validated, including a synthesised one when structure gave
             # no usable level.
             tp=econ.target if econ.target is not None else target,
-            quantity=0.0 if predictive_veto else clip_qty,
+            quantity=clip_qty if mapped in {"fire", "scale"} else 0.0,
             expected_net_value=action.expected_net_value,
             information_id=info_id,
             analogue_n=evidence.analogue_n,

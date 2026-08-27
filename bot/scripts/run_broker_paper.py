@@ -3597,6 +3597,7 @@ def main() -> None:
                 _brain_counts = extra_hb.get("counts") or {}
                 _funnel = extra_hb.get("funnel") or {}
                 extra_hb["firehose_telemetry"] = {
+                    "FIREHOSE_ACTIVE": bool(_funnel.get("FIREHOSE_ACTIVE", True)),
                     "SCANS": int(_funnel.get("SCANS", _brain_counts.get("scans", 0)) or 0),
                     "RAW_SIGNALS": int(_brain_counts.get("raw_signals", 0) or 0),
                     "ML_ELIGIBLE": int(_brain_counts.get("ml_eligible", 0) or 0),
@@ -3609,7 +3610,7 @@ def main() -> None:
                         _funnel.get("MICRO_CANDIDATES", 0) or 0
                     ),
                     "VALIDATED_CANDIDATES": int(
-                        _funnel.get("VALIDATED_MATCH", 0) or 0
+                        _funnel.get("VALIDATED_CANDIDATES", _funnel.get("VALIDATED_MATCH", 0)) or 0
                     ),
                     "EXPLORATION_CANDIDATES": int(
                         _funnel.get("EXPLORATION_CANDIDATES", 0) or 0
@@ -3641,6 +3642,13 @@ def main() -> None:
                     "MECHANISMS_ACTUALLY_GENERATING_CANDIDATES": int(
                         _funnel.get("MECHANISMS_ACTUALLY_GENERATING_CANDIDATES", 0) or 0
                     ),
+                    "BEST_BUY_SCORE": _funnel.get("BEST_BUY_SCORE"),
+                    "BEST_SELL_SCORE": _funnel.get("BEST_SELL_SCORE"),
+                    "BEST_AVAILABLE_SYMBOL": _funnel.get("BEST_AVAILABLE_SYMBOL"),
+                    "BEST_AVAILABLE_SIDE": _funnel.get("BEST_AVAILABLE_SIDE"),
+                    "BEST_AVAILABLE_HORIZON": _funnel.get("BEST_AVAILABLE_HORIZON"),
+                    "BEST_AVAILABLE_MECHANISM": _funnel.get("BEST_AVAILABLE_MECHANISM"),
+                    "WHY_NO_ORDER": _funnel.get("WHY_NO_ORDER"),
                     "SPREAD_FAIL": int(_funnel.get("SPREAD_FAIL", 0) or 0),
                     "GEOMETRY_FAIL": int(_funnel.get("GEOMETRY_FAIL", 0) or 0),
                     "RISK_FAIL": int(_funnel.get("RISK_FAIL", 0) or 0),
