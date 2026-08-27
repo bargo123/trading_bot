@@ -244,7 +244,7 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
             "policy": "short_horizon_support_revoked",
         }
 
-    return attach_execution_evidence(
+    result = attach_execution_evidence(
         fast_verdict,
         ctx=ctx,
         entry_price=_entry_px,
@@ -254,6 +254,26 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
         expected_friction_price=_friction_price,
         broker_spec=_spec_fast,
     )
+    # Emit the current protective floor as evidence. TradeController owns the
+    # monotonic per-ticket floor and prevents a later lower MFE observation from
+    # loosening it.
+    floor_fraction = (
+        ctx.harvest_policy.protected_mfe_fraction
+        if ctx.harvest_policy is not None and ctx.harvest_policy.is_available
+        else 1.0 - FastExitConfig().giveback_frac
+    )
+    mfe_r = _mfe_pips / max(_stop_dist_pips, 0.1)
+    if mfe_r >= FastExitConfig().mfe_arm_r:
+        result["profit_floor_r"] = max(0.0, mfe_r * float(floor_fraction))
+        result["profit_floor_source"] = (
+            "validated_harvest_policy"
+            if ctx.harvest_policy is not None and ctx.harvest_policy.is_available
+            else "fast_exit_giveback_protection"
+        )
+    else:
+        result["profit_floor_r"] = None
+        result["profit_floor_source"] = "not_armed"
+    return result
 
 
 def build_harvest_input(ctx: FastExitContext) -> HarvestInput | None:

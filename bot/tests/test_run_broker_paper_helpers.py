@@ -32,8 +32,14 @@ from scripts.run_broker_paper import (
     meaningful_quote_change,
     video_style_signal_for_scan,
     pending_order_lifecycle_metadata,
+    legacy_normal_exit_enabled,
 )
 from aegis.intel.send_guard import candidate_spread_limit, refresh_verdict
+
+
+def test_intelligent_firehose_has_only_trade_controller_normal_exit_authority():
+    assert legacy_normal_exit_enabled(False) is True
+    assert legacy_normal_exit_enabled(True) is False
 
 
 def test_meaningful_quote_change_allows_same_bar_reevaluation():

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Any, Mapping
 
 
 @dataclass(frozen=True)
@@ -218,6 +219,42 @@ class ProfitHarvester:
             and input.return_5s_r >= self.policy.accelerating_return_r
             and input.return_5s_r > input.return_15s_r > input.return_30s_r > 0
         )
+
+
+def load_validated_harvest_policy(config: Mapping[str, Any]) -> HarvestPolicy | None:
+    """Load an explicitly supplied, complete costed policy for production.
+
+    Missing, malformed, or incomplete policy evidence deliberately returns
+    ``None`` rather than inventing harvest thresholds.
+    """
+    raw = config.get("profit_harvest_policy") if isinstance(config, Mapping) else None
+    if not isinstance(raw, Mapping):
+        return None
+    evidence_raw = raw.get("evidence")
+    if not isinstance(evidence_raw, Mapping):
+        return None
+    try:
+        policy = HarvestPolicy(
+            min_net_r=float(raw["min_net_r"]),
+            min_mfe_r=float(raw["min_mfe_r"]),
+            protected_mfe_fraction=float(raw["protected_mfe_fraction"]),
+            max_extension_s=float(raw["max_extension_s"]),
+            scratch_age_s=float(raw["scratch_age_s"]),
+            scratch_loss_r=float(raw["scratch_loss_r"]),
+            stalled_return_r=float(raw["stalled_return_r"]),
+            accelerating_return_r=float(raw["accelerating_return_r"]),
+            evidence=HarvestPolicyEvidence(
+                policy_id=str(evidence_raw["policy_id"]),
+                status=str(evidence_raw["status"]),
+                completed_lifecycles=int(evidence_raw["completed_lifecycles"]),
+                oos_expectancy_after_cost=float(
+                    evidence_raw["oos_expectancy_after_cost"]
+                ),
+            ),
+        )
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None
+    return policy if policy.is_available else None
 
 
 def _is_finite(value: object) -> bool:

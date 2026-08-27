@@ -33,9 +33,37 @@ def _canonical_action(source_action: object, reason: object) -> str:
 class TradeController:
     """Combine evidence adapters into exactly one canonical action.
 
-    ProfitManager and FastExit remain evidence producers.  The runner calls
-    this controller once and closes only for HARVEST, SCRATCH, or ABORT.
+    ProfitManager, FastExit, and ProfitHarvester remain evidence producers.
+    The runner calls this controller once and closes only for HARVEST, SCRATCH,
+    or ABORT.
     """
+
+    def __init__(self) -> None:
+        self._profit_floor_by_ticket: dict[str, float] = {}
+
+    def release_ticket(self, ticket: str) -> None:
+        """Forget monotonic per-ticket state only after broker close confirmation."""
+        self._profit_floor_by_ticket.pop(str(ticket or ""), None)
+
+    def _ratchet_profit_floor(
+        self,
+        ticket: str | None,
+        candidate_floor_r: float | None,
+    ) -> float | None:
+        key = str(ticket or "").strip()
+        previous = self._profit_floor_by_ticket.get(key) if key else None
+        candidate = None
+        try:
+            value = float(candidate_floor_r) if candidate_floor_r is not None else None
+            if value is not None and math.isfinite(value) and value >= 0.0:
+                candidate = value
+        except (TypeError, ValueError, OverflowError):
+            candidate = None
+        values = [value for value in (previous, candidate) if value is not None]
+        floor = max(values) if values else None
+        if key and floor is not None:
+            self._profit_floor_by_ticket[key] = floor
+        return floor
 
     def decide(
         self,
@@ -45,6 +73,10 @@ class TradeController:
         remaining_ev: float | None = None,
         harvest_ev_comparison: Mapping[str, Any] | None = None,
         evidence_snapshot: Mapping[str, Any] | None = None,
+        ticket: str | None = None,
+        profit_floor_r: float | None = None,
+        current_mfe_r: float | None = None,
+        protected_mfe_fraction: float | None = None,
     ) -> dict[str, Any]:
         pm = dict(profit_manager_verdict or {})
         fast = dict(fast_verdict or {})
@@ -64,6 +96,17 @@ class TradeController:
         why_exit = str(selected.get("why") or selected.get("reason") or "") if action in {
             "HARVEST", "SCRATCH", "ABORT"
         } else ""
+        floor_candidate = profit_floor_r
+        if floor_candidate is None:
+            floor_candidate = fast.get("profit_floor_r")
+        if floor_candidate is None:
+            floor_candidate = pm.get("profit_floor_r")
+        if floor_candidate is None and current_mfe_r is not None and protected_mfe_fraction is not None:
+            try:
+                floor_candidate = float(current_mfe_r) * float(protected_mfe_fraction)
+            except (TypeError, ValueError, OverflowError):
+                floor_candidate = None
+        profit_floor = self._ratchet_profit_floor(ticket, floor_candidate)
         result = {
             "action": action,
             "reason": str(selected.get("reason") or f"controller_{action.lower()}"),
@@ -75,9 +118,14 @@ class TradeController:
             "remaining_ev": remaining_ev,
             "harvest_ev_comparison": dict(harvest_ev_comparison or {}),
             "evidence_snapshot": dict(evidence_snapshot or {}),
+            "ticket": ticket,
+            "profit_floor_r": profit_floor,
         }
         if action == "HOLD" and not result["why_hold"]:
-            result["why_hold"] = "no exit policy triggered"
+            result["why_hold"] = (
+                "continuation remains preferable to harvesting: "
+                "no supported deterioration or harvest trigger"
+            )
         return result
 
     def replay_quote_path(

@@ -12,6 +12,7 @@ from aegis.intel.profit_harvester import (  # noqa: E402
     HarvestPolicy,
     HarvestPolicyEvidence,
     ProfitHarvester,
+    load_validated_harvest_policy,
 )
 
 
@@ -165,3 +166,34 @@ def test_absent_or_incomplete_policy_artifact_is_unavailable():
             oos_expectancy_after_cost=math.nan,
         ),
     )).evaluate(observed).action == "UNAVAILABLE"
+
+
+def test_runtime_policy_loader_accepts_only_complete_costed_evidence():
+    config = {
+        "profit_harvest_policy": {
+            "min_net_r": 0.50,
+            "min_mfe_r": 0.60,
+            "protected_mfe_fraction": 0.60,
+            "max_extension_s": 30.0,
+            "scratch_age_s": 20.0,
+            "scratch_loss_r": -0.25,
+            "stalled_return_r": 0.02,
+            "accelerating_return_r": 0.05,
+            "evidence": {
+                "policy_id": "validated-v1",
+                "status": "COMPLETE",
+                "completed_lifecycles": 12,
+                "oos_expectancy_after_cost": 0.08,
+            },
+        }
+    }
+
+    policy = load_validated_harvest_policy(config)
+
+    assert policy is not None
+    assert policy.is_available
+    assert load_validated_harvest_policy({}) is None
+    assert load_validated_harvest_policy({"profit_harvest_policy": {
+        **config["profit_harvest_policy"],
+        "evidence": {**config["profit_harvest_policy"]["evidence"], "status": "NO_EVIDENCE"},
+    }}) is None

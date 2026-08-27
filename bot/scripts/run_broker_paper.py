@@ -1292,6 +1292,11 @@ def broker_close_evidence(deals, *, ticket: str) -> dict[str, object]:
     return {"status": "BROKER_CONFIRMED", **facts}
 
 
+def legacy_normal_exit_enabled(intelligent_mode: bool) -> bool:
+    """Keep legacy CORE exits out of the intelligent Firehose lane."""
+    return not bool(intelligent_mode)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Aegis broker-engine paper runner")
     parser.add_argument("--config", default=str(ROOT / "config_ib_paper_eurusd.yaml"))
@@ -1420,17 +1425,17 @@ def main() -> None:
     profit_manager = ProfitManager(
         cfg, persist_path=ROOT / "intel" / "pm_tickets.json"
     )
-    # Fast exit state machine for FAST_TURNOVER_FIREHOSE tickets.
-    from aegis.intel.fast_firehose import FastExitStateMachine, FastExitConfig
     from aegis.intel.fast_exit_runner import (
         FastExitContext, evaluate_fast_exit, firehose_exit_trace,
-        unified_trade_controller_decision,
         MissingLiquidationMarkError, spread_r_from_geometry,
         REMAINING_EV_EXIT_POLICY_ID, estimate_remaining_ev,
     )
+    from aegis.intel.profit_harvester import load_validated_harvest_policy
+    from aegis.intel.trade_controller import TradeController
     from aegis.intel.opportunity_engine import rank_and_allocate
 
-    fast_exit_sm = FastExitStateMachine()
+    trade_controller = TradeController()
+    harvest_policy = load_validated_harvest_policy(cfg)
     last_inventory_journal: dict[str, float] = {"ts": 0.0}
 
     def write_heartbeat(extra: Optional[dict] = None) -> None:
@@ -2083,6 +2088,20 @@ def main() -> None:
                     },
                 )
                 if decision.action in {"exit", "reduce"}:
+                    controller_exit = trade_controller.decide(
+                        {
+                            "action": "EXIT" if decision.action == "exit" else "SCRATCH",
+                            "reason": decision.reason,
+                            "why": f"brain management decision: {decision.reason}",
+                            "policy": "brain_management",
+                        },
+                        {
+                            "action": "HOLD",
+                            "reason": "per_ticket_management_deferred",
+                            "why": "per-ticket controller will re-evaluate live executable evidence",
+                        },
+                        evidence_snapshot=dict(decision.journal),
+                    )
                     open_pos = list(eng.positions(sym))
                     thesis_key_now = str(decision.journal.get("thesis_key") or "")
                     owned_tickets: set[str] = set()
@@ -2093,7 +2112,10 @@ def main() -> None:
                                 t for t in mem.tickets
                                 if any(str(getattr(p, "ticket", "") or "") == t for p in open_pos)
                             }
-                    close_n = int(decision.close_clips or (len(open_pos) if decision.action == "exit" else 1))
+                    close_n = int(
+                        decision.close_clips
+                        or (len(open_pos) if controller_exit["action"] == "ABORT" else 1)
+                    )
                     closed = 0
                     if hasattr(eng, "close_ticket") and open_pos:
                         if owned_tickets:
@@ -2112,8 +2134,8 @@ def main() -> None:
                                 {
                                     "event": "intel_brain_exit" if decision.action == "exit" else "intel_brain_reduce",
                                     "symbol": sym,
-                                    "action": decision.action,
-                                    "reason": decision.reason,
+                                    "action": controller_exit["action"],
+                                    "reason": controller_exit["reason"],
                                     "ticket": ticket,
                                     "pnl": float(pos.unrealized_pnl),
                                     "ok": res.ok,
@@ -2135,7 +2157,7 @@ def main() -> None:
                                         "symbol": sym,
                                         "floating_pnl_at_request": float(pos.unrealized_pnl),
                                         "broker_confirmed": False,
-                                        "reason": decision.reason,
+                                        "reason": controller_exit["reason"],
                                     },
                                 )
                     leftover = eng.positions(sym)
@@ -3314,6 +3336,15 @@ def main() -> None:
                 extra_hb["quote_refresh"] = dict(quote_refresh_counts)
                 extra_hb["fast_exit_errors"] = fast_exit_error_count
                 extra_hb["short_horizon_model"] = short_horizon_predictor.snapshot()
+                extra_hb["trade_management"] = {
+                    "authority": "TradeController",
+                    "profit_harvester": (
+                        "VALIDATED" if harvest_policy is not None else "UNAVAILABLE"
+                    ),
+                    "legacy_normal_exits": legacy_normal_exit_enabled(
+                        bool(cfg.get("intelligent_firehose", False))
+                    ),
+                }
                 if intelligent_brain is not None:
                     extra_hb.update(intelligent_brain.snapshot())
                     # Profit-management reporting (spec O) + exposure metrics
@@ -3938,6 +3969,11 @@ def main() -> None:
                                                 if _ticket_meta is not None
                                                 else None
                                             ),
+                                            mechanism=(
+                                                _ticket_meta.expected_mechanism
+                                                if _ticket_meta is not None
+                                                else None
+                                            ),
                                         )
                                     except Exception as exc:
                                         logger.debug(
@@ -4014,6 +4050,7 @@ def main() -> None:
                                         remaining_ev_status=_rem_status,
                                         observed_spread_r=_spread_r,
                                         spread_normal=_spread_normal,
+                                        harvest_policy=harvest_policy,
                                         short_horizon_prediction=_current_short_prediction,
                                     )
                                     try:
@@ -4085,13 +4122,24 @@ def main() -> None:
                                             observed_at=datetime.now(timezone.utc).isoformat(),
                                         ),
                                     )
-                            verdict = unified_trade_controller_decision(
+                            verdict = trade_controller.decide(
                                 verdict,
                                 fast_verdict,
+                                ticket=tk,
+                                remaining_ev=_rem_ev,
+                                profit_floor_r=fast_verdict.get("profit_floor_r"),
+                                evidence_snapshot=(
+                                    fast_verdict.get("evidence_snapshot")
+                                    if isinstance(fast_verdict, Mapping) else None
+                                ),
                             )
                             if trace is not None:
                                 trace["exit_action"] = verdict["action"]
                                 trace["exit_reason"] = verdict["reason"]
+                                trace["profit_floor_r"] = verdict.get("profit_floor_r")
+                                trace["profit_floor_source"] = fast_verdict.get(
+                                    "profit_floor_source"
+                                )
                                 trace["EXIT_ACTION"] = verdict["action"]
                                 trace["EXIT_REASON"] = verdict["reason"]
                                 trace["exit_owner"] = verdict.get("source")
@@ -4131,6 +4179,7 @@ def main() -> None:
                                     except Exception:
                                         close_confirmed = False
                                 if close_confirmed:
+                                    trade_controller.release_ticket(tk)
                                     closed_at = time.time()
                                     broker_confirmed = (
                                         close_facts.get("status") == "BROKER_CONFIRMED"
@@ -4272,6 +4321,22 @@ def main() -> None:
                                 buffer_usd = float(
                                     cfg.get("pm_breakeven_buffer_usd", 0.05) or 0.05
                                 )
+                                floor_r = verdict.get("profit_floor_r")
+                                if floor_r is not None:
+                                    try:
+                                        risk_for_floor = (
+                                            float(_ticket_meta.initial_risk)
+                                            if _ticket_meta is not None
+                                            and _ticket_meta.initial_risk is not None
+                                            else 0.0
+                                        )
+                                        if risk_for_floor > 0 and math.isfinite(float(floor_r)):
+                                            buffer_usd = max(
+                                                buffer_usd,
+                                                float(floor_r) * risk_for_floor,
+                                            )
+                                    except (TypeError, ValueError, OverflowError):
+                                        pass
                                 spec_lock = BrokerSymbolSpec.from_mapping(
                                     eng.symbol_spec(str(pos.symbol)) if hasattr(eng, 'symbol_spec') else None)
                                 from aegis.intel.broker_math import lock_buffer_price
@@ -4384,7 +4449,7 @@ def main() -> None:
                                     mae.pop(sym, None)
                                     save_mfe(mae_path, mae)
                                     closed_now = True
-                            elif max_hold > 0 and held >= max_hold:
+                            elif legacy_normal_exit_enabled(intelligent_mode) and max_hold > 0 and held >= max_hold:
                                 if scratch_losers or pnl >= 0:
                                     flat = flatten_open(sym, open_pos, equity, held, reason="max_hold")
                                     if flat.ok:
