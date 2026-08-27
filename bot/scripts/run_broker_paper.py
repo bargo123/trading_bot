@@ -1759,7 +1759,10 @@ def main() -> None:
     )
     from aegis.intel.profit_harvester import load_validated_harvest_policy
     from aegis.intel.trade_controller import TradeController
-    from aegis.intel.opportunity_engine import rank_and_allocate
+    from aegis.intel.opportunity_engine import (
+        ordered_execution_attempts,
+        rank_and_allocate,
+    )
 
     trade_controller = TradeController()
     harvest_policy = load_validated_harvest_policy(cfg)
@@ -5029,13 +5032,15 @@ def main() -> None:
                         ) if intelligent_brain is not None else (),
                     )
                     global_rank_finished_at = time.time()
-                    selected_opportunities = [
+                    execution_opportunities = [
                         freeze_opportunity({
                             **row.to_dict(),
                             "global_rank_started_at": global_rank_started_at,
                             "global_rank_finished_at": global_rank_finished_at,
                         })
-                        for row in selected_opportunities
+                        for row in ordered_execution_attempts(
+                            ranked_opportunities, selected_opportunities
+                        )
                     ]
                     global_opportunity_counts["GLOBAL_RANKED"] += len(ranked_opportunities)
                     global_opportunity_counts["GLOBAL_SELECTED"] += len(selected_opportunities)
@@ -5051,7 +5056,11 @@ def main() -> None:
                             ],
                         },
                     )
-                    for opportunity in selected_opportunities:
+                    for opportunity in execution_opportunities:
+                        if len(eng.positions()) >= (
+                            _open_for_allocation + _remaining_capacity
+                        ):
+                            break
                         maybe_enter(
                             str(opportunity["symbol"]),
                             equity,

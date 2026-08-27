@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from aegis.intel.opportunity_engine import FrozenOpportunity, freeze_opportunity, rank_and_allocate
+from aegis.intel.opportunity_engine import (
+    FrozenOpportunity,
+    freeze_opportunity,
+    ordered_execution_attempts,
+    rank_and_allocate,
+)
 
 
 def _candidate(name, *, symbol, thesis, p_capture, ev, lcb=0.0, risk=0.10,
@@ -170,3 +175,27 @@ def test_forced_demo_lane_is_rankable_without_probability_or_positive_ev():
     assert len(ranked) == 1
     assert selected[0]["candidate_id"] == "forced"
     assert selected[0]["p_captured_win"] is None
+
+
+def test_nineteen_ranked_candidates_fall_through_after_selected_failure():
+    candidates = [
+        _candidate(
+            f"candidate-{index}",
+            symbol=f"FX{index:02d}",
+            thesis=f"thesis-{index}",
+            p_capture=0.99 - index * 0.01,
+            ev=0.10,
+        )
+        for index in range(19)
+    ]
+
+    ranked, selected = rank_and_allocate(candidates, max_positions=1)
+    attempted = []
+    for row in ordered_execution_attempts(ranked, selected):
+        attempted.append(row["candidate_id"])
+        if row["candidate_id"] == "candidate-2":
+            break
+
+    assert len(ranked) == 19
+    assert [row["candidate_id"] for row in selected] == ["candidate-0"]
+    assert attempted == ["candidate-0", "candidate-1", "candidate-2"]

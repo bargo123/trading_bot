@@ -157,3 +157,20 @@ def rank_and_allocate(
             used_theses.add(thesis)
         risk_used += marginal_risk
     return ranked, selected
+
+
+def ordered_execution_attempts(
+    ranked: Iterable[FrozenOpportunity],
+    selected: Iterable[FrozenOpportunity],
+) -> list[FrozenOpportunity]:
+    """Put allocated rows first, then expose the remaining ranked fallbacks.
+
+    Allocation determines the preferred occupants for the currently available
+    slots.  A preferred row can still fail fresh quote, broker geometry, or
+    risk revalidation.  The runner must therefore be able to try the next
+    globally ranked row without rebuilding or changing its identity.
+    """
+    ranked_rows = list(ranked)
+    selected_rows = list(selected)
+    selected_ids = {id(row) for row in selected_rows}
+    return selected_rows + [row for row in ranked_rows if id(row) not in selected_ids]
