@@ -1,0 +1,12 @@
+{
+  "claude_next_experiments": [],
+  "execution_authority": "NONE",
+  "exit_recommendations": [],
+  "feature_tests": [],
+  "generated_at": "2026-08-27T10:33:45.895128+00:00",
+  "hypotheses": [],
+  "next_experiments": [],
+  "schema": "fast_edge_experiment_handoff.v1",
+  "source_report": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\reports\\research\\fast_edge_generations\\20260827T100112Z\\fast_edge_leaderboard.json",
+  "source_schema": "fast_edge_council_review.v1"
+}
