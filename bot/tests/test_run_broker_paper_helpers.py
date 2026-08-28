@@ -68,7 +68,7 @@ def test_meaningful_quote_change_allows_same_bar_reevaluation():
     assert meaningful_quote_change(None, bid=1.1, ask=1.1001, pip=0.0001) is True
 
 
-def test_stale_quote_is_research_usable_but_not_executable():
+def test_old_broker_event_quote_is_research_usable_and_locally_recheckable():
     now = pd.Timestamp("2026-08-28T00:00:00Z").to_pydatetime()
     quote = Quote(
         symbol="EURUSD", bid=1.10000, ask=1.10002,
@@ -78,8 +78,8 @@ def test_stale_quote_is_research_usable_but_not_executable():
     verdict = quote_scan_verdict(quote, max_age_s=5.0, max_future_skew_s=5.0, now=now)
 
     assert verdict.scan_allowed is True
-    assert verdict.execution_allowed is False
-    assert verdict.reason == "stale_for_execution"
+    assert verdict.execution_allowed is True
+    assert verdict.reason == "latest_quote_unchanged"
 
 
 def test_fresh_quote_acquisition_polls_without_rerunning_research():
@@ -95,7 +95,7 @@ def test_fresh_quote_acquisition_polls_without_rerunning_research():
 
     clock = Clock()
     quotes = iter([
-        Quote("EURUSD", 1.10000, 1.10002, pd.Timestamp(93, unit="s", tz="UTC").to_pydatetime()),
+        Quote("EURUSD", 1.10000, 1.10002, pd.Timestamp(110, unit="s", tz="UTC").to_pydatetime()),
         Quote("EURUSD", 1.10001, 1.10003, pd.Timestamp(99.5, unit="s", tz="UTC").to_pydatetime()),
     ])
     initial = Quote("EURUSD", 1.10000, 1.10002, pd.Timestamp(93, unit="s", tz="UTC").to_pydatetime())
@@ -116,6 +116,80 @@ def test_fresh_quote_acquisition_polls_without_rerunning_research():
     assert acquired.bid == 1.10001
     assert detail["attempts"] == 2
     assert detail["acquired"] is True
+
+
+def test_latest_broker_quote_can_execute_without_a_new_market_event():
+    quote = Quote(
+        "EURUSD", 1.10000, 1.10002,
+        pd.Timestamp(92, unit="s", tz="UTC").to_pydatetime(),
+    )
+
+    acquired, detail = acquire_fresh_quote(
+        lambda: quote,
+        initial_quote=quote,
+        max_age_s=5.0,
+        max_future_skew_s=5.0,
+        timeout_s=0.0,
+        feed_status="HEALTHY",
+        now_fn=lambda: 100.0,
+        monotonic_fn=lambda: 0.0,
+        sleep_fn=lambda _seconds: None,
+    )
+
+    assert acquired == quote
+    assert detail["quote_status"] == "LATEST_BROKER_QUOTE_ACQUIRED"
+    assert detail["latest_broker_quote_acquired"] is True
+    assert detail["new_tick_acquired"] is False
+    assert detail["broker_tick_age_s"] == pytest.approx(8.0)
+
+
+def test_stalled_feed_blocks_latest_broker_quote_execution():
+    quote = Quote(
+        "EURUSD", 1.10000, 1.10002,
+        pd.Timestamp(70, unit="s", tz="UTC").to_pydatetime(),
+    )
+
+    acquired, detail = acquire_fresh_quote(
+        lambda: quote,
+        initial_quote=quote,
+        max_age_s=5.0,
+        max_future_skew_s=5.0,
+        timeout_s=0.0,
+        feed_status="FEED_STALLED",
+        now_fn=lambda: 100.0,
+        monotonic_fn=lambda: 0.0,
+        sleep_fn=lambda _seconds: None,
+    )
+
+    assert acquired is None
+    assert detail["reason"] == "feed_stalled"
+
+
+def test_latest_quote_refresh_verdict_uses_feed_and_not_event_age():
+    verdict = refresh_verdict(
+        new_age_s=8.0,
+        new_spread=0.00002,
+        max_age_s=5.0,
+        max_spread=0.00003,
+        quote_status="LATEST_BROKER_QUOTE_ACQUIRED",
+        feed_status="HEALTHY",
+    )
+
+    assert verdict.ok is True
+
+
+def test_stalled_feed_refresh_verdict_blocks_even_a_locally_acquired_quote():
+    verdict = refresh_verdict(
+        new_age_s=1.0,
+        new_spread=0.00002,
+        max_age_s=5.0,
+        max_spread=0.00003,
+        quote_status="LATEST_BROKER_QUOTE_ACQUIRED",
+        feed_status="FEED_STALLED",
+    )
+
+    assert verdict.ok is False
+    assert verdict.reason == "feed_stalled"
 
 
 def test_feed_health_distinguishes_benchmark_stall_from_normal_advancement():

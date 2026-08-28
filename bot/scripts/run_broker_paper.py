@@ -628,7 +628,7 @@ def quote_scan_verdict(
     if max_future_skew_s > 0 and future_s > max_future_skew_s:
         return QuoteScanVerdict(True, False, "future_for_execution", age_s, future_s)
     if max_age_s > 0 and age_s > max_age_s:
-        return QuoteScanVerdict(True, False, "stale_for_execution", age_s, future_s)
+        return QuoteScanVerdict(True, True, "latest_quote_unchanged", age_s, future_s)
     return QuoteScanVerdict(True, True, "fresh_for_execution", age_s, future_s)
 
 
@@ -640,11 +640,12 @@ def acquire_fresh_quote(
     max_future_skew_s: float,
     timeout_s: float = 1.0,
     poll_s: float = 0.05,
+    feed_status: str = "HEALTHY",
     now_fn: Callable[[], float] = time.time,
     monotonic_fn: Callable[[], float] = time.monotonic,
     sleep_fn: Callable[[float], None] = time.sleep,
 ) -> tuple[Any | None, dict[str, Any]]:
-    """Poll a bounded hot path for a new executable quote, never for research."""
+    """Acquire the broker's current quote without requiring a new market event."""
     started = monotonic_fn()
     deadline = started + max(0.0, float(timeout_s))
     previous = initial_quote
@@ -652,6 +653,17 @@ def acquire_fresh_quote(
     last_reason = "quote_refresh_timeout"
     last_age = float("inf")
     last_skew = 0.0
+    feed_state = str(feed_status or "").upper()
+    if feed_state == "FEED_STALLED":
+        return None, {
+            "attempts": 0,
+            "acquired": False,
+            "wait_ms": 0.0,
+            "broker_tick_age_s": last_age,
+            "future_skew_s": last_skew,
+            "feed_status": feed_status,
+            "reason": "feed_stalled",
+        }
     while True:
         retrieved_at = monotonic_fn()
         try:
@@ -678,18 +690,28 @@ def acquire_fresh_quote(
             or float(quote.bid) != float(previous.bid)
             or float(quote.ask) != float(previous.ask)
         )
-        if verdict.execution_allowed and changed:
+        if verdict.scan_allowed and verdict.future_skew_s <= 0:
+            acquired_monotonic = monotonic_fn()
+            quote_status = (
+                "NEW_TICK_ACQUIRED" if changed else "LATEST_BROKER_QUOTE_ACQUIRED"
+            )
             return quote, {
                 "attempts": attempts,
                 "acquired": True,
-                "wait_ms": max(0.0, (monotonic_fn() - started) * 1000.0),
-                "local_quote_acquisition_age_ms": max(
-                    0.0, (monotonic_fn() - retrieved_at) * 1000.0
+                "wait_ms": max(0.0, (acquired_monotonic - started) * 1000.0),
+                "local_quote_acquisition_age_ms": 0.0,
+                "quote_call_duration_ms": max(
+                    0.0, (acquired_monotonic - retrieved_at) * 1000.0
                 ),
+                "acquired_monotonic": acquired_monotonic,
                 "broker_tick_age_s": verdict.age_s,
                 "future_skew_s": verdict.future_skew_s,
-                "timestamp_or_price_advanced": True,
-                "reason": verdict.reason,
+                "timestamp_or_price_advanced": changed,
+                "new_tick_acquired": changed,
+                "latest_broker_quote_acquired": True,
+                "quote_status": quote_status,
+                "feed_status": feed_status,
+                "reason": quote_status,
             }
         previous = quote
         if monotonic_fn() >= deadline:
@@ -700,6 +722,7 @@ def acquire_fresh_quote(
                 "broker_tick_age_s": last_age,
                 "future_skew_s": last_skew,
                 "timestamp_or_price_advanced": changed,
+                "feed_status": feed_status,
                 "reason": last_reason,
             }
         sleep_fn(max(0.0, min(float(poll_s), deadline - monotonic_fn())))
@@ -1877,6 +1900,7 @@ def main() -> None:
     fire_retry_guard = PendingRetryGuard()
     execution_status_counts: dict[str, int] = {}
     submitted_count = 0
+    order_send_attempts_count = 0
     fill_count = 0
     hot_path_discovery_to_send_ms: list[float] = []
     oms_reject_reasons: dict[str, int] = {}
@@ -1893,10 +1917,19 @@ def main() -> None:
         "risk_budget_precheck_skip": 0,
         "fresh_tick_acquisition_attempts": 0,
         "fresh_tick_acquired": 0,
+        "new_tick_acquired": 0,
+        "latest_broker_quote_acquired": 0,
+        "order_check_attempts": 0,
+        "order_check_pass": 0,
+        "order_check_fail": 0,
+        "execution_revalidation_pass": 0,
     }
     quote_refresh_wait_ms: list[float] = []
+    quote_local_acquisition_age_ms: list[float] = []
+    broker_event_age_s: list[float] = []
     quote_feed_health = QuoteFeedHealth.for_symbols(symbols)
     last_quote_diagnostics: dict[str, dict[str, Any]] = {}
+    last_quote_acquired_monotonic: dict[str, float] = {}
     observed_funnel_counts: dict[str, int] = {"SCANS": 0, "RISK_REJECT": 0}
     global_opportunity_counts: dict[str, int] = {
         "GLOBAL_CANDIDATES": 0,
@@ -2280,7 +2313,7 @@ def main() -> None:
         ) -> None:
             nonlocal day_trades, day_stamp, last_halt_journal, last_quote_health_journal, close_block_until
             nonlocal margin_block_until
-            nonlocal submitted_count, fill_count
+            nonlocal submitted_count, order_send_attempts_count, fill_count
             nonlocal global_opportunity_counts
             brain_decision = None
             if open_attempt_blocked(time.time(), close_block_until):
@@ -2306,6 +2339,9 @@ def main() -> None:
             scan_id = firehose_scan_id(sym, bar_time)
 
             q = eng.quote(sym)
+            quote_acquired_monotonic = time.monotonic()
+            last_quote_acquired_monotonic[sym] = quote_acquired_monotonic
+            quote_status = "CURRENT_DECISION_QUOTE"
             fresh_quote_at = time.time()
             candidate_created_at = fresh_quote_at
             global_rank_started_at = 0.0
@@ -2371,8 +2407,9 @@ def main() -> None:
                     },
                 )
                 return
-            # A stale/future broker timestamp is an execution blocker only. The
-            # research brain still evaluates this marked-age context.
+            # Broker event age is context only. A future timestamp remains
+            # invalid; an old but newly retrieved latest quote is usable after
+            # the dedicated send-time feed and broker checks.
             observed_funnel_counts["SCANS"] += 1
             if not scan_quote.execution_allowed and now_ts - last_quote_health_journal >= 15.0:
                 last_quote_health_journal = now_ts
@@ -2476,6 +2513,7 @@ def main() -> None:
                     return
 
             sig = None
+            _book_logic: dict[str, Any] = {}
             if frozen_opportunity is not None:
                 from aegis.intel.firehose_brain import DemoDecision
                 from aegis.strategy import Signal
@@ -3168,9 +3206,8 @@ def main() -> None:
                 return
 
             # --- Pre-send refresh (P8): the decision was priced on quote q,
-            # fetched before the brain ran. If that quote is now stale, use a
-            # short bounded acquisition loop and re-validate; never send on
-            # stale pricing and never disable stale protection to force trades.
+            # fetched before the brain ran. Re-query the broker immediately
+            # before send; event age alone is telemetry, not a freshness gate.
             from aegis.intel.send_guard import (
                 margin_precheck_ok,
                 min_lot_ok,
@@ -3182,6 +3219,19 @@ def main() -> None:
             max_skew_send = float(
                 cfg.get("max_quote_future_skew_s", max_age_send) or 0.0
             )
+            if quote_feed_health.status == "FEED_STALLED":
+                append_journal(
+                    journal,
+                    {
+                        "event": "quote_refresh_failed",
+                        "symbol": sym,
+                        "why": "feed_stalled",
+                        "broker_tick_age_s": quote_age_s(q),
+                        "feed_status": quote_feed_health.status,
+                        "bar": str(bar_time),
+                    },
+                )
+                return
             if needs_quote_refresh(quote_age_s(q), max_age_s=max_age_send) or (
                 max_skew_send > 0 and quote_future_skew_s(q) > max_skew_send
             ):
@@ -3193,12 +3243,23 @@ def main() -> None:
                     max_future_skew_s=max_skew_send,
                     timeout_s=float(cfg.get("fresh_quote_timeout_s", 1.0) or 1.0),
                     poll_s=float(cfg.get("fresh_quote_poll_s", 0.05) or 0.05),
+                    feed_status=quote_feed_health.status,
                 )
                 quote_refresh_counts["fresh_tick_acquisition_attempts"] += int(
                     acquisition.get("attempts", 0) or 0
                 )
                 if acquisition.get("acquired"):
-                    quote_refresh_counts["fresh_tick_acquired"] += 1
+                    if acquisition.get("new_tick_acquired"):
+                        quote_refresh_counts["new_tick_acquired"] += 1
+                        quote_refresh_counts["fresh_tick_acquired"] += 1
+                    if acquisition.get("latest_broker_quote_acquired"):
+                        quote_refresh_counts["latest_broker_quote_acquired"] += 1
+                    if acquisition.get("broker_tick_age_s") is not None:
+                        broker_event_age_s.append(
+                            float(acquisition["broker_tick_age_s"])
+                        )
+                        if len(broker_event_age_s) > 1024:
+                            del broker_event_age_s[:-1024]
                 if acquisition.get("wait_ms") is not None:
                     quote_refresh_wait_ms.append(float(acquisition["wait_ms"]))
                     if len(quote_refresh_wait_ms) > 256:
@@ -3215,11 +3276,19 @@ def main() -> None:
                             "why": acquisition.get("reason", "quote_refresh_failed"),
                             "attempts": acquisition.get("attempts", 0),
                             "broker_tick_age_s": acquisition.get("broker_tick_age_s"),
+                            "feed_status": acquisition.get("feed_status"),
                             "bar": str(bar_time),
                         },
                     )
                     return
                 q = refreshed
+                quote_status = str(
+                    acquisition.get("quote_status") or ""
+                )
+                quote_acquired_monotonic = float(
+                    acquisition.get("acquired_monotonic") or time.monotonic()
+                )
+                last_quote_acquired_monotonic[sym] = quote_acquired_monotonic
                 refreshed_age = quote_age_s(q)
                 live_spread = max(0.0, float(q.ask) - float(q.bid))
                 verdict = refresh_verdict(
@@ -3232,6 +3301,8 @@ def main() -> None:
                         if intelligent_mode and brain_decision is not None
                         else None
                     ),
+                    quote_status=quote_status,
+                    feed_status=quote_feed_health.status,
                 )
                 if not verdict.ok:
                     quote_refresh_counts["candidate_invalidated_after_refresh"] += 1
@@ -3594,10 +3665,17 @@ def main() -> None:
                         "validated_match": bool(_terminal == "VALIDATED_MATCH"),
                         "exploration_eligible": bool(_terminal == "EXPLORATION_ELIGIBLE"),
                         "brain_intent": True,
-                        "submitted": True,
+                        "submitted": False,
                         "filled": False,
                     },
                 )
+            local_age_ms = max(
+                0.0, (time.monotonic() - quote_acquired_monotonic) * 1000.0
+            )
+            quote_local_acquisition_age_ms.append(local_age_ms)
+            if len(quote_local_acquisition_age_ms) > 256:
+                del quote_local_acquisition_age_ms[:-256]
+            quote_refresh_counts["execution_revalidation_pass"] += 1
             order_send_at = time.time()
             latency.request_ts = order_send_at
             if frozen_opportunity is not None and candidate_created_at > 0:
@@ -3632,11 +3710,38 @@ def main() -> None:
                         ),
                     },
                 )
-            submitted_count += 1
-            record_funnel_execution(
-                observed_funnel_counts, submitted=True, filled=False
-            )
             res = eng.place_order(req)
+            order_check_state = getattr(eng, "last_order_check", None)
+            order_send_attempted = True
+            if isinstance(order_check_state, dict):
+                if order_check_state.get("attempted"):
+                    quote_refresh_counts["order_check_attempts"] += 1
+                    if order_check_state.get("ok"):
+                        quote_refresh_counts["order_check_pass"] += 1
+                    else:
+                        quote_refresh_counts["order_check_fail"] += 1
+                    append_journal(
+                        journal,
+                        {
+                            "event": "order_check",
+                            "symbol": sym,
+                            "side": sig.side,
+                            "ok": bool(order_check_state.get("ok")),
+                            "retcode": order_check_state.get("retcode"),
+                            "reason": order_check_state.get("reason"),
+                            "bar": str(bar_time),
+                        },
+                    )
+                if "send_attempted" in order_check_state:
+                    order_send_attempted = bool(
+                        order_check_state.get("send_attempted")
+                    )
+            if order_send_attempted:
+                order_send_attempts_count += 1
+                submitted_count += 1
+                record_funnel_execution(
+                    observed_funnel_counts, submitted=True, filled=False
+                )
             latency.response_ts = time.time()
             audit = classify_execution(
                 ok=res.ok,
@@ -3660,7 +3765,7 @@ def main() -> None:
                         "validated_match": bool(_terminal == "VALIDATED_MATCH"),
                         "exploration_eligible": bool(_terminal == "EXPLORATION_ELIGIBLE"),
                         "brain_intent": True,
-                        "submitted": True,
+                        "submitted": order_send_attempted,
                         "filled": status in {"POSITION_CONFIRMED", "DEAL_EXECUTED"},
                     },
                 )
@@ -4037,14 +4142,25 @@ def main() -> None:
                     try:
                         acquired_at = time.monotonic()
                         q = eng.quote(sym)
-                        acquisition_age_ms = max(0.0, (time.monotonic() - acquired_at) * 1000.0)
+                        quote_acquired_at = time.monotonic()
+                        acquisition_duration_ms = max(
+                            0.0, (quote_acquired_at - acquired_at) * 1000.0
+                        )
+                        last_quote_acquired_monotonic[sym] = quote_acquired_at
                         quote_feed_health.observe(sym, q, now_mono)
+                        broker_event_age_s.append(float(quote_age_s(q)))
+                        if len(broker_event_age_s) > 1024:
+                            del broker_event_age_s[:-1024]
                         last_quote_diagnostics[sym] = {
                             "raw_tick_time": getattr(q, "raw_time", None),
                             "raw_tick_time_msc": getattr(q, "raw_time_msc", None),
                             "normalized_time": q.time.isoformat() if getattr(q, "time", None) else None,
                             "broker_tick_age_s": quote_age_s(q),
-                            "local_quote_acquisition_age_ms": acquisition_age_ms,
+                            "local_quote_acquisition_age_ms": max(
+                                0.0,
+                                (time.monotonic() - quote_acquired_at) * 1000.0,
+                            ),
+                            "quote_call_duration_ms": acquisition_duration_ms,
                             "bid": float(q.bid),
                             "ask": float(q.ask),
                         }
@@ -4090,6 +4206,15 @@ def main() -> None:
                                 "reason": f"{type(exc).__name__}:{exc}",
                             },
                         )
+                quote_diagnostics = {}
+                for _symbol, _diagnostic in last_quote_diagnostics.items():
+                    _row = dict(_diagnostic)
+                    _acquired = last_quote_acquired_monotonic.get(_symbol)
+                    if _acquired is not None:
+                        _row["local_quote_acquisition_age_ms"] = max(
+                            0.0, (time.monotonic() - _acquired) * 1000.0
+                        )
+                    quote_diagnostics[_symbol] = _row
                 extra_hb = {
                     "status": "running",
                     "equity": equity,
@@ -4109,7 +4234,7 @@ def main() -> None:
                     "feed_status": feed_status,
                     "feed_stall_count": quote_feed_health.stall_count,
                     "feed_recovery_attempts": quote_feed_health.recovery_attempts,
-                    "quote_diagnostics": dict(last_quote_diagnostics),
+                    "quote_diagnostics": quote_diagnostics,
                 }
                 _risk_ok, _risk_why = risk.allow(equity, open_positions=len(all_pos))
                 extra_hb["risk_halted"] = bool(risk.state.halted) or (not _risk_ok)
@@ -4336,6 +4461,14 @@ def main() -> None:
                 _turnover = firehose_turnover.snapshot(time.time())
                 _brain_counts = extra_hb.get("counts") or {}
                 _funnel = extra_hb.get("funnel") or {}
+                _event_ages = sorted(
+                    value for value in broker_event_age_s if math.isfinite(value)
+                )
+                _local_ages = sorted(
+                    value
+                    for value in quote_local_acquisition_age_ms
+                    if math.isfinite(value)
+                )
                 extra_hb["firehose_telemetry"] = {
                     "FIREHOSE_ACTIVE": bool(_funnel.get("FIREHOSE_ACTIVE", True)),
                     "SCANS": int(_funnel.get("SCANS", _brain_counts.get("scans", 0)) or 0),
@@ -4450,6 +4583,33 @@ def main() -> None:
                     "FRESH_TICK_ACQUIRED": int(
                         quote_refresh_counts.get("fresh_tick_acquired", 0) or 0
                     ),
+                    "NEW_TICK_ACQUIRED": int(
+                        quote_refresh_counts.get("new_tick_acquired", 0) or 0
+                    ),
+                    "LATEST_BROKER_QUOTE_ACQUIRED": int(
+                        quote_refresh_counts.get("latest_broker_quote_acquired", 0) or 0
+                    ),
+                    "BROKER_EVENT_AGE_P50_S": (
+                        round(_event_ages[len(_event_ages) // 2], 3)
+                        if _event_ages else None
+                    ),
+                    "BROKER_EVENT_AGE_P95_S": (
+                        round(_event_ages[int(0.95 * (len(_event_ages) - 1))], 3)
+                        if _event_ages else None
+                    ),
+                    "LOCAL_ACQUISITION_AGE_P50_MS": (
+                        round(_local_ages[len(_local_ages) // 2], 3)
+                        if _local_ages else None
+                    ),
+                    "LOCAL_ACQUISITION_AGE_P95_MS": (
+                        round(_local_ages[int(0.95 * (len(_local_ages) - 1))], 3)
+                        if _local_ages else None
+                    ),
+                    "BENCHMARK_SYMBOLS_ADVANCING": [
+                        symbol
+                        for symbol in quote_feed_health.benchmarks
+                        if symbol in quote_feed_health.last_advanced_monotonic
+                    ],
                     "FRESH_TICK_WAIT_P50_MS": (
                         round(sorted(quote_refresh_wait_ms)[len(quote_refresh_wait_ms) // 2], 3)
                         if quote_refresh_wait_ms else None
@@ -4459,8 +4619,25 @@ def main() -> None:
                         if quote_refresh_wait_ms else None
                     ),
                     "FEED_STATUS": quote_feed_health.status,
+                    "FEED_LIVENESS": (
+                        "LIVE" if quote_feed_health.status == "HEALTHY"
+                        else quote_feed_health.status
+                    ),
                     "FEED_STALL_COUNT": int(quote_feed_health.stall_count),
                     "FEED_RECOVERY_ATTEMPTS": int(quote_feed_health.recovery_attempts),
+                    "ORDER_CHECK_ATTEMPTS": int(
+                        quote_refresh_counts.get("order_check_attempts", 0) or 0
+                    ),
+                    "ORDER_CHECK_PASS": int(
+                        quote_refresh_counts.get("order_check_pass", 0) or 0
+                    ),
+                    "ORDER_CHECK_FAIL": int(
+                        quote_refresh_counts.get("order_check_fail", 0) or 0
+                    ),
+                    "EXECUTION_REVALIDATION_PASS": int(
+                        quote_refresh_counts.get("execution_revalidation_pass", 0) or 0
+                    ),
+                    "ORDER_SEND_ATTEMPTS": int(order_send_attempts_count),
                     "RISK_RESIZED": int(
                         quote_refresh_counts.get("risk_resized", 0) or 0
                     ),

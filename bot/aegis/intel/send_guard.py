@@ -26,15 +26,26 @@ def refresh_verdict(
     max_age_s: float,
     max_spread: float,
     candidate_spread_limit: float | None = None,
+    quote_status: str | None = None,
+    feed_status: str | None = None,
 ) -> RefreshVerdict:
-    """After fetching ONE fresh tick, decide whether the candidate survives.
+    """After fetching ONE current broker quote, decide whether it survives.
 
-    The fresh quote must itself be within age limits, and the live spread must
-    still clear the symbol's spread ceiling - otherwise the candidate is
-    invalidated rather than sent blind.
+    ``new_age_s`` is the broker's event age, not local acquisition age.  A
+    quote explicitly marked as locally acquired from the broker may therefore
+    be older than the event-age telemetry limit.  The legacy ``None`` status
+    keeps callers that have not established local acquisition fail-closed.
     """
-    if max_age_s > 0 and float(new_age_s) > float(max_age_s):
+    if str(feed_status or "").upper() == "FEED_STALLED":
+        return RefreshVerdict(False, "feed_stalled")
+    if quote_status is None and max_age_s > 0 and float(new_age_s) > float(max_age_s):
         return RefreshVerdict(False, "refresh_still_stale")
+    if quote_status is not None and str(quote_status) not in {
+        "NEW_TICK_ACQUIRED",
+        "LATEST_BROKER_QUOTE_ACQUIRED",
+        "CURRENT_DECISION_QUOTE",
+    }:
+        return RefreshVerdict(False, "quote_not_locally_acquired")
     spread_limit = (
         float(candidate_spread_limit)
         if candidate_spread_limit is not None

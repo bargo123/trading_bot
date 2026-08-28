@@ -35,6 +35,7 @@ _DEFAULT_TERMINAL = r"C:\Program Files\MetaTrader 5\terminal64.exe"
 _MAX_LOTS_DEFAULT = 0.10
 _UNITS_QTY_FLOOR = 100.0  # IB-style FX units; MT5 uses lots
 _OK_RETCODES = {10008, 10009, 10010}  # PLACED / DONE / DONE_PARTIAL
+_ORDER_CHECK_OK_RETCODES = {0, 10008, 10009, 10010}
 _TF_ATTR = {
     "1m": "TIMEFRAME_M1",
     "m1": "TIMEFRAME_M1",
@@ -89,6 +90,14 @@ class MT5Engine(BrokerEngine):
         self.deviation = int(cfg.get("mt5_deviation", 20) or 20)
         self.max_lots = float(cfg.get("mt5_max_lots", _MAX_LOTS_DEFAULT) or _MAX_LOTS_DEFAULT)
         self.path = str(cfg.get("mt5_path") or os.environ.get("MT5_PATH") or _DEFAULT_TERMINAL)
+        self.last_order_check: dict[str, Any] = {
+            "attempted": False,
+            "available": False,
+            "ok": None,
+            "retcode": None,
+            "reason": "not_run",
+            "send_attempted": False,
+        }
         self._server_utc_offset_s: float | None = None
         self._offset_samples: list[float] = []
 
@@ -727,6 +736,14 @@ class MT5Engine(BrokerEngine):
         return None
 
     def place_order(self, req: OrderRequest) -> OrderResult:
+        self.last_order_check = {
+            "attempted": False,
+            "available": False,
+            "ok": None,
+            "retcode": None,
+            "reason": "not_run",
+            "send_attempted": False,
+        }
         blocked = self._mutation_allowed()
         if blocked:
             return OrderResult(ok=False, message=blocked)
@@ -787,6 +804,64 @@ class MT5Engine(BrokerEngine):
             "type_time": int(getattr(mt5, "ORDER_TIME_GTC", 0)),
             "type_filling": filling,
         }
+        order_check = getattr(mt5, "order_check", None)
+        if callable(order_check):
+            try:
+                checked = order_check(request)
+            except Exception as exc:
+                self.last_order_check = {
+                    "attempted": True,
+                    "available": True,
+                    "ok": False,
+                    "retcode": None,
+                    "reason": f"order_check_error:{type(exc).__name__}",
+                    "send_attempted": False,
+                }
+                return OrderResult(ok=False, message=self.last_order_check["reason"])
+            if checked is None:
+                self.last_order_check = {
+                    "attempted": True,
+                    "available": True,
+                    "ok": False,
+                    "retcode": None,
+                    "reason": f"order_check returned None ({self._last_error()})",
+                    "send_attempted": False,
+                }
+                return OrderResult(ok=False, message=self.last_order_check["reason"])
+            raw_retcode = getattr(checked, "retcode", None)
+            if raw_retcode is None:
+                self.last_order_check = {
+                    "attempted": True,
+                    "available": True,
+                    "ok": False,
+                    "retcode": None,
+                    "reason": "order_check missing retcode",
+                    "send_attempted": False,
+                }
+                return OrderResult(ok=False, message=self.last_order_check["reason"])
+            retcode = int(raw_retcode or 0)
+            msg = str(getattr(checked, "comment", "") or f"retcode={retcode}")
+            check_ok = retcode in _ORDER_CHECK_OK_RETCODES
+            self.last_order_check = {
+                "attempted": True,
+                "available": True,
+                "ok": check_ok,
+                "retcode": retcode,
+                "reason": msg,
+                "send_attempted": False,
+            }
+            if not check_ok:
+                return OrderResult(ok=False, message=f"order_check {retcode} {msg}")
+        else:
+            self.last_order_check = {
+                "attempted": False,
+                "available": False,
+                "ok": None,
+                "retcode": None,
+                "reason": "order_check_unavailable",
+                "send_attempted": False,
+            }
+        self.last_order_check["send_attempted"] = True
         result = mt5.order_send(request)
         if result is None:
             return OrderResult(ok=False, message=f"order_send returned None ({self._last_error()})")

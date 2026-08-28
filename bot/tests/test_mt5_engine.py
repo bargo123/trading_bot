@@ -452,6 +452,47 @@ def test_place_order_uses_emergency_broker_geometry_not_virtual_target():
     assert api.sends[-1]["tp"] == 0.0
 
 
+def test_order_check_rejection_blocks_order_send():
+    api = FakeMT5()
+    api.order_check = lambda _request: FakeResult(
+        retcode=10016, order=0, comment="invalid stops", price=0, deal=0
+    )
+    eng = _engine(api)
+    eng.connect()
+
+    result = eng.place_order(
+        OrderRequest(symbol="EURUSD", side="buy", quantity=0.01, kind="market")
+    )
+
+    assert result.ok is False
+    assert "10016" in result.message
+    assert api.sends == []
+    assert eng.last_order_check["attempted"] is True
+    assert eng.last_order_check["ok"] is False
+
+
+def test_order_check_pass_reaches_order_send_with_same_market_request():
+    api = FakeMT5()
+    checked = []
+
+    def order_check(request):
+        checked.append(dict(request))
+        return FakeResult(retcode=0, order=0, comment="check passed", price=0, deal=0)
+
+    api.order_check = order_check
+    eng = _engine(api)
+    eng.connect()
+
+    result = eng.place_order(
+        OrderRequest(symbol="EURUSD", side="buy", quantity=0.01, kind="market")
+    )
+
+    assert result.ok is True
+    assert len(checked) == 1
+    assert checked[0] == api.sends[0]
+    assert eng.last_order_check["ok"] is True
+
+
 def test_history_deals_and_orders_readonly():
     api = FakeMT5()
     api.deals = [
