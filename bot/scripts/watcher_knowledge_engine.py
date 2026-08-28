@@ -539,6 +539,11 @@ def analyze_decision(
         "opinion": item.get("opinion"),
         "applicability_status": item.get("applicability", {}).get("status"),
         "reasons": item.get("applicability", {}).get("reasons", []),
+        "evidence_status": item.get("evidence_status", "LEGACY_UNCOMPILED"),
+        "evaluation_status": item.get("evaluation_status"),
+        "context_hash": item.get("context_hash"),
+        "failed_predicates": item.get("failed_predicates", []),
+        "missing": item.get("missing", []),
         "execution_authority": False,
         "uses_future_data": False,
     } for item in evaluated]
@@ -794,6 +799,7 @@ class WatcherKnowledgeEngine:
                 "book": opinion.get("book"),
                 "source_file": opinion.get("source_file"),
                 "strategy_family": opinion.get("strategy_family"),
+                "evidence_status": opinion.get("evidence_status", "LEGACY_UNCOMPILED"),
                 "evaluated_decisions": 0,
                 "applicable_decisions": 0,
                 "opinion_counts": {"BUY": 0, "SELL": 0, "NO_TRADE": 0, "NOT_APPLICABLE": 0},
@@ -807,6 +813,7 @@ class WatcherKnowledgeEngine:
             })
             row.setdefault("confirmed_outcomes", 0)
             row.setdefault("outcome_count", 0)
+            row.setdefault("evidence_status", opinion.get("evidence_status", "LEGACY_UNCOMPILED"))
             row.setdefault("wins", 0)
             row.setdefault("losses", 0)
             row.setdefault("net_pnl_usd", 0.0)
@@ -831,6 +838,7 @@ class WatcherKnowledgeEngine:
                 "book": None,
                 "source_file": None,
                 "strategy_family": state.get("mechanism"),
+                "evidence_status": "LEGACY_UNCOMPILED",
                 "evaluated_decisions": 0,
                 "applicable_decisions": 0,
                 "opinion_counts": {"BUY": 0, "SELL": 0, "NO_TRADE": 0, "NOT_APPLICABLE": 0},
@@ -848,11 +856,15 @@ class WatcherKnowledgeEngine:
                 "wins": 0,
                 "losses": 0,
                 "net_pnl_usd": 0.0,
+                "evidence_source": "broker_confirmed_net_pnl",
             })
             bucket["sample_size"] += 1
             bucket["wins"] += int(net > 0)
             bucket["losses"] += int(net < 0)
             bucket["net_pnl_usd"] += net
+            bucket["p_captured_win"] = bucket["wins"] / bucket["sample_size"]
+            bucket["expectancy"] = bucket["net_pnl_usd"] / bucket["sample_size"]
+            bucket["horizon_s"] = state.get("horizon_s")
             row["confirmed_outcomes"] = int(row.get("confirmed_outcomes") or 0) + 1
             row["outcome_count"] = int(row.get("outcome_count") or 0) + 1
             row["wins"] = int(row.get("wins") or 0) + int(net > 0)
@@ -900,13 +912,25 @@ class WatcherKnowledgeEngine:
                 "applicability": item.get("applicability_status"),
                 "reason_codes": codes,
                 "opinion": item.get("opinion"),
+                "evidence_status": item.get("evidence_status", "LEGACY_UNCOMPILED"),
+                "evaluation_status": item.get("evaluation_status"),
+                "context_hash": item.get("context_hash"),
+                "failed_predicates": item.get("failed_predicates", []),
+                "missing": item.get("missing", []),
             })
         for item in strategies:
             rate, sample_size = self._strategy_capture_rate(item.get("record_id"), analysis.get("state", {}))
             item["p_captured_win"] = rate
             item["p_captured_win_percent"] = None if rate is None else rate * 100.0
             item["p_captured_win_sample_size"] = sample_size
-            item["p_captured_win_source"] = "broker_confirmed_net_pnl" if sample_size else "UNAVAILABLE"
+            if sample_size:
+                item["p_captured_win_source"] = "broker_confirmed_net_pnl"
+            elif item.get("evidence_status") == "FAMILY_PROXY":
+                item["p_captured_win_source"] = "FAMILY_PROXY_UNAVAILABLE"
+            elif item.get("evidence_status") == "UNTESTABLE_SOURCE":
+                item["p_captured_win_source"] = "UNTESTABLE_SOURCE"
+            else:
+                item["p_captured_win_source"] = "UNAVAILABLE"
         return {
             "record_type": "blocked_strategy_study",
             "study_id": _hash({"event": self._event_id(event), "kind": "blocked_strategy_study"}),
