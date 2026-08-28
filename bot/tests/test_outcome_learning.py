@@ -6,9 +6,11 @@ import json
 import pytest
 
 from aegis.research.outcome_learning import (
+    build_daily_trade_behavior_reports,
     exit_pnls,
     record_fast_trade_autopsy,
     read_outcomes,
+    render_daily_trade_behavior_markdown,
     summarize_fast_trade_autopsy,
     summarize_outcomes,
 )
@@ -35,6 +37,67 @@ def test_read_outcomes_dedupes_by_ticket(tmp_path):
     )
     rows = read_outcomes(path)
     assert [r["ticket"] for r in rows] == ["1", "2", "3"]
+
+
+def test_read_outcomes_uses_position_side_and_never_guesses_from_exit_side(tmp_path):
+    path = tmp_path / "outcome_log.jsonl"
+    path.write_text(
+        "\n".join(
+            [
+                json.dumps({
+                    "ticket": "entry-known",
+                    "is_exit": True,
+                    "side": "sell",  # closing DEAL side, not position side
+                    "position_side": "buy",
+                    "evidence_status": "BROKER_CONFIRMED",
+                    "pnl": 0.04,
+                }),
+                json.dumps({
+                    "ticket": "entry-missing",
+                    "is_exit": True,
+                    "side": "buy",  # unsafe to interpret without entry evidence
+                    "evidence_status": "BROKER_CONFIRMED",
+                    "pnl": -0.04,
+                }),
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rows = read_outcomes(path)
+
+    assert rows[0]["side"] == "buy"
+    assert rows[1]["side"] == "unknown"
+
+
+def test_exit_pnls_uses_broker_confirmed_net_pnl_over_event_pnl():
+    rows = [{
+        "ticket": "broker-truth",
+        "is_exit": True,
+        "pnl": 0.20,
+        "realized_net_usd": -0.12,
+        "evidence_status": "BROKER_CONFIRMED",
+    }]
+
+    assert exit_pnls(rows) == [-0.12]
+
+
+def test_learning_slices_use_broker_confirmed_net_pnl_over_event_pnl():
+    rows = []
+    for index in range(5):
+        rows.append({
+            "ticket": str(index),
+            "is_exit": True,
+            "symbol": "EURUSD",
+            "side": "buy",
+            "pnl": 0.20,
+            "realized_net_usd": -0.12,
+            "evidence_status": "BROKER_CONFIRMED",
+        })
+
+    summary = summarize_outcomes(rows)
+
+    assert summary["by_symbol"][0]["expectancy"] == pytest.approx(-0.12)
 
 
 def test_exit_pnls_and_summary_geometry():
@@ -144,3 +207,89 @@ def test_fast_trade_autopsy_separates_explicit_giveback_and_time_decay_losses():
         "median_mfe_usd": 0.18,
         "median_mae_usd": None,
     }
+
+
+def test_fast_trade_autopsy_uses_broker_confirmed_net_pnl_over_event_pnl():
+    outcomes = [{
+        "ticket": "broker-truth",
+        "is_exit": True,
+        # A stale/event-level value must not override broker-confirmed net.
+        "pnl": 0.20,
+        "realized_net_usd": -0.12,
+        "evidence_status": "BROKER_CONFIRMED",
+        "symbol": "EURUSD",
+    }]
+
+    summary = summarize_fast_trade_autopsy(outcomes, {})
+
+    assert summary["n_trades"] == 1
+    assert summary["metrics"]["n_wins"] == 0
+    assert summary["metrics"]["n_losses"] == 1
+    assert summary["trades"][0]["pnl"] == pytest.approx(-0.12)
+
+
+def test_daily_trade_behavior_records_green_to_red_broker_confirmed_lifecycle():
+    outcomes = [{
+        "ticket": "deal-1",
+        "position": "position-1",
+        "is_exit": True,
+        "pnl": 0.50,
+        "realized_net_usd": -0.02,
+        "evidence_status": "BROKER_CONFIRMED",
+        "symbol": "EURJPY",
+        "side": "buy",
+    }]
+    journal = {"position-1": [
+        {"event": "firehose_open", "ticket": "position-1", "timestamp": "2026-08-28T08:00:00+00:00"},
+        {"event": "firehose_exit_trace", "ticket": "position-1", "timestamp": "2026-08-28T08:00:01+00:00", "pnl_usd": -0.03},
+        {"event": "firehose_exit_trace", "ticket": "position-1", "timestamp": "2026-08-28T08:00:02+00:00", "pnl_usd": 0.02},
+        {"event": "firehose_exit_trace", "ticket": "position-1", "timestamp": "2026-08-28T08:00:03+00:00", "pnl_usd": 0.05},
+        {"event": "firehose_exit_trace", "ticket": "position-1", "timestamp": "2026-08-28T08:00:04+00:00", "pnl_usd": -0.01},
+        {"event": "pm_exit", "ticket": "position-1", "timestamp": "2026-08-28T08:00:04+00:00", "action": "SCRATCH", "exit_reason": "prediction_collapsed", "mfe_before_close": 0.05},
+        {"event": "firehose_close", "ticket": "position-1", "timestamp": "2026-08-28T08:00:05+00:00", "confirmed": True},
+    ]}
+
+    summary = summarize_fast_trade_autopsy(outcomes, journal)
+    reports = build_daily_trade_behavior_reports(summary, timezone_name="Asia/Amman")
+
+    trade = reports["2026-08-28"]["trades"][0]
+    assert trade["state_path"] == [
+        "OPEN", "RED", "GREEN", "PEAK", "GREEN_TO_RED", "CLOSE_LOSS",
+    ]
+    assert trade["first_net_green_s"] == pytest.approx(2.0)
+    assert trade["peak_executable_pnl_usd"] == pytest.approx(0.05)
+    assert trade["broker_confirmed_net_pnl_usd"] == pytest.approx(-0.02)
+    assert trade["exit_action"] == "SCRATCH"
+    assert trade["exit_reason"] == "prediction_collapsed"
+    assert reports["2026-08-28"]["winner_to_loser_count"] == 1
+    assert reports["2026-08-28"]["net_pnl_usd"] == pytest.approx(-0.02)
+
+
+def test_daily_trade_behavior_markdown_exposes_each_trade_path():
+    report = {
+        "date": "2026-08-28",
+        "timezone": "Asia/Amman",
+        "n_trades": 1,
+        "n_wins": 1,
+        "n_losses": 0,
+        "net_pnl_usd": 0.04,
+        "winner_to_loser_count": 0,
+        "winner_to_loser_rate": 0.0,
+        "trades": [{
+            "ticket": "T1",
+            "symbol": "EURUSD",
+            "side": "sell",
+            "state_path": ["OPEN", "GREEN", "PEAK", "CLOSE_WIN"],
+            "broker_confirmed_net_pnl_usd": 0.04,
+            "first_net_green_s": 0.3,
+            "peak_executable_pnl_usd": 0.06,
+            "giveback_usd": 0.02,
+            "exit_action": "HARVEST",
+            "exit_reason": "profit_without_continuation_evidence",
+        }],
+    }
+
+    markdown = render_daily_trade_behavior_markdown(report)
+
+    assert "OPEN -> GREEN -> PEAK -> CLOSE_WIN" in markdown
+    assert "profit_without_continuation_evidence" in markdown

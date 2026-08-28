@@ -14,6 +14,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from aegis.intel.expected_value import payoff_metrics
 from aegis.research.costs import pnl_summary
@@ -21,6 +22,60 @@ from aegis.research.registry import DuplicateExperimentError, ExperimentRegistry
 from aegis.research_factory.evaluation import record_outcome
 
 DEFAULT_OUTCOME_PATH = Path(__file__).resolve().parents[2] / "intel" / "outcome_log.jsonl"
+
+
+def _broker_confirmed(row: Mapping[str, Any]) -> bool:
+    facts = row.get("broker_facts")
+    return (
+        str(row.get("evidence_status") or "") == "BROKER_CONFIRMED"
+        or row.get("broker_confirmed") is True
+        or (
+            isinstance(facts, Mapping)
+            and (
+                facts.get("confirmed") is True
+                or str(facts.get("status") or "") == "BROKER_CONFIRMED"
+            )
+        )
+    )
+
+
+def _broker_position_side(row: Mapping[str, Any]) -> str | None:
+    facts = row.get("broker_facts")
+    candidates = (
+        row.get("position_side"),
+        facts.get("position_side") if isinstance(facts, Mapping) else None,
+    )
+    for candidate in candidates:
+        side = str(candidate or "").strip().lower()
+        if side in {"buy", "sell"}:
+            return side
+    return None
+
+
+def _normalize_broker_exit_identity(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep closing-DEAL action from becoming the original position side."""
+    normalized = dict(row)
+    if normalized.get("is_exit") and _broker_confirmed(normalized):
+        normalized["side"] = _broker_position_side(normalized) or "unknown"
+    return normalized
+
+
+def _broker_truth_pnl(row: Mapping[str, Any]) -> float | None:
+    """Prefer confirmed realized net PnL; event PnL is only a fallback."""
+    value = None
+    if _broker_confirmed(row):
+        value = row.get("realized_net_usd")
+        if value is None:
+            facts = row.get("broker_facts")
+            if isinstance(facts, Mapping):
+                value = facts.get("realized_net_usd")
+    if value is None:
+        value = row.get("pnl")
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
 
 
 def read_outcomes(path: Path | None = None) -> list[dict[str, Any]]:
@@ -43,6 +98,7 @@ def read_outcomes(path: Path | None = None) -> list[dict[str, Any]]:
             continue
         if not isinstance(payload, dict):
             continue
+        payload = _normalize_broker_exit_identity(payload)
         ticket = str(payload.get("ticket") or "")
         if ticket and ticket != "0":
             if ticket in seen:
@@ -57,10 +113,9 @@ def exit_pnls(rows: Iterable[Mapping[str, Any]]) -> list[float]:
     for row in rows:
         if not row.get("is_exit"):
             continue
-        try:
-            out.append(float(row["pnl"]))
-        except (KeyError, TypeError, ValueError):
-            continue
+        pnl = _broker_truth_pnl(row)
+        if pnl is not None:
+            out.append(pnl)
     return out
 
 
@@ -74,9 +129,8 @@ def slice_learning(
     for row in rows:
         if not row.get("is_exit"):
             continue
-        try:
-            pnl = float(row["pnl"])
-        except (KeyError, TypeError, ValueError):
+        pnl = _broker_truth_pnl(row)
+        if pnl is None:
             continue
         key = "|".join(str(row.get(field) or "unknown") for field in by)
         buckets[key].append(pnl)
@@ -143,6 +197,35 @@ def _median(values: Iterable[float]) -> float | None:
     return (items[middle - 1] + items[middle]) / 2.0
 
 
+def _trade_state_path(
+    trace_pnls: list[tuple[Mapping[str, Any], float | None]],
+    final_pnl: float,
+) -> list[str]:
+    """Compress observed executable PnL into an auditable lifecycle path."""
+    path = ["OPEN"]
+    values = [value for _event, value in trace_pnls if value is not None]
+    peak_index = max(range(len(values)), key=values.__getitem__) if values else None
+    seen_green = False
+    value_index = -1
+    for _event, value in trace_pnls:
+        if value is None:
+            continue
+        value_index += 1
+        if value > 0:
+            if not seen_green:
+                path.append("GREEN")
+                seen_green = True
+            if value_index == peak_index and (not path or path[-1] != "PEAK"):
+                path.append("PEAK")
+        elif seen_green:
+            if "GREEN_TO_RED" not in path:
+                path.append("GREEN_TO_RED")
+        elif "RED" not in path:
+            path.append("RED")
+    path.append("CLOSE_WIN" if final_pnl > 0 else "CLOSE_LOSS" if final_pnl < 0 else "CLOSE_FLAT")
+    return path
+
+
 def summarize_fast_trade_autopsy(
     outcomes: Iterable[Mapping[str, Any]],
     journal_events: Mapping[str, Iterable[Mapping[str, Any]]],
@@ -157,7 +240,7 @@ def summarize_fast_trade_autopsy(
         if not outcome.get("is_exit"):
             continue
         ticket = str(outcome.get("ticket") or "").strip()
-        pnl = _finite_number(outcome.get("pnl"))
+        pnl = _broker_truth_pnl(outcome)
         if not ticket or pnl is None:
             continue
         position = str(outcome.get("position") or "").strip()
@@ -189,6 +272,8 @@ def summarize_fast_trade_autopsy(
             (event, _finite_number(event.get("pnl_usd")))
             for event in traces
         ]
+        trace_values = [value for _event, value in trace_pnls if value is not None]
+        peak_executable_pnl_usd = max(trace_values) if trace_values else None
         green_at = next(
             (event_time for event, pnl_usd in trace_pnls
              if pnl_usd is not None and pnl_usd > 0
@@ -225,9 +310,16 @@ def summarize_fast_trade_autopsy(
         mae_usd = min(mae_values) if mae_values else None
         exit_reason = str(
             (pm_exits[-1].get("exit_reason") if pm_exits else None)
+            or (traces[-1].get("exit_reason") if traces else None)
             or outcome.get("close_reason")
             or outcome.get("reason")
             or "unknown"
+        )
+        exit_action = str(
+            (pm_exits[-1].get("action") if pm_exits else None)
+            or (pm_exits[-1].get("exit_action") if pm_exits else None)
+            or (traces[-1].get("exit_action") if traces else None)
+            or "UNKNOWN"
         )
         reason_lower = exit_reason.lower()
         close_reason = str(outcome.get("close_reason") or "").lower()
@@ -260,12 +352,23 @@ def summarize_fast_trade_autopsy(
                 "pnl": pnl,
                 "category": category,
                 "exit_reason": exit_reason,
+                "exit_action": exit_action,
+                "opened_at": opened_at.isoformat() if opened_at is not None else None,
+                "closed_at": closed_at.isoformat() if closed_at is not None else None,
                 "hold_s": hold_s,
                 "time_to_green_s": time_to_green_s,
+                "first_net_green_s": time_to_green_s,
                 "seconds_in_red_observed_s": seconds_in_red,
                 "mfe_usd": mfe_usd,
                 "mae_usd": mae_usd,
+                "peak_executable_pnl_usd": peak_executable_pnl_usd,
                 "giveback_usd": (mfe_usd - pnl if mfe_usd is not None else None),
+                "winner_to_loser": bool(
+                    peak_executable_pnl_usd is not None
+                    and peak_executable_pnl_usd > 0
+                    and pnl <= 0
+                ),
+                "state_path": _trade_state_path(trace_pnls, pnl),
                 "evidence_status": "COMPLETE" if opens and closes and (traces or pm_exits) else "PARTIAL",
             }
         )
@@ -343,6 +446,85 @@ def summarize_fast_trade_autopsy(
             for category, count in sorted(Counter(trade["category"] for trade in losses).items())
         ],
     }
+
+
+def build_daily_trade_behavior_reports(
+    summary: Mapping[str, Any],
+    *,
+    timezone_name: str = "Asia/Amman",
+) -> dict[str, dict[str, Any]]:
+    """Group broker-confirmed lifecycle observations by local close date."""
+    try:
+        local_tz = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        local_tz = timezone.utc
+        timezone_name = "UTC"
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for raw_trade in summary.get("trades") or []:
+        trade = dict(raw_trade)
+        closed_at = _event_time(trade.get("closed_at"))
+        opened_at = _event_time(trade.get("opened_at"))
+        observed_at = closed_at or opened_at
+        if observed_at is None:
+            continue
+        grouped[observed_at.astimezone(local_tz).date().isoformat()].append(trade)
+
+    reports: dict[str, dict[str, Any]] = {}
+    for day, trades in sorted(grouped.items()):
+        wins = sum(float(trade["pnl"]) > 0 for trade in trades)
+        losses = sum(float(trade["pnl"]) < 0 for trade in trades)
+        winner_to_loser_count = sum(bool(trade.get("winner_to_loser")) for trade in trades)
+        reports[day] = {
+            "schema": "daily_trade_behavior.v1",
+            "label": "research_observation",
+            "date": day,
+            "timezone": timezone_name,
+            "n_trades": len(trades),
+            "n_wins": wins,
+            "n_losses": losses,
+            "net_pnl_usd": round(sum(float(trade["pnl"]) for trade in trades), 8),
+            "winner_to_loser_count": winner_to_loser_count,
+            "winner_to_loser_rate": winner_to_loser_count / len(trades) if trades else None,
+            "trades": [
+                {
+                    **trade,
+                    "broker_confirmed_net_pnl_usd": trade.get("pnl"),
+                }
+                for trade in trades
+            ],
+        }
+    return reports
+
+
+def render_daily_trade_behavior_markdown(report: Mapping[str, Any]) -> str:
+    """Render a compact human-readable lifecycle report."""
+    lines = [
+        f"# Daily Trade Behavior — {report.get('date', 'unknown')}",
+        "",
+        f"Timezone: {report.get('timezone', 'unknown')}",
+        "",
+        f"Trades: {report.get('n_trades', 0)} | Wins: {report.get('n_wins', 0)} | "
+        f"Losses: {report.get('n_losses', 0)} | Net PnL: ${float(report.get('net_pnl_usd') or 0.0):.4f}",
+        "",
+        f"Winner-to-loser: {report.get('winner_to_loser_count', 0)}",
+        "",
+        "| Ticket | Market | Path | Net PnL | First green | Peak | Giveback | Exit |",
+        "|---|---|---|---:|---:|---:|---:|---|",
+    ]
+    for trade in report.get("trades") or []:
+        path = " -> ".join(str(state) for state in trade.get("state_path") or [])
+        first_green = trade.get("first_net_green_s")
+        peak = trade.get("peak_executable_pnl_usd")
+        giveback = trade.get("giveback_usd")
+        exit_text = f"{trade.get('exit_action', 'UNKNOWN')}: {trade.get('exit_reason', 'unknown')}"
+        lines.append(
+            f"| {trade.get('ticket', '')} | {trade.get('symbol', '')} {trade.get('side', '')} | "
+            f"{path} | ${float(trade.get('broker_confirmed_net_pnl_usd') or 0.0):.4f} | "
+            f"{'' if first_green is None else f'{float(first_green):.3f}s'} | "
+            f"{'' if peak is None else f'${float(peak):.4f}'} | "
+            f"{'' if giveback is None else f'${float(giveback):.4f}'} | {exit_text} |"
+        )
+    return "\n".join(lines) + "\n"
 
 
 def record_fast_trade_autopsy(

@@ -1,18 +1,25 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pandas as pd
 import pytest
 
-from aegis.engines.base import PositionSnapshot, Quote
+from aegis.engines.base import OrderResult, PositionSnapshot, Quote
 from aegis.intel.firehose_basket import BasketMetadataStore
+from aegis.intel.profit_management import ProfitManager
+from aegis.intel.quote_buffer import QuoteBuffer
 from aegis.intel.firehose_turnover import FirehoseReentryGuard, TurnoverMetrics
 from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
+from aegis.intel.trade_controller import TradeController
 from aegis.sizing import ContractSpec
 from scripts.run_broker_paper import (
     confirmed_position_geometry,
     ticket_metadata_from_pending,
     close_ticket_confirmed,
     broker_close_evidence,
+    broker_outcome_event,
+    broker_position_identities,
     exploration_order_risk_check,
     firehose_lifecycle_identity,
     firehose_funnel_risk_row,
@@ -34,6 +41,8 @@ from scripts.run_broker_paper import (
     frozen_opportunity_from_decision,
     intelligent_refresh_spread_limit,
     meaningful_quote_change,
+    cached_bars_for_scan,
+    cached_prepared_scan_frame,
     quote_scan_verdict,
     acquire_fresh_quote,
     QuoteFeedHealth,
@@ -41,9 +50,127 @@ from scripts.run_broker_paper import (
     pending_order_lifecycle_metadata,
     outcome_features_from_ticket_metadata,
     record_broker_confirmed_outcome_learning,
+    finalize_confirmed_firehose_close,
+    execute_cooperative_checkpoint,
+    FirehoseStopRequested,
     legacy_normal_exit_enabled,
 )
 from aegis.intel.send_guard import candidate_spread_limit, refresh_verdict
+import scripts.run_broker_paper as broker_runner
+from aegis.intel.runtime_checkpoint import RuntimeCheckpointState, ScanProgress
+
+
+def test_cooperative_checkpoint_updates_management_heartbeat_and_counters():
+    state = RuntimeCheckpointState(interval_s=1.0)
+    heartbeats = []
+    management_calls = []
+
+    result = execute_cooperative_checkpoint(
+        state=state,
+        now_mono=10.0,
+        now_wall=1000.0,
+        progress=ScanProgress(4, 26, 7.0),
+        force=False,
+        stop_requested=lambda: False,
+        manage_positions=lambda: (
+            management_calls.append("managed")
+            or {"open_ticket_rechecks": 2, "confirmed_closes": 1}
+        ),
+        heartbeat_write=heartbeats.append,
+    )
+
+    assert result["ran"] is True
+    assert management_calls == ["managed"]
+    assert [row["runtime_phase"] for row in heartbeats] == [
+        "RUNNING_MANAGEMENT_CHECKPOINT", "RUNNING_SCAN",
+    ]
+    assert result["OPEN_TICKET_RECHECKS"] == 2
+    assert result["CONFIRMED_CLOSES_FINALIZED"] == 1
+    assert result["SCAN_SYMBOL_INDEX"] == 4
+
+
+def test_cooperative_checkpoint_honors_operator_stop_before_management():
+    state = RuntimeCheckpointState(interval_s=1.0)
+
+    with pytest.raises(FirehoseStopRequested):
+        execute_cooperative_checkpoint(
+            state=state,
+            now_mono=10.0,
+            now_wall=1000.0,
+            progress=ScanProgress(1, 26, 10.0),
+            force=True,
+            stop_requested=lambda: True,
+            manage_positions=lambda: pytest.fail("management must not run"),
+            heartbeat_write=lambda row: pytest.fail(f"unexpected heartbeat {row}"),
+        )
+
+
+def test_runner_exposes_rapid_exit_recheck_for_scan_interleaving():
+    """Exit checks must be callable between slow global-scan symbols."""
+    assert callable(getattr(broker_runner, "rapid_exit_recheck", None))
+
+
+def test_rapid_exit_recheck_closes_untracked_executable_winner(tmp_path):
+    class Predictor:
+        def predict(self, **_kwargs):
+            return {"abstain": True, "abstain_reason": "artifact_shadow_only"}
+
+    class Engine:
+        def __init__(self, position):
+            self.open_positions = [position]
+            self.closed = []
+
+        def symbol_spec(self, _symbol):
+            return {
+                "name": "EURUSD",
+                "trade_tick_value": 1.0,
+                "trade_tick_size": 0.00001,
+                "volume_min": 0.01,
+                "volume_step": 0.01,
+                "volume_max": 100.0,
+                "trade_contract_size": 100000.0,
+            }
+
+        def close_ticket(self, ticket):
+            self.closed.append(ticket)
+            self.open_positions = []
+            return OrderResult(ok=True, message="closed")
+
+        def positions(self):
+            return list(self.open_positions)
+
+    position = PositionSnapshot(
+        symbol="EURUSD", side="buy", quantity=0.01, avg_price=1.10000,
+        unrealized_pnl=0.05, ticket="T-RAPID", stop_loss=1.09900,
+        opened_ts=1000.0,
+    )
+    engine = Engine(position)
+    finalized = []
+    decisions = broker_runner.rapid_exit_recheck(
+        engine=engine,
+        positions=[position],
+        live_marks={"EURUSD": {"bid": 1.10005, "ask": 1.10007}},
+        metadata_store=TicketMetadataStore(tmp_path / "tickets.json"),
+        profit_manager=ProfitManager({"commission_round_trip_usd": 0.03}),
+        short_horizon_predictor=Predictor(),
+        quote_buffer=QuoteBuffer(),
+        config={"commission_round_trip_usd": 0.03},
+        intelligent_brain=SimpleNamespace(regime_by_symbol={}),
+        trade_controller=TradeController(),
+        harvest_policy=None,
+        now_ts=1000.1,
+        confirmed_close_finalizer=lambda **facts: (
+            finalized.append(facts)
+            or {"status": "FINALIZED", "slot_released": True}
+        ),
+    )
+
+    assert engine.closed == ["T-RAPID"]
+    assert decisions[0]["action"] == "HARVEST"
+    assert decisions[0]["close_confirmed"] is True
+    assert decisions[0]["finalization_status"] == "FINALIZED"
+    assert finalized[0]["position"] is position
+    assert finalized[0]["decision"]["action"] == "HARVEST"
 
 
 def test_heartbeat_atomic_writer_replaces_target_without_temp_file(tmp_path):
@@ -66,6 +193,71 @@ def test_meaningful_quote_change_allows_same_bar_reevaluation():
     assert meaningful_quote_change(previous, bid=1.10000, ask=1.10002, pip=0.0001) is False
     assert meaningful_quote_change(previous, bid=1.10001, ask=1.10003, pip=0.0001) is True
     assert meaningful_quote_change(None, bid=1.1, ask=1.1001, pip=0.0001) is True
+
+
+def test_cached_bars_for_scan_reuses_history_until_completed_bar_changes():
+    class Engine:
+        def __init__(self):
+            self.latest = pd.Timestamp("2026-08-28T00:00:00Z").to_pydatetime()
+            self.probes = 0
+            self.history_calls = 0
+
+        def latest_bar_time(self, symbol, timeframe):
+            self.probes += 1
+            return self.latest
+
+        def bars(self, symbol, timeframe, lookback_days):
+            self.history_calls += 1
+            return [type("Bar", (), {"time": self.latest})()]
+
+    engine = Engine()
+    cache = {}
+    first = cached_bars_for_scan(engine, cache, "EURUSD", "1m", 30)
+    second = cached_bars_for_scan(engine, cache, "EURUSD", "1m", 30)
+    engine.latest = pd.Timestamp("2026-08-28T00:01:00Z").to_pydatetime()
+    third = cached_bars_for_scan(engine, cache, "EURUSD", "1m", 30)
+
+    assert first is second
+    assert third is not second
+    assert engine.probes == 2
+    assert engine.history_calls == 2
+
+
+def test_prepared_frame_cache_reuses_same_completed_bar_but_not_new_bar():
+    cache = {}
+    calls = []
+
+    def build():
+        calls.append("build")
+        return pd.DataFrame({"close": [1.1]})
+
+    first = cached_prepared_scan_frame(
+        cache, symbol="EURUSD", timeframe="M1",
+        completed_bar_time_msc=1000, build=build,
+    )
+    second = cached_prepared_scan_frame(
+        cache, symbol="EURUSD", timeframe="M1",
+        completed_bar_time_msc=1000, build=build,
+    )
+    advanced = cached_prepared_scan_frame(
+        cache, symbol="EURUSD", timeframe="M1",
+        completed_bar_time_msc=2000, build=build,
+    )
+
+    assert first is second
+    assert advanced is not first
+    assert calls == ["build", "build"]
+    assert list(cache) == [("EURUSD", "M1", 2000)]
+
+
+def test_prepared_frame_cache_never_caches_execution_quote():
+    frame = cached_prepared_scan_frame(
+        {}, symbol="EURUSD", timeframe="M1", completed_bar_time_msc=1000,
+        build=lambda: pd.DataFrame({"close": [1.1]}),
+    )
+
+    assert "current_bid" not in frame.attrs
+    assert "current_ask" not in frame.attrs
 
 
 def test_old_broker_event_quote_is_research_usable_and_locally_recheckable():
@@ -253,6 +445,31 @@ def test_forced_demo_emergency_stop_clamps_to_existing_risk_budget():
     )
 
     assert stop == pytest.approx(1.09985)
+
+
+def test_forced_demo_emergency_stop_rounds_toward_entry_without_exceeding_risk():
+    spec = {
+        "name": "AUDUSD",
+        "trade_tick_size": 0.00001,
+        "trade_tick_value": 1.0,
+        "volume_min": 0.01,
+        "volume_step": 0.01,
+        "volume_max": 100.0,
+        "point": 0.00001,
+        "trade_stops_level": 0,
+        "trade_freeze_level": 0,
+        "trade_contract_size": 100000.0,
+    }
+
+    stop = emergency_broker_stop(
+        symbol="AUDUSD", side="buy", entry=0.71989,
+        virtual_stop=0.719825, quantity=0.02, spec=spec,
+        max_risk_usd=0.15, clamp_to_risk=True,
+        market_bid=0.71988, market_ask=0.71990,
+    )
+
+    assert stop == pytest.approx(0.71982)
+    assert (0.71989 - stop) / 0.00001 * 1.0 * 0.02 <= 0.15
 
 
 def test_emergency_broker_stop_clears_the_executable_liquidation_side():
@@ -674,6 +891,64 @@ def test_outcome_learning_helper_keeps_exact_pre_entry_snapshot_and_broker_net_t
     assert row["pre_entry_state"]["return_3s"] == pytest.approx(0.0003)
 
 
+def test_outcome_learning_uses_position_side_not_exit_deal_side_when_metadata_is_gone(tmp_path):
+    from aegis.intel.outcome_memory import OutcomeMemoryStore
+
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    row = record_broker_confirmed_outcome_learning(
+        outcome_memory=store,
+        outcome_id="T-SIDE-TRUTH",
+        close_facts={
+            "status": "BROKER_CONFIRMED",
+            "confirmed": True,
+            "realized_net_usd": -0.12,
+            "position_symbol": "EURUSD",
+            "position_side": "buy",
+            "close_timestamp": "2026-08-27T10:00:02Z",
+        },
+        metadata=None,
+        lifecycle_detail={},
+        # MT5 exit DEAL side is sell when closing a BUY position.
+        event={"is_exit": True, "symbol": "EURUSD", "side": "sell"},
+    )
+
+    assert row["features"]["symbol"] == "EURUSD"
+    assert row["features"]["side"] == "buy"
+    assert row["realized_net_usd"] == pytest.approx(-0.12)
+
+
+def test_exit_deal_side_is_not_used_as_position_identity_without_entry_evidence():
+    state = outcome_features_from_ticket_metadata(
+        None,
+        event={"is_exit": True, "symbol": "EURUSD", "side": "sell"},
+    )
+
+    assert state["symbol"] == "EURUSD"
+    assert state.get("side") is None
+
+
+def test_broker_outcome_event_records_position_side_and_preserves_deal_side():
+    row = broker_outcome_event(
+        {"is_exit": True, "symbol": "EURUSD", "side": "sell"},
+        {"position_symbol": "EURUSD", "position_side": "buy", "realized_net_usd": -0.12},
+    )
+
+    assert row["side"] == "buy"
+    assert row["position_side"] == "buy"
+    assert row["deal_side"] == "sell"
+
+
+def test_broker_position_identities_rejects_ambiguous_entry_side():
+    identities = broker_position_identities([
+        {"position_id": "P1", "entry": 0, "symbol": "EURUSD", "side": "buy"},
+        {"position_id": "P1", "entry": 0, "symbol": "EURUSD", "side": "sell"},
+        {"position_id": "P2", "entry": 0, "symbol": "USDJPY", "side": "sell"},
+        {"position_id": "P2", "entry": 1, "symbol": "USDJPY", "side": "buy"},
+    ])
+
+    assert identities == {"P2": {"symbol": "USDJPY", "side": "sell"}}
+
+
 def test_outcome_learning_helper_stages_context_until_delayed_deal_confirmation(tmp_path):
     from aegis.intel.outcome_memory import OutcomeMemoryStore
 
@@ -1031,6 +1306,100 @@ def _persisted_cleanup_state(
     metadata_store = TicketMetadataStore(metadata_path)
     metadata_store.add(_ticket_metadata(basket_id))
     return metadata_path, metadata_store
+
+
+def test_confirmed_close_finalizer_releases_every_owner_once(tmp_path):
+    _, metadata_store = _persisted_cleanup_state(tmp_path)
+    release_calls = []
+    turnover_calls = []
+    learning_ids = []
+    journal_events = []
+
+    class Controller:
+        def release_ticket(self, ticket):
+            release_calls.append(ticket)
+
+    class Turnover:
+        def record_close(self, ticket, **facts):
+            turnover_calls.append((ticket, facts))
+
+        def close_detail(self, ticket):
+            return {"mfe_usd": 0.08, "mae_usd": -0.02, "first_green_s": 0.5}
+
+    class OutcomeMemory:
+        def record_confirmed_close(self, **facts):
+            learning_ids.append(facts["outcome_id"])
+            return {"status": "RECORDED", "evidence_status": "BROKER_CONFIRMED"}
+
+    class Engine:
+        def symbol_spec(self, symbol):
+            return _contract(symbol)
+
+    metadata = metadata_store.get("T1")
+    kwargs = {
+        "root": tmp_path,
+        "engine": Engine(),
+        "ticket": "T1",
+        "position": PositionSnapshot(
+            symbol="EURUSD", side="buy", quantity=0.01,
+            avg_price=1.1000, stop_loss=1.09985, ticket="T1",
+        ),
+        "metadata": metadata,
+        "metadata_store": metadata_store,
+        "reentry_guard": FirehoseReentryGuard(),
+        "trade_controller": Controller(),
+        "turnover": Turnover(),
+        "profit_summary": {
+            "mfe_before_close": 0.08,
+            "mae_before_close": -0.02,
+            "duration_s": 1.0,
+        },
+        "close_facts": {
+            "status": "BROKER_CONFIRMED",
+            "realized_net_usd": 0.04,
+            "gross_realized_pnl_usd": 0.05,
+            "cost_usd": 0.01,
+            "entry_quantity": 0.01,
+            "position_symbol": "EURUSD",
+            "position_side": "buy",
+            "close_timestamp": "2026-08-28T09:00:01+00:00",
+        },
+        "quote_buffer": QuoteBuffer(),
+        "outcome_memory": OutcomeMemory(),
+        "journal_append": journal_events.append,
+        "closed_at": 1001.0,
+        "quote_fingerprint_value": "EURUSD:buy:1",
+        "contract": _contract("EURUSD"),
+        "exit_reason": "profit_without_continuation_evidence",
+        "remaining_ev": None,
+    }
+
+    first = finalize_confirmed_firehose_close(**kwargs)
+    second = finalize_confirmed_firehose_close(**kwargs)
+
+    assert first["status"] == "FINALIZED"
+    assert second["status"] == "ALREADY_FINALIZED"
+    assert release_calls == ["T1"]
+    assert [ticket for ticket, _facts in turnover_calls] == ["T1"]
+    assert learning_ids == ["T1"]
+    assert metadata_store.get("T1") is None
+    assert [event["event"] for event in journal_events].count("firehose_close") == 1
+    assert journal_events[-1]["event"] == "firehose_basket_close"
+
+
+def test_unconfirmed_ticket_retains_all_local_close_ownership(tmp_path):
+    _, metadata_store = _persisted_cleanup_state(tmp_path)
+    position = PositionSnapshot(
+        symbol="EURUSD", side="buy", quantity=0.01,
+        avg_price=1.1000, stop_loss=1.09985, ticket="T1",
+    )
+
+    assert close_ticket_confirmed([position], "T1") is False
+    assert metadata_store.get("T1") is not None
+    assert BasketMetadataStore(
+        tmp_path / "intel" / "firehose_baskets" / "EURUSD.json",
+        trusted_contract=ContractSpec.from_mapping("EURUSD", _contract("EURUSD")),
+    ).get_ticket("T1") is not None
 
 
 def test_confirmed_fill_persists_exact_one_clip_basket_in_symbol_store(tmp_path):

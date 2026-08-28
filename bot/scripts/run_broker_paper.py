@@ -550,6 +550,63 @@ def bars_to_frame(bars) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def cached_bars_for_scan(
+    engine: Any,
+    cache: dict[tuple[str, str, int], tuple[object, list[Any]]],
+    symbol: str,
+    timeframe: str,
+    lookback_days: int,
+) -> list[Any]:
+    """Reuse completed-bar history until MT5 reports a new current bar.
+
+    The Firehose still refreshes executable quotes every cycle.  Only the
+    expensive historical-rate payload is cached; a new broker bar invalidates
+    the entry and fetches the full history again.  Engines without the optional
+    latest-bar probe retain the old uncached behavior.
+    """
+    key = (str(symbol), str(timeframe), int(lookback_days))
+    cached = cache.get(key)
+    latest_probe = getattr(engine, "latest_bar_time", None)
+    latest = None
+    if cached is not None and callable(latest_probe):
+        try:
+            latest = latest_probe(symbol, timeframe)
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+            latest = None
+        if latest is not None and latest == cached[0]:
+            return cached[1]
+    bars = engine.bars(symbol, timeframe, int(lookback_days))
+    if callable(latest_probe) and bars:
+        if latest is None:
+            latest = getattr(bars[-1], "time", None)
+        if latest is not None:
+            cache[key] = (latest, bars)
+    return bars
+
+
+def cached_prepared_scan_frame(
+    cache: dict[tuple[str, str, int], pd.DataFrame],
+    *,
+    symbol: str,
+    timeframe: str,
+    completed_bar_time_msc: int,
+    build: Callable[[], pd.DataFrame],
+) -> pd.DataFrame:
+    """Reuse feature preparation only for an identical completed bar."""
+    symbol_key = str(symbol).upper()
+    timeframe_key = str(timeframe)
+    key = (symbol_key, timeframe_key, int(completed_bar_time_msc))
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    for stale_key in tuple(cache):
+        if stale_key[:2] == key[:2]:
+            cache.pop(stale_key, None)
+    frame = build()
+    cache[key] = frame
+    return frame
+
+
 def append_journal(path: Path, event: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
@@ -1092,6 +1149,13 @@ def emergency_broker_stop(
         # even when a 4R emergency backstop would exceed the same approved risk
         # cap. Keep the broker protection, but never exceed that cap.
         desired_distance = allowed_distance
+    # MT5 rounds stops to the broker tick. Round the catastrophe distance
+    # toward entry so the server-side stop cannot become wider than the
+    # approved risk budget after price normalization.
+    safe_ticks = math.floor((desired_distance + 1e-12) / point)
+    desired_distance = safe_ticks * point
+    if desired_distance + 1e-12 < minimum_distance:
+        return None
     if side_l == "buy":
         return entry_price - desired_distance
     if side_l == "sell":
@@ -1618,6 +1682,245 @@ def close_ticket_confirmed(positions, ticket: str) -> bool:
     )
 
 
+class FirehoseStopRequested(RuntimeError):
+    """Internal control signal for an explicit operator STOP FIREHOSE file."""
+
+
+def execute_cooperative_checkpoint(
+    *,
+    state: Any,
+    now_mono: float,
+    now_wall: float,
+    progress: Any,
+    force: bool,
+    stop_requested: Callable[[], bool],
+    manage_positions: Callable[[], Mapping[str, Any]],
+    heartbeat_write: Callable[[dict[str, Any]], None],
+) -> dict[str, Any]:
+    """Run one due management checkpoint without creating another owner."""
+    if stop_requested():
+        raise FirehoseStopRequested("STOP FIREHOSE")
+    if not force and not state.due(float(now_mono)):
+        return {"ran": False, **state.snapshot(now_mono=float(now_mono))}
+    heartbeat_write({
+        "status": "running",
+        "runtime_phase": "RUNNING_MANAGEMENT_CHECKPOINT",
+        **state.snapshot(now_mono=float(now_mono)),
+    })
+    managed = dict(manage_positions() or {})
+    snapshot = state.record(
+        float(now_mono),
+        float(now_wall),
+        progress,
+        open_ticket_rechecks=int(managed.get("open_ticket_rechecks", 0) or 0),
+        confirmed_closes=int(managed.get("confirmed_closes", 0) or 0),
+        close_to_rescan_ms=managed.get("close_to_rescan_ms"),
+    )
+    heartbeat_write({
+        "status": "running",
+        "runtime_phase": "RUNNING_SCAN",
+        **snapshot,
+    })
+    return {"ran": True, **snapshot, **managed}
+
+
+def rapid_exit_recheck(
+    *,
+    engine,
+    positions: list[Any],
+    live_marks: Mapping[str, Mapping[str, float]],
+    metadata_store,
+    profit_manager,
+    short_horizon_predictor,
+    quote_buffer,
+    config: Mapping[str, Any],
+    intelligent_brain,
+    trade_controller,
+    harvest_policy,
+    now_ts: float,
+    journal_append: Callable[[dict[str, Any]], None] | None = None,
+    confirmed_close_finalizer: Callable[..., Mapping[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Re-evaluate open tickets between expensive global-scan symbols.
+
+    This remains inside the one broker runner and delegates the final action
+    to the same FastExit + TradeController path used by the normal pass.  It
+    exists only to prevent a slow research scan from becoming an unbounded
+    exit-monitoring gap.
+    """
+    from aegis.intel.fast_exit_runner import (
+        FastExitContext,
+        MissingLiquidationMarkError,
+        evaluate_fast_exit,
+        firehose_exit_trace,
+    )
+
+    decisions: list[dict[str, Any]] = []
+    for position in list(positions or []):
+        ticket = str(getattr(position, "ticket", "") or "").strip()
+        symbol = str(getattr(position, "symbol", "") or "").upper()
+        side = str(getattr(position, "side", "") or "").lower()
+        if not ticket or not symbol or side not in {"buy", "sell"}:
+            continue
+        marks = dict(live_marks.get(symbol) or {})
+        bid = marks.get("bid")
+        ask = marks.get("ask")
+        if bid is None or ask is None:
+            continue
+        try:
+            metadata = metadata_store.get(ticket) if metadata_store is not None else None
+            track = getattr(profit_manager, "tracks", {}).get(ticket)
+            entry = float(
+                metadata.entry_price if metadata is not None
+                else getattr(track, "entry_price", 0.0)
+                or getattr(position, "avg_price", 0.0)
+            )
+            stop = float(
+                metadata.stop_loss if metadata is not None
+                else getattr(track, "current_sl", 0.0)
+                or getattr(position, "stop_loss", 0.0)
+            )
+            quantity = float(getattr(position, "quantity", 0.0) or 0.0)
+            if entry <= 0 or stop <= 0 or quantity <= 0:
+                continue
+            spec = engine.symbol_spec(symbol)
+            prediction = short_horizon_predictor.predict(
+                symbol=symbol,
+                quote_buffer=quote_buffer,
+                now_ts=float(now_ts),
+                side=side,
+                broker_spec=spec,
+                quantity=quantity,
+                horizon_s=(metadata.selected_horizon_s if metadata is not None else None),
+                mechanism=(metadata.expected_mechanism if metadata is not None else None),
+            )
+            regime = str(
+                getattr(track, "regime_at_open", "")
+                or (getattr(intelligent_brain, "regime_by_symbol", {}) or {}).get(symbol, "")
+            )
+            pm_verdict = profit_manager.evaluate(
+                ticket=ticket,
+                volume=quantity,
+                volume_min=0.01,
+                regime_now=regime,
+                remaining_ev=None,
+                remaining_ev_status="UNKNOWN",
+            )
+            spread = max(0.0, float(ask) - float(bid))
+            spread_limit = max_spread_for(symbol, config)
+            ctx = FastExitContext(
+                symbol=symbol,
+                ticket=ticket,
+                side=side,
+                entry_price=entry,
+                current_bid=float(bid),
+                current_ask=float(ask),
+                avg_price=entry,
+                stop_loss=stop,
+                quantity=quantity,
+                mfe_usd=float(getattr(track, "mfe_usd", 0.0) or 0.0),
+                mae_usd=float(getattr(track, "mae_usd", 0.0) or 0.0),
+                opened_ts=float(
+                    metadata.opened_ts if metadata is not None
+                    else getattr(track, "opened_ts", 0.0)
+                    or getattr(position, "opened_ts", now_ts)
+                ),
+                regime_at_entry=str(
+                    metadata.regime if metadata is not None
+                    else getattr(track, "regime_at_open", "")
+                ),
+                track_target=float(
+                    metadata.target_price if metadata is not None
+                    else getattr(track, "target", 0.0) or 0.0
+                ),
+                track_invalidation=float(
+                    metadata.stop_loss if metadata is not None
+                    else getattr(track, "invalidation", 0.0) or stop
+                ),
+                track_entry_ev=float(getattr(track, "entry_ev_at_open", 0.0) or 0.0),
+                track_side=side,
+                ticket_meta=metadata,
+                engine_spec=spec,
+                config=config,
+                live_marks={symbol: {"bid": float(bid), "ask": float(ask)}},
+                intelligent_brain=intelligent_brain,
+                profit_manager=profit_manager,
+                now_ts=float(now_ts),
+                quote_buffer=quote_buffer,
+                spread_normal=(spread <= spread_limit if spread_limit > 0 else True),
+                harvest_policy=harvest_policy,
+                short_horizon_prediction=prediction,
+            )
+            fast_verdict = evaluate_fast_exit(ctx)
+            final = trade_controller.decide(
+                pm_verdict,
+                fast_verdict,
+                ticket=ticket,
+                remaining_ev=fast_verdict.get("remaining_ev"),
+                profit_floor_r=fast_verdict.get("profit_floor_r"),
+            )
+            trace = firehose_exit_trace(ctx, fast_verdict)
+            trace.update({
+                "rapid_recheck": True,
+                "exit_action": final["action"],
+                "exit_reason": final["reason"],
+                "EXIT_ACTION": final["action"],
+                "EXIT_REASON": final["reason"],
+                "exit_owner": final.get("source"),
+            })
+            if journal_append is not None:
+                journal_append(trace)
+            if final["action"] in {"HARVEST", "SCRATCH", "ABORT"} and hasattr(engine, "close_ticket"):
+                close_result = engine.close_ticket(ticket)
+                confirmed = bool(
+                    getattr(close_result, "ok", False)
+                    and close_ticket_confirmed(engine.positions(), ticket)
+                )
+                row = {
+                    **final,
+                    "ticket": ticket,
+                    "close_requested": True,
+                    "close_ok": bool(getattr(close_result, "ok", False)),
+                    "close_confirmed": confirmed,
+                }
+                if journal_append is not None:
+                    journal_append({
+                        "event": "rapid_exit_close",
+                        **row,
+                    })
+                if confirmed:
+                    try:
+                        close_facts = broker_close_evidence(
+                            engine.history_deals(1), ticket=ticket
+                        )
+                    except (AttributeError, OSError, TypeError, ValueError):
+                        close_facts = {
+                            "status": "INCOMPLETE_BROKER_EVIDENCE",
+                            "reason": "deal_history_unavailable",
+                        }
+                    if confirmed_close_finalizer is not None:
+                        finalized = dict(confirmed_close_finalizer(
+                            position=position,
+                            decision=final,
+                            close_facts=close_facts,
+                            closed_at=float(now_ts),
+                        ) or {})
+                        row["finalization_status"] = finalized.get("status")
+                        row["slot_released"] = bool(finalized.get("slot_released"))
+                    else:
+                        trade_controller.release_ticket(ticket)
+                decisions.append(row)
+            else:
+                decisions.append(final)
+        except MissingLiquidationMarkError:
+            continue
+        except (AttributeError, KeyError, TypeError, ValueError, ZeroDivisionError):
+            # This checkpoint must never turn a data-quality issue into a
+            # broker mutation. The normal pass will emit its detailed error.
+            continue
+    return decisions
+
+
 def broker_close_evidence(deals, *, ticket: str) -> dict[str, object]:
     """Return exact broker close facts, never substituting floating PnL."""
     facts = aggregate_confirmed_exit_deals(deals, position_id=str(ticket))
@@ -1627,6 +1930,70 @@ def broker_close_evidence(deals, *, ticket: str) -> dict[str, object]:
             "reason": "exact_exit_deal_not_available",
         }
     return {"status": "BROKER_CONFIRMED", **facts}
+
+
+def broker_outcome_event(
+    event: Mapping[str, Any],
+    close_facts: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Normalize an exit event to position identity without changing PnL truth.
+
+    MT5 reports the closing action in an exit DEAL (SELL closes a BUY and
+    vice versa). Outcome consumers need the original position side, while
+    retaining the raw DEAL side for audit.
+    """
+    payload = {**dict(event or {}), **dict(close_facts or {})}
+    position_side = str(close_facts.get("position_side") or "").strip().lower()
+    position_symbol = str(close_facts.get("position_symbol") or "").strip().upper()
+    if position_side in {"buy", "sell"}:
+        payload["position_side"] = position_side
+        payload["deal_side"] = event.get("side")
+        payload["side"] = position_side
+    elif bool(event.get("is_exit")):
+        # Do not mislabel an exit action as the position identity when entry
+        # evidence is unavailable.
+        payload["deal_side"] = event.get("side")
+        payload["side"] = None
+    if position_symbol:
+        payload["position_symbol"] = position_symbol
+        payload["symbol"] = position_symbol
+    return payload
+
+
+def broker_position_identities(
+    deals: Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, str]]:
+    """Extract unambiguous position identity from opening broker DEALs."""
+    identities: dict[str, dict[str, str]] = {}
+    ambiguous: set[str] = set()
+    for deal in deals or []:
+        if not isinstance(deal, Mapping):
+            continue
+        try:
+            entry = int(deal.get("entry", -1))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if entry not in {0, 2}:
+            continue
+        position_id = str(deal.get("position_id") or deal.get("position") or "").strip()
+        symbol = str(deal.get("symbol") or "").strip().upper()
+        side = str(deal.get("side") or "").strip().lower()
+        if (
+            not position_id
+            or position_id == "0"
+            or not symbol
+            or side not in {"buy", "sell"}
+            or position_id in ambiguous
+        ):
+            continue
+        identity = {"symbol": symbol, "side": side}
+        previous = identities.get(position_id)
+        if previous is not None and previous != identity:
+            identities.pop(position_id, None)
+            ambiguous.add(position_id)
+        else:
+            identities[position_id] = identity
+    return identities
 
 
 def outcome_features_from_ticket_metadata(
@@ -1675,9 +2042,17 @@ def outcome_features_from_ticket_metadata(
         },
     }
     state.update({key: value for key, value in derived_context.items() if value})
+    event_symbol = (
+        event_values.get("position_symbol")
+        or event_values.get("entry_symbol")
+        or event_values.get("symbol")
+    )
+    event_side = event_values.get("position_side") or event_values.get("entry_side")
+    if event_side is None and not bool(event_values.get("is_exit")):
+        event_side = event_values.get("side")
     observed = {
-        "symbol": getattr(metadata, "symbol", None) or event_values.get("symbol"),
-        "side": getattr(metadata, "side", None) or event_values.get("side"),
+        "symbol": getattr(metadata, "symbol", None) or event_symbol,
+        "side": getattr(metadata, "side", None) or event_side,
         "mechanism": (
             getattr(metadata, "expected_mechanism", None)
             or getattr(metadata, "strategy_family", None)
@@ -1753,7 +2128,13 @@ def record_broker_confirmed_outcome_learning(
     """Record or stage one completed ticket without using floating PnL."""
     from aegis.intel.outcome_memory import _finite
 
-    state = outcome_features_from_ticket_metadata(metadata, event=event)
+    event_values = dict(event or {})
+    if isinstance(close_facts, Mapping):
+        if close_facts.get("position_symbol") is not None:
+            event_values.setdefault("position_symbol", close_facts.get("position_symbol"))
+        if close_facts.get("position_side") is not None:
+            event_values.setdefault("position_side", close_facts.get("position_side"))
+    state = outcome_features_from_ticket_metadata(metadata, event=event_values)
     detail = dict(lifecycle_detail or {})
     symbol = str(state.get("symbol") or "").upper()
     entry_time = state.get("entry_time")
@@ -1804,6 +2185,164 @@ def record_broker_confirmed_outcome_learning(
         **common,
         broker_facts=close_facts,
     )
+
+
+def finalize_confirmed_firehose_close(
+    *,
+    root: Path,
+    engine: Any,
+    ticket: str,
+    position: Any,
+    metadata: Any,
+    metadata_store: Any,
+    reentry_guard: Any,
+    trade_controller: Any,
+    turnover: Any,
+    profit_summary: Mapping[str, Any],
+    close_facts: Mapping[str, Any],
+    quote_buffer: Any,
+    outcome_memory: Any,
+    journal_append: Callable[[dict[str, Any]], None],
+    closed_at: float,
+    quote_fingerprint_value: str | None,
+    contract: Mapping[str, Any] | None,
+    exit_reason: str,
+    remaining_ev: float | None,
+) -> dict[str, Any]:
+    """Finalize one broker-confirmed close through every local owner.
+
+    The caller must first prove the ticket is absent from a fresh broker
+    position snapshot. Persisted ticket metadata is the idempotency boundary.
+    """
+    ticket_id = str(ticket)
+    persisted_metadata = metadata_store.get(ticket_id) if metadata_store is not None else None
+    if metadata is not None and persisted_metadata is None:
+        return {"status": "ALREADY_FINALIZED", "slot_released": True}
+    exact_metadata = persisted_metadata or metadata
+    broker_confirmed = close_facts.get("status") == "BROKER_CONFIRMED"
+
+    trade_controller.release_ticket(ticket_id)
+    turnover.record_close(
+        ticket_id,
+        closed_at=float(closed_at),
+        gross_pnl_usd=(
+            float(close_facts["gross_realized_pnl_usd"])
+            if broker_confirmed else None
+        ),
+        net_pnl_usd=(
+            float(close_facts["realized_net_usd"])
+            if broker_confirmed else None
+        ),
+        cost_usd=float(close_facts["cost_usd"]) if broker_confirmed else None,
+        confirmed=True,
+        exit_reason=str(exit_reason or "unknown"),
+    )
+
+    learning_status = None
+    if outcome_memory is not None:
+        try:
+            learning_result = record_broker_confirmed_outcome_learning(
+                outcome_memory=outcome_memory,
+                outcome_id=ticket_id,
+                close_facts=close_facts,
+                metadata=exact_metadata,
+                lifecycle_detail=turnover.close_detail(ticket_id),
+                quote_buffer=quote_buffer,
+                usd_per_price_unit=broker_replay_usd_per_price_unit(
+                    engine,
+                    symbol=str(getattr(position, "symbol", "")),
+                    close_facts=close_facts,
+                ),
+            )
+            learning_status = str(learning_result.get("status") or "RECORDED")
+            journal_append({
+                "event": "outcome_learning",
+                "ticket": ticket_id,
+                "status": learning_status,
+                "evidence_status": learning_result.get("evidence_status"),
+                "classification": learning_result.get("classification"),
+                "speed_label": learning_result.get("speed_label"),
+            })
+        except (AttributeError, KeyError, TypeError, ValueError, OSError) as exc:
+            learning_status = "ERROR"
+            journal_append({
+                "event": "outcome_learning_error",
+                "ticket": ticket_id,
+                "error_type": type(exc).__name__,
+                "message": str(exc)[:200],
+            })
+
+    journal_append({
+        "event": "firehose_close",
+        "ticket": ticket_id,
+        "timestamp": datetime.fromtimestamp(float(closed_at), timezone.utc).isoformat(),
+        "confirmed": True,
+        "symbol": str(getattr(position, "symbol", "")),
+        "realized_net_usd": close_facts.get("realized_net_usd") if broker_confirmed else None,
+        "gross_pnl_usd": close_facts.get("gross_realized_pnl_usd") if broker_confirmed else None,
+        "cost_usd": close_facts.get("cost_usd") if broker_confirmed else None,
+        "evidence_status": (
+            "BROKER_CONFIRMED" if broker_confirmed else "INCOMPLETE_BROKER_EVIDENCE"
+        ),
+        "broker_close_facts": dict(close_facts),
+        **firehose_lifecycle_identity(exact_metadata),
+    })
+
+    cleanup_result: dict[str, Any] = {"status": "NO_EVIDENCE", "reason": "missing_ticket_metadata"}
+    if exact_metadata is not None:
+        cleanup_result = remove_confirmed_firehose_basket_then_cleanup(
+            root=root,
+            metadata_store=metadata_store,
+            guard=reentry_guard,
+            ticket_id=ticket_id,
+            quote_fingerprint=quote_fingerprint_value,
+            closed_at=float(closed_at),
+            contract=dict(contract or {}) if contract is not None else None,
+        )
+    basket_removal = cleanup_result.get("basket_removal", cleanup_result)
+    close_cleanup = cleanup_result.get("close_cleanup")
+
+    from aegis.intel.firehose_turnover import basket_lifecycle_trace
+
+    peak = profit_summary.get("mfe_before_close")
+    basket_trace = basket_lifecycle_trace(
+        exact_metadata,
+        event="firehose_basket_close",
+        timestamp=datetime.fromtimestamp(float(closed_at), timezone.utc).isoformat(),
+        confirmed=True,
+        observation={
+            "mfe_usd": peak,
+            "mae_usd": profit_summary.get("mae_before_close"),
+            "peak_net_profit_usd": peak,
+            "realized_net_usd": close_facts.get("realized_net_usd") if broker_confirmed else None,
+            "capture_ratio": None,
+            "age_seconds": profit_summary.get("duration_s"),
+            "clips": exact_metadata.clip_sequence if exact_metadata is not None else None,
+            "decision_reasons": [str(exit_reason or "unknown")],
+            "ev": remaining_ev,
+            "cost_usd": close_facts.get("cost_usd") if broker_confirmed else None,
+            "broker_close_facts": dict(close_facts),
+            "turnover": 1.0,
+            "basket_removal_status": basket_removal.get("status"),
+        },
+        slot_released=bool(close_cleanup and close_cleanup.slot_released),
+        basket_closed=bool(close_cleanup and close_cleanup.basket_closed),
+    )
+    if basket_trace is not None:
+        journal_append(basket_trace)
+
+    if exact_metadata is not None and cleanup_result.get("status") != "CLEANED":
+        return {
+            "status": "PENDING_CLEANUP",
+            "reason": str(cleanup_result.get("reason") or cleanup_result.get("status")),
+            "slot_released": False,
+            "learning_status": learning_status,
+        }
+    return {
+        "status": "FINALIZED",
+        "slot_released": bool(close_cleanup.slot_released) if close_cleanup else True,
+        "learning_status": learning_status,
+    }
 
 
 def legacy_normal_exit_enabled(intelligent_mode: bool) -> bool:
@@ -1862,6 +2401,8 @@ def main() -> None:
     qty = float(cfg.get("order_quantity", 0.01 if engine_name == "mt5" else 20000))
     last_bar_time: dict[str, pd.Timestamp] = {}
     last_quote_state: dict[str, dict[str, float]] = {}
+    scan_bars_cache: dict[tuple[str, str, int], tuple[object, list[Any]]] = {}
+    prepared_scan_cache: dict[tuple[str, str, int], pd.DataFrame] = {}
     deferred_opportunities: list[FrozenOpportunity] = []
     hr = None
     position_opened_at: dict[str, float] = {}
@@ -1972,16 +2513,159 @@ def main() -> None:
         ordered_execution_attempts,
         rank_and_allocate,
     )
+    from aegis.intel.runtime_checkpoint import RuntimeCheckpointState, ScanProgress
 
     trade_controller = TradeController()
     harvest_policy = load_validated_harvest_policy(cfg)
     last_inventory_journal: dict[str, float] = {"ts": 0.0}
+    heartbeat_snapshot: dict[str, Any] = {}
 
     def write_heartbeat(extra: Optional[dict] = None) -> None:
+        if extra:
+            heartbeat_snapshot.update(extra)
         write_runner_heartbeat(
             heartbeat, pid=os.getpid(), symbols=symbols, qty=qty,
-            metrics=firehose_turnover, extra=extra,
+            metrics=firehose_turnover, extra=dict(heartbeat_snapshot),
         )
+
+    checkpoint_state = RuntimeCheckpointState(
+        interval_s=float(cfg.get("runtime_checkpoint_interval_s", 1.0) or 1.0)
+    )
+    scan_cycle_started_mono = time.monotonic()
+    scan_symbol_index = 0
+
+    def _finalize_checkpoint_close(
+        *, position: Any, decision: Mapping[str, Any],
+        close_facts: Mapping[str, Any], closed_at: float,
+    ) -> dict[str, Any]:
+        ticket = str(getattr(position, "ticket", "") or "")
+        metadata = ticket_metadata_store.get(ticket)
+        summary = dict(decision.get("profit_summary") or {})
+        if not summary:
+            summary = profit_manager.close_summary(
+                ticket, exit_reason=str(decision.get("reason") or "unknown")
+            ) or {}
+        fingerprint = None
+        try:
+            quote = eng.quote(str(getattr(position, "symbol", "")))
+            fingerprint = quote_fingerprint(
+                str(getattr(position, "symbol", "")),
+                str(getattr(position, "side", "")),
+                float(quote.bid),
+                float(quote.ask),
+            )
+        except (AttributeError, OSError, TypeError, ValueError):
+            pass
+        contract = None
+        try:
+            contract = eng.symbol_spec(str(getattr(position, "symbol", "")))
+        except (AttributeError, OSError, TypeError, ValueError):
+            pass
+        outcome_memory = (
+            getattr(intelligent_brain, "outcome_memory", None)
+            if intelligent_brain is not None else None
+        )
+        return finalize_confirmed_firehose_close(
+            root=ROOT,
+            engine=eng,
+            ticket=ticket,
+            position=position,
+            metadata=metadata,
+            metadata_store=ticket_metadata_store,
+            reentry_guard=firehose_reentry_guard,
+            trade_controller=trade_controller,
+            turnover=firehose_turnover,
+            profit_summary=summary,
+            close_facts=close_facts,
+            quote_buffer=quote_buffer,
+            outcome_memory=outcome_memory,
+            journal_append=lambda row: append_journal(journal, row),
+            closed_at=float(closed_at),
+            quote_fingerprint_value=fingerprint,
+            contract=contract,
+            exit_reason=str(decision.get("reason") or "unknown"),
+            remaining_ev=decision.get("remaining_ev"),
+        )
+
+    def _manage_checkpoint_positions() -> dict[str, Any]:
+        if not bool(cfg.get("intelligent_firehose", False)):
+            return {"open_ticket_rechecks": 0, "confirmed_closes": 0}
+        now = time.time()
+        positions_now = list(eng.positions())
+        if not positions_now:
+            return {"open_ticket_rechecks": 0, "confirmed_closes": 0}
+        marks: dict[str, dict[str, float]] = {}
+        for position in positions_now:
+            symbol = str(getattr(position, "symbol", "") or "").upper()
+            if not symbol or symbol in marks:
+                continue
+            try:
+                quote = eng.quote(symbol)
+                marks[symbol] = {"bid": float(quote.bid), "ask": float(quote.ask)}
+            except (AttributeError, OSError, TypeError, ValueError):
+                continue
+        decisions = rapid_exit_recheck(
+            engine=eng,
+            positions=positions_now,
+            live_marks=marks,
+            metadata_store=ticket_metadata_store,
+            profit_manager=profit_manager,
+            short_horizon_predictor=short_horizon_predictor,
+            quote_buffer=quote_buffer,
+            config=cfg,
+            intelligent_brain=intelligent_brain,
+            trade_controller=trade_controller,
+            harvest_policy=harvest_policy,
+            now_ts=now,
+            journal_append=lambda row: append_journal(journal, row),
+            confirmed_close_finalizer=_finalize_checkpoint_close,
+        )
+        confirmed = sum(
+            str(row.get("finalization_status") or "")
+            in {"FINALIZED", "ALREADY_FINALIZED"}
+            for row in decisions
+        )
+        return {
+            "open_ticket_rechecks": len(positions_now),
+            "confirmed_closes": confirmed,
+            "close_to_rescan_ms": 0.0 if confirmed else None,
+        }
+
+    def runtime_checkpoint(
+        stage: str,
+        mechanism: str = "",
+        side: str = "",
+        horizon_s: int | None = None,
+        *,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        result = execute_cooperative_checkpoint(
+            state=checkpoint_state,
+            now_mono=time.monotonic(),
+            now_wall=time.time(),
+            progress=ScanProgress(
+                scan_symbol_index,
+                len(symbols),
+                scan_cycle_started_mono,
+            ),
+            force=force,
+            stop_requested=lambda: firehose_stop_requested(stop_file),
+            manage_positions=_manage_checkpoint_positions,
+            heartbeat_write=write_heartbeat,
+        )
+        if result.get("ran"):
+            append_journal(journal, {
+                "event": "runtime_checkpoint",
+                "stage": stage,
+                "mechanism": mechanism,
+                "side": side,
+                "horizon_s": horizon_s,
+                **result,
+            })
+        return result
+
+    def run_rapid_exit_recheck_if_due() -> None:
+        runtime_checkpoint("symbol_boundary")
 
     try:
         acct = eng.account()
@@ -2318,22 +3002,38 @@ def main() -> None:
             brain_decision = None
             if open_attempt_blocked(time.time(), close_block_until):
                 return
-            bars = eng.bars(sym, str(cfg["timeframe"]), int(cfg.get("lookback_days", 30)))
+            bars = cached_bars_for_scan(
+                eng,
+                scan_bars_cache,
+                sym,
+                str(cfg["timeframe"]),
+                int(cfg.get("lookback_days", 30)),
+            )
             if len(bars) < 50:
                 logger.warning("%s: not enough bars yet (%s)", sym, len(bars))
                 return
             raw = bars_to_frame(bars)
+            completed_bar_time = pd.Timestamp(raw.iloc[-2]["time"])
+            completed_bar_time_msc = int(completed_bar_time.value // 1_000_000)
             prep_cfg = cfg
             if pa_select_mode:
                 from aegis.pa_select import fetch_mtf_frames
 
-                bar_time_raw = pd.Timestamp(raw.iloc[-2]["time"])
+                bar_time_raw = completed_bar_time
                 prev_raw = last_bar_time.get(sym)
                 if prev_raw is not None and bar_time_raw <= prev_raw:
                     return
                 prep_cfg = dict(cfg)
                 prep_cfg["pa_mtf_frames"] = fetch_mtf_frames(eng, sym, cfg)
-            frame = prepare(raw, prep_cfg)
+                frame = prepare(raw, prep_cfg)
+            else:
+                frame = cached_prepared_scan_frame(
+                    prepared_scan_cache,
+                    symbol=sym,
+                    timeframe=str(cfg["timeframe"]),
+                    completed_bar_time_msc=completed_bar_time_msc,
+                    build=lambda: prepare(raw, prep_cfg),
+                )
             row = frame.iloc[-2]
             bar_time = pd.Timestamp(row["time"])
             scan_id = firehose_scan_id(sym, bar_time)
@@ -2561,6 +3261,18 @@ def main() -> None:
                         )
                     except Exception as exc:
                         logger.warning("historical outcome import skipped: %s", exc)
+                    try:
+                        broker_identities = broker_position_identities(eng.history_deals(30))
+                        repaired = intelligent_brain.outcome_memory.repair_broker_position_identity(
+                            broker_identities
+                        )
+                        if repaired:
+                            logger.info(
+                                "repaired %s confirmed outcome identities from broker entry DEALs",
+                                repaired,
+                            )
+                    except Exception as exc:
+                        logger.warning("broker outcome identity repair skipped: %s", exc)
                 completed = raw.iloc[:-1].copy() if len(raw) >= 2 else raw
                 hint_cfg = dict(loop_cfg)
                 hint_cfg["intel_enabled"] = False
@@ -2628,6 +3340,7 @@ def main() -> None:
                     video_style=video_style_mode,
                     short_horizon_prediction=selected_prediction,
                     previous_row=(frame.iloc[-3] if len(frame) >= 3 else None),
+                    checkpoint=runtime_checkpoint,
                 )
                 brain_decision = decision
                 _book_logic = decision.journal.get("book_logic") or {}
@@ -4076,6 +4789,8 @@ def main() -> None:
             cfg.clear()
             cfg.update(new)
             cfg_mtime = mtime
+            scan_bars_cache.clear()
+            prepared_scan_cache.clear()
             qty = float(cfg.get("order_quantity", 0.01 if engine_name == "mt5" else 20000))
             max_hold = float(cfg.get("max_hold_seconds", 0) or 0)
             max_positions = int(cfg.get("max_positions", 1) or 1)
@@ -4112,6 +4827,8 @@ def main() -> None:
 
         while True:
             try:
+                scan_cycle_started_mono = time.monotonic()
+                scan_symbol_index = 0
                 reload_live_yaml()
                 if firehose_stop_requested(stop_file):
                     logger.warning("[FIREHOSE] STOP FIREHOSE requested; exiting")
@@ -4138,7 +4855,7 @@ def main() -> None:
                 now_ts = time.time()
                 now_mono = time.monotonic()
                 deferred_opportunities.clear()
-                for sym in symbols:
+                for scan_symbol_index, sym in enumerate(symbols, start=1):
                     try:
                         acquired_at = time.monotonic()
                         q = eng.quote(sym)
@@ -4217,6 +4934,7 @@ def main() -> None:
                     quote_diagnostics[_symbol] = _row
                 extra_hb = {
                     "status": "running",
+                    "runtime_phase": "RUNNING_SCAN",
                     "equity": equity,
                     "open": len(all_pos),
                     "held": [f"{p.symbol}:{p.side}" for p in all_pos],
@@ -4235,6 +4953,7 @@ def main() -> None:
                     "feed_stall_count": quote_feed_health.stall_count,
                     "feed_recovery_attempts": quote_feed_health.recovery_attempts,
                     "quote_diagnostics": quote_diagnostics,
+                    **checkpoint_state.snapshot(now_mono=time.monotonic()),
                 }
                 _risk_ok, _risk_why = risk.allow(equity, open_positions=len(all_pos))
                 extra_hb["risk_halted"] = bool(risk.state.halted) or (not _risk_ok)
@@ -4367,8 +5086,7 @@ def main() -> None:
                                         exit_reason=str(event.get("close_reason") or "broker_reconciled"),
                                     )
                                     append_outcome({
-                                        **event,
-                                        **close_facts,
+                                        **broker_outcome_event(event, close_facts),
                                         "event_type": "position_exit",
                                         "source": "reconcile",
                                         "pnl": net_pnl,
@@ -4440,8 +5158,7 @@ def main() -> None:
                                                 pass
                                 else:
                                     append_outcome({
-                                        **event,
-                                        **close_facts,
+                                        **broker_outcome_event(event, close_facts),
                                         "event_type": "position_exit",
                                         "source": "reconcile",
                                         "evidence_status": "INCOMPLETE_BROKER_EVIDENCE",
@@ -5084,158 +5801,26 @@ def main() -> None:
                                     except Exception:
                                         close_confirmed = False
                                 if close_confirmed:
-                                    trade_controller.release_ticket(tk)
                                     closed_at = time.time()
-                                    broker_confirmed = (
-                                        close_facts.get("status") == "BROKER_CONFIRMED"
-                                    )
-                                    firehose_turnover.record_close(
-                                        tk,
+                                    finalization = _finalize_checkpoint_close(
+                                        position=pos,
+                                        decision={
+                                            **dict(verdict),
+                                            "remaining_ev": _rem_ev,
+                                            "profit_summary": summary or {},
+                                        },
+                                        close_facts=close_facts,
                                         closed_at=closed_at,
-                                        gross_pnl_usd=(
-                                            float(close_facts["gross_realized_pnl_usd"])
-                                            if broker_confirmed else None
-                                        ),
-                                        net_pnl_usd=(
-                                            float(close_facts["realized_net_usd"])
-                                            if broker_confirmed else None
-                                        ),
-                                        cost_usd=(
-                                            float(close_facts["cost_usd"])
-                                            if broker_confirmed else None
-                                        ),
-                                        confirmed=True,
-                                        exit_reason=str(verdict.get("reason") or "unknown"),
                                     )
-                                    outcome_memory = getattr(
-                                        intelligent_brain, "outcome_memory", None
-                                    ) if intelligent_brain is not None else None
-                                    if outcome_memory is not None:
-                                        try:
-                                            replay_unit = broker_replay_usd_per_price_unit(
-                                                eng,
-                                                symbol=str(getattr(pos, "symbol", "")),
-                                                close_facts=close_facts,
-                                            )
-                                            learning_result = record_broker_confirmed_outcome_learning(
-                                                outcome_memory=outcome_memory,
-                                                outcome_id=tk,
-                                                close_facts=close_facts,
-                                                metadata=_ticket_meta,
-                                                lifecycle_detail=firehose_turnover.close_detail(tk),
-                                                quote_buffer=quote_buffer,
-                                                usd_per_price_unit=replay_unit,
-                                            )
-                                            append_journal(
-                                                journal,
-                                                {
-                                                    "event": "outcome_learning",
-                                                    "ticket": tk,
-                                                    "status": learning_result.get("status", "RECORDED"),
-                                                    "evidence_status": learning_result.get("evidence_status"),
-                                                    "classification": learning_result.get("classification"),
-                                                    "speed_label": learning_result.get("speed_label"),
-                                                },
-                                            )
-                                        except Exception as learning_exc:
-                                            logger.error(
-                                                "outcome learning update failed position=%s: %s",
-                                                tk, learning_exc, exc_info=True,
-                                            )
                                     append_journal(
                                         journal,
                                         {
-                                            "event": "firehose_close",
+                                            "event": "confirmed_close_finalization",
                                             "ticket": tk,
-                                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                                            "confirmed": True,
-                                            "symbol": str(getattr(pos, "symbol", "")),
-                                            "realized_net_usd": (
-                                                close_facts.get("realized_net_usd")
-                                                if broker_confirmed else None
-                                            ),
-                                            "gross_pnl_usd": (
-                                                close_facts.get("gross_realized_pnl_usd")
-                                                if broker_confirmed else None
-                                            ),
-                                            "cost_usd": (
-                                                close_facts.get("cost_usd")
-                                                if broker_confirmed else None
-                                            ),
-                                            "evidence_status": (
-                                                "BROKER_CONFIRMED"
-                                                if broker_confirmed
-                                                else "INCOMPLETE_BROKER_EVIDENCE"
-                                            ),
-                                            "broker_close_facts": close_facts,
-                                            **firehose_lifecycle_identity(_ticket_meta),
+                                            **finalization,
                                         },
                                     )
-                                    _marks_close = live_marks.get(
-                                        str(getattr(pos, "symbol", "")), {}
-                                    )
-                                    if _marks_close.get("bid") is not None and _marks_close.get("ask") is not None:
-                                        _fingerprint = quote_fingerprint(
-                                            str(getattr(pos, "symbol", "")),
-                                            str(getattr(pos, "side", "")),
-                                            _marks_close["bid"], _marks_close["ask"],
-                                        )
-                                    else:
-                                        _fingerprint = None
-                                    basket_contract = None
-                                    if _ticket_meta is not None and _ticket_meta.basket_id:
-                                        try:
-                                            basket_contract = eng.symbol_spec(_ticket_meta.symbol)
-                                        except (AttributeError, OSError, TypeError, ValueError):
-                                            pass
-                                    cleanup_result = remove_confirmed_firehose_basket_then_cleanup(
-                                        root=ROOT,
-                                        metadata_store=ticket_metadata_store,
-                                        guard=firehose_reentry_guard,
-                                        ticket_id=tk,
-                                        quote_fingerprint=_fingerprint,
-                                        closed_at=closed_at,
-                                        contract=basket_contract,
-                                    )
-                                    basket_removal = cleanup_result.get(
-                                        "basket_removal", cleanup_result,
-                                    )
-                                    close_cleanup = cleanup_result.get("close_cleanup")
-                                    peak = (summary or {}).get("mfe_before_close")
-                                    basket_trace = basket_lifecycle_trace(
-                                        _ticket_meta,
-                                        event="firehose_basket_close",
-                                        timestamp=datetime.now(timezone.utc).isoformat(),
-                                        confirmed=True,
-                                        observation={
-                                            "mfe_usd": peak,
-                                            "mae_usd": (summary or {}).get("mae_before_close"),
-                                            "peak_net_profit_usd": peak,
-                                            "realized_net_usd": (
-                                                close_facts.get("realized_net_usd")
-                                                if broker_confirmed else None
-                                            ),
-                                            "capture_ratio": None,
-                                            "age_seconds": (summary or {}).get("duration_s"),
-                                            "clips": (
-                                                _ticket_meta.clip_sequence
-                                                if _ticket_meta is not None else None
-                                            ),
-                                            "decision_reasons": [str(verdict.get("reason") or "unknown")],
-                                            "ev": _rem_ev,
-                                            "cost_usd": (
-                                                close_facts.get("cost_usd")
-                                                if broker_confirmed else None
-                                            ),
-                                            "broker_close_facts": close_facts,
-                                            "turnover": 1.0,
-                                            "basket_removal_status": basket_removal.get("status"),
-                                        },
-                                        slot_released=bool(close_cleanup and close_cleanup.slot_released),
-                                        basket_closed=bool(close_cleanup and close_cleanup.basket_closed),
-                                    )
-                                    if basket_trace is not None:
-                                        append_journal(journal, basket_trace)
+                                    runtime_checkpoint("confirmed_close", force=True)
                                 elif res_close.ok:
                                     append_journal(
                                         journal,
@@ -5318,6 +5903,7 @@ def main() -> None:
                         logger.warning("profit-management cycle error: %s", exc)
                 for sym in symbols:
                     try:
+                        run_rapid_exit_recheck_if_due()
                         open_pos = eng.positions(sym)
                         if open_pos:
                             opened = position_opened_at.get(sym)
@@ -5463,6 +6049,7 @@ def main() -> None:
                         logger.exception("Symbol loop error %s", sym)
 
                 if bool(cfg.get("intelligent_firehose", False)) and deferred_opportunities:
+                    runtime_checkpoint("global_rank_before")
                     _open_for_allocation = len(eng.positions())
                     _remaining_capacity = max(0, int(max_positions) - _open_for_allocation)
                     _per_trade_budget = float(
@@ -5482,6 +6069,7 @@ def main() -> None:
                         ) if intelligent_brain is not None else (),
                     )
                     global_rank_finished_at = time.time()
+                    runtime_checkpoint("global_rank_after")
                     execution_opportunities = [
                         freeze_opportunity({
                             **row.to_dict(),
@@ -5507,6 +6095,12 @@ def main() -> None:
                         },
                     )
                     for opportunity in execution_opportunities:
+                        runtime_checkpoint(
+                            "execution_revalidation",
+                            str(opportunity.get("mechanism") or ""),
+                            str(opportunity.get("side") or ""),
+                            int(opportunity.get("horizon_s") or 0) or None,
+                        )
                         if len(eng.positions()) >= (
                             _open_for_allocation + _remaining_capacity
                         ):
@@ -5524,6 +6118,13 @@ def main() -> None:
                 if args.once:
                     break
                 time.sleep(poll)
+            except FirehoseStopRequested:
+                logger.warning("[FIREHOSE] STOP FIREHOSE requested during checkpoint; exiting")
+                append_journal(
+                    journal,
+                    {"event": "operator_stop", "reason": "STOP FIREHOSE"},
+                )
+                break
             except KeyboardInterrupt:
                 raise
             except Exception as exc:
