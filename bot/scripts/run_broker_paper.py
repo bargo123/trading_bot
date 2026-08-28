@@ -847,6 +847,14 @@ class QuoteFeedHealth:
         }
 
 
+def feed_stall_threshold(cfg: Mapping[str, Any]) -> float:
+    """Use the execution freshness window unless a feed-specific threshold is set."""
+    explicit = cfg.get("feed_stall_after_s")
+    if explicit is not None and explicit != "":
+        return max(1.0, float(explicit))
+    return max(5.0, float(cfg.get("max_quote_age_s", 5.0) or 5.0))
+
+
 def funnel_terminal_for_reason(reason: object) -> str:
     text = str(reason or "").lower()
     if "stale" in text or "future_quote" in text or "quote_refresh" in text:
@@ -4926,7 +4934,7 @@ def main() -> None:
                         pass
                 feed_status = quote_feed_health.evaluate(
                     now_mono,
-                    stall_after_s=float(cfg.get("feed_stall_after_s", 30.0) or 30.0),
+                    stall_after_s=feed_stall_threshold(cfg),
                 )
                 if feed_status == "FEED_STALLED" and now_ts >= next_feed_recovery_at:
                     quote_feed_health.recovery_attempts += 1

@@ -47,6 +47,7 @@ from scripts.run_broker_paper import (
     quote_scan_verdict,
     acquire_fresh_quote,
     QuoteFeedHealth,
+    feed_stall_threshold,
     video_style_signal_for_scan,
     pending_order_lifecycle_metadata,
     outcome_features_from_ticket_metadata,
@@ -59,6 +60,11 @@ from scripts.run_broker_paper import (
 from aegis.intel.send_guard import candidate_spread_limit, refresh_verdict
 import scripts.run_broker_paper as broker_runner
 from aegis.intel.runtime_checkpoint import RuntimeCheckpointState, ScanProgress
+
+
+def test_feed_stall_threshold_defaults_to_execution_freshness_without_overriding_explicit_config():
+    assert feed_stall_threshold({"max_quote_age_s": 5.0}) == 5.0
+    assert feed_stall_threshold({"max_quote_age_s": 5.0, "feed_stall_after_s": 30.0}) == 30.0
 
 
 def test_global_lane_selection_telemetry_counts_frozen_choices_and_books():
