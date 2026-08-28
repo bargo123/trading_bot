@@ -35,6 +35,7 @@ def test_explicit_rule_is_measurable_but_not_validated():
     assert result["status"] == "CODED_EXACT"
     assert result["validation_status"] == "UNVALIDATED_RESEARCH"
     assert result["side_rule"] == "BUY"
+    assert result["compiled_rule"] == {"structure_eq": "breakout"}
 
 
 def test_explicit_but_underparameterized_rule_is_not_promoted_to_exact():

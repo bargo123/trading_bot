@@ -142,6 +142,20 @@ def _side_rule(text: str) -> str | None:
     return None
 
 
+def _compiled_rule(text: str) -> dict[str, Any]:
+    """Compile only simple, explicitly named predicates supported by replay."""
+    lowered = text.lower()
+    if re.search(r"cross(?:es|ed)?\s+above|\bbreakout\b", lowered):
+        return {"structure_eq": "breakout"}
+    if re.search(r"cross(?:es|ed)?\s+below|\bbreakdown\b", lowered):
+        return {"structure_eq": "breakdown"}
+    if "oversold" in lowered:
+        return {"oscillator_state_eq": "oversold"}
+    if "overbought" in lowered:
+        return {"oscillator_state_eq": "overbought"}
+    return {}
+
+
 def classify_passage(text: str) -> dict[str, Any]:
     """Classify one passage without assigning performance or execution authority."""
     excerpt = re.sub(r"\s+", " ", str(text or "")).strip()
@@ -151,17 +165,19 @@ def classify_passage(text: str) -> dict[str, Any]:
     exit_rule = bool(_EXIT_RE.search(excerpt))
     parameter = bool(_PARAMETER_RE.search(excerpt))
     family = _mechanism_family(excerpt)
+    compiled_rule = _compiled_rule(excerpt)
     result: dict[str, Any] = {
         "entry_rule": excerpt if entry else None,
         "exit_rule": excerpt if exit_rule else None,
         "side_rule": _side_rule(excerpt),
         "strategy_family": family,
         "required_features": _required_features(excerpt),
+        "compiled_rule": compiled_rule or None,
         "validation_status": "UNVALIDATED_RESEARCH",
         "evidence_status": "NO_SAMPLES",
         "excerpt": excerpt[:MAX_EXCERPT_CHARS],
     }
-    if direction and entry and exit_rule and parameter:
+    if direction and entry and exit_rule and parameter and compiled_rule:
         result.update({"status": "CODED_EXACT", "reason": "explicit_entry_exit_rule"})
     elif direction and entry and exit_rule:
         result.update({"status": "COMPILE_ERROR", "reason": "explicit_rule_missing_parameter"})
