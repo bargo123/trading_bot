@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Callable, Iterable, Mapping, Optional
 
 import pandas as pd
 
@@ -934,6 +934,31 @@ def record_funnel_execution(
         counts["FIRES"] = int(counts.get("FIRES", 0)) + 1
     if filled:
         counts["FILLS"] = int(counts.get("FILLS", 0)) + 1
+
+
+def record_global_lane_selection(
+    counts: dict[str, int], selected: Iterable[Mapping[str, object]]
+) -> None:
+    """Record the allocator's frozen lane choices for runtime proof."""
+    for row in selected:
+        lane = str(row.get("lane") or "").strip().upper()
+        if lane == "VALIDATED":
+            key = "VALIDATED_SELECTED"
+        elif lane in {"CALIBRATED_EXPLORATION", "SAFE_TO_LEARN_ON_DEMO"}:
+            key = "CALIBRATED_EXPLORATION_SELECTED"
+        elif lane in {"FORCED_DEMO_EXPLORATION", "FORCED_DEMO"}:
+            key = "FORCED_DEMO_EXPLORATION_SELECTED"
+        else:
+            continue
+        counts[key] = int(counts.get(key, 0)) + 1
+        decision_journal = row.get("decision_journal")
+        book_logic = row.get("book_logic")
+        if not isinstance(book_logic, Mapping) and isinstance(decision_journal, Mapping):
+            book_logic = decision_journal.get("book_logic")
+        if isinstance(book_logic, Mapping) and book_logic.get("source_book"):
+            counts["BOOK_DERIVED_SELECTED"] = int(
+                counts.get("BOOK_DERIVED_SELECTED", 0)
+            ) + 1
 
 
 def write_runner_heartbeat(
@@ -2478,6 +2503,10 @@ def main() -> None:
         "GLOBAL_SELECTED": 0,
         "GLOBAL_REVALIDATED": 0,
         "GLOBAL_INVALIDATED_ON_REFRESH": 0,
+        "VALIDATED_SELECTED": 0,
+        "CALIBRATED_EXPLORATION_SELECTED": 0,
+        "FORCED_DEMO_EXPLORATION_SELECTED": 0,
+        "BOOK_DERIVED_SELECTED": 0,
     }
     fast_exit_error_count: int = 0
     # Quote buffer for genuine sub-minute features
@@ -5234,11 +5263,48 @@ def main() -> None:
                     ),
                     "BEST_BUY_SCORE": _funnel.get("BEST_BUY_SCORE"),
                     "BEST_SELL_SCORE": _funnel.get("BEST_SELL_SCORE"),
+                    "BEST_BUY_CANDIDATE": _funnel.get("BEST_BUY_CANDIDATE"),
+                    "BEST_SELL_CANDIDATE": _funnel.get("BEST_SELL_CANDIDATE"),
+                    "BEST_OVERALL_SIDE": _funnel.get("BEST_OVERALL_SIDE"),
                     "BEST_AVAILABLE_SYMBOL": _funnel.get("BEST_AVAILABLE_SYMBOL"),
                     "BEST_AVAILABLE_SIDE": _funnel.get("BEST_AVAILABLE_SIDE"),
                     "BEST_AVAILABLE_HORIZON": _funnel.get("BEST_AVAILABLE_HORIZON"),
                     "BEST_AVAILABLE_MECHANISM": _funnel.get("BEST_AVAILABLE_MECHANISM"),
                     "WHY_NO_ORDER": _funnel.get("WHY_NO_ORDER"),
+                    "NO_ORDER_REASON": _funnel.get(
+                        "NO_ORDER_REASON", _funnel.get("WHY_NO_ORDER")
+                    ),
+                    "VALIDATED_SELECTED": int(
+                        global_opportunity_counts.get("VALIDATED_SELECTED", 0) or 0
+                    ),
+                    "CALIBRATED_EXPLORATION_SELECTED": int(
+                        global_opportunity_counts.get(
+                            "CALIBRATED_EXPLORATION_SELECTED", 0
+                        ) or 0
+                    ),
+                    "FORCED_DEMO_EXPLORATION_SELECTED": int(
+                        global_opportunity_counts.get(
+                            "FORCED_DEMO_EXPLORATION_SELECTED", 0
+                        ) or 0
+                    ),
+                    "BOOK_DERIVED_MECHANISMS_LOADED": int(
+                        _funnel.get("BOOK_DERIVED_MECHANISMS_LOADED", 0) or 0
+                    ),
+                    "BOOK_DERIVED_MECHANISMS_TESTED": int(
+                        _funnel.get("BOOK_DERIVED_MECHANISMS_TESTED", 0) or 0
+                    ),
+                    "BOOK_DERIVED_CANDIDATES": int(
+                        _funnel.get("BOOK_DERIVED_CANDIDATES", 0) or 0
+                    ),
+                    "BOOK_DERIVED_SELECTED": int(
+                        global_opportunity_counts.get("BOOK_DERIVED_SELECTED", 0) or 0
+                    ),
+                    "GLOBAL_CANDIDATES": int(
+                        global_opportunity_counts.get("GLOBAL_CANDIDATES", 0) or 0
+                    ),
+                    "GLOBAL_SELECTED": int(
+                        global_opportunity_counts.get("GLOBAL_SELECTED", 0) or 0
+                    ),
                     "SPREAD_FAIL": int(_funnel.get("SPREAD_FAIL", 0) or 0),
                     "GEOMETRY_FAIL": int(_funnel.get("GEOMETRY_FAIL", 0) or 0),
                     "RISK_FAIL": int(_funnel.get("RISK_FAIL", 0) or 0),
@@ -6082,6 +6148,9 @@ def main() -> None:
                     ]
                     global_opportunity_counts["GLOBAL_RANKED"] += len(ranked_opportunities)
                     global_opportunity_counts["GLOBAL_SELECTED"] += len(selected_opportunities)
+                    record_global_lane_selection(
+                        global_opportunity_counts, selected_opportunities
+                    )
                     append_journal(
                         journal,
                         {

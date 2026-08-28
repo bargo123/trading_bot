@@ -24,6 +24,7 @@ from scripts.run_broker_paper import (
     firehose_lifecycle_identity,
     firehose_funnel_risk_row,
     record_funnel_execution,
+    record_global_lane_selection,
     merge_firehose_funnel_counts,
     normalize_protective_stops,
     emergency_broker_stop,
@@ -58,6 +59,25 @@ from scripts.run_broker_paper import (
 from aegis.intel.send_guard import candidate_spread_limit, refresh_verdict
 import scripts.run_broker_paper as broker_runner
 from aegis.intel.runtime_checkpoint import RuntimeCheckpointState, ScanProgress
+
+
+def test_global_lane_selection_telemetry_counts_frozen_choices_and_books():
+    counts = {}
+    record_global_lane_selection(counts, [
+        {"lane": "validated"},
+        {
+            "lane": "CALIBRATED_EXPLORATION",
+            "decision_journal": {"book_logic": {"source_book": "Book A"}},
+        },
+        {"lane": "FORCED_DEMO_EXPLORATION"},
+    ])
+
+    assert counts == {
+        "VALIDATED_SELECTED": 1,
+        "CALIBRATED_EXPLORATION_SELECTED": 1,
+        "FORCED_DEMO_EXPLORATION_SELECTED": 1,
+        "BOOK_DERIVED_SELECTED": 1,
+    }
 
 
 def test_cooperative_checkpoint_updates_management_heartbeat_and_counters():

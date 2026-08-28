@@ -5,6 +5,7 @@ import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 
@@ -341,7 +342,46 @@ def test_firehose_snapshot_exposes_active_search_telemetry(tmp_path):
     assert funnel["BEST_AVAILABLE_SIDE"] is None
     assert funnel["BEST_AVAILABLE_HORIZON"] is None
     assert funnel["BEST_AVAILABLE_MECHANISM"] is None
+    assert funnel["BEST_OVERALL_SIDE"] is None
+    assert funnel["BEST_BUY_CANDIDATE"] is None
+    assert funnel["BEST_SELL_CANDIDATE"] is None
+    assert funnel["VALIDATED_SELECTED"] == 0
+    assert funnel["CALIBRATED_EXPLORATION_SELECTED"] == 0
+    assert funnel["FORCED_DEMO_EXPLORATION_SELECTED"] == 0
+    assert funnel["BOOK_DERIVED_MECHANISMS_LOADED"] > 0
+    assert funnel["BOOK_DERIVED_MECHANISMS_TESTED"] == 0
+    assert funnel["BOOK_DERIVED_CANDIDATES"] == 0
+    assert funnel["BOOK_DERIVED_SELECTED"] == 0
     assert funnel["WHY_NO_ORDER"] is None
+    assert funnel["NO_ORDER_REASON"] is None
+
+
+def test_firehose_snapshot_compares_buy_sell_and_preserves_candidate_identity(tmp_path):
+    index = tmp_path / "analogue_index.json"
+    index.write_text(json.dumps({"schema": "analogue_index.v1", "records": []}), encoding="utf-8")
+    brain = IntelligentFirehoseBrain({"analogue_index_path": str(index)})
+    brain._record_search_score(
+        SimpleNamespace(
+            symbol="EURUSD", side="buy", family="momentum",
+            max_hold_s=3, variant_id="momentum:buy:3s",
+        ),
+        0.12,
+    )
+    brain._record_search_score(
+        SimpleNamespace(
+            symbol="GBPUSD", side="sell", family="snapback",
+            max_hold_s=10, variant_id="snapback:sell:10s",
+        ),
+        0.18,
+    )
+
+    funnel = brain.snapshot()["funnel"]
+
+    assert funnel["BEST_BUY_SCORE"] == 0.12
+    assert funnel["BEST_SELL_SCORE"] == 0.18
+    assert funnel["BEST_OVERALL_SIDE"] == "sell"
+    assert funnel["BEST_BUY_CANDIDATE"]["variant_id"] == "momentum:buy:3s"
+    assert funnel["BEST_SELL_CANDIDATE"]["variant_id"] == "snapback:sell:10s"
 
 def test_brain_can_fire_with_bootstrap_analogues(tmp_path):
     m1_for_signature = _m1()

@@ -809,6 +809,7 @@ class IntelligentFirehoseBrain:
         self._search_horizons_seen: set[int] = set()
         self._search_mechanisms_seen: set[str] = set()
         self._search_mechanisms_generating_seen: set[str] = set()
+        self._book_derived_mechanisms_seen: set[str] = set()
         self._best_rejected_candidate: dict[str, Any] = {
             "expected_net_value_usd": None,
             "p_green": None,
@@ -819,6 +820,8 @@ class IntelligentFirehoseBrain:
             "best_sell_score": None,
             "best_available": {},
             "best_score_type": None,
+            "best_buy_candidate": None,
+            "best_sell_candidate": None,
             "why_no_order": None,
         }
         self._seen_hypotheses: dict[str, float] = {}
@@ -864,6 +867,11 @@ class IntelligentFirehoseBrain:
             "capture_probability_fail": 0,
             "memory_suppression": 0,
             "portfolio_fail": 0,
+            "book_derived_candidates": 0,
+            "book_derived_selected": 0,
+            "validated_selected": 0,
+            "calibrated_exploration_selected": 0,
+            "forced_demo_exploration_selected": 0,
         }
 
     def _note_skip(self, reason: str) -> None:
@@ -876,6 +884,8 @@ class IntelligentFirehoseBrain:
             "best_sell_score": None,
             "best_available": {},
             "best_score_type": None,
+            "best_buy_candidate": None,
+            "best_sell_candidate": None,
             "why_no_order": None,
         }
 
@@ -897,6 +907,15 @@ class IntelligentFirehoseBrain:
             current = self._search_telemetry.get(key)
             if current is None or score > float(current):
                 self._search_telemetry[key] = score
+                self._search_telemetry[f"best_{side}_candidate"] = {
+                    "symbol": str(getattr(candidate, "symbol", "") or "").upper(),
+                    "side": side,
+                    "horizon_s": int(getattr(candidate, "max_hold_s", 0) or 0),
+                    "mechanism": str(getattr(candidate, "family", "") or ""),
+                    "variant_id": str(getattr(candidate, "variant_id", "") or ""),
+                    "score": score,
+                    "score_type": str(score_type),
+                }
         if available:
             current = self._search_telemetry.get("best_available") or {}
             if not current or score > float(current.get("score", float("-inf"))):
@@ -908,6 +927,18 @@ class IntelligentFirehoseBrain:
                     "score": score,
                     "score_type": str(score_type),
                 }
+
+    def _note_lane_selection(self, lane: str) -> None:
+        """Count the lane selected by this brain without changing authority."""
+        normalized = str(lane or "").strip().upper()
+        key = {
+            "VALIDATED": "validated_selected",
+            "CALIBRATED_EXPLORATION": "calibrated_exploration_selected",
+            "SAFE_TO_LEARN_ON_DEMO": "calibrated_exploration_selected",
+            "FORCED_DEMO_EXPLORATION": "forced_demo_exploration_selected",
+        }.get(normalized)
+        if key:
+            self.counts[key] = int(self.counts.get(key, 0)) + 1
 
     def _search_horizons(self) -> tuple[int, ...]:
         from aegis.intel.fast_firehose import SEARCH_HORIZONS_S
@@ -1384,6 +1415,12 @@ class IntelligentFirehoseBrain:
         horizons = self._search_horizons()
         self._search_horizons_seen.update(horizons)
         runtime_specs = runtime_mechanism_specs()
+        book_mechanism_ids = {
+            str(spec.mechanism_id)
+            for spec in runtime_specs
+            if str(getattr(spec, "source_kind", "") or "").upper() == "BOOK_DERIVED"
+        }
+        self._book_derived_mechanisms_seen.update(book_mechanism_ids)
         self._search_mechanisms_seen.update(spec.mechanism_id for spec in runtime_specs)
         variants_per_side = max(0, len(runtime_specs) - 1) * len(horizons)
         self.counts["buy_variants_tested"] = int(
@@ -1415,6 +1452,12 @@ class IntelligentFirehoseBrain:
         self.counts["search_candidates_generated"] = int(
             self.counts.get("search_candidates_generated", 0)
         ) + len(search_cands)
+        self.counts["book_derived_candidates"] = int(
+            self.counts.get("book_derived_candidates", 0)
+        ) + sum(
+            1 for candidate in search_cands
+            if str(getattr(candidate, "family", "") or "") in book_mechanism_ids
+        )
         self.counts["micro_candidates"] = int(
             self.counts.get("micro_candidates", 0)
         ) + len(search_cands)
@@ -2056,6 +2099,16 @@ class IntelligentFirehoseBrain:
         # Reservation happens in the RUNNER after the pre-send guard passes,
         # not here — otherwise the guard sees its own decision as a conflict.
         self.counts["exploration_eligible"] = int(self.counts.get("exploration_eligible", 0)) + 1
+        self._note_lane_selection(
+            "FORCED_DEMO_EXPLORATION" if forced_mode else "CALIBRATED_EXPLORATION"
+        )
+        if (
+            str(getattr(mc, "family", "") or "") in self._book_derived_mechanisms_seen
+            or bool(book_logic.get("source_book"))
+        ):
+            self.counts["book_derived_selected"] = int(
+                self.counts.get("book_derived_selected", 0)
+            ) + 1
         rejected_by_side: dict[str, list[str]] = {"buy": [], "sell": []}
         for evaluation in candidate_evaluations:
             candidate_side = str(evaluation.get("side") or "").lower()
@@ -2317,6 +2370,12 @@ class IntelligentFirehoseBrain:
     def snapshot(self) -> dict[str, Any]:
         from aegis.intel.fast_firehose import runtime_mechanism_specs
 
+        runtime_specs = runtime_mechanism_specs()
+        self._book_derived_mechanisms_seen.update(
+            str(spec.mechanism_id)
+            for spec in runtime_specs
+            if str(getattr(spec, "source_kind", "") or "").upper() == "BOOK_DERIVED"
+        )
         records = len(getattr(self.analogues, "_records", []))
         model = self.strategy
         if model is None:
@@ -2346,6 +2405,20 @@ class IntelligentFirehoseBrain:
                 int(value)
                 for reason, value in skip_reasons.items()
                 if any(needle in str(reason).lower() for needle in needles)
+            )
+
+        best_available = self._search_telemetry.get("best_available") or {}
+        best_buy_score = self._search_telemetry.get("best_buy_score")
+        best_sell_score = self._search_telemetry.get("best_sell_score")
+        if best_available.get("side") in {"buy", "sell"}:
+            best_overall_side = best_available.get("side")
+        elif best_buy_score is None:
+            best_overall_side = "sell" if best_sell_score is not None else None
+        elif best_sell_score is None:
+            best_overall_side = "buy"
+        else:
+            best_overall_side = (
+                "buy" if float(best_buy_score) >= float(best_sell_score) else "sell"
             )
 
         funnel = {
@@ -2397,12 +2470,15 @@ class IntelligentFirehoseBrain:
             ),
             "HORIZONS_TESTED": len(self._search_horizons_seen),
             "MECHANISMS_TESTED": len(self._search_mechanisms_seen),
-            "MECHANISMS_AVAILABLE": len(runtime_mechanism_specs()),
+            "MECHANISMS_AVAILABLE": len(runtime_specs),
             "MECHANISMS_ACTUALLY_GENERATING_CANDIDATES": len(
                 self._search_mechanisms_generating_seen
             ),
-            "BEST_BUY_SCORE": self._search_telemetry.get("best_buy_score"),
-            "BEST_SELL_SCORE": self._search_telemetry.get("best_sell_score"),
+            "BEST_BUY_SCORE": best_buy_score,
+            "BEST_SELL_SCORE": best_sell_score,
+            "BEST_BUY_CANDIDATE": self._search_telemetry.get("best_buy_candidate"),
+            "BEST_SELL_CANDIDATE": self._search_telemetry.get("best_sell_candidate"),
+            "BEST_OVERALL_SIDE": best_overall_side,
             "BEST_SCORE_TYPE": self._search_telemetry.get("best_score_type"),
             "BEST_AVAILABLE_SYMBOL": (
                 self._search_telemetry.get("best_available", {}).get("symbol")
@@ -2417,6 +2493,26 @@ class IntelligentFirehoseBrain:
                 self._search_telemetry.get("best_available", {}).get("mechanism")
             ),
             "WHY_NO_ORDER": self._search_telemetry.get("why_no_order"),
+            "NO_ORDER_REASON": self._search_telemetry.get("why_no_order"),
+            "VALIDATED_SELECTED": int(self.counts.get("validated_selected", 0)),
+            "CALIBRATED_EXPLORATION_SELECTED": int(
+                self.counts.get("calibrated_exploration_selected", 0)
+            ),
+            "FORCED_DEMO_EXPLORATION_SELECTED": int(
+                self.counts.get("forced_demo_exploration_selected", 0)
+            ),
+            "BOOK_DERIVED_MECHANISMS_LOADED": len(self._book_derived_mechanisms_seen),
+            "BOOK_DERIVED_MECHANISMS_TESTED": len(
+                self._book_derived_mechanisms_seen.intersection(
+                    self._search_mechanisms_seen
+                )
+            ),
+            "BOOK_DERIVED_CANDIDATES": int(
+                self.counts.get("book_derived_candidates", 0)
+            ),
+            "BOOK_DERIVED_SELECTED": int(
+                self.counts.get("book_derived_selected", 0)
+            ),
             "SPREAD_FAIL": int(self.counts.get("spread_fail", 0)),
             "GEOMETRY_FAIL": int(self.counts.get("geometry_fail", 0)),
             "RISK_FAIL": int(self.counts.get("risk_fail", 0)),
@@ -3226,6 +3322,15 @@ class IntelligentFirehoseBrain:
             self.counts["validated_candidates"] = int(
                 self.counts.get("validated_candidates", 0)
             ) + 1
+            self._note_lane_selection("VALIDATED")
+            if (
+                str(setup or "") in self._book_derived_mechanisms_seen
+                or any(str(item.get("strategy_family") or "") in self._book_derived_mechanisms_seen
+                       for item in books if isinstance(item, Mapping))
+            ):
+                self.counts["book_derived_selected"] = int(
+                    self.counts.get("book_derived_selected", 0)
+                ) + 1
         exposure = exposure_snapshot(positions)
         journal = {
             "brain": "intelligent_firehose",
