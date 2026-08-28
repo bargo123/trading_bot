@@ -1548,15 +1548,21 @@ def _forced_candidate(*, side="buy", target_pips=5.0, stop_pips=1.0,
     )
 
 
-def _run_forced_demo_brain(tmp_path, monkeypatch, candidates):
+def _run_forced_demo_brain(tmp_path, monkeypatch, candidates, checkpoint=None):
     from aegis.intel.fast_firehose import FastMarketContext
     from aegis.intel.firehose_brain import IntelligentFirehoseBrain
 
     index = tmp_path / "analogue_index.json"
     index.write_text(json.dumps({"schema": "analogue_index.v1", "records": []}), encoding="utf-8")
+    def generated_candidates(*args, **kwargs):
+        callback = kwargs.get("checkpoint")
+        if callback is not None:
+            callback("candidate_generated", "forced_test_mechanism", "buy", 3)
+        return list(candidates)
+
     monkeypatch.setattr(
         "aegis.intel.fast_firehose.generate_runtime_search_candidates",
-        lambda *args, **kwargs: list(candidates),
+        generated_candidates,
     )
     monkeypatch.setattr(
         "aegis.intel.fast_firehose.diagnose_micro_candidates",
@@ -1592,7 +1598,30 @@ def _run_forced_demo_brain(tmp_path, monkeypatch, candidates):
         actual_bid=1.1000, actual_ask=1.1002, row=row,
         completed_m1=completed, state={"session": "asia", "regime": {"label": "range"}},
         market_ctx=ctx,
+        checkpoint=checkpoint,
     )
+
+
+def test_exploration_brain_forwards_runtime_checkpoint_without_changing_decision(
+    tmp_path, monkeypatch,
+):
+    calls = []
+
+    result, skip = _run_forced_demo_brain(
+        tmp_path,
+        monkeypatch,
+        [_forced_candidate()],
+        checkpoint=lambda stage, mechanism, side, horizon: calls.append(
+            (stage, mechanism, side, horizon)
+        ),
+    )
+
+    assert skip is None
+    assert result is not None and result.action == "fire"
+    assert calls == [
+        ("candidate_generated", "forced_test_mechanism", "buy", 3),
+        ("candidate_economics", "forced_test_mechanism", "buy", 3),
+    ]
 
 
 def test_mt5_demo_forced_lane_fires_without_probability_evidence(tmp_path, monkeypatch):

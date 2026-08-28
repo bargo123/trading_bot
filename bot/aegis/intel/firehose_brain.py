@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 import pandas as pd
 
@@ -1127,6 +1127,7 @@ class IntelligentFirehoseBrain:
         positions: Sequence[PositionSnapshot] = (),
         short_horizon_prediction: Mapping[str, Any] | None = None,
         exploration_shadow_model_probe: bool = False,
+        checkpoint: Callable[[str, str, str, int | None], None] | None = None,
     ) -> tuple[DemoDecision | None, str | None]:
         """Exploration Firehose gate chain. Returns (fire_decision, skip_reason).
 
@@ -1387,6 +1388,7 @@ class IntelligentFirehoseBrain:
         search_cands = generate_runtime_search_candidates(
             ctx, row=row, previous_row=previous_row, cfg=self.cfg,
             horizons=horizons,
+            checkpoint=checkpoint,
         )
         if video_candidate is not None:
             if not getattr(video_candidate, "variant_id", ""):
@@ -1426,6 +1428,13 @@ class IntelligentFirehoseBrain:
         candidate_model_rejections: list[dict[str, str]] = []
         spec = symbol_spec or {}
         for mc in search_cands:
+            if checkpoint is not None:
+                checkpoint(
+                    "candidate_economics",
+                    str(getattr(mc, "family", "") or ""),
+                    str(getattr(mc, "side", "") or ""),
+                    int(getattr(mc, "max_hold_s", 0) or 0) or None,
+                )
             spec_tick_val = (symbol_spec or {}).get("trade_tick_value")
             spec_tick_sz = (symbol_spec or {}).get("trade_tick_size")
             econ = check_entry_economics(
@@ -2565,6 +2574,7 @@ class IntelligentFirehoseBrain:
         video_style: bool = False,
         short_horizon_prediction: Mapping[str, Any] | None = None,
         previous_row: pd.Series | None = None,
+        checkpoint: Callable[[str, str, str, int | None], None] | None = None,
     ) -> DemoDecision:
         clip_qty = float(self.cfg.get("order_quantity", 0.01))
         clip_risk = max(self._risk_budget * float(self.cfg.get("intelligent_risk_fraction", 0.08)) / 5.0, 0.01)
@@ -3116,6 +3126,7 @@ class IntelligentFirehoseBrain:
                 positions=positions,
                 short_horizon_prediction=short_horizon_prediction,
                 exploration_shadow_model_probe=exploration_shadow_model_probe,
+                checkpoint=checkpoint,
             )
             if exp_decision is not None:
                 # Explicit exploration classification (audited fix, defect 6).

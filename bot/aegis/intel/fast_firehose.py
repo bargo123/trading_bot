@@ -22,7 +22,7 @@ import math
 import time
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from aegis.intel.profit_harvester import (
     HarvestDecision,
@@ -409,12 +409,25 @@ def generate_micro_candidates(ctx: FastMarketContext) -> list[MicroCandidate]:
 # gate. A mechanism must first construct its own genuine broker geometry.
 SEARCH_HORIZONS_S: tuple[int, ...] = (1, 2, 3, 5, 8, 10, 15, 20)
 SEARCH_SIDES: tuple[str, ...] = ("buy", "sell")
+Checkpoint = Callable[[str, str, str, int | None], None]
+
+
+def _run_checkpoint(
+    checkpoint: Checkpoint | None,
+    stage: str,
+    mechanism: str,
+    side: str,
+    horizon_s: int | None,
+) -> None:
+    if checkpoint is not None:
+        checkpoint(stage, mechanism, side, horizon_s)
 
 
 def generate_micro_search_candidates(
     ctx: FastMarketContext,
     *,
     horizons: tuple[int, ...] = SEARCH_HORIZONS_S,
+    checkpoint: Checkpoint | None = None,
 ) -> list[MicroCandidate]:
     """Enumerate valid side/mechanism/horizon combinations.
 
@@ -431,6 +444,7 @@ def generate_micro_search_candidates(
     valid_horizons = tuple(sorted({int(h) for h in horizons if int(h) > 0}))
     for family, fn in families:
         for side in SEARCH_SIDES:
+            _run_checkpoint(checkpoint, "mechanism_side", family, side, None)
             try:
                 base = fn(ctx, side=side)
             except Exception:
@@ -438,6 +452,9 @@ def generate_micro_search_candidates(
             if base is None:
                 continue
             for horizon_s in valid_horizons:
+                _run_checkpoint(
+                    checkpoint, "mechanism_horizon", family, side, horizon_s
+                )
                 variant_id = f"{family}:{side}:{horizon_s}s"
                 candidates.append(replace(
                     base,
@@ -574,9 +591,12 @@ def generate_runtime_search_candidates(
     previous_row: Any = None,
     cfg: Mapping[str, Any] | None = None,
     horizons: tuple[int, ...] = SEARCH_HORIZONS_S,
+    checkpoint: Checkpoint | None = None,
 ) -> list[MicroCandidate]:
     """Generate micro plus every compiled catalog strategy for each horizon."""
-    candidates = generate_micro_search_candidates(ctx, horizons=horizons)
+    candidates = generate_micro_search_candidates(
+        ctx, horizons=horizons, checkpoint=checkpoint
+    )
     if row is None:
         return candidates
     from aegis.strategies_catalog import STRATEGIES
@@ -585,11 +605,25 @@ def generate_runtime_search_candidates(
     valid_horizons = tuple(sorted({int(value) for value in horizons if int(value) > 0}))
     for strategy in STRATEGIES:
         for horizon_s in valid_horizons:
+            _run_checkpoint(
+                checkpoint,
+                "catalog_horizon",
+                str(strategy.id),
+                "",
+                horizon_s,
+            )
             candidate = _compiled_catalog_candidate(
                 ctx, row=row, previous_row=previous_row, cfg=settings,
                 strategy=strategy, horizon_s=horizon_s,
             )
             if candidate is not None:
+                _run_checkpoint(
+                    checkpoint,
+                    "candidate_generated",
+                    str(candidate.family),
+                    str(candidate.side),
+                    int(candidate.max_hold_s),
+                )
                 candidates.append(candidate)
     return candidates
 

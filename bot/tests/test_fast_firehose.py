@@ -20,6 +20,7 @@ from aegis.intel.fast_firehose import (  # noqa: E402
     diagnose_micro_candidates,
     generate_micro_candidates,
     generate_micro_search_candidates,
+    generate_runtime_search_candidates,
     runtime_mechanism_specs,
     micro_momentum_burst,
     failed_breakout_fade,
@@ -268,6 +269,30 @@ def test_search_candidates_enumerate_both_sides_and_learned_horizons():
     assert all(candidate.variant_id for candidate in candidates)
 
 
+def test_runtime_search_checkpoints_preserve_complete_candidate_identity():
+    ctx = _ctx()
+    baseline = generate_runtime_search_candidates(ctx, horizons=(3, 10))
+    calls = []
+
+    observed = generate_runtime_search_candidates(
+        ctx,
+        horizons=(3, 10),
+        checkpoint=lambda stage, mechanism, side, horizon: calls.append(
+            (stage, mechanism, side, horizon)
+        ),
+    )
+
+    assert [
+        (candidate.variant_id, candidate.side, candidate.max_hold_s)
+        for candidate in observed
+    ] == [
+        (candidate.variant_id, candidate.side, candidate.max_hold_s)
+        for candidate in baseline
+    ]
+    assert {call[2] for call in calls if call[2]} == {"buy", "sell"}
+    assert {call[3] for call in calls if call[3] is not None} == {3, 10}
+
+
 def test_runtime_registry_exposes_compiled_catalog_mechanisms():
     ids = {spec.mechanism_id for spec in runtime_mechanism_specs()}
 
@@ -280,8 +305,6 @@ def test_runtime_registry_exposes_compiled_catalog_mechanisms():
 
 
 def test_compiled_catalog_candidate_uses_executable_quote_geometry():
-    from aegis.intel.fast_firehose import generate_runtime_search_candidates
-
     row = pd.Series({
         "time": pd.Timestamp("2026-08-21T12:00:00Z"), "close": 1.0990,
         "atr": 0.0005, "adx": 10.0, "rsi": 20.0,
