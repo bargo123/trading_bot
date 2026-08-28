@@ -45,6 +45,7 @@ STRUCTURED_KB_FILES = (
 # book-memory sink is also part of the repository knowledge base and is loaded
 # without treating its research proxies as validated strategies.
 ADDITIONAL_KB_FILES = ("research/book_memory/knowledge_records.jsonl",)
+CANONICAL_REGISTRY_NAME = "book_strategy_registry.jsonl"
 
 _CATEGORY_BY_FILE = {
     "concepts.jsonl": "concept",
@@ -196,7 +197,7 @@ def _required_values(value: Any) -> list[str]:
     return [item for item in re.split(r"[,/|+ ]+", text) if item and item not in {"or", "and"}]
 
 
-def load_knowledge_library(knowledge_dir: Path) -> dict[str, Any]:
+def load_knowledge_library(knowledge_dir: Path, *, registry_path: Path | None = None) -> dict[str, Any]:
     """Load every structured knowledge sink with provenance intact."""
     root = Path(knowledge_dir)
     manifest = _json(root / "corpus_manifest.json", {})
@@ -254,6 +255,68 @@ def load_knowledge_library(knowledge_dir: Path) -> dict[str, Any]:
         invalid_by_file[name] = invalid
         files[name] = {"exists": path.is_file(), "rows": rows, "invalid": invalid}
 
+    # Once the Downloads corpus has been extracted, prefer its canonical
+    # strategy records over the older duplicated hypothesis sinks. Other
+    # knowledge categories remain available to the Watcher.
+    registry_path = Path(registry_path) if registry_path is not None else root.parent.parent / "reports" / "research" / CANONICAL_REGISTRY_NAME
+    if registry_path.is_file():
+        records = [row for row in records if row["category"] != "strategy"]
+        registry_rows = 0
+        registry_invalid = 0
+        try:
+            with registry_path.open(encoding="utf-8") as handle:
+                for line_number, line in enumerate(handle, 1):
+                    if not line.strip():
+                        continue
+                    try:
+                        raw_record = json.loads(line)
+                    except json.JSONDecodeError:
+                        registry_invalid += 1
+                        continue
+                    if not isinstance(raw_record, Mapping):
+                        registry_invalid += 1
+                        continue
+                    raw_record = dict(raw_record)
+                    strategy_id = _text(raw_record.get("strategy_id"))
+                    if not strategy_id:
+                        registry_invalid += 1
+                        continue
+                    registry_rows += 1
+                    records.append({
+                        "record_id": strategy_id,
+                        "category": "strategy",
+                        "source_file": CANONICAL_REGISTRY_NAME,
+                        "source_line": line_number,
+                        "raw_record": raw_record,
+                        "provenance": {
+                            "book": raw_record.get("source_title"),
+                            "book_hash": raw_record.get("source_sha256"),
+                            "passage_hash": raw_record.get("passage_hash"),
+                            "location": {
+                                "file": raw_record.get("source_path"),
+                                "page_start": raw_record.get("page_start"),
+                                "page_end": raw_record.get("page_end"),
+                            },
+                        },
+                        "applicability_requirements": {
+                            "required_data": raw_record.get("required_features"),
+                            "required_regime": raw_record.get("required_regime"),
+                            "required_timeframe": raw_record.get("required_timeframe"),
+                            "side_rule": raw_record.get("side_rule"),
+                        },
+                        "validation_status": raw_record.get("validation_status") or "UNVALIDATED_RESEARCH",
+                        "testability": raw_record.get("testability") or raw_record.get("status"),
+                    })
+        except OSError:
+            registry_invalid += 1
+        counts_by_file[CANONICAL_REGISTRY_NAME] = registry_rows
+        invalid_by_file[CANONICAL_REGISTRY_NAME] = registry_invalid
+        files[CANONICAL_REGISTRY_NAME] = {
+            "exists": True,
+            "rows": registry_rows,
+            "invalid": registry_invalid,
+        }
+
     counts = {
         "records": len(records),
         "strategy_records": sum(row["category"] == "strategy" for row in records),
@@ -280,7 +343,7 @@ def load_knowledge_library(knowledge_dir: Path) -> dict[str, Any]:
         "counts": counts,
         "counts_by_file": counts_by_file,
         "invalid_by_file": invalid_by_file,
-        "processed_all_structured_kb": all(item["exists"] for item in files.values()),
+        "processed_all_structured_kb": all(files[name]["exists"] for name in all_sources),
         "records": records,
         "strategy_records": [row for row in records if row["category"] == "strategy"],
     }
@@ -652,7 +715,10 @@ class WatcherKnowledgeEngine:
         self.knowledge_dir = Path(knowledge_dir)
         self.report_dir = Path(report_dir)
         self.report_dir.mkdir(parents=True, exist_ok=True)
-        self.library = load_knowledge_library(self.knowledge_dir)
+        self.library = load_knowledge_library(
+            self.knowledge_dir,
+            registry_path=self.report_dir.parent / "research" / CANONICAL_REGISTRY_NAME,
+        )
         self.library_path = self.report_dir / "knowledge_library.json"
         self.library_path.write_text(json.dumps(self.library, indent=2, default=str), encoding="utf-8")
         self.seen: set[str] = set()
@@ -928,12 +994,21 @@ class WatcherKnowledgeEngine:
             })
         for item in strategies:
             rate, sample_size = self._strategy_capture_rate(item.get("record_id"), analysis.get("state", {}))
-            item["p_captured_win"] = rate
-            item["p_captured_win_percent"] = None if rate is None else rate * 100.0
-            item["p_captured_win_sample_size"] = sample_size
-            if sample_size:
+            evidence_status = _text(item.get("evidence_status")).upper()
+            item["p_captured_win"] = None if evidence_status == "FAMILY_PROXY" else rate
+            item["p_captured_win_percent"] = None if item["p_captured_win"] is None else item["p_captured_win"] * 100.0
+            item["p_captured_win_sample_size"] = sample_size if evidence_status != "FAMILY_PROXY" else 0
+            item["exact_win_rate"] = rate if evidence_status in {"CODED_EXACT", "LEGACY_UNCOMPILED"} else None
+            item["exact_win_rate_percent"] = None if item["exact_win_rate"] is None else item["exact_win_rate"] * 100.0
+            item["exact_sample_size"] = sample_size if item["exact_win_rate"] is not None else 0
+            item["proxy_win_rate"] = rate if evidence_status == "FAMILY_PROXY" else None
+            item["proxy_win_rate_percent"] = None if item["proxy_win_rate"] is None else item["proxy_win_rate"] * 100.0
+            item["proxy_sample_size"] = sample_size if item["proxy_win_rate"] is not None else 0
+            if sample_size and evidence_status != "FAMILY_PROXY":
                 item["p_captured_win_source"] = "broker_confirmed_net_pnl"
-            elif item.get("evidence_status") == "FAMILY_PROXY":
+            elif sample_size and evidence_status == "FAMILY_PROXY":
+                item["p_captured_win_source"] = "family_proxy_observation"
+            elif evidence_status == "FAMILY_PROXY":
                 item["p_captured_win_source"] = "FAMILY_PROXY_UNAVAILABLE"
             elif item.get("evidence_status") == "UNTESTABLE_SOURCE":
                 item["p_captured_win_source"] = "UNTESTABLE_SOURCE"
