@@ -200,6 +200,9 @@ class FireLatency:
         return None
 
     def as_dict(self) -> dict[str, Any]:
+        # The runner updates quote_ts after a broker refresh; normalize that
+        # assignment as well as constructor values before serializing.
+        self.__post_init__()
         return {
             "decision_ts": round(self.decision_ts, 3),
             "quote_ts": round(self.quote_ts, 3),

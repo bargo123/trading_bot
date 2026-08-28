@@ -201,3 +201,11 @@ def test_fire_latency_normalizes_broker_datetime_quote_timestamp():
 
     assert latency.quote_ts == quote_time.timestamp()
     assert latency.as_dict()["quote_ts"] == round(quote_time.timestamp(), 3)
+
+
+def test_fire_latency_normalizes_datetime_assigned_after_initialization():
+    quote_time = datetime(2026, 8, 25, 1, 44, tzinfo=timezone.utc)
+    latency = FireLatency(decision_ts=1000.0)
+    latency.quote_ts = quote_time
+
+    assert latency.as_dict()["quote_ts"] == round(quote_time.timestamp(), 3)
