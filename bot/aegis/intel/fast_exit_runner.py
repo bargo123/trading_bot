@@ -244,6 +244,55 @@ def evaluate_fast_exit(ctx: FastExitContext) -> dict[str, Any]:
             "policy": "short_horizon_support_revoked",
         }
 
+    # If the position is already profitable at the executable liquidation
+    # mark but there is no validated continuation evidence, bank that observed
+    # profit.  This is deliberately not a fixed dollar target: the threshold
+    # is the known non-spread entry cost for this ticket.  Opening spread is
+    # already reflected by the liquidation mark and must not be charged twice.
+    continuation_support = prediction_support_status(ctx.short_horizon_prediction)
+    continuation_unavailable = continuation_support in {
+        "ABSTAIN", "UNAVAILABLE", "UNCALIBRATED", "INVALID", "REVOKED",
+    }
+    remaining_ev_positive = (
+        remaining_ev_active
+        and _finite(ctx.remaining_ev)
+        and float(ctx.remaining_ev) > 0.0
+    )
+    validated_continuation_policy = (
+        ctx.harvest_policy is not None and ctx.harvest_policy.is_available
+    )
+    if (
+        fast_verdict.get("action") in {"HOLD", "LOCK"}
+        and continuation_unavailable
+        and not remaining_ev_positive
+        and not validated_continuation_policy
+    ):
+        try:
+            unit_usd = _spec_fast.usd_per_price_unit_per_lot() * float(ctx.quantity)
+            direction = 1.0 if pos_side == "buy" else -1.0
+            current_pnl_usd = (_mark - _entry_px) * direction * unit_usd
+            additional_cost_usd = known_additional_friction_usd(
+                ctx, entry_price=_entry_px, broker_spec=_spec_fast
+            )
+        except (TypeError, ValueError, ZeroDivisionError):
+            current_pnl_usd = None
+            additional_cost_usd = None
+        if (
+            _finite(current_pnl_usd)
+            and _finite(additional_cost_usd)
+            and float(current_pnl_usd) > float(additional_cost_usd) + 1e-12
+        ):
+            fast_verdict = {
+                "action": "HARVEST",
+                "reason": "profit_without_continuation_evidence",
+                "why": (
+                    "current executable profit exceeded known non-spread entry "
+                    f"costs (${float(current_pnl_usd):.4f} > ${float(additional_cost_usd):.4f}) "
+                    f"with continuation support {continuation_support}"
+                ),
+                "policy": "profit_without_continuation_evidence",
+            }
+
     result = attach_execution_evidence(
         fast_verdict,
         ctx=ctx,
@@ -459,6 +508,46 @@ def initial_friction_for_context(
         commission_price = 0.0
     price = max(0.0, spread_price + slippage_price + commission_price)
     return price / max(float(pip), 1e-12), price
+
+
+def known_additional_friction_usd(
+    ctx: FastExitContext,
+    *,
+    entry_price: float,
+    broker_spec: BrokerSymbolSpec,
+) -> float | None:
+    """Return known round-trip costs excluding the opening spread.
+
+    The executable mark already includes the opening spread.  Only explicit
+    slippage and commission assumptions are compared with a small profit when
+    deciding whether unsupported continuation should be harvested.
+    """
+    meta = ctx.ticket_meta
+    slippage_bps = (
+        meta.slippage_assumption
+        if meta is not None and meta.slippage_assumption is not None
+        else ctx.config.get("slippage_bps", 0.0)
+    )
+    commission = (
+        meta.commission_assumption
+        if meta is not None and meta.commission_assumption is not None
+        else ctx.config.get("commission_round_trip_usd", 0.0)
+    )
+    try:
+        slippage_price = (
+            2.0 * max(0.0, float(slippage_bps or 0.0)) / 10_000.0
+            * float(entry_price)
+        )
+        unit_usd = (
+            broker_spec.usd_per_price_unit_per_lot() * max(float(ctx.quantity), 0.0)
+        )
+        if not _finite_positive(unit_usd):
+            return None
+        commission_usd = max(0.0, float(commission or 0.0))
+        result = slippage_price * unit_usd + commission_usd
+        return result if _finite(result) else None
+    except (TypeError, ValueError, OverflowError, ZeroDivisionError):
+        return None
 
 
 def adverse_beyond_friction_pips(pnl_pips: float, friction_pips: float) -> float:

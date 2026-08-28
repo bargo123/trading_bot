@@ -21,6 +21,7 @@ def test_aggregate_confirmed_exit_deals_uses_exact_position_and_broker_costs():
                 "order": "entry-order",
                 "position_id": "P1",
                 "symbol": "EURUSD",
+                "side": "buy",
                 "entry": 0,
                 "profit": 0.0,
                 "commission": -0.01,
@@ -89,6 +90,8 @@ def test_aggregate_confirmed_exit_deals_uses_exact_position_and_broker_costs():
     assert facts["cost_usd"] == pytest.approx(0.057)
     assert facts["realized_net_usd"] == pytest.approx(0.093)
     assert facts["actual_close_price"] == pytest.approx(1.10108)
+    assert facts["position_symbol"] == "EURUSD"
+    assert facts["position_side"] == "buy"
     assert facts["confirmed"] is True
 
 

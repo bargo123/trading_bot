@@ -178,9 +178,16 @@ def _forced_demo_score(
         loser_similarity = float(memory_summary.get("loser_similarity", 0.0) or 0.0)
     except (TypeError, ValueError, OverflowError):
         loser_similarity = 0.0
+    try:
+        broker_negative_net_penalty = float(
+            memory_summary.get("broker_negative_net_penalty", 0.0) or 0.0
+        )
+    except (TypeError, ValueError, OverflowError):
+        broker_negative_net_penalty = 0.0
     score = base_score if dollar_score else base_score / stop_pips
     score += 0.25 * winner_similarity
     score -= 0.75 * loser_similarity
+    score -= max(0.0, broker_negative_net_penalty)
     score -= 0.05 * len(tuple(quality_reasons))
     return round(score, 8) if math.isfinite(score) else float("-inf")
 

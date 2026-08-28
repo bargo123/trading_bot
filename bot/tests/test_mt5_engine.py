@@ -352,6 +352,18 @@ def test_quote_and_bars():
     assert bars[0].close == 1.105
 
 
+def test_latest_bar_time_uses_small_broker_probe():
+    api = FakeMT5()
+    eng = _engine(api)
+    eng.connect()
+
+    latest = eng.latest_bar_time("EURUSD", "1m")
+
+    assert latest.tzinfo is not None
+    assert latest.second == 0
+    assert latest.microsecond == 0
+
+
 def test_bars_normalize_mt5_period_timestamps_to_minute_boundaries():
     api = FakeMT5()
     eng = _engine(api)

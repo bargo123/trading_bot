@@ -177,6 +177,24 @@ def test_forced_demo_lane_is_rankable_without_probability_or_positive_ev():
     assert selected[0]["p_captured_win"] is None
 
 
+def test_forced_demo_score_penalizes_repeated_broker_negative_net_states():
+    from types import SimpleNamespace
+    from aegis.intel.firehose_brain import _forced_demo_score
+
+    candidate = SimpleNamespace(stop_pips=1.0)
+    baseline = _forced_demo_score(
+        candidate, {"net_target_pips": 1.0}, {}, [],
+    )
+    penalized = _forced_demo_score(
+        candidate,
+        {"net_target_pips": 1.0},
+        {"broker_negative_net_penalty": 0.70},
+        [],
+    )
+
+    assert penalized < baseline
+
+
 def test_nineteen_ranked_candidates_fall_through_after_selected_failure():
     candidates = [
         _candidate(

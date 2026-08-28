@@ -288,6 +288,33 @@ def test_confirmed_close_refuses_unconfirmed_or_floating_pnl(tmp_path):
     assert store.records == []
 
 
+def test_repair_broker_position_identity_corrects_side_without_changing_net(tmp_path):
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    store.record_confirmed_close(
+        outcome_id="T-REPAIR",
+        features={"symbol": "EURUSD", "side": "sell", "horizon_s": 3},
+        broker_facts={
+            "status": "BROKER_CONFIRMED",
+            "confirmed": True,
+            "realized_net_usd": -0.12,
+        },
+        mfe_usd=0.0,
+        mae_usd=-0.12,
+        time_to_green_s=None,
+    )
+
+    changed = store.repair_broker_position_identity({
+        "T-REPAIR": {"symbol": "EURUSD", "side": "buy"},
+    })
+
+    row = store.records[0]
+    assert changed == 1
+    assert row["features"]["side"] == "buy"
+    assert row["pre_entry_state"]["side"] == "buy"
+    assert row["state_key"] == json.dumps(row["features"], sort_keys=True, separators=(",", ":"))
+    assert row["realized_net_usd"] == pytest.approx(-0.12)
+
+
 def test_confirmed_close_replays_buy_sell_abstain_and_alternative_horizons_after_close(tmp_path):
     store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
     row = store.record_confirmed_close(
@@ -349,6 +376,29 @@ def test_repeated_state_feedback_penalizes_losers_rewards_winners_without_symbol
     winner_feedback = store.state_feedback(winner_state)
     assert winner_feedback["fast_winner_count"] == 2
     assert winner_feedback["winner_bonus"] > 0
+
+
+def test_repeated_broker_negative_net_is_learned_without_inventing_excursions(tmp_path):
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    state = {
+        "symbol": "EURUSD", "side": "buy", "mechanism": "video_style_breakout",
+        "horizon_s": 45, "session": "asia", "regime": "trend",
+    }
+    for index in range(2):
+        store.record_confirmed_close(
+            outcome_id=f"BROKER-LOSS-{index}",
+            features=state,
+            broker_facts=_broker_facts(-0.12),
+            mfe_usd=None,
+            mae_usd=None,
+            time_to_green_s=None,
+        )
+
+    feedback = store.state_feedback(state)
+
+    assert feedback["fast_loser_count"] == 0
+    assert feedback["broker_negative_net_count"] == 2
+    assert feedback["broker_negative_net_penalty"] > 0
 
 
 def test_pending_close_context_is_reused_when_broker_deal_arrives_later(tmp_path):

@@ -560,6 +560,26 @@ class MT5Engine(BrokerEngine):
             )
         return out
 
+    def latest_bar_time(self, symbol: str, timeframe: str) -> datetime:
+        """Return the broker's current bar timestamp with a tiny MT5 probe.
+
+        The runner uses this to avoid downloading a full lookback on every
+        same-minute quote reevaluation.  It does not provide prices or relax
+        any quote/execution gate.
+        """
+        mt5 = self._require()
+        name = self._resolve_symbol(symbol)
+        self._ensure_symbol(name)
+        tf_key = str(timeframe).strip().lower()
+        attr = _TF_ATTR.get(tf_key)
+        if not attr:
+            raise ValueError(f"Unsupported timeframe for MT5: {timeframe}")
+        raw = mt5.copy_rates_from_pos(name, int(getattr(mt5, attr)), 0, 1)
+        if raw is None or len(raw) == 0:
+            raise RuntimeError(f"latest bar probe failed for {name} ({self._last_error()})")
+        timestamp = raw[0]["time"] if hasattr(raw[0], "__getitem__") else raw[0].time
+        return self._quote_time_utc(timestamp).replace(second=0, microsecond=0)
+
     def positions(self, symbol: Optional[str] = None) -> list[PositionSnapshot]:
         mt5 = self._require()
         name = self._resolve_symbol(symbol) if symbol else None

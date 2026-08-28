@@ -413,6 +413,53 @@ class OutcomeMemoryStore:
                 if isinstance(value, dict)
             }
 
+    def repair_broker_position_identity(
+        self,
+        identities: Mapping[str, Mapping[str, Any]],
+    ) -> int:
+        """Repair side/symbol from exact broker entry identity.
+
+        MT5 exit DEALs report the closing action, not the original position
+        side.  This migration changes only confirmed rows whose exact broker
+        entry identity is supplied; realized net PnL and lifecycle labels are
+        deliberately untouched.
+        """
+        changed = 0
+        for row in self.records:
+            if str(row.get("evidence_status") or "") != "BROKER_CONFIRMED":
+                continue
+            identity = identities.get(str(row.get("outcome_id") or ""))
+            if not isinstance(identity, Mapping):
+                continue
+            symbol = str(identity.get("symbol") or "").strip().upper()
+            side = str(identity.get("side") or "").strip().lower()
+            if not symbol or side not in {"buy", "sell"}:
+                continue
+            features = dict(row.get("features") or {})
+            pre_entry_state = dict(row.get("pre_entry_state") or {})
+            broker_facts = dict(row.get("broker_facts") or {})
+            row_changed = (
+                features.get("symbol") != symbol
+                or features.get("side") != side
+                or pre_entry_state.get("symbol") != symbol
+                or pre_entry_state.get("side") != side
+                or broker_facts.get("position_symbol") != symbol
+                or broker_facts.get("position_side") != side
+            )
+            if not row_changed:
+                continue
+            features.update({"symbol": symbol, "side": side})
+            pre_entry_state.update({"symbol": symbol, "side": side})
+            broker_facts.update({"position_symbol": symbol, "position_side": side})
+            row["features"] = features
+            row["pre_entry_state"] = pre_entry_state
+            row["state_key"] = _state_key(features)
+            row["broker_facts"] = broker_facts
+            changed += 1
+        if changed:
+            self._persist()
+        return changed
+
     def _persist(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -815,11 +862,23 @@ class OutcomeMemoryStore:
         winner_count = sum(
             row.get("speed_label") == "FAST_WINNER" for _score, row in matches
         )
+        broker_negative_net_count = sum(
+            row.get("evidence_status") == "BROKER_CONFIRMED"
+            and (_finite(row.get("realized_net_usd")) or 0.0) < 0.0
+            for _score, row in matches
+        )
         return {
             "fast_loser_count": loser_count,
             "fast_winner_count": winner_count,
             "loser_penalty": min(1.0, 0.35 * loser_count),
             "winner_bonus": min(1.0, 0.20 * winner_count),
+            # Broker net PnL remains useful even when excursion telemetry is
+            # unavailable.  This is a score penalty, not a hard blacklist;
+            # exact identity prevents one loss from poisoning a symbol.
+            "broker_negative_net_count": broker_negative_net_count,
+            "broker_negative_net_penalty": min(
+                1.0, 0.35 * broker_negative_net_count
+            ),
         }
 
     def should_suppress(

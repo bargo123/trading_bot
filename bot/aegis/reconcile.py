@@ -340,6 +340,16 @@ def aggregate_confirmed_exit_deals(
     entry_cost = entry_commission + entry_swap + entry_fee
     exit_cost = commission + swap + fee
     net = gross + entry_cost + exit_cost
+    entry_symbols = {
+        str(row.get("symbol") or "").strip().upper()
+        for row in entries
+        if str(row.get("symbol") or "").strip()
+    }
+    entry_sides = {
+        str(row.get("side") or "").strip().lower()
+        for row in entries
+        if str(row.get("side") or "").strip().lower() in {"buy", "sell"}
+    }
     return {
         "confirmed": True,
         "position_id": wanted,
@@ -348,6 +358,10 @@ def aggregate_confirmed_exit_deals(
         "deal_tickets": [str(row.get("ticket") or "") for row in ordered],
         "entry_quantity": entry_quantity,
         "entry_price": entry_price,
+        # Exit DEAL side is the opposite action used to close the position.
+        # Position identity is available only from an unambiguous entry DEAL.
+        "position_symbol": next(iter(entry_symbols)) if len(entry_symbols) == 1 else None,
+        "position_side": next(iter(entry_sides)) if len(entry_sides) == 1 else None,
         "gross_realized_pnl_usd": gross,
         "entry_commission_usd": entry_commission,
         "entry_swap_usd": entry_swap,

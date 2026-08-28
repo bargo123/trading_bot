@@ -275,6 +275,78 @@ class TestFastExitProductionHelper:
         assert trace["current_executable_pnl"] == pytest.approx(0.0)
         assert trace["adverse_beyond_friction"] == pytest.approx(0.0)
 
+    def test_profitable_position_without_continuation_evidence_harvests_immediately(self):
+        """A real executable profit is banked when no continuation evidence exists."""
+        ctx = self.create_context(
+            current_bid=1.10010,
+            current_ask=1.10012,
+            mfe_usd=0.0,
+            mae_usd=0.0,
+            opened_ts=1000.0,
+            now_ts=1000.1,
+            config={"commission_round_trip_usd": 0.03},
+            short_horizon_prediction={"abstain": True, "abstain_reason": "artifact_shadow_only"},
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["action"] == "HARVEST"
+        assert verdict["reason"] == "profit_without_continuation_evidence"
+        assert verdict["current_executable_pnl"] == pytest.approx(0.10)
+
+    def test_profit_without_continuation_evidence_must_cover_known_costs(self):
+        ctx = self.create_context(
+            current_bid=1.10010,
+            current_ask=1.10012,
+            mfe_usd=0.0,
+            mae_usd=0.0,
+            opened_ts=1000.0,
+            now_ts=1000.1,
+            config={"commission_round_trip_usd": 0.11},
+            short_horizon_prediction=None,
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["action"] == "HOLD"
+        assert verdict["reason"] == "fast_hold_justified"
+
+    def test_spread_only_mark_does_not_trigger_unsupported_profit_harvest(self):
+        ctx = self.create_context(
+            current_bid=1.09998,
+            current_ask=1.10000,
+            mfe_usd=0.0,
+            mae_usd=0.0,
+            opened_ts=1000.0,
+            now_ts=1000.1,
+            short_horizon_prediction=None,
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["action"] == "HOLD"
+        assert verdict["current_executable_pnl"] == pytest.approx(-0.02)
+
+    def test_untracked_profitable_position_harvests_with_current_quote(self):
+        """Missing lifecycle metadata must not hide an executable winner."""
+        ctx = self.create_context(
+            current_bid=1.10005,
+            current_ask=1.10007,
+            mfe_usd=0.0,
+            mae_usd=0.0,
+            ticket_meta=None,
+            quote_buffer=QuoteBuffer(),
+            opened_ts=1000.0,
+            now_ts=1000.1,
+            config={"commission_round_trip_usd": 0.03},
+            short_horizon_prediction={"abstain": True, "abstain_reason": "artifact_shadow_only"},
+        )
+
+        verdict = evaluate_fast_exit(ctx)
+
+        assert verdict["action"] == "HARVEST"
+        assert verdict["reason"] == "profit_without_continuation_evidence"
+
     def test_exit_trace_exposes_usd_friction_and_prediction_support(self):
         ctx = self.create_context(
             current_bid=1.09990,
@@ -699,11 +771,22 @@ class TestFirehoseHarvestAdapter:
         assert exact_spread_r == pytest.approx(0.02)
         assert exact_spread_r != trailed_spread_r
 
-    def test_missing_quote_history_keeps_existing_safety_hold(self):
+    def test_missing_quote_history_cannot_authorize_holding_executable_profit(self):
         ctx = self._context(quote_buffer=QuoteBuffer())
         ctx.mfe_usd = 0.0
+        ctx.remaining_ev = None
+        ctx.remaining_ev_status = "UNKNOWN"
+        ctx.short_horizon_prediction = {
+            "abstain": True,
+            "abstain_reason": "missing_quote_history",
+        }
+        ctx.current_bid = 1.10010
+        ctx.current_ask = 1.10012
+        ctx.config = {"commission_round_trip_usd": 0.03}
         assert build_harvest_input(ctx) is None
-        assert evaluate_fast_exit(ctx)["action"] == "HOLD"
+        verdict = evaluate_fast_exit(ctx)
+        assert verdict["action"] == "HARVEST"
+        assert verdict["reason"] == "profit_without_continuation_evidence"
 
     def test_unvalidated_harvester_keeps_legacy_ev_behavior(self):
         ctx = self._context(
