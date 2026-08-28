@@ -100,6 +100,7 @@ class MT5Engine(BrokerEngine):
         }
         self._server_utc_offset_s: float | None = None
         self._offset_samples: list[float] = []
+        self._account_identity: tuple[str, str] | None = None
 
     def _api(self) -> Any:
         if self._api_mod is not None:
@@ -221,6 +222,10 @@ class MT5Engine(BrokerEngine):
                 f"Refusing non-demo MT5 account {getattr(info, 'login', '?')} "
                 f"server={getattr(info, 'server', '')}. Set allow_live: true only when intentional."
             )
+        self._account_identity = (
+            str(getattr(info, "login", "") or ""),
+            str(getattr(info, "server", "") or ""),
+        )
         logger.info(
             "MT5 connected login=%s server=%s company=%s demo=%s",
             getattr(info, "login", ""),
@@ -269,6 +274,10 @@ class MT5Engine(BrokerEngine):
                 f"Refusing non-demo MT5 account {getattr(info, 'login', '?')} "
                 f"server={getattr(info, 'server', '')}."
             )
+        self._account_identity = (
+            str(getattr(info, "login", "") or ""),
+            str(getattr(info, "server", "") or ""),
+        )
         logger.info(
             "MT5 readonly attach login=%s server=%s demo=%s",
             getattr(info, "login", ""),
@@ -449,6 +458,73 @@ class MT5Engine(BrokerEngine):
             if mt5.symbol_info_tick(name) is not None:
                 refreshed += 1
         return refreshed
+
+    def raw_tick(self, symbol: str) -> dict[str, Any]:
+        """Return direct ``symbol_info_tick`` fields without Quote normalization."""
+        mt5 = self._require()
+        requested = str(symbol)
+        name = self._resolve_symbol(requested)
+        info = self._ensure_symbol(name)
+        tick = mt5.symbol_info_tick(name)
+        if tick is None:
+            raise RuntimeError(f"No raw tick for {name} ({self._last_error()})")
+        return {
+            "requested_symbol": requested,
+            "resolved_symbol": name,
+            "time": int(getattr(tick, "time", 0) or 0) or None,
+            "time_msc": int(float(getattr(tick, "time_msc", 0) or 0)) or None,
+            "bid": float(getattr(tick, "bid", 0) or 0),
+            "ask": float(getattr(tick, "ask", 0) or 0),
+            "last": float(getattr(tick, "last", 0) or 0),
+            "flags": int(getattr(tick, "flags", 0) or 0),
+            "visible": bool(getattr(info, "visible", True)),
+        }
+
+    def reinitialize_connection(
+        self,
+        *,
+        symbols: list[str],
+        backoff_s: float = 1.0,
+        sleep_fn: Any = time.sleep,
+    ) -> dict[str, Any]:
+        """Reconnect this owner once and revalidate its DEMO account and symbols."""
+        mt5 = self._api()
+        previous_identity = self._account_identity
+        mt5.shutdown()
+        self._connected = False
+        self._resolved.clear()
+        self._server_utc_offset_s = None
+        self._offset_samples = []
+        if float(backoff_s) > 0:
+            sleep_fn(float(backoff_s))
+        self.connect()
+        account = self.account()
+        current_identity = (account.account_id, str(account.raw.get("server") or ""))
+        if previous_identity is not None and current_identity != previous_identity:
+            raise RuntimeError(
+                "MT5 account identity changed during feed recovery: "
+                f"expected={previous_identity!r} actual={current_identity!r}"
+            )
+        if not account.is_paper and not self.allow_live:
+            raise RuntimeError("MT5 recovery refused a non-DEMO account")
+        terminal = mt5.terminal_info()
+        if terminal is not None and not bool(getattr(terminal, "connected", True)):
+            raise RuntimeError("MT5 terminal is disconnected after recovery")
+        if terminal is not None and not bool(getattr(terminal, "trade_allowed", True)):
+            raise RuntimeError("MT5 terminal trade_allowed=False after recovery")
+        if not bool(account.raw.get("trade_expert", True)):
+            raise RuntimeError("MT5 account trade_expert=False after recovery")
+        resolved: dict[str, str] = {}
+        for symbol in symbols:
+            raw = self.raw_tick(symbol)
+            resolved[str(symbol)] = str(raw["resolved_symbol"])
+        return {
+            "account_id": account.account_id,
+            "server": current_identity[1],
+            "is_paper": bool(account.is_paper),
+            "symbols": list(symbols),
+            "resolved_symbols": resolved,
+        }
 
     def symbol_spec(self, symbol: str) -> dict[str, Any]:
         """Broker contract facts (Harris/Aldridge: measure costs before promoting a scalp)."""

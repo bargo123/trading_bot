@@ -72,6 +72,7 @@ from aegis.intel.ticket_metadata import (  # noqa: E402
 )
 from aegis.intel.send_guard import candidate_spread_limit  # noqa: E402
 from aegis.intel.lifecycle import aggregate_confirmed_exit_deals  # noqa: E402
+from aegis.intel.feed_recovery import recover_stalled_feed  # noqa: E402
 from aegis.intel.opportunity_engine import (  # noqa: E402
     FrozenOpportunity,
     freeze_opportunity,
@@ -4932,27 +4933,49 @@ def main() -> None:
                     next_feed_recovery_at = now_ts + max(
                         5.0, float(cfg.get("feed_recovery_backoff_s", 30.0) or 30.0)
                     )
-                    try:
-                        refresh_symbols = getattr(eng, "refresh_symbols", None)
-                        if callable(refresh_symbols):
-                            refresh_symbols(list(quote_feed_health.benchmarks))
+                    recovery = recover_stalled_feed(
+                        eng,
+                        list(quote_feed_health.benchmarks),
+                        probe_seconds=float(cfg.get("feed_recovery_probe_s", 2.0) or 2.0),
+                        poll_seconds=float(cfg.get("feed_recovery_poll_s", 0.2) or 0.2),
+                        reconnect_backoff_s=float(
+                            cfg.get("feed_recovery_reconnect_backoff_s", 1.0) or 1.0
+                        ),
+                    )
+                    if recovery.success:
+                        quote_feed_health.status = "HEALTHY"
+                        recovered_at = time.monotonic()
+                        for benchmark in recovery.advanced_symbols:
+                            quote_feed_health.last_advanced_monotonic[benchmark] = recovered_at
+                        feed_status = "HEALTHY"
+                    if recovery.success:
                         append_journal(
                             journal,
                             {
                                 "event": "feed_stalled_recovery",
                                 "benchmarks": list(quote_feed_health.benchmarks),
                                 "attempt": quote_feed_health.recovery_attempts,
-                                "backoff_s": max(5.0, float(cfg.get("feed_recovery_backoff_s", 30.0) or 30.0)),
+                                "status": recovery.status,
+                                "stage": recovery.stage,
+                                "reason": recovery.reason,
+                                "probe_attempts": recovery.attempts,
+                                "advanced_symbols": recovery.advanced_symbols,
+                                "details": recovery.details,
                             },
                         )
-                    except Exception as exc:
+                    else:
                         append_journal(
                             journal,
                             {
                                 "event": "feed_stalled_recovery_failed",
                                 "benchmarks": list(quote_feed_health.benchmarks),
                                 "attempt": quote_feed_health.recovery_attempts,
-                                "reason": f"{type(exc).__name__}:{exc}",
+                                "status": recovery.status,
+                                "stage": recovery.stage,
+                                "reason": recovery.reason,
+                                "probe_attempts": recovery.attempts,
+                                "advanced_symbols": recovery.advanced_symbols,
+                                "details": recovery.details,
                             },
                         )
                 quote_diagnostics = {}

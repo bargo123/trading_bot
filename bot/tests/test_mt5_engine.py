@@ -247,6 +247,36 @@ def test_quote_prefers_millisecond_tick_timestamp(monkeypatch):
     assert quote.time_msc == int(round((now - 0.125) * 1000))
 
 
+def test_raw_tick_returns_direct_broker_fields_without_quote_normalization():
+    api = FakeMT5()
+    api.tick.time_msc = 1_700_000_000_123
+    eng = _engine(api)
+    eng.connect()
+
+    raw = eng.raw_tick("EURUSD.gc")
+
+    assert raw["requested_symbol"] == "EURUSD.gc"
+    assert raw["resolved_symbol"] == "EURUSD"
+    assert raw["time_msc"] == 1_700_000_000_123
+    assert raw["bid"] == 1.1
+    assert raw["ask"] == 1.1002
+
+
+def test_reinitialize_connection_revalidates_demo_account_and_symbols():
+    api = FakeMT5()
+    eng = _engine(api)
+    eng.connect()
+
+    result = eng.reinitialize_connection(
+        symbols=["EURUSD"], backoff_s=0.0, sleep_fn=lambda _seconds: None
+    )
+
+    assert api.shutdown_calls == 1
+    assert result["account_id"] == "555"
+    assert result["is_paper"] is True
+    assert result["symbols"] == ["EURUSD"]
+
+
 @pytest.mark.parametrize("offset", [0, 7_200, 10_800])
 def test_server_offset_uses_millisecond_ticks_at_timezone_boundaries(monkeypatch, offset):
     import aegis.engines.mt5 as mt5_mod
