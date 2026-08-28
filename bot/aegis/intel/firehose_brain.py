@@ -1647,8 +1647,12 @@ class IntelligentFirehoseBrain:
                     p_green=p_green,
                     expected_net_value_usd=candidate_econ.expected_net_value_usd,
                 ))
-                if not forced_demo_lane or _forced_demo_hard_reasons([reason]):
-                    continue
+                # A DEMO exploration lane may operate below the 95% target,
+                # but it still needs a measured executable probability for
+                # after-cost economics.  Missing probability is not an
+                # opportunity; do not turn it into a broker order merely to
+                # keep throughput non-zero.
+                continue
             authority_observations = int(
                 getattr(candidate_evidence, "analogue_n", 0) or 0
             ) if measured_candidate_evidence else 0
@@ -1949,7 +1953,7 @@ class IntelligentFirehoseBrain:
             evidence=candidate_evidence,
             p_win=selected_p_win,
         )
-        if not exploration_econ.acceptable and not forced_mode:
+        if not exploration_econ.acceptable:
             return None, (
                 "exploration_economics_rejected:"
                 f"{exploration_econ.reason}"

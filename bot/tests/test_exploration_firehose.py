@@ -290,6 +290,7 @@ class _PositiveEvidence(_FakeEvidence):
     eligible = True
     analogue_n = 60
     analogue_n_losses = 12
+    win_probability = 0.8
     expectancy = 0.01
     profit_factor = 2.0
     uncertainty = "calibrated"
@@ -1548,7 +1549,9 @@ def _forced_candidate(*, side="buy", target_pips=5.0, stop_pips=1.0,
     )
 
 
-def _run_forced_demo_brain(tmp_path, monkeypatch, candidates, checkpoint=None):
+def _run_forced_demo_brain(
+    tmp_path, monkeypatch, candidates, checkpoint=None, evidence=None,
+):
     from aegis.intel.fast_firehose import FastMarketContext
     from aegis.intel.firehose_brain import IntelligentFirehoseBrain
 
@@ -1594,7 +1597,7 @@ def _run_forced_demo_brain(tmp_path, monkeypatch, candidates, checkpoint=None):
             "trade_tick_value": 1.0, "trade_tick_size": 0.00001,
         },
         question="forced demo test", volatility="stable", regime_label="range",
-        evidence=_FakeEvidence(), spread_price=0.00002,
+        evidence=evidence or _FakeEvidence(), spread_price=0.00002,
         actual_bid=1.1000, actual_ask=1.1002, row=row,
         completed_m1=completed, state={"session": "asia", "regime": {"label": "range"}},
         market_ctx=ctx,
@@ -1611,6 +1614,7 @@ def test_exploration_brain_forwards_runtime_checkpoint_without_changing_decision
         tmp_path,
         monkeypatch,
         [_forced_candidate()],
+        evidence=_PositiveEvidence(),
         checkpoint=lambda stage, mechanism, side, horizon: calls.append(
             (stage, mechanism, side, horizon)
         ),
@@ -1624,36 +1628,44 @@ def test_exploration_brain_forwards_runtime_checkpoint_without_changing_decision
     ]
 
 
-def test_mt5_demo_forced_lane_fires_without_probability_evidence(tmp_path, monkeypatch):
+def test_mt5_demo_forced_lane_does_not_fire_without_probability_evidence(tmp_path, monkeypatch):
     result, skip = _run_forced_demo_brain(
         tmp_path, monkeypatch, [_forced_candidate()]
     )
 
-    assert skip is None
-    assert result is not None and result.action == "fire"
-    assert result.journal["exploration_lane"] == "FORCED_DEMO_EXPLORATION"
-    assert result.journal["authority_type"] == "FORCED_DEMO_EXPLORATION"
-    assert result.journal["calibration_status"] == "UNCALIBRATED"
-    assert result.journal["p_captured_win"] is None
-    assert result.journal["p_captured_win_lcb95"] is None
-    assert result.journal["viable_candidates"]
-    assert result.journal["viable_candidates"][0]["p_captured_win"] is None
+    assert result is None
+    assert skip is not None
+    assert "no_win_probability_evidence" in skip
+
+
+def test_forced_demo_lane_rejects_missing_executable_win_evidence(tmp_path, monkeypatch):
+    result, skip = _run_forced_demo_brain(
+        tmp_path, monkeypatch, [_forced_candidate()]
+    )
+
+    assert result is None
+    assert skip is not None
+    assert "no_win_probability_evidence" in skip
 
 
 def test_forced_lane_skips_hard_blocked_candidate_and_uses_next_safe_one(tmp_path, monkeypatch):
     blocked = _forced_candidate(target_pips=0.1, stop_pips=1.0)
-    safe = _forced_candidate(side="sell", target_pips=5.0, stop_pips=1.0)
-    result, skip = _run_forced_demo_brain(tmp_path, monkeypatch, [blocked, safe])
+    safe = _forced_candidate(target_pips=5.0, stop_pips=1.0)
+    result, skip = _run_forced_demo_brain(
+        tmp_path, monkeypatch, [blocked, safe], evidence=_PositiveEvidence()
+    )
 
     assert skip is None
     assert result is not None and result.action == "fire"
-    assert result.side == "sell"
-    assert result.journal["authority_type"] == "FORCED_DEMO_EXPLORATION"
+    assert result.side == "buy"
+    assert result.journal["authority_type"] != "FORCED_DEMO_EXPLORATION"
 
 
 def test_forced_lane_is_not_available_when_every_candidate_is_hard_blocked(tmp_path, monkeypatch):
     blocked = _forced_candidate(target_pips=0.1, stop_pips=0.1)
-    result, skip = _run_forced_demo_brain(tmp_path, monkeypatch, [blocked])
+    result, skip = _run_forced_demo_brain(
+        tmp_path, monkeypatch, [blocked], evidence=_PositiveEvidence()
+    )
 
     assert result is None
     assert skip is not None
