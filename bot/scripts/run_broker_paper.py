@@ -10,7 +10,7 @@ import math
 import os
 import sys
 import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Optional
@@ -793,6 +793,7 @@ class QuoteFeedHealth:
     benchmarks: tuple[str, ...]
     last_observation: dict[str, tuple[float, float, float]]
     last_advanced_monotonic: dict[str, float]
+    last_event_wall_s: dict[str, float] = field(default_factory=dict)
     status: str = "UNKNOWN"
     stall_count: int = 0
     recovery_attempts: int = 0
@@ -815,11 +816,23 @@ class QuoteFeedHealth:
         previous = self.last_observation.get(key)
         advanced = previous is None or current[2] > previous[2] or current[:2] != previous[:2]
         self.last_observation[key] = current
+        try:
+            event_time = quote.time.timestamp()
+        except (AttributeError, TypeError, ValueError, OverflowError):
+            event_time = None
+        if event_time is not None:
+            self.last_event_wall_s[key] = float(event_time)
         if advanced:
             self.last_advanced_monotonic[key] = float(monotonic_now)
         return advanced
 
-    def evaluate(self, monotonic_now: float, *, stall_after_s: float) -> str:
+    def evaluate(
+        self,
+        monotonic_now: float,
+        *,
+        stall_after_s: float,
+        wall_now: float | None = None,
+    ) -> str:
         if not self.benchmarks:
             self.status = "UNMONITORED"
             return self.status
@@ -827,11 +840,20 @@ class QuoteFeedHealth:
         if not observed:
             self.status = "UNKNOWN"
             return self.status
-        stalled = all(
+        stalled_by_advance = all(
             monotonic_now - self.last_advanced_monotonic.get(s, monotonic_now)
             >= max(1.0, float(stall_after_s))
             for s in self.benchmarks
         )
+        stalled_by_event_age = (
+            wall_now is not None
+            and all(
+                float(wall_now) - self.last_event_wall_s.get(s, float(wall_now))
+                >= max(1.0, float(stall_after_s))
+                for s in self.benchmarks
+            )
+        )
+        stalled = stalled_by_advance or stalled_by_event_age
         previous = self.status
         self.status = "FEED_STALLED" if stalled else "HEALTHY"
         if self.status == "FEED_STALLED" and previous != self.status:
@@ -4935,6 +4957,7 @@ def main() -> None:
                 feed_status = quote_feed_health.evaluate(
                     now_mono,
                     stall_after_s=feed_stall_threshold(cfg),
+                    wall_now=now_ts,
                 )
                 if feed_status == "FEED_STALLED" and now_ts >= next_feed_recovery_at:
                     quote_feed_health.recovery_attempts += 1

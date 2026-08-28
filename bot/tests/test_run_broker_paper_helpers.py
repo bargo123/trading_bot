@@ -425,6 +425,20 @@ def test_feed_health_distinguishes_benchmark_stall_from_normal_advancement():
     assert health.evaluate(31.0, stall_after_s=30.0) == "HEALTHY"
 
 
+def test_feed_health_marks_all_benchmark_event_timestamps_stale_at_scan_boundary():
+    health = QuoteFeedHealth.for_symbols(["EURUSD", "GBPUSD", "USDJPY"])
+    for symbol in health.benchmarks:
+        quote = Quote(
+            symbol,
+            1.1,
+            1.1001,
+            pd.Timestamp(94, unit="s", tz="UTC").to_pydatetime(),
+        )
+        health.observe(symbol, quote, 0.0)
+
+    assert health.evaluate(0.0, stall_after_s=5.0, wall_now=100.0) == "FEED_STALLED"
+
+
 def test_emergency_broker_stop_is_wide_but_stays_inside_risk_budget():
     spec = {
         "name": "EURUSD",
