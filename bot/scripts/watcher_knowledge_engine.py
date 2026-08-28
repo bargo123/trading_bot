@@ -702,6 +702,13 @@ class WatcherKnowledgeEngine:
         if not isinstance(payload, Mapping):
             return
         self.seen = set(str(item) for item in payload.get("seen_event_ids", []) if item)
+        open_production = payload.get("open_production")
+        if isinstance(open_production, Mapping):
+            self.production_open = {
+                str(ticket): dict(value)
+                for ticket, value in open_production.items()
+                if isinstance(value, Mapping)
+            }
 
     def _append(self, name: str, record: Mapping[str, Any]) -> None:
         with (self.report_dir / name).open("a", encoding="utf-8") as handle:
@@ -714,6 +721,7 @@ class WatcherKnowledgeEngine:
             "seen_event_ids": sorted(self.seen),
             "open_shadow_ids": sorted(self.open_shadow),
             "open_production_tickets": sorted(self.production_open),
+            "open_production": self.production_open,
         }
         self.state_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         (self.report_dir / "strategy_stats.json").write_text(
@@ -1076,10 +1084,14 @@ class WatcherKnowledgeEngine:
     def _process_open(self, event: Mapping[str, Any]) -> None:
         ticket = _text(event.get("ticket"))
         if ticket:
+            pre_entry_state = _state_from_event(event)
+            strategy_ids = _strategy_ids(pre_entry_state)
             self.production_open[ticket] = {
                 "ticket": ticket,
                 "opened_event": dict(event),
-                "pre_entry_state": _state_from_event(event),
+                "pre_entry_state": pre_entry_state,
+                "strategy_ids": strategy_ids,
+                "context_hash": pre_entry_state.get("context_hash"),
             }
             self._append("raw_observations.jsonl", {"record_type": "production_open", **dict(event)})
 
@@ -1108,6 +1120,18 @@ class WatcherKnowledgeEngine:
         if lifecycle.get("green_then_loser") is True or event.get("green_then_loser") is True:
             labels.append("GREEN_THEN_LOSER")
         state = dict(opened.get("pre_entry_state") or _state_from_event(event))
+        # Strategy membership and context are frozen at open. A close event is
+        # not allowed to introduce post-entry attribution.
+        for key in ("strategy_ids", "strategy_id", "strategy_record_id", "hypothesis_id"):
+            state.pop(key, None)
+        frozen_strategy_ids = [str(item) for item in opened.get("strategy_ids", []) if item]
+        if frozen_strategy_ids:
+            state["strategy_ids"] = frozen_strategy_ids
+        if opened.get("context_hash"):
+            state["context_hash"] = opened["context_hash"]
+        elif not opened:
+            state.pop("context_hash", None)
+        attribution_status = "ATTRIBUTED" if frozen_strategy_ids else "UNATTRIBUTED"
         quotes = event.get("counterfactual_quotes") or event.get("quotes") or []
         counterfactuals = replay_counterfactuals(
             state,
@@ -1122,6 +1146,7 @@ class WatcherKnowledgeEngine:
             "ticket": ticket or None,
             "broker_confirmed": True,
             "realized_net_usd": net,
+            "attribution_status": attribution_status,
             "classification": classification,
             "lifecycle_labels": labels,
             "features": state,
