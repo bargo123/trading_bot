@@ -439,6 +439,13 @@ def test_feed_health_marks_all_benchmark_event_timestamps_stale_at_scan_boundary
     assert health.evaluate(0.0, stall_after_s=5.0, wall_now=100.0) == "FEED_STALLED"
 
 
+def test_feed_health_snapshot_exposes_recovery_success_count():
+    health = QuoteFeedHealth.for_symbols(["EURUSD"])
+    health.recovery_successes = 2
+
+    assert health.snapshot()["recovery_successes"] == 2
+
+
 def test_emergency_broker_stop_is_wide_but_stays_inside_risk_budget():
     spec = {
         "name": "EURUSD",

@@ -797,6 +797,7 @@ class QuoteFeedHealth:
     status: str = "UNKNOWN"
     stall_count: int = 0
     recovery_attempts: int = 0
+    recovery_successes: int = 0
 
     @classmethod
     def for_symbols(cls, symbols: list[str]) -> "QuoteFeedHealth":
@@ -865,6 +866,7 @@ class QuoteFeedHealth:
             "status": self.status,
             "stall_count": int(self.stall_count),
             "recovery_attempts": int(self.recovery_attempts),
+            "recovery_successes": int(self.recovery_successes),
             "benchmarks": list(self.benchmarks),
         }
 
@@ -4974,6 +4976,7 @@ def main() -> None:
                         ),
                     )
                     if recovery.success:
+                        quote_feed_health.recovery_successes += 1
                         quote_feed_health.status = "HEALTHY"
                         recovered_at = time.monotonic()
                         for benchmark in recovery.advanced_symbols:
@@ -5465,6 +5468,7 @@ def main() -> None:
                     ),
                     "FEED_STALL_COUNT": int(quote_feed_health.stall_count),
                     "FEED_RECOVERY_ATTEMPTS": int(quote_feed_health.recovery_attempts),
+                    "FEED_RECOVERY_SUCCESS": int(quote_feed_health.recovery_successes),
                     "ORDER_CHECK_ATTEMPTS": int(
                         quote_refresh_counts.get("order_check_attempts", 0) or 0
                     ),
