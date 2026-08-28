@@ -725,6 +725,27 @@ def test_merge_firehose_funnel_counts_preserves_observed_halted_scans():
     assert merged == {"SCANS": 7, "RISK_REJECT": 3, "FIRES": 2}
 
 
+def test_merge_firehose_funnel_counts_preserves_selection_diagnostics():
+    merged = merge_firehose_funnel_counts(
+        {"SCANS": 7, "BEST_OVERALL_SIDE": "buy"},
+        {
+            "SCANS": 8,
+            "BEST_BUY_SCORE": -0.01,
+            "BEST_SELL_SCORE": 0.03,
+            "BEST_OVERALL_SIDE": "sell",
+            "BEST_SELL_CANDIDATE": {"variant_id": "snapback:sell:10s"},
+            "NO_ORDER_REASON": "NO_EXECUTABLE_AFTER_COST_EDGE",
+        },
+    )
+
+    assert merged["SCANS"] == 8
+    assert merged["BEST_BUY_SCORE"] == -0.01
+    assert merged["BEST_SELL_SCORE"] == 0.03
+    assert merged["BEST_OVERALL_SIDE"] == "sell"
+    assert merged["BEST_SELL_CANDIDATE"]["variant_id"] == "snapback:sell:10s"
+    assert merged["NO_ORDER_REASON"] == "NO_EXECUTABLE_AFTER_COST_EDGE"
+
+
 def test_record_funnel_execution_counts_only_real_submission_and_fill():
     counts = {"FIRES": 0, "FILLS": 0}
 

@@ -903,9 +903,21 @@ def merge_firehose_funnel_counts(
             "FIRES", "FILLS",
         )
     }
-    merged: dict[str, int] = {}
+    diagnostic_keys = {
+        "BEST_BUY_SCORE", "BEST_SELL_SCORE", "BEST_BUY_CANDIDATE",
+        "BEST_SELL_CANDIDATE", "BEST_OVERALL_SIDE", "BEST_SCORE_TYPE",
+        "BEST_AVAILABLE_SYMBOL", "BEST_AVAILABLE_SIDE",
+        "BEST_AVAILABLE_HORIZON", "BEST_AVAILABLE_MECHANISM",
+        "WHY_NO_ORDER", "NO_ORDER_REASON",
+        "BEST_REJECTED_CANDIDATE_EV", "BEST_REJECTED_CANDIDATE_P_GREEN",
+        "BEST_REJECTED_REASON",
+    }
+    merged: dict[str, object] = {}
     for source in (base or {}, observed or {}):
         for stage, value in source.items():
+            if str(stage) in diagnostic_keys:
+                merged[str(stage)] = value
+                continue
             try:
                 count = max(0, int(value or 0))
             except (TypeError, ValueError):
@@ -914,15 +926,6 @@ def merge_firehose_funnel_counts(
             merged[key] = max(merged.get(key, 0), count)
     # The funnel also carries diagnostic values, not counters. Keep these
     # values truthful instead of coercing ``None``/text to zero.
-    for key in (
-        "BEST_REJECTED_CANDIDATE_EV",
-        "BEST_REJECTED_CANDIDATE_P_GREEN",
-        "BEST_REJECTED_REASON",
-    ):
-        if key in (observed or {}):
-            merged[key] = (observed or {})[key]
-        elif key in (base or {}):
-            merged[key] = (base or {})[key]
     return merged
 
 
