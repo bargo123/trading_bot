@@ -1618,22 +1618,32 @@ class IntelligentFirehoseBrain:
                 volume_step=float(spec.get("volume_step", 0.01) or 0.01),
             )
             if not sizing_preview.get("allowed"):
+                _min_lot_risk = float(sizing_preview.get("actual_min_lot_risk_usd") or 0.0)
+                _desired_risk = float(sizing_preview.get("desired_risk_usd") or 0.0)
+                _excess_usd = round(max(0.0, _min_lot_risk - _desired_risk), 4)
                 reason = str(sizing_preview.get("reason") or "RISK_GRANULARITY_BLOCKED")
-                all_rejections.append(reason)
-                distance = dict(econ.get("distance_to_eligibility") or {})
-                distance["risk_excess_usd"] = round(max(
-                    0.0,
-                    float(sizing_preview.get("actual_min_lot_risk_usd") or 0.0)
-                    - float(sizing_preview.get("desired_risk_usd") or 0.0),
-                ), 4)
-                candidate_evaluations.append(self._record_search_evaluation(
-                    candidate=mc,
-                    reasons=[reason],
-                    distance=distance,
-                    near_eligible=False,
-                    p_green=p_green,
-                ))
-                continue
+                _risk_cap = _desired_risk * float(self.cfg.get("forced_demo_risk_cap_multiplier", 5.0) or 5.0)
+                _forced_ok = forced_demo_lane and _min_lot_risk > 0 and _min_lot_risk <= _risk_cap + 1e-9
+                if _forced_ok:
+                    _vmin = float(spec.get("volume_min", 0.01) or 0.01)
+                    sizing_preview = {"allowed": True, "lots": _vmin,
+                                      "reason": "forced_demo_min_lot",
+                                      "desired_risk_usd": round(_desired_risk, 4),
+                                      "actual_min_lot_risk_usd": round(_min_lot_risk, 4)}
+                    quality_reasons.append(f"forced_demo_min_lot:excess={_excess_usd}")
+                else:
+                    all_rejections.append(reason)
+                    distance = dict(econ.get("distance_to_eligibility") or {})
+                    distance["risk_excess_usd"] = _excess_usd
+                    candidate_evaluations.append(self._record_search_evaluation(
+                        candidate=mc,
+                        reasons=[reason],
+                        distance=distance,
+                        near_eligible=False,
+                        p_green=p_green,
+                    ))
+                    continue
+
 
             candidate_portfolio_ok, candidate_portfolio_reason = pretrade_ok(
                 positions=list(positions),
@@ -1997,10 +2007,17 @@ class IntelligentFirehoseBrain:
             p_win=selected_p_win,
         )
         if not exploration_econ.acceptable:
-            return None, (
-                "exploration_economics_rejected:"
-                f"{exploration_econ.reason}"
-            )
+            # In forced_demo_lane, missing win-probability evidence is
+            # handled by forced_demo_exploration_uncalibrated below.
+            # Only hard rejections (negative EV, geometry) block here.
+            if not (
+                forced_mode
+                and exploration_econ.reason == "no_win_probability_evidence"
+            ):
+                return None, (
+                    "exploration_economics_rejected:"
+                    f"{exploration_econ.reason}"
+                )
         if forced_mode:
             capture_authorization = CaptureAuthorization(
                 authorized=False,
