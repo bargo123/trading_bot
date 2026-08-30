@@ -1704,8 +1704,10 @@ class IntelligentFirehoseBrain:
                 # but it still needs a measured executable probability for
                 # after-cost economics.  Missing probability is not an
                 # opportunity; do not turn it into a broker order merely to
-                # keep throughput non-zero.
-                continue
+                # keep throughput non-zero.  In forced_demo_lane, however,
+                # evidence-collection with minimum risk is explicitly allowed.
+                if not (forced_demo_lane and reason == "no_win_probability_evidence"):
+                    continue
             authority_observations = int(
                 getattr(candidate_evidence, "analogue_n", 0) or 0
             ) if measured_candidate_evidence else 0

@@ -1628,24 +1628,31 @@ def test_exploration_brain_forwards_runtime_checkpoint_without_changing_decision
     ]
 
 
-def test_mt5_demo_forced_lane_does_not_fire_without_probability_evidence(tmp_path, monkeypatch):
+def test_mt5_demo_forced_lane_fires_for_evidence_collection(tmp_path, monkeypatch):
+    # forced_demo_lane exists to collect evidence even without probability data.
+    # Fix 3 allows inner loop to proceed to forced_pool instead of hard-continuing.
     result, skip = _run_forced_demo_brain(
         tmp_path, monkeypatch, [_forced_candidate()]
     )
 
-    assert result is None
-    assert skip is not None
-    assert "no_win_probability_evidence" in skip
+    assert skip is None
+    assert result is not None and result.action == "fire"
+    assert result.journal.get("exploration_authority") == "FORCED_DEMO_EXPLORATION"
+    assert result.journal.get("calibration_status") == "UNCALIBRATED"
 
 
-def test_forced_demo_lane_rejects_missing_executable_win_evidence(tmp_path, monkeypatch):
+
+
+def test_forced_demo_lane_accepts_evidence_collection_without_probability(tmp_path, monkeypatch):
     result, skip = _run_forced_demo_brain(
         tmp_path, monkeypatch, [_forced_candidate()]
     )
 
-    assert result is None
-    assert skip is not None
-    assert "no_win_probability_evidence" in skip
+    assert skip is None
+    assert result is not None and result.action == "fire"
+    assert result.journal.get("exploration_authority") == "FORCED_DEMO_EXPLORATION"
+
+
 
 
 def test_forced_lane_skips_hard_blocked_candidate_and_uses_next_safe_one(tmp_path, monkeypatch):
