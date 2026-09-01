@@ -85,8 +85,17 @@ bot/reports/research/book_strategy_registry.jsonl
 bot/reports/research/*_runs/
 bot/reports/research/short_horizon_candidate*/
 bot/reports/research/short_horizon_clean_probe*/
+bot/reports/research/selected_strategy_replay*.json
+bot/reports/research/book_strategy_historical_replay*.json
+bot/reports/research/book_consensus_historical_replay*.json
+bot/reports/research/external_dag_manifest.json
+bot/reports/research/watcher_algorithm_historical_replay*.json
+bot/reports/research/ml_pipeline.json
+bot/reports/research/fast_trade_autopsy.json
+bot/reports/council/live.jsonl
 bot/reports/FIREHOSE_STOP*
 bot/reports/*.err
+bot/intel/outcome_log.jsonl
 bot/research/fast_edge_shadow_rows*.jsonl
 bot/research/books_index.sqlite
 bot/intel/analogue_index.json
