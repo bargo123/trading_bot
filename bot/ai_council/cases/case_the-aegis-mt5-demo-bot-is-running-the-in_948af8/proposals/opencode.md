@@ -1,0 +1,1 @@
+Test a spread-adaptive entry filter that abstains when the current spread exceeds the symbol’s rolling 80th percentile. Compare it against the unchanged validated-state baseline on a sealed DEMO replay set, net of configured spread and slippage. Retain it only if net expectancy improves and trade count remains at least 70% of baseline without worsening maximum drawdown.

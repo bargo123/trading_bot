@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Aegis signals through a broker engine (IBKR paper first; MT5 later)."""
+"""Run AEGIS through its governed broker engine; MT5 DEMO is the execution path."""
 from __future__ import annotations
 
 import argparse
@@ -71,14 +71,36 @@ from aegis.intel.ticket_metadata import (  # noqa: E402
     firehose_lifecycle_identity,
 )
 from aegis.intel.send_guard import candidate_spread_limit  # noqa: E402
+from aegis.intel.trade_economics import broker_tick_size, broker_tick_value  # noqa: E402
 from aegis.intel.lifecycle import aggregate_confirmed_exit_deals  # noqa: E402
 from aegis.intel.feed_recovery import recover_stalled_feed  # noqa: E402
 from aegis.intel.opportunity_engine import (  # noqa: E402
     FrozenOpportunity,
     freeze_opportunity,
 )
+from aegis.intel.integration_contracts import (  # noqa: E402
+    BrokerSpecSnapshot,
+    CloseIntent,
+    ConfirmedClose,
+    ConfirmedOutcome,
+    EventLedger,
+    ExecutionReport,
+    FillEvent,
+    FirehoseContract,
+    MarketEvent,
+    OrderAcknowledgement,
+    OrderIntent,
+    PositionEvent,
+    PreflightResult,
+    ReconciliationEvent,
+    make_contract_event,
+)
 
 logger = logging.getLogger(__name__)
+
+_PREDICTION_SCOPE = "GITHUB_TOOLS_AND_BOOK_ALGORITHMS_ONLY"
+_BOOK_RANKING_ROLE = "secondary_tiebreak_after_capture_confidence_and_ev"
+_BOOK_ALGORITHM_REGISTRY_COUNT = 616
 
 
 def video_style_signal_for_scan(
@@ -96,6 +118,71 @@ def video_style_signal_for_scan(
         return video_style_signal(completed_m1, symbol=symbol)
     except (AttributeError, KeyError, TypeError, ValueError):
         return None
+
+
+def market_event_from_quote(
+    symbol: str,
+    quote: Any,
+    *,
+    event_id: str | None = None,
+    session: str | None = None,
+) -> MarketEvent:
+    """Convert one raw MT5 quote into a causal, read-only market contract.
+
+    Broker event time is preserved.  Local retrieval time is deliberately not
+    used as the event timestamp, so a stale quote cannot enter the feature
+    buffer disguised as a fresh observation.
+    """
+    raw_time_msc = getattr(quote, "raw_time_msc", None)
+    try:
+        raw_time_msc_value = int(raw_time_msc) if raw_time_msc not in (None, "") else 0
+    except (TypeError, ValueError, OverflowError):
+        raw_time_msc_value = 0
+    normalized_time_msc = getattr(quote, "time_msc", None)
+    try:
+        normalized_time_msc_value = (
+            int(normalized_time_msc)
+            if normalized_time_msc not in (None, "") else 0
+        )
+    except (TypeError, ValueError, OverflowError):
+        normalized_time_msc_value = 0
+    if normalized_time_msc_value > 0:
+        event_ts = normalized_time_msc_value / 1000.0
+    else:
+        timestamp = getattr(quote, "time", None)
+        if timestamp is not None and hasattr(timestamp, "timestamp"):
+            event_ts = float(timestamp.timestamp())
+        elif raw_time_msc_value > 0:
+            event_ts = raw_time_msc_value / 1000.0
+        else:
+            raise ValueError("quote_missing_broker_timestamp")
+    bid = float(getattr(quote, "bid"))
+    ask = float(getattr(quote, "ask"))
+    normalized_symbol = str(symbol or "").upper()
+    identity = (
+        f"{normalized_symbol}|{raw_time_msc_value}|{normalized_time_msc_value}|"
+        f"{event_ts:.6f}|"
+        f"{bid:.12g}|{ask:.12g}"
+    )
+    payload: dict[str, Any] = {
+        "bid": bid,
+        "ask": ask,
+        "mid": (bid + ask) / 2.0,
+        "raw_time_msc": raw_time_msc_value or None,
+        "normalized_time_msc": normalized_time_msc_value or None,
+        "quote_source": "mt5.symbol_info_tick",
+    }
+    if session:
+        payload["session"] = str(session)
+    return MarketEvent(
+        event_id=event_id or hashlib.sha256(identity.encode("utf-8")).hexdigest(),
+        correlation_id=f"market:{normalized_symbol}",
+        symbol=normalized_symbol,
+        event_ts=event_ts,
+        source="mt5.symbol_info_tick",
+        status="OBSERVED",
+        payload=payload,
+    )
 
 
 def intelligent_refresh_spread_limit(decision, cfg) -> float:
@@ -204,6 +291,7 @@ def firehose_decision_snapshot(
         ),
         "ranking": comparison.get("ranking", []),
         "market_state": market_state,
+        "watcher_advisory": dict(journal.get("watcher_advisory") or {}),
         "economics": economics,
         "risk": {
             "quantity": float(qty),
@@ -213,6 +301,36 @@ def firehose_decision_snapshot(
             "spread": float(spread),
             "quote_age_s": float(quote_age),
         },
+    }
+
+
+def watcher_funnel_fields(
+    advisory: Mapping[str, Any] | None,
+) -> dict[str, object]:
+    """Expose compact read-only Watcher proof on runner funnel events."""
+    if not isinstance(advisory, Mapping):
+        return {}
+
+    def integer(key: str) -> int:
+        try:
+            return max(0, int(advisory.get(key) or 0))
+        except (TypeError, ValueError, OverflowError):
+            return 0
+
+    return {
+        "watcher_status": str(advisory.get("status") or "UNAVAILABLE"),
+        "watcher_algorithm_count": integer("algorithm_count"),
+        "watcher_evaluated_count": integer("evaluated_count"),
+        "watcher_applicable_count": integer("applicable_count"),
+        "watcher_consensus": advisory.get("consensus"),
+        "watcher_supporting_count": integer("supporting_algorithm_count"),
+        "watcher_opposing_count": integer("opposing_algorithm_count"),
+        "watcher_result_sha256": advisory.get("algorithm_result_sha256"),
+        "watcher_execution_authority": bool(
+            advisory.get("execution_authority") is True
+        ),
+        "watcher_research_only": bool(advisory.get("research_only") is True),
+        "watcher_order_intent": bool(advisory.get("order_intent") is True),
     }
 
 
@@ -295,6 +413,9 @@ def frozen_opportunity_from_decision(
         "calibration_status": journal.get("calibration_status"),
         "selection_score": journal.get("selection_score"),
         "selection_score_type": journal.get("selection_score_type"),
+        "book_support_score": journal.get("book_support_score"),
+        "book_signal_rows": list(journal.get("book_signal_rows") or [])
+        if isinstance(journal.get("book_signal_rows"), list) else [],
         "authority_probability": authority_probability,
         "authority_capture_lcb95": authority_lcb,
         "authority_expected_net_ev": expected_ev,
@@ -440,11 +561,8 @@ def exploration_order_risk_check(
     if stop is None:
         return {"allowed": False, "reason": "exploration_stop_required", "max_lots": 0.0}
     broker_spec = dict(spec or {})
-    tick_values = [
-        float(broker_spec.get(name) or 0.0)
-        for name in ("trade_tick_value_profit", "trade_tick_value_loss", "trade_tick_value")
-    ]
-    tick_value = max(tick_values) if any(tick_values) else None
+    tick_value = broker_tick_value(broker_spec)
+    tick_size = broker_tick_size(broker_spec)
     from aegis.intel.exploration import risk_lots_for_exploration
 
     sizing = risk_lots_for_exploration(
@@ -454,7 +572,7 @@ def exploration_order_risk_check(
         pip=float(pip),
         contract_size=float(broker_spec.get("trade_contract_size") or 100000.0),
         tick_value=tick_value,
-        tick_size=float(broker_spec.get("trade_tick_size") or 0.0) or None,
+        tick_size=tick_size,
         volume_min=float(broker_spec.get("volume_min") or 0.01),
         volume_step=float(broker_spec.get("volume_step") or 0.01),
     )
@@ -612,6 +730,17 @@ def append_journal(path: Path, event: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(event, default=str) + "\n")
+
+
+def append_firehose_contract(
+    journal_path: Path,
+    contract_cls: type[FirehoseContract],
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Append one typed lifecycle record without granting execution authority."""
+    event = make_contract_event(contract_cls, **kwargs)
+    append_journal(journal_path, event)
+    return event
 
 
 def fast_exit_error_event(
@@ -995,6 +1124,13 @@ def record_global_lane_selection(
             counts["BOOK_DERIVED_SELECTED"] = int(
                 counts.get("BOOK_DERIVED_SELECTED", 0)
             ) + 1
+        signals = row.get("book_signal_rows")
+        if not isinstance(signals, list) and isinstance(decision_journal, Mapping):
+            signals = decision_journal.get("book_signal_rows")
+        if isinstance(signals, list):
+            counts["BOOK_SIGNALS_SELECTED"] = int(
+                counts.get("BOOK_SIGNALS_SELECTED", 0)
+            ) + len(signals)
 
 
 def write_runner_heartbeat(
@@ -1015,6 +1151,11 @@ def write_runner_heartbeat(
         "iso": datetime.fromtimestamp(timestamp, timezone.utc).isoformat(),
         "symbols": symbols,
         "qty": qty,
+        "prediction_scope": _PREDICTION_SCOPE,
+        "council_influence": False,
+        "research_factory_influence": False,
+        "book_algorithm_registry_count": _BOOK_ALGORITHM_REGISTRY_COUNT,
+        "book_ranking_role": _BOOK_RANKING_ROLE,
         "firehose_turnover": metrics.snapshot(timestamp),
     }
     if extra:
@@ -1028,8 +1169,19 @@ def _write_text_atomically(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
-        temporary.write_text(str(text), encoding="utf-8")
-        os.replace(str(temporary), str(path))
+        # Windows can briefly refuse the replacement when a dashboard or
+        # another read-only observer has the previous report open.  Retry
+        # only that transient filesystem condition; permanent failures still
+        # propagate so heartbeat loss is visible rather than silently hidden.
+        for attempt in range(4):
+            temporary.write_text(str(text), encoding="utf-8")
+            try:
+                os.replace(str(temporary), str(path))
+                return
+            except PermissionError:
+                if attempt >= 3:
+                    raise
+                time.sleep(0.02 * (attempt + 1))
     finally:
         try:
             temporary.unlink()
@@ -2333,6 +2485,41 @@ def finalize_confirmed_firehose_close(
                 "message": str(exc)[:200],
             })
 
+    _close_symbol = str(getattr(position, "symbol", "") or "").upper()
+    _close_strategy = str(
+        getattr(exact_metadata, "strategy_family", "") or ""
+    ) if exact_metadata is not None else ""
+    _close_experiment = str(
+        getattr(exact_metadata, "hypothesis_id", "") or ""
+    ) if exact_metadata is not None else ""
+    _close_basket = str(
+        getattr(exact_metadata, "basket_id", "") or ""
+    ) if exact_metadata is not None else ""
+    journal_append(make_contract_event(
+        ConfirmedOutcome,
+        event_id=f"outcome:{ticket_id}:{int(float(closed_at) * 1000)}",
+        correlation_id=f"ticket:{ticket_id}",
+        symbol=_close_symbol,
+        event_ts=float(closed_at),
+        source="run_broker_paper",
+        status="RECORDED" if learning_status else "CONFIRMED",
+        reason="broker_confirmed_close_learning",
+        strategy_id=_close_strategy,
+        experiment_id=_close_experiment,
+        basket_id=_close_basket,
+        payload={
+            "ticket": ticket_id,
+            "learning_status": learning_status,
+            "realized_net_usd": close_facts.get("realized_net_usd")
+            if broker_confirmed else None,
+            "cost_usd": close_facts.get("cost_usd") if broker_confirmed else None,
+            "broker_evidence_status": (
+                "BROKER_CONFIRMED" if broker_confirmed
+                else "INCOMPLETE_BROKER_EVIDENCE"
+            ),
+        },
+    ))
+
     journal_append({
         "event": "firehose_close",
         "ticket": ticket_id,
@@ -2362,6 +2549,27 @@ def finalize_confirmed_firehose_close(
         )
     basket_removal = cleanup_result.get("basket_removal", cleanup_result)
     close_cleanup = cleanup_result.get("close_cleanup")
+
+    journal_append(make_contract_event(
+        ConfirmedClose,
+        event_id=f"confirmed-close:{ticket_id}:{int(float(closed_at) * 1000)}",
+        correlation_id=f"ticket:{ticket_id}",
+        symbol=_close_symbol,
+        event_ts=float(closed_at),
+        source="run_broker_paper",
+        status="BROKER_CONFIRMED" if broker_confirmed else "CONFIRMED",
+        reason=str(exit_reason or "unknown"),
+        strategy_id=_close_strategy,
+        experiment_id=_close_experiment,
+        basket_id=_close_basket,
+        payload={
+            "ticket": ticket_id,
+            "broker_close_facts": dict(close_facts),
+            "remaining_ev": remaining_ev,
+            "slot_released": bool(close_cleanup and close_cleanup.slot_released),
+            "basket_closed": bool(close_cleanup and close_cleanup.basket_closed),
+        },
+    ))
 
     from aegis.intel.firehose_turnover import basket_lifecycle_trace
 
@@ -2409,6 +2617,18 @@ def finalize_confirmed_firehose_close(
 def legacy_normal_exit_enabled(intelligent_mode: bool) -> bool:
     """Keep legacy CORE exits out of the intelligent Firehose lane."""
     return not bool(intelligent_mode)
+
+
+def reconnect_engine_for_retry(engine: Any) -> tuple[bool, str]:
+    """Retry a broker connection without hiding the fail-closed reason."""
+    connect = getattr(engine, "connect", None)
+    if not callable(connect):
+        return False, "connect_unavailable"
+    try:
+        connect()
+    except Exception as exc:
+        return False, f"{type(exc).__name__}:{exc}"
+    return True, ""
 
 
 def main() -> None:
@@ -2492,6 +2712,28 @@ def main() -> None:
     next_feed_recovery_at = 0.0
     last_intel_journal: dict[str, float] = {}
     intelligent_brain = None
+    from aegis.intel.execution_bundle import ExecutionBundleLoader, ExecutionContext
+
+    execution_context = ExecutionContext()
+    execution_bundle_config = cfg.get("execution_bundle_path")
+    execution_bundle_path = (
+        Path(str(execution_bundle_config))
+        if execution_bundle_config
+        else ROOT / "intel" / "execution_bundle.json"
+    )
+    if not execution_bundle_path.is_absolute():
+        execution_bundle_path = ROOT / execution_bundle_path
+    execution_bundle_loader = ExecutionBundleLoader(
+        execution_bundle_path,
+        context=execution_context,
+    )
+    execution_bundle_status: dict[str, Any] = {
+        "status": "NOT_CHECKED",
+        "reason": "",
+        "bundle_hash": None,
+        "path": str(execution_bundle_path),
+    }
+    last_execution_bundle_event: tuple[str, str, str | None] | None = None
     from aegis.intel.lifecycle import ingest_deals, load_cursor, save_cursor
 
     reconcile_cursor_path = ROOT / "reports" / "reconcile_cursor.json"
@@ -2525,11 +2767,17 @@ def main() -> None:
         "order_check_pass": 0,
         "order_check_fail": 0,
         "execution_revalidation_pass": 0,
+        "causal_events_accepted": 0,
+        "causal_events_quarantined": 0,
     }
     quote_refresh_wait_ms: list[float] = []
     quote_local_acquisition_age_ms: list[float] = []
     broker_event_age_s: list[float] = []
     quote_feed_health = QuoteFeedHealth.for_symbols(symbols)
+    causal_event_ledger = EventLedger(
+        max_quote_age_s=float(cfg.get("max_quote_age_s", 5.0) or 5.0),
+        future_tolerance_s=0.0,
+    )
     last_quote_diagnostics: dict[str, dict[str, Any]] = {}
     last_quote_acquired_monotonic: dict[str, float] = {}
     observed_funnel_counts: dict[str, int] = {"SCANS": 0, "RISK_REJECT": 0}
@@ -3319,7 +3567,16 @@ def main() -> None:
                 from aegis.strategy import Signal
 
                 if intelligent_brain is None:
-                    intelligent_brain = IntelligentFirehoseBrain(cfg)
+                    # Run the complete Watcher as read-only advisory evidence
+                    # inside the governed Firehose brain.  This local flag does
+                    # not grant execution authority; the runner remains the
+                    # only component that can submit MT5 orders.
+                    brain_cfg = dict(cfg)
+                    brain_cfg.setdefault("watcher_runtime_enabled", True)
+                    intelligent_brain = IntelligentFirehoseBrain(
+                        brain_cfg,
+                        execution_context=execution_context,
+                    )
                     try:
                         intelligent_brain.outcome_memory.import_historical_confirmed_trades(
                             ROOT / "intel" / "outcome_log.jsonl"
@@ -3437,6 +3694,9 @@ def main() -> None:
                         "brain_intent": decision.action in {"fire", "scale"},
                         "submitted": False,
                         "filled": False,
+                        **watcher_funnel_fields(
+                            decision.journal.get("watcher_advisory")
+                        ),
                     },
                 )
                 if decision.action in {"exit", "reduce"}:
@@ -3480,6 +3740,44 @@ def main() -> None:
                             ticket = str(getattr(pos, "ticket", "") or "").strip()
                             if not ticket:
                                 continue
+                            _brain_close_metadata = ticket_metadata_store.get(ticket)
+                            append_firehose_contract(
+                                journal,
+                                CloseIntent,
+                                event_id=f"close-intent:{ticket}:{time.time_ns()}",
+                                correlation_id=f"ticket:{ticket}",
+                                symbol=str(getattr(pos, "symbol", "")),
+                                event_ts=time.time(),
+                                source="run_broker_paper",
+                                status="REQUESTED",
+                                reason=str(controller_exit.get("reason") or "")[:200],
+                                strategy_id=str(
+                                    getattr(
+                                        _brain_close_metadata,
+                                        "strategy_family",
+                                        "",
+                                    ) or ""
+                                ),
+                                experiment_id=str(
+                                    getattr(
+                                        _brain_close_metadata,
+                                        "hypothesis_id",
+                                        "",
+                                    ) or ""
+                                ),
+                                basket_id=str(
+                                    getattr(_brain_close_metadata, "basket_id", "")
+                                    or ""
+                                ),
+                                payload={
+                                    "ticket": ticket,
+                                    "action": controller_exit.get("action"),
+                                    "why": controller_exit.get("why"),
+                                    "floating_pnl": float(
+                                        getattr(pos, "unrealized_pnl", 0) or 0
+                                    ),
+                                },
+                            )
                             res = eng.close_ticket(ticket)
                             append_journal(
                                 journal,
@@ -4402,6 +4700,116 @@ def main() -> None:
                 spread=live_spread,
                 quote_age=quote_age_s(q),
             )
+            _decision_journal = dict(
+                getattr(brain_decision, "journal", {}) or {}
+            ) if brain_decision is not None else {}
+            _contract_now = time.time()
+            _contract_strategy_id = str(
+                _decision_journal.get("variant_id")
+                or _decision_journal.get("hypothesis_id")
+                or ""
+            )
+            _contract_experiment_id = str(
+                _decision_journal.get("hypothesis_id") or ""
+            )
+            _watcher = _decision_journal.get("watcher_advisory")
+            _watcher = dict(_watcher) if isinstance(_watcher, Mapping) else {}
+            _contract_payload = {
+                "request": {
+                    "side": str(req.side).upper(),
+                    "quantity": float(req.quantity),
+                    "kind": str(req.kind),
+                    "limit_price": req.limit_price,
+                    "stop_loss": req.stop_loss,
+                    "take_profit": req.take_profit,
+                    "broker_stop_loss": req.broker_stop_loss,
+                    "broker_take_profit": req.broker_take_profit,
+                    "client_tag": client_tag,
+                },
+                "quote": {
+                    "bid": float(q.bid),
+                    "ask": float(q.ask),
+                    "age_s": float(quote_age_s(q)),
+                    "spread": float(live_spread),
+                },
+                "lane": (
+                    "exploration" if _decision_journal.get("exploration")
+                    else "validated"
+                ),
+                "send_orders_enabled": bool(send_orders),
+                "watcher_status": _watcher.get("status"),
+                "watcher_execution_authority": bool(
+                    _watcher.get("execution_authority") is True
+                ),
+                "watcher_research_only": bool(
+                    _watcher.get("research_only") is True
+                ),
+                "watcher_order_intent": bool(
+                    _watcher.get("order_intent") is True
+                ),
+                "book_support_score": _decision_journal.get("book_support_score"),
+                "book_signal_count": len(
+                    _decision_journal.get("book_signal_rows")
+                    if isinstance(_decision_journal.get("book_signal_rows"), list)
+                    else []
+                ),
+            }
+            append_firehose_contract(
+                journal,
+                OrderIntent,
+                event_id=f"intent:{client_tag}",
+                correlation_id=f"scan:{scan_id}",
+                symbol=sym,
+                event_ts=_contract_now,
+                source="run_broker_paper",
+                status="READY",
+                reason="brain_candidate_passed_local_gates",
+                strategy_id=_contract_strategy_id,
+                experiment_id=_contract_experiment_id,
+                payload=_contract_payload,
+            )
+            append_firehose_contract(
+                journal,
+                BrokerSpecSnapshot,
+                event_id=f"broker-spec:{client_tag}",
+                correlation_id=f"scan:{scan_id}",
+                symbol=sym,
+                event_ts=_contract_now,
+                source="run_broker_paper",
+                status="OBSERVED",
+                reason="broker_contract_snapshot_before_order_send",
+                strategy_id=_contract_strategy_id,
+                experiment_id=_contract_experiment_id,
+                payload={
+                    "symbol": sym,
+                    "spec": dict(spec_pre) if isinstance(spec_pre, Mapping) else {},
+                    "quote": {
+                        "bid": float(q.bid),
+                        "ask": float(q.ask),
+                        "age_s": float(quote_age_s(q)),
+                    },
+                },
+            )
+            append_firehose_contract(
+                journal,
+                PreflightResult,
+                event_id=f"preflight:{client_tag}",
+                correlation_id=f"scan:{scan_id}",
+                symbol=sym,
+                event_ts=_contract_now,
+                source="run_broker_paper",
+                status="PASS",
+                reason="fresh_quote_risk_margin_oms_revalidation_pass",
+                strategy_id=_contract_strategy_id,
+                experiment_id=_contract_experiment_id,
+                payload={
+                    **_contract_payload,
+                    "broker_spec_available": bool(spec_pre),
+                    "risk_revalidated": True,
+                    "margin_revalidated": bool(funds is not None),
+                    "oms_revalidated": True,
+                },
+            )
             if brain_decision is not None and send_orders:
                 pending_metadata = pending_order_lifecycle_metadata(
                     decision=brain_decision,
@@ -4445,6 +4853,9 @@ def main() -> None:
                         "brain_intent": True,
                         "submitted": False,
                         "filled": False,
+                        **watcher_funnel_fields(
+                            brain_decision.journal.get("watcher_advisory")
+                        ),
                     },
                 )
             local_age_ms = max(
@@ -4521,14 +4932,99 @@ def main() -> None:
                     observed_funnel_counts, submitted=True, filled=False
                 )
             latency.response_ts = time.time()
+            positions_after = list(eng.positions(sym))
             audit = classify_execution(
                 ok=res.ok,
                 message=res.message,
                 filled=res.filled,
                 positions_before=positions_before,
-                positions_after=list(eng.positions(sym)),
+                positions_after=positions_after,
             )
             status = audit["status"]
+            _ack_status = "ACCEPTED" if res.ok else "REJECTED"
+            append_firehose_contract(
+                journal,
+                OrderAcknowledgement,
+                event_id=f"ack:{client_tag}",
+                correlation_id=f"scan:{scan_id}",
+                symbol=sym,
+                event_ts=time.time(),
+                source="run_broker_paper",
+                status=_ack_status,
+                reason=str(res.message or "")[:200],
+                strategy_id=_contract_strategy_id,
+                experiment_id=_contract_experiment_id,
+                payload={
+                    "broker_order_id": str(res.broker_order_id or ""),
+                    "ok": bool(res.ok),
+                    "filled": bool(res.filled),
+                    "fill_price": res.fill_price,
+                    "execution_status": status,
+                },
+            )
+            append_firehose_contract(
+                journal,
+                ExecutionReport,
+                event_id=f"execution:{client_tag}",
+                correlation_id=f"scan:{scan_id}",
+                symbol=sym,
+                event_ts=time.time(),
+                source="run_broker_paper",
+                status=status,
+                reason=str(audit.get("detail") or res.message or "")[:200],
+                strategy_id=_contract_strategy_id,
+                experiment_id=_contract_experiment_id,
+                payload={
+                    "broker_order_id": str(res.broker_order_id or ""),
+                    "ok": bool(res.ok),
+                    "filled": bool(res.filled),
+                    "fill_price": res.fill_price,
+                    "audit": dict(audit),
+                },
+            )
+            if status in {"POSITION_CONFIRMED", "DEAL_EXECUTED"}:
+                for _position in positions_after:
+                    _ticket = str(getattr(_position, "ticket", "") or "")
+                    if not _ticket:
+                        continue
+                    _ticket_correlation = f"ticket:{_ticket}"
+                    _position_payload = {
+                        "ticket": _ticket,
+                        "quantity": float(getattr(_position, "quantity", 0) or 0),
+                        "side": str(getattr(_position, "side", "") or "").upper(),
+                        "entry_price": getattr(_position, "avg_price", None),
+                        "stop_loss": getattr(_position, "stop_loss", None),
+                        "take_profit": getattr(_position, "take_profit", None),
+                        "broker_order_id": str(res.broker_order_id or ""),
+                    }
+                    append_firehose_contract(
+                        journal,
+                        FillEvent,
+                        event_id=f"fill:{_ticket}",
+                        correlation_id=_ticket_correlation,
+                        symbol=sym,
+                        event_ts=time.time(),
+                        source="run_broker_paper",
+                        status="FILLED",
+                        reason="broker_position_confirmed",
+                        strategy_id=_contract_strategy_id,
+                        experiment_id=_contract_experiment_id,
+                        payload=_position_payload,
+                    )
+                    append_firehose_contract(
+                        journal,
+                        PositionEvent,
+                        event_id=f"position:{_ticket}:open",
+                        correlation_id=_ticket_correlation,
+                        symbol=sym,
+                        event_ts=time.time(),
+                        source="run_broker_paper",
+                        status="OPEN",
+                        reason="broker_position_confirmed",
+                        strategy_id=_contract_strategy_id,
+                        experiment_id=_contract_experiment_id,
+                        payload=_position_payload,
+                    )
             if brain_decision is not None:
                 append_journal(
                     journal,
@@ -4545,6 +5041,9 @@ def main() -> None:
                         "brain_intent": True,
                         "submitted": order_send_attempted,
                         "filled": status in {"POSITION_CONFIRMED", "DEAL_EXECUTED"},
+                        **watcher_funnel_fields(
+                            brain_decision.journal.get("watcher_advisory")
+                        ),
                     },
                 )
             execution_status_counts[status] = int(execution_status_counts.get(status, 0)) + 1
@@ -4902,6 +5401,25 @@ def main() -> None:
                         {"event": "operator_stop", "reason": "STOP FIREHOSE"},
                     )
                     break
+                refresh_result = execution_bundle_loader.refresh_if_changed()
+                execution_bundle_status.update(
+                    {
+                        "status": refresh_result.status,
+                        "reason": refresh_result.reason,
+                        "bundle_hash": refresh_result.bundle_hash,
+                    }
+                )
+                bundle_event = (
+                    refresh_result.status,
+                    refresh_result.reason,
+                    refresh_result.bundle_hash,
+                )
+                if bundle_event != last_execution_bundle_event:
+                    append_journal(
+                        journal,
+                        {"event": "execution_bundle_refresh", **execution_bundle_status},
+                    )
+                    last_execution_bundle_event = bundle_event
                 if intelligent_brain is not None:
                     intelligent_brain.refresh()
                 poll = float(cfg.get("poll_seconds", 60))
@@ -4946,7 +5464,31 @@ def main() -> None:
                             "bid": float(q.bid),
                             "ask": float(q.ask),
                         }
-                        if q.bid and q.ask:
+                        ledger_result = None
+                        try:
+                            market_event = market_event_from_quote(sym, q)
+                            ledger_result = causal_event_ledger.append(
+                                market_event,
+                                now_ts=now_ts,
+                            )
+                            last_quote_diagnostics[sym].update({
+                                "causal_ledger": (
+                                    "ACCEPTED" if ledger_result.accepted else "QUARANTINED"
+                                ),
+                                "causal_ledger_reason": ledger_result.reason_code,
+                                "causal_event_id": ledger_result.event_id,
+                            })
+                            if ledger_result.accepted:
+                                quote_refresh_counts["causal_events_accepted"] += 1
+                            else:
+                                quote_refresh_counts["causal_events_quarantined"] += 1
+                        except (AttributeError, TypeError, ValueError, OverflowError) as exc:
+                            quote_refresh_counts["causal_events_quarantined"] += 1
+                            last_quote_diagnostics[sym].update({
+                                "causal_ledger": "QUARANTINED",
+                                "causal_ledger_reason": f"ledger_error:{type(exc).__name__}",
+                            })
+                        if q.bid and q.ask and ledger_result is not None and ledger_result.accepted:
                             # Preserve broker event time. The local retrieval
                             # instant is telemetry only and must not fabricate
                             # fresh market history from a stale last tick.
@@ -5042,6 +5584,7 @@ def main() -> None:
                     "feed_stall_count": quote_feed_health.stall_count,
                     "feed_recovery_attempts": quote_feed_health.recovery_attempts,
                     "quote_diagnostics": quote_diagnostics,
+                    "causal_event_ledger": causal_event_ledger.stats(),
                     **checkpoint_state.snapshot(now_mono=time.monotonic()),
                 }
                 _risk_ok, _risk_why = risk.allow(equity, open_positions=len(all_pos))
@@ -5070,6 +5613,23 @@ def main() -> None:
                 }
                 extra_hb["fast_exit_errors"] = fast_exit_error_count
                 extra_hb["short_horizon_model"] = short_horizon_predictor.snapshot()
+                active_execution_bundle = execution_context.snapshot()
+                extra_hb["execution_bundle"] = {
+                    **execution_bundle_status,
+                    "active": active_execution_bundle is not None,
+                    "authorized_symbols": (
+                        list(active_execution_bundle.authorized_symbols)
+                        if active_execution_bundle is not None else []
+                    ),
+                    "authorized_horizons_s": (
+                        list(active_execution_bundle.authorized_horizons_s)
+                        if active_execution_bundle is not None else []
+                    ),
+                    "book_algorithm_count": (
+                        active_execution_bundle.book_algorithm_count
+                        if active_execution_bundle is not None else 0
+                    ),
+                }
                 extra_hb["trade_management"] = {
                     "authority": "TradeController",
                     "profit_harvester": (
@@ -5139,6 +5699,41 @@ def main() -> None:
                                 or event.get("ticket")
                                 or ""
                             )
+                            _recon_symbol = str(event.get("symbol") or "").upper()
+                            if _recon_symbol:
+                                _recon_time_msc = event.get("time_msc")
+                                try:
+                                    _recon_ts = (
+                                        float(_recon_time_msc) / 1000.0
+                                        if _recon_time_msc is not None
+                                        else time.time()
+                                    )
+                                except (TypeError, ValueError, OverflowError):
+                                    _recon_ts = time.time()
+                                append_journal(
+                                    journal,
+                                    make_contract_event(
+                                        ReconciliationEvent,
+                                        event_id=(
+                                            f"reconciliation:{event.get('deal') or position_id}"
+                                        ),
+                                        correlation_id=(
+                                            f"ticket:{position_id or event.get('deal') or 'unknown'}"
+                                        ),
+                                        symbol=_recon_symbol,
+                                        event_ts=_recon_ts,
+                                        source="run_broker_paper",
+                                        status=(
+                                            "EXIT" if event.get("is_exit") else "OBSERVED"
+                                        ),
+                                        reason=str(
+                                            event.get("close_reason")
+                                            or event.get("entry_reason")
+                                            or "broker_deal_reconciled"
+                                        )[:200],
+                                        payload={"broker_event": dict(event)},
+                                    ),
+                                )
                             # Attribution map: ENTRY deals carry the original
                             # EXP comment; SL/TP exit deals get theirs overwritten
                             # by MT5 ('[sl ...]'/'[tp ...]'), so match via
@@ -5333,6 +5928,15 @@ def main() -> None:
                     "WHY_NO_ORDER": _funnel.get("WHY_NO_ORDER"),
                     "NO_ORDER_REASON": _funnel.get(
                         "NO_ORDER_REASON", _funnel.get("WHY_NO_ORDER")
+                    ),
+                    "CAUSAL_EVENTS_ACCEPTED": int(
+                        quote_refresh_counts.get("causal_events_accepted", 0) or 0
+                    ),
+                    "CAUSAL_EVENTS_QUARANTINED": int(
+                        quote_refresh_counts.get("causal_events_quarantined", 0) or 0
+                    ),
+                    "CAUSAL_QUARANTINE_REASONS": dict(
+                        causal_event_ledger.stats().get("reason_counts") or {}
                     ),
                     "VALIDATED_SELECTED": int(
                         global_opportunity_counts.get("VALIDATED_SELECTED", 0) or 0
@@ -5894,6 +6498,39 @@ def main() -> None:
                                 trace["exit_owner"] = verdict.get("source")
                                 append_journal(journal, trace)
                             if verdict["action"] in {"HARVEST", "SCRATCH", "ABORT"} and hasattr(eng, "close_ticket"):
+                                _close_metadata = ticket_metadata_store.get(tk)
+                                _close_identity = firehose_lifecycle_identity(
+                                    _close_metadata
+                                ) if _close_metadata is not None else {}
+                                append_firehose_contract(
+                                    journal,
+                                    CloseIntent,
+                                    event_id=f"close-intent:{tk}:{time.time_ns()}",
+                                    correlation_id=f"ticket:{tk}",
+                                    symbol=str(getattr(pos, "symbol", "")),
+                                    event_ts=time.time(),
+                                    source="run_broker_paper",
+                                    status="REQUESTED",
+                                    reason=str(verdict.get("reason") or "")[:200],
+                                    strategy_id=str(
+                                        _close_identity.get("strategy_family") or ""
+                                    ),
+                                    experiment_id=str(
+                                        _close_identity.get("hypothesis_id") or ""
+                                    ),
+                                    basket_id=str(
+                                        _close_identity.get("basket_id") or ""
+                                    ),
+                                    payload={
+                                        "ticket": tk,
+                                        "action": verdict.get("action"),
+                                        "why": verdict.get("why"),
+                                        "remaining_ev": _rem_ev,
+                                        "floating_pnl": float(
+                                            getattr(pos, "unrealized_pnl", 0) or 0
+                                        ),
+                                    },
+                                )
                                 res_close = eng.close_ticket(tk)
                                 try:
                                     close_facts = broker_close_evidence(
@@ -6259,15 +6896,19 @@ def main() -> None:
                 raise
             except Exception as exc:
                 logger.exception("Loop error (will retry): %s", exc)
+                reconnected, reconnect_error = reconnect_engine_for_retry(eng)
+                if not reconnected:
+                    logger.error("MT5 reconnect failed: %s", reconnect_error)
                 try:
-                    write_heartbeat({"status": "error", "error": str(exc)})
+                    write_heartbeat({
+                        "status": "error",
+                        "error": str(exc),
+                        "reconnect_status": "CONNECTED" if reconnected else "FAILED",
+                        "reconnect_error": reconnect_error or None,
+                    })
                 except Exception:
                     pass
                 time.sleep(float(cfg.get("poll_seconds", 60)))
-                try:
-                    eng.connect()
-                except Exception:
-                    pass
     finally:
         try:
             risk.save_json(risk_path)

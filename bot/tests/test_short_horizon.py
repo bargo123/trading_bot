@@ -44,6 +44,23 @@ def test_labels_skip_horizons_without_a_complete_future_window():
     assert set(labels["horizon_s"]) == {3}
 
 
+def test_labels_skip_entries_without_a_full_horizon_quote():
+    times = list(pd.date_range("2026-01-01T00:00:00Z", periods=5, freq="1s"))
+    times.extend(pd.date_range("2026-01-01T00:00:20Z", periods=10, freq="1s"))
+    mid = [1.1] * len(times)
+    quotes = pd.DataFrame({
+        "time": times,
+        "bid": [value - 0.00001 for value in mid],
+        "ask": [value + 0.00001 for value in mid],
+    })
+
+    labels = build_short_horizon_labels(
+        quotes, sides=("buy",), horizons=(5,), cost=0.0
+    )
+
+    assert pd.Timestamp("2026-01-01T00:00:03Z") not in set(labels["entry_time"])
+
+
 def test_features_are_point_in_time_and_include_microstructure():
     quotes = _quotes()
     at = quotes.loc[4, "time"]

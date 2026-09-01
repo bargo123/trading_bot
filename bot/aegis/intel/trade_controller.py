@@ -140,6 +140,7 @@ class TradeController:
         slippage_price: float = 0.0,
         commission_usd: float = 0.0,
         usd_per_price_unit: float = 1.0,
+        close_latency_s: float = 0.0,
     ) -> dict[str, Any]:
         """Replay the live controller against sequential executable quotes.
 
@@ -160,13 +161,17 @@ class TradeController:
             slippage = float(slippage_price)
             commission = float(commission_usd)
             unit = float(usd_per_price_unit)
+            close_latency = float(close_latency_s)
         except (TypeError, ValueError, OverflowError):
             return {"status": "UNAVAILABLE", "reason": "invalid_replay_parameters"}
         if not all(math.isfinite(value) for value in (
-            horizon, target, stop, pip, slippage, commission, unit
+            horizon, target, stop, pip, slippage, commission, unit, close_latency
         )):
             return {"status": "UNAVAILABLE", "reason": "invalid_replay_parameters"}
-        if horizon <= 0 or pip <= 0 or slippage < 0 or commission < 0 or unit <= 0:
+        if (
+            horizon <= 0 or pip <= 0 or slippage < 0 or commission < 0
+            or unit <= 0 or close_latency < 0
+        ):
             return {"status": "UNAVAILABLE", "reason": "invalid_replay_parameters"}
         if not isinstance(quotes, list) or not quotes:
             return {"status": "UNAVAILABLE", "reason": "quote_history_missing"}
@@ -193,8 +198,13 @@ class TradeController:
             or (normalized_side == "sell" and not (target < entry < stop))
         ):
             return {"status": "UNAVAILABLE", "reason": "invalid_replay_geometry"}
-        future = [item for item in normalized[1:] if start < item[0] <= start + horizon]
-        if not future:
+        horizon_end = start + horizon
+        future = [
+            item for item in normalized[1:]
+            if start < item[0] <= horizon_end + close_latency
+        ]
+        decision_future = [item for item in future if item[0] <= horizon_end]
+        if not decision_future:
             return {"status": "UNAVAILABLE", "reason": "quote_history_missing_future"}
 
         # FastExitStateMachine is imported lazily to keep the controller usable
@@ -212,7 +222,7 @@ class TradeController:
         peak_time_s: float | None = None
         peak_price = -float("inf")
         terminal: dict[str, Any] | None = None
-        for timestamp, bid, ask in future:
+        for future_index, (timestamp, bid, ask) in enumerate(decision_future):
             mark = bid if normalized_side == "buy" else ask
             signed_price = (mark - entry) * direction
             signed_prices.append(signed_price)
@@ -242,15 +252,55 @@ class TradeController:
             )
             decision = self.decide(None, fast)
             action = decision["action"]
-            actions.append({
-                "time_s": timestamp - start,
-                "action": action,
-                "reason": decision["reason"],
-                "net_pnl_usd": net_usd,
-            })
             if action in {"HARVEST", "SCRATCH", "ABORT"}:
+                close_index = len(future) - 1
+                if close_latency > 0.0:
+                    close_index = next(
+                        (
+                            candidate
+                            for candidate in range(future_index, len(future))
+                            if future[candidate][0] >= timestamp + close_latency
+                        ),
+                        -1,
+                    )
+                    if close_index < 0:
+                        return {
+                            "status": "UNAVAILABLE",
+                            "reason": "close_latency_quote_missing",
+                        }
+                    # The controller decision is causal and was already made
+                    # from ``decision_future`` only.  Once a close is
+                    # requested, however, every executable quote observed
+                    # while the broker close is pending is part of the
+                    # realized path.  Include those quotes in MFE/MAE,
+                    # first-green, and peak timing so captured PnL cannot be
+                    # larger (or smaller) than the path metrics that describe
+                    # it.
+                    for path_index in range(future_index + 1, close_index + 1):
+                        path_timestamp, path_bid, path_ask = future[path_index]
+                        path_mark = path_bid if normalized_side == "buy" else path_ask
+                        path_signed = (path_mark - entry) * direction
+                        signed_prices.append(path_signed)
+                        if path_signed > peak_price:
+                            peak_price = path_signed
+                            peak_time_s = path_timestamp - start
+                        path_net_usd = path_signed * unit - slippage * unit - commission
+                        if first_green_s is None and path_net_usd > 0:
+                            first_green_s = path_timestamp - start
+                    close_timestamp, close_bid, close_ask = future[close_index]
+                    close_mark = close_bid if normalized_side == "buy" else close_ask
+                    close_signed = (close_mark - entry) * direction
+                    net_usd = close_signed * unit - slippage * unit - commission
+                else:
+                    close_timestamp = timestamp
+                actions.append({
+                    "time_s": close_timestamp - start,
+                    "action": action,
+                    "reason": decision["reason"],
+                    "net_pnl_usd": net_usd,
+                })
                 terminal = {
-                    "time_s": timestamp - start,
+                    "time_s": close_timestamp - start,
                     # Keep the historical label vocabulary stable while
                     # retaining the exact canonical controller action below.
                     "reason": "harvest" if action == "HARVEST" else "abort",
@@ -258,8 +308,14 @@ class TradeController:
                     "net_pnl_usd": net_usd,
                 }
                 break
+            actions.append({
+                "time_s": timestamp - start,
+                "action": action,
+                "reason": decision["reason"],
+                "net_pnl_usd": net_usd,
+            })
 
-        last_timestamp, last_bid, last_ask = future[-1]
+        last_timestamp, last_bid, last_ask = decision_future[-1]
         endpoint_mark = last_bid if normalized_side == "buy" else last_ask
         endpoint_signed = (endpoint_mark - entry) * direction
         endpoint_net = endpoint_signed * unit - slippage * unit - commission
@@ -280,8 +336,9 @@ class TradeController:
             "captured_exit_reason": str(terminal["reason"]),
             "captured_exit_action": str(terminal.get("action") or "TIMEOUT"),
             "captured_exit_time_s": float(terminal["time_s"]),
-            # Terminal means the last observed executable quote, even when the
-            # controller captured earlier. Both values use the same costs.
+            # Terminal means the last executable quote at the decision
+            # horizon. A delayed-close quote is represented by the captured
+            # outcome and path extrema above, not by a post-horizon label.
             "terminal_net_pnl": float(endpoint_net),
             "mfe_net_pnl": float(max_favorable),
             "mae_net_pnl": float(max_adverse),

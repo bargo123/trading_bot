@@ -1,0 +1,130 @@
+{
+  "created_utc": "2026-08-28T11:11:57.885438+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_97d977\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 22.53,
+          "finished_utc": "2026-08-28T11:15:13.068695+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-28T11:14:50.534996+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T11:15:13.072703+00:00",
+        "text": "This is an API compatibility error, not a research proposal, so it provides no testable hypothesis, validation plan, or risk controls. Treating an unsupported preview model as a strategy signal would be unmeasurable and operationally unsafe; select a supported model and log failure handling before continuing."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_97d977\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 10.92,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T11:15:23.996420+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-28T11:15:47.547184+00:00",
+    "decision": "no_change",
+    "evidence": {
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "DUPLICATE_FAILED_HYPOTHESIS"
+    },
+    "rationale": "REAL: candidate hypothesis overlaps prior record council_the-aegis-mt5-demo-bot-is-running-the-in_f56126 (queued, overlap 0.55); not re-tested"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_97d977",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_97d977\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 9.08,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T11:12:43.151179+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_97d977\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.81,
+        "finished_utc": "2026-08-28T11:13:12.673355+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T11:12:58.866164+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T11:13:12.675885+00:00",
+      "text": "Test an exit refinement that scratches validated EURUSD breakout trades when the 3-minute post-entry return is negative and tick-volume falls below its entry-window median. Evaluate it only on sealed MT5 DEMO historical/replay episodes, net of configured spread and slippage, against the current champion. Accept it only if the holdout improves net expectancy with no increase in 95th-percentile tail loss or maximum drawdown; otherwise reject and retain the champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_97d977\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 8.78,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T11:15:32.791011+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_97d977\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 14.69,
+        "finished_utc": "2026-08-28T11:15:47.497228+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T11:15:32.811044+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T11:15:47.499751+00:00",
+      "text": "Test the exit refinement using an available, supported model or a deterministic rule-only evaluation path; record any unavailable-model failure without fabricating results. Evaluate sealed MT5 DEMO historical/replay episodes net of configured spread and slippage against the current champion. Accept only if holdout net expectancy improves with no increase in 95th-percentile tail loss or maximum drawdown; otherwise reject and retain the champion."
+    }
+  },
+  "status": "decided"
+}

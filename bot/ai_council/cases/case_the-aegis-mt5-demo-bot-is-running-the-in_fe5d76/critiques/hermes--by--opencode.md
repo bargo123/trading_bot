@@ -1,0 +1,1 @@
+This is an API compatibility error, not a trading proposal, so it contains no hypothesis, metrics, validation plan, or safety controls to review. Resolve the unsupported model configuration before presenting a measurable research or execution change.

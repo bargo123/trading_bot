@@ -33,6 +33,27 @@ CREATE TABLE IF NOT EXISTS experiments (
     new_reason TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_experiments_sim ON experiments(similarity_key);
+CREATE TABLE IF NOT EXISTS external_workflow_runs (
+    run_id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    bundle_hash TEXT NOT NULL,
+    dataset_hash TEXT NOT NULL,
+    run_status TEXT NOT NULL,
+    promotion_status TEXT NOT NULL,
+    ts_utc TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS external_workflow_nodes (
+    run_id TEXT NOT NULL,
+    node_index INTEGER NOT NULL,
+    node_id TEXT NOT NULL,
+    tool_id TEXT NOT NULL,
+    request_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    artifact_hashes_json TEXT NOT NULL,
+    reason TEXT,
+    PRIMARY KEY (run_id, node_index),
+    FOREIGN KEY (run_id) REFERENCES external_workflow_runs(run_id)
+);
 """
 
 
@@ -141,6 +162,103 @@ class ExperimentRegistry:
                 "SELECT * FROM experiments WHERE id = ?", (experiment_id,)
             ).fetchone()
         return self._row_dict(row) if row is not None else None
+
+    def record_external_workflow(
+        self,
+        *,
+        research_bundle: Any,
+        dataset_hash: str,
+        promotion_status: str,
+    ) -> str:
+        """Atomically persist an immutable external DAG run and every node."""
+        run_id = str(research_bundle.run_id)
+        workflow_id = str(research_bundle.workflow_id)
+        bundle_hash = str(research_bundle.bundle_hash)
+        normalized_dataset_hash = str(dataset_hash).lower()
+        run_status = "SUCCESS" if bool(research_bundle.complete) else "INCOMPLETE"
+        normalized_promotion = str(promotion_status).upper()
+        with self._connect() as con:
+            con.execute("PRAGMA foreign_keys = ON")
+            existing = con.execute(
+                "SELECT * FROM external_workflow_runs WHERE run_id = ?", (run_id,)
+            ).fetchone()
+            if existing is not None:
+                immutable = (
+                    str(existing["workflow_id"]),
+                    str(existing["bundle_hash"]),
+                    str(existing["dataset_hash"]),
+                    str(existing["run_status"]),
+                    str(existing["promotion_status"]),
+                )
+                requested = (
+                    workflow_id,
+                    bundle_hash,
+                    normalized_dataset_hash,
+                    run_status,
+                    normalized_promotion,
+                )
+                if immutable != requested:
+                    raise ValueError("immutable external workflow run cannot be changed")
+                return run_id
+            con.execute(
+                """
+                INSERT INTO external_workflow_runs (
+                    run_id, workflow_id, bundle_hash, dataset_hash,
+                    run_status, promotion_status, ts_utc
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    workflow_id,
+                    bundle_hash,
+                    normalized_dataset_hash,
+                    run_status,
+                    normalized_promotion,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+            for index, result in enumerate(research_bundle.node_results):
+                con.execute(
+                    """
+                    INSERT INTO external_workflow_nodes (
+                        run_id, node_index, node_id, tool_id, request_id,
+                        status, artifact_hashes_json, reason
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        run_id,
+                        index,
+                        str(result.node_id),
+                        str(result.tool_id),
+                        str(result.request_id),
+                        str(result.status),
+                        json.dumps(list(result.artifact_hashes)),
+                        str(result.reason or ""),
+                    ),
+                )
+        return run_id
+
+    def get_external_workflow(self, run_id: str) -> dict[str, Any] | None:
+        with self._connect() as con:
+            run = con.execute(
+                "SELECT * FROM external_workflow_runs WHERE run_id = ?", (str(run_id),)
+            ).fetchone()
+            if run is None:
+                return None
+            nodes = con.execute(
+                """
+                SELECT * FROM external_workflow_nodes
+                WHERE run_id = ? ORDER BY node_index
+                """,
+                (str(run_id),),
+            ).fetchall()
+        payload = dict(run)
+        payload["nodes"] = []
+        for row in nodes:
+            node = dict(row)
+            node["artifact_hashes"] = json.loads(node.pop("artifact_hashes_json"))
+            payload["nodes"].append(node)
+        return payload
 
     @staticmethod
     def _row_dict(row: sqlite3.Row) -> dict[str, Any]:

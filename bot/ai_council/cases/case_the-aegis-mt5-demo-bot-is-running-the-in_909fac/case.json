@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-28T01:10:40.386464+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_909fac\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 13.15,
+          "finished_utc": "2026-08-28T01:13:50.375683+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-28T01:13:37.226974+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T01:13:50.379719+00:00",
+        "text": "This is an API compatibility error, not a research proposal, so it contains no testable hypothesis, validation plan, or measurable trading claim. It also provides no evidence that substituting a preview/free model would preserve council reliability, abstention behavior, or read-only safety constraints."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_909fac\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 8.59,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T01:13:58.989392+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-28T01:14:21.155760+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_b15405",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_b15405 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_909fac",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_909fac\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.73,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T01:10:59.766629+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_909fac\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.34,
+        "finished_utc": "2026-08-28T01:11:28.066799+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T01:11:14.726332+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T01:11:28.069308+00:00",
+      "text": "Test a stricter validated-state entry filter requiring at least 30 completed trades for the active symbol/session regime and a positive 95% bootstrap lower confidence bound on net expectancy after modeled spread and slippage. Compare it with the current gate on a sealed holdout using identical signal timestamps, position sizing, and exits. Accept it only if holdout net expectancy improves by at least 10% without increasing maximum drawdown or reducing trade count by more than 25%; otherwise reject and record the result."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_909fac\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 8.19,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T01:14:07.191371+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_909fac\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.88,
+        "finished_utc": "2026-08-28T01:14:21.094061+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T01:14:07.211925+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T01:14:21.097586+00:00",
+      "text": "Test the stricter validated-state entry filter requiring at least 30 completed trades and a positive 95% bootstrap lower confidence bound on net expectancy after modeled spread and slippage. Compare it with the current gate on a sealed holdout using identical timestamps, sizing, and exits. Accept only if net expectancy improves by at least 10%, maximum drawdown does not increase, and trade count declines by no more than 25%; otherwise reject and record the result. Use a supported model endpoint and record any API or model-availability failure honestly."
+    }
+  },
+  "status": "decided"
+}

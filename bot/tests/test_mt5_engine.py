@@ -513,6 +513,20 @@ def test_order_check_rejection_blocks_order_send():
     assert eng.last_order_check["ok"] is False
 
 
+def test_dry_run_true_blocks_mt5_mutation_before_order_check_or_send():
+    api = FakeMT5()
+    eng = _engine(api, dry_run=True)
+    eng.connect()
+
+    result = eng.place_order(
+        OrderRequest(symbol="EURUSD", side="buy", quantity=0.01, kind="market")
+    )
+
+    assert result.ok is False
+    assert "dry_run" in result.message.lower()
+    assert api.sends == []
+
+
 def test_order_check_pass_reaches_order_send_with_same_market_request():
     api = FakeMT5()
     checked = []

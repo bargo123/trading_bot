@@ -406,6 +406,11 @@ class MLPipeline:
         for model in self.models:
             model_path = path / f"{model.name}.joblib"
             joblib.dump(model, model_path)
+            # Runtime loads only the raw sklearn estimator.  Keeping this
+            # separate from the research wrapper prevents live inference from
+            # importing the Research Factory package to unpickle metadata.
+            runtime_model_file = f"{model.name}.runtime.joblib"
+            joblib.dump(model.model, path / runtime_model_file)
 
         # Save metadata
         metadata = {
@@ -418,6 +423,8 @@ class MLPipeline:
                     "threshold": m.calibration_threshold,
                     "metrics": m.metrics,
                     "trained_at": m.trained_at,
+                    "feature_names": list(m.feature_names),
+                    "runtime_model_file": f"{m.name}.runtime.joblib",
                 }
                 for m in self.models
             ],

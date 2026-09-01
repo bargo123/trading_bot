@@ -156,6 +156,46 @@ def _compiled_rule(text: str) -> dict[str, Any]:
     return {}
 
 
+def _algorithm_spec(
+    excerpt: str,
+    *,
+    direction: bool,
+    entry: bool,
+    exit_rule: bool,
+    parameter: bool,
+    family: str | None,
+    side_rule: str | None,
+    required_features: list[str],
+    compiled_rule: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build a Watcher algorithm record without inventing missing rules."""
+    missing: list[str] = []
+    if not direction:
+        missing.append("direction")
+    if not entry:
+        missing.append("entry_rule")
+    if not exit_rule:
+        missing.append("exit_rule")
+    if not parameter:
+        missing.append("parameters")
+    if not compiled_rule:
+        missing.append("compiled_predicate")
+    exact = not missing
+    return {
+        "schema": "book_algorithm.v1",
+        "algorithm_kind": "EXACT_PREDICATE" if exact else "RESEARCH_SPECIFICATION",
+        "watcher_evaluable": exact,
+        "side": side_rule,
+        "family": family,
+        "entry_text": excerpt if entry else None,
+        "exit_text": excerpt if exit_rule else None,
+        "required_features": list(required_features),
+        "compiled_entry_predicates": dict(compiled_rule),
+        "missing_components": missing,
+        "source_rule": excerpt,
+    }
+
+
 def classify_passage(text: str) -> dict[str, Any]:
     """Classify one passage without assigning performance or execution authority."""
     excerpt = re.sub(r"\s+", " ", str(text or "")).strip()
@@ -166,12 +206,14 @@ def classify_passage(text: str) -> dict[str, Any]:
     parameter = bool(_PARAMETER_RE.search(excerpt))
     family = _mechanism_family(excerpt)
     compiled_rule = _compiled_rule(excerpt)
+    side_rule = _side_rule(excerpt)
+    required_features = _required_features(excerpt)
     result: dict[str, Any] = {
         "entry_rule": excerpt if entry else None,
         "exit_rule": excerpt if exit_rule else None,
-        "side_rule": _side_rule(excerpt),
+        "side_rule": side_rule,
         "strategy_family": family,
-        "required_features": _required_features(excerpt),
+        "required_features": required_features,
         "compiled_rule": compiled_rule or None,
         "validation_status": "UNVALIDATED_RESEARCH",
         "evidence_status": "NO_SAMPLES",
@@ -187,6 +229,17 @@ def classify_passage(text: str) -> dict[str, Any]:
         result.update({"status": "UNTESTABLE_SOURCE", "reason": "missing_explicit_entry_exit_rule"})
     # Keep lint/static analysis from treating this as an omitted validation.
     result["source_text_present"] = bool(lowered)
+    result["algorithm"] = _algorithm_spec(
+        excerpt,
+        direction=direction,
+        entry=entry,
+        exit_rule=exit_rule,
+        parameter=parameter,
+        family=family,
+        side_rule=side_rule,
+        required_features=required_features,
+        compiled_rule=compiled_rule,
+    )
     return result
 
 
@@ -205,7 +258,25 @@ def _passage_windows(pages: Iterable[Mapping[str, Any]]) -> Iterable[tuple[int, 
             yield number, paragraph
 
 
+def source_label_from_path(path: Path) -> str:
+    """Derive a stable human-readable book label from a downloaded filename."""
+    stem = Path(path).stem.strip()
+    stem = re.sub(r"\s+-\s+libgen(?:\.[^.]+)?$", "", stem, flags=re.IGNORECASE).strip()
+    stem = re.sub(r"\s*\([^()]*\)\s*$", "", stem).strip()
+    stem = re.sub(r"^\[[^\]]+\]\s*", "", stem).strip()
+    if " - " in stem:
+        author, title = stem.split(" - ", 1)
+        author = author.strip()
+        title = title.strip()
+        if author and title:
+            return f"{author} — {title}"
+    return stem
+
+
 def _source_title(path: Path, pages: Iterable[Mapping[str, Any]]) -> str:
+    filename_label = source_label_from_path(path)
+    if filename_label:
+        return filename_label
     for page in pages:
         for line in str(page.get("text") or "").splitlines():
             line = re.sub(r"\s+", " ", line).strip()
@@ -250,9 +321,15 @@ def build_strategy_registry(
                 continue
             seen_passages[passage_hash] = source_id
             classified = classify_passage(passage)
+            strategy_id = canonical_strategy_id(file_hash, passage_hash)
+            algorithm = classified.get("algorithm")
+            if isinstance(algorithm, Mapping):
+                algorithm = dict(algorithm)
+                algorithm["algorithm_id"] = strategy_id
+            classified.pop("algorithm", None)
             records.append({
                 "record_type": "strategy",
-                "strategy_id": canonical_strategy_id(file_hash, passage_hash),
+                "strategy_id": strategy_id,
                 "source_id": source_id,
                 "source_title": title,
                 "source_path": str(path),
@@ -263,6 +340,7 @@ def build_strategy_registry(
                 "extraction_method": "pypdf_text",
                 "status": classified.pop("status"),
                 "reason": classified.pop("reason"),
+                "algorithm": algorithm,
                 **classified,
             })
 
@@ -303,4 +381,5 @@ __all__ = [
     "discover_book_sources",
     "extract_source_pages",
     "sha256_file",
+    "source_label_from_path",
 ]

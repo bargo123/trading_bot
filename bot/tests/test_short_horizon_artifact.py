@@ -8,6 +8,7 @@ from aegis.research.registry import ExperimentRegistry
 from aegis.research.short_horizon_artifact import (
     _feature_frame,
     _execution_status,
+    _model_frame,
     _metrics,
     _authorized_symbols,
     _select_decision_horizon,
@@ -120,6 +121,7 @@ def test_captured_exit_replay_is_the_only_execution_authorizing_target():
     status, reason = _execution_status(
         target_definition="captured_exit_replay",
         decision_horizon_s=10,
+        validation_metrics=_positive_captured_metrics(0.001),
         test_metrics=_positive_captured_metrics(0.001),
         sealed_metrics=_positive_captured_metrics(0.001),
         sealed_by_horizon={"10": _positive_captured_metrics(0.001)},
@@ -148,6 +150,7 @@ def test_execution_candidate_requires_positive_test_sealed_and_horizon_metrics()
     status, reason = _execution_status(
         target_definition="captured_exit_replay",
         decision_horizon_s=10,
+        validation_metrics=_positive_captured_metrics(0.001),
         test_metrics=_positive_captured_metrics(0.001),
         sealed_metrics=_positive_captured_metrics(0.001),
         sealed_by_horizon={"10": _positive_captured_metrics(0.001)},
@@ -157,6 +160,20 @@ def test_execution_candidate_requires_positive_test_sealed_and_horizon_metrics()
     assert reason == "positive_test_sealed_decision_horizon_captured_exit_oos"
 
 
+def test_execution_candidate_requires_positive_validation_oos():
+    status, reason = _execution_status(
+        target_definition="captured_exit_replay",
+        decision_horizon_s=10,
+        validation_metrics=_positive_captured_metrics(-0.001),
+        test_metrics=_positive_captured_metrics(0.001),
+        sealed_metrics=_positive_captured_metrics(0.001),
+        sealed_by_horizon={"10": _positive_captured_metrics(0.001)},
+    )
+
+    assert status == "SHADOW_ONLY_NO_POSITIVE_OOS"
+    assert reason == "validation_captured_exit_oos_not_positive"
+
+
 def test_execution_candidate_requires_minimum_observed_captured_losses():
     sparse_losses = _positive_captured_metrics(0.001)
     sparse_losses["captured_exit_loss_count"] = 4
@@ -164,6 +181,7 @@ def test_execution_candidate_requires_minimum_observed_captured_losses():
     status, reason = _execution_status(
         target_definition="captured_exit_replay",
         decision_horizon_s=10,
+        validation_metrics=_positive_captured_metrics(0.001),
         test_metrics=sparse_losses,
         sealed_metrics=_positive_captured_metrics(0.001),
         sealed_by_horizon={"10": _positive_captured_metrics(0.001)},
@@ -179,6 +197,7 @@ def test_execution_candidate_requires_captured_win_rate_target():
     status, reason = _execution_status(
         target_definition="captured_exit_replay",
         decision_horizon_s=10,
+        validation_metrics=_positive_captured_metrics(0.001),
         test_metrics=weak,
         sealed_metrics=_positive_captured_metrics(0.001),
         sealed_by_horizon={"10": _positive_captured_metrics(0.001)},
@@ -271,6 +290,91 @@ def test_scope_threshold_selection_uses_validation_harvest_lcb():
     assert metrics["harvest_lcb95_return"] > 0.0
 
 
+def test_captured_threshold_selection_requires_loss_coverage():
+    probabilities = np.array(
+        [0.99, 0.98, 0.97, 0.96, 0.95, 0.94, 0.93, 0.92, 0.91, 0.90, 0.89, 0.88]
+    )
+    captured = [0.1] * 7 + [-0.01] * 5
+    frame = pd.DataFrame(
+        {
+            "target": [int(value > 0) for value in captured],
+            "terminal_return": captured,
+            "captured_exit_return": captured,
+            "captured_exit_net_pnl": captured,
+            "mfe": captured,
+            "mae": [0.0] * len(captured),
+            "mid": [1.0] * len(captured),
+            "tail_loss": [0] * len(captured),
+            "time_to_profit_s": [1.0] * len(captured),
+            "time_to_failure_s": [None] * 7 + [1.0] * 5,
+        }
+    )
+    prediction = {
+        "probability": probabilities,
+        "model_probabilities": np.vstack([probabilities, probabilities]),
+        "uncertainty": np.zeros(len(probabilities)),
+        "abstain": np.zeros(len(probabilities), dtype=bool),
+    }
+
+    threshold, metrics = _select_threshold_for_prediction(
+        prediction, frame, target_definition="captured_exit_replay", min_selected=2
+    )
+
+    assert threshold == pytest.approx(0.88)
+    assert metrics["captured_exit_loss_count"] >= 5
+
+
+def test_model_frame_excludes_future_green_time_alias():
+    frame = pd.DataFrame(
+        {
+            "target": [0, 1],
+            "terminal_return": [-0.01, 0.01],
+            "time_to_first_net_green_s": [1.0, 2.0],
+            "time_to_first_net_green": [1.0, 2.0],
+            "entry_spread_price": [0.0001, 0.0001],
+            "mid": [1.0, 1.0],
+        }
+    )
+
+    model_frame = _model_frame(frame)
+
+    assert "time_to_first_net_green_s" not in model_frame.columns
+    assert "time_to_first_net_green" not in model_frame.columns
+    assert "entry_spread_price" in model_frame.columns
+
+
+def test_model_frame_excludes_all_future_outcome_aliases():
+    frame = pd.DataFrame(
+        {
+            "target": [0],
+            "mid": [1.0],
+            "return_5s": [0.001],
+            "pnl_5s": [0.2],
+            "green_within_5s": [True],
+            "captured_win_5s": [True],
+            "exit_capturedexit_net_pnl": [0.2],
+            "future_path_observed_n": [4],
+            "first_green": [True],
+            "immediate_adverse_move": [-0.1],
+            "time_to_mfe_s": [1.0],
+            "winner_giveback": [0.2],
+        }
+    )
+
+    model_frame = _model_frame(frame)
+
+    assert "return_5s" in model_frame.columns
+    assert not any(
+        str(column).startswith(
+            ("pnl_", "green_", "captured_", "exit_", "future_", "time_to_")
+        )
+        for column in model_frame.columns
+    )
+    assert "first_green" not in model_frame.columns
+    assert "immediate_adverse_move" not in model_frame.columns
+    assert "winner_giveback" not in model_frame.columns
+
+
 def test_oos_metrics_include_calibration_curve_ece_and_confusion_counts():
     frame = pd.DataFrame(
         {
@@ -332,6 +436,80 @@ def test_short_horizon_features_do_not_read_future_quotes():
     left = first[first["time"] < pd.Timestamp("2026-01-01T00:02:00Z")][columns].reset_index(drop=True)
     right = second[second["time"] < pd.Timestamp("2026-01-01T00:02:00Z")][columns].reset_index(drop=True)
     pd.testing.assert_frame_equal(left, right)
+
+
+def test_feature_frame_keeps_actual_last_tick_time_within_each_second():
+    quotes = pd.DataFrame(
+        {
+            "time": pd.to_datetime(
+                [
+                    "2026-01-01T00:00:00.100Z",
+                    "2026-01-01T00:00:00.900Z",
+                    "2026-01-01T00:00:01.100Z",
+                    "2026-01-01T00:00:02.100Z",
+                ],
+                utc=True,
+            ),
+            "bid": [1.0, 1.1, 1.2, 1.3],
+            "ask": [1.01, 1.11, 1.21, 1.31],
+        }
+    )
+
+    features = _feature_frame(quotes, "EURUSD", minimum_history_rows=2)
+
+    first = features.iloc[0]
+    assert first["time"] == pd.Timestamp("2026-01-01T00:00:00.900Z")
+    assert first["bid"] == pytest.approx(1.1)
+
+
+def test_captured_replay_thresholds_do_not_read_future_spreads():
+    times = pd.date_range("2026-01-01T00:00:00Z", periods=70, freq="1s")
+    bid = np.full(70, 1.0)
+    bid[1] = 1.0004
+    bid[2:11] = 0.9997
+    ask = bid + 0.0001
+    original = pd.DataFrame({"time": times, "bid": bid, "ask": ask})
+
+    changed = original.copy()
+    changed.loc[20:, "ask"] = changed.loc[20:, "bid"] + 0.01
+
+    original_frame = build_quote_training_frame(
+        {"EURUSD": original}, horizons=(10,), sample_every_s=1,
+        target_mode="captured_exit_replay",
+    )
+    changed_frame = build_quote_training_frame(
+        {"EURUSD": changed}, horizons=(10,), sample_every_s=1,
+        target_mode="captured_exit_replay",
+    )
+    original_row = original_frame[
+        (original_frame["time"] == times[0]) & (original_frame["side"] == "buy")
+    ].iloc[0]
+    changed_row = changed_frame[
+        (changed_frame["time"] == times[0]) & (changed_frame["side"] == "buy")
+    ].iloc[0]
+
+    assert original_row["captured_exit_reason"] == "harvest"
+    assert original_row["captured_win_label"] == 1
+    assert changed_row["captured_exit_reason"] == "harvest"
+    assert changed_row["captured_win_label"] == 1
+
+
+def test_training_frame_skips_entries_without_a_full_horizon_quote():
+    times = list(pd.date_range("2026-01-01T00:00:00Z", periods=30, freq="1s"))
+    times.extend(pd.date_range("2026-01-01T00:00:40Z", periods=40, freq="1s"))
+    mid = np.full(len(times), 1.1)
+    quotes = pd.DataFrame({
+        "time": times,
+        "bid": mid - 0.00001,
+        "ask": mid + 0.00001,
+    })
+
+    frame = build_quote_training_frame(
+        {"EURUSD": quotes}, horizons=(10,), sample_every_s=1,
+        target_mode="captured_exit_replay",
+    )
+
+    assert pd.Timestamp("2026-01-01T00:00:25Z") not in set(frame["time"])
 
 
 def test_training_and_runtime_share_symbol_encoding():
@@ -406,6 +584,37 @@ def test_captured_exit_replay_subtracts_configured_slippage_without_double_count
     )
     assert slipped["captured_exit_net_pnl"] < 0.0
     assert slipped["target"] == 0
+
+
+def test_captured_exit_returns_are_invariant_to_broker_usd_conversion_scale():
+    quotes = _quotes()
+    raw = build_quote_training_frame(
+        {"EURUSD": quotes},
+        horizons=(10,),
+        sample_every_s=5,
+        target_mode="captured_exit_replay",
+        usd_per_price_unit_by_symbol={"EURUSD": 1.0},
+    )
+    broker_usd = build_quote_training_frame(
+        {"EURUSD": quotes},
+        horizons=(10,),
+        sample_every_s=5,
+        target_mode="captured_exit_replay",
+        usd_per_price_unit_by_symbol={"EURUSD": 1000.0},
+    )
+
+    raw_row = raw.iloc[0]
+    broker_row = broker_usd.iloc[0]
+    assert broker_row["captured_exit_net_pnl"] == pytest.approx(
+        raw_row["captured_exit_net_pnl"] * 1000.0
+    )
+    assert broker_row["captured_exit_return"] == pytest.approx(
+        raw_row["captured_exit_return"]
+    )
+    assert broker_row["terminal_return"] == pytest.approx(raw_row["terminal_return"])
+    assert broker_row["harvest_return"] == pytest.approx(raw_row["harvest_return"])
+    assert broker_row["mfe_return"] == pytest.approx(raw_row["mfe_return"])
+    assert broker_row["mae_return"] == pytest.approx(raw_row["mae_return"])
 
 
 def test_captured_labels_keep_exact_identity_and_provenance():
@@ -548,6 +757,18 @@ def test_chronological_slices_are_disjoint_and_ordered():
     assert slices.train["time"].max() < slices.validation["time"].min()
     assert slices.validation["time"].max() < slices.test["time"].min()
     assert slices.test["time"].max() < slices.sealed["time"].min()
+
+
+def test_chronological_slices_purge_label_horizon_between_splits():
+    frame = build_quote_training_frame(
+        {"EURUSD": _quotes(600)}, horizons=(20,), sample_every_s=1
+    )
+    slices = chronological_slices(frame)
+    purge = pd.Timedelta(seconds=20)
+
+    assert slices.train["time"].max() + purge < slices.validation["time"].min()
+    assert slices.validation["time"].max() + purge < slices.test["time"].min()
+    assert slices.test["time"].max() + purge < slices.sealed["time"].min()
 
 
 def test_shadow_artifact_is_recorded_as_no_evidence(tmp_path):

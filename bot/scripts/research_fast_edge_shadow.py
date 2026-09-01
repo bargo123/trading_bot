@@ -17,6 +17,7 @@ if str(BOT_ROOT) not in sys.path:
     sys.path.insert(0, str(BOT_ROOT))
 
 from aegis.engines.mt5 import MT5Engine  # noqa: E402
+from aegis.intel.trade_economics import usd_per_price_unit  # noqa: E402
 from aegis.research.fast_edge_shadow import (  # noqa: E402
     SHADOW_HORIZONS_S,
     build_shadow_dataset,
@@ -98,11 +99,47 @@ def primary_oos_metrics(model_report: dict) -> dict[str, object]:
     return result
 
 
+def exit_policy_comparison_for_frame(
+    frame: pd.DataFrame,
+    *,
+    captured_only: bool,
+    min_samples: int = 20,
+) -> list[dict]:
+    """Compare auxiliary exits only when their outcomes were generated."""
+    if captured_only:
+        return []
+    return evaluate_exit_policies(frame, min_samples=min_samples)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=BOT_ROOT / "config_mt5_demo_firehose_hw.yaml")
     parser.add_argument("--lookback-seconds", type=int, default=3600)
     parser.add_argument("--sample-every-seconds", type=int, default=1)
+    parser.add_argument(
+        "--horizon",
+        action="append",
+        dest="horizon_values",
+        type=int,
+        help="bounded horizon selection (repeatable; defaults to all short horizons)",
+    )
+    parser.add_argument(
+        "--captured-only",
+        action="store_true",
+        help="persist only the governed captured-exit path; auxiliary policies are omitted",
+    )
+    parser.add_argument(
+        "--entry-latency-s",
+        type=float,
+        default=0.0,
+        help="causal quote delay before entry execution (research only)",
+    )
+    parser.add_argument(
+        "--close-latency-s",
+        type=float,
+        default=0.0,
+        help="causal quote delay before captured close execution (research only)",
+    )
     parser.add_argument("--symbol", action="append", dest="symbol_overrides", help="focused configured symbol replay (repeatable)")
     parser.add_argument("--out-dir", type=Path, default=BOT_ROOT / "reports" / "research")
     parser.add_argument("--no-rows", action="store_true", help="do not persist the row-level shadow dataset")
@@ -110,6 +147,12 @@ def main() -> None:
     parser.add_argument("--experiment-handoff", type=Path, help="prior research-only Council experiment handoff")
     args = parser.parse_args()
     experiment_handoff = _load_experiment_handoff(args.experiment_handoff)
+    cfg = {}
+    horizons = tuple(
+        sorted({int(value) for value in (args.horizon_values or SHADOW_HORIZONS_S) if int(value) > 0})
+    )
+    if not horizons:
+        raise SystemExit("at least one positive horizon is required")
 
     if args.rows_input:
         frame = pd.read_json(args.rows_input, orient="records", lines=True)
@@ -139,17 +182,36 @@ def main() -> None:
                 print(f"HISTORY_SKIP {symbol} {type(exc).__name__}: {str(exc)[:120]}", flush=True)
         if not quotes_by_symbol:
             raise SystemExit("no MT5 quote history was available")
+        usd_conversion: dict[str, float] = {}
+        for symbol in quotes_by_symbol:
+            spec = engine.symbol_spec(symbol)
+            try:
+                minimum_lot = float(spec.get("volume_min"))
+            except (AttributeError, TypeError, ValueError, OverflowError):
+                minimum_lot = 0.0
+            conversion = usd_per_price_unit(spec, lots=minimum_lot)
+            if conversion is None:
+                raise SystemExit(f"USD conversion unavailable for {symbol}")
+            usd_conversion[symbol] = float(conversion)
         frame = build_shadow_dataset(
             quotes_by_symbol,
-            horizons=SHADOW_HORIZONS_S,
+            horizons=horizons,
             sample_every_s=max(1, int(args.sample_every_seconds)),
+            slippage_bps=float(cfg.get("slippage_bps", 0.0) or 0.0),
+            commission_round_trip_usd=float(cfg.get("commission_round_trip_usd", 0.0) or 0.0),
+            usd_per_price_unit_by_symbol=usd_conversion,
+            entry_latency_s=float(args.entry_latency_s),
+            close_latency_s=float(args.close_latency_s),
+            include_auxiliary_exit_policies=not args.captured_only,
         )
     model_report = fit_shadow_model_space(frame, min_samples=20)
     spread_vol_gate_sweep = evaluate_spread_vol_gates(frame)
     spread_vol_soft_gate_sweep = evaluate_soft_spread_vol_gates(frame)
     sealed_frame = chronological_shadow_slices(frame).sealed
     fast_winner_discovery = fast_winner_feature_discovery(sealed_frame)
-    exit_policy_comparison = evaluate_exit_policies(sealed_frame, min_samples=20)
+    exit_policy_comparison = exit_policy_comparison_for_frame(
+        sealed_frame, captured_only=args.captured_only, min_samples=20
+    )
     sealed_predictions = model_report.pop("sealed_predictions", None)
     book_queries = (
         "scalping tick behavior short momentum",
@@ -215,7 +277,20 @@ def main() -> None:
         "VALIDATION_HASH": model_report["validation_hash"],
         "DECISION_HORIZON": "multi_horizon_shadow_only",
         "candidate_source": "all_quote_entries",
-        "horizons_s": list(SHADOW_HORIZONS_S),
+        "cost_model": {
+            "spread": "executable_bid_ask_entry_and_liquidation",
+            "slippage_bps": float(cfg.get("slippage_bps", 0.0) or 0.0),
+            "commission_round_trip_usd": float(cfg.get("commission_round_trip_usd", 0.0) or 0.0),
+            "entry_latency_s": float(args.entry_latency_s),
+            "close_latency_s": float(args.close_latency_s),
+            "usd_per_price_unit_by_symbol": (
+                {str(symbol): float(value) for symbol, value in usd_conversion.items()}
+                if not args.rows_input else None
+            ),
+            "outcome_units": "captured_exit_return is broker-unit-normalized after-cost return",
+            "captured_only": bool(args.captured_only),
+        },
+        "horizons_s": list(horizons),
         "symbols": sorted(frame["symbol"].astype(str).str.upper().unique().tolist()),
         "candidate_rows": int(len(frame)),
         "shadow_trades_evaluated": int(len(frame)),
@@ -322,7 +397,7 @@ def main() -> None:
                 "code_commit": None,
                 "config_fingerprint": "mt5_demo_readonly_shadow_v1",
                 "dataset_fingerprint": model_report["dataset_hash"],
-                "params": {"horizons_s": list(SHADOW_HORIZONS_S), "symbols": len(report["symbols"])},
+                "params": {"horizons_s": list(horizons), "symbols": len(report["symbols"])},
                 "metrics": {"candidate_rows": len(frame), "leaderboard_rows": len(model_report["leaderboard"])},
             }
         )

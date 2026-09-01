@@ -1,0 +1,34 @@
+{
+  "report": "execution_authority_audit",
+  "captured_at_utc": "2026-08-31T03:49:39.9412617Z",
+  "status": "STATIC_AUDIT_PASS; ONE_LOGICAL_RUNTIME_OWNER; VERIFIED_SOURCE_LOADED",
+  "designated_execution_owner": "bot/scripts/run_broker_paper.py",
+  "engine_order_send_owner": "bot/aegis/engines/mt5.py",
+  "research_order_send_hits": 0,
+  "research_broker_mutation_hits": 0,
+  "external_tool_count": 14,
+  "external_tool_broker_authority_count": 0,
+  "book_algorithm_count": 616,
+  "book_algorithm_execution_authority_count": 0,
+  "watcher_contract": {
+    "execution_authority": false,
+    "research_only": true,
+    "order_intent": false
+  },
+  "process_rows": 2,
+  "logical_runtime_owner_count": 1,
+  "current_runtime_evidence": {
+    "heartbeat_pid": 13204,
+    "heartbeat_status": "running",
+    "feed_status": "HEALTHY",
+    "trading_eligible": true,
+    "new_code_loaded": true,
+    "scans": 52,
+    "book_derived_mechanisms_loaded": 12,
+    "book_derived_candidates": 24,
+    "open_positions": 0,
+    "restart_performed": true
+  },
+  "allow_live": false,
+  "live_money_path": false
+}

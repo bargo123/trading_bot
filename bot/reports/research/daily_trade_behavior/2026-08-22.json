@@ -1,0 +1,40 @@
+{
+  "schema": "daily_trade_behavior.v1",
+  "label": "research_observation",
+  "date": "2026-08-22",
+  "timezone": "Asia/Amman",
+  "n_trades": 1,
+  "n_wins": 1,
+  "n_losses": 0,
+  "net_pnl_usd": 0.17,
+  "winner_to_loser_count": 0,
+  "winner_to_loser_rate": 0.0,
+  "trades": [
+    {
+      "ticket": "9860751176",
+      "symbol": "EURCHF",
+      "side": "sell",
+      "pnl": 0.17,
+      "category": "WINNER_GIVEBACK",
+      "exit_reason": "pm_mfe_giveback",
+      "exit_action": "UNKNOWN",
+      "opened_at": null,
+      "closed_at": "2026-08-21T23:43:11+00:00",
+      "hold_s": null,
+      "time_to_green_s": null,
+      "first_net_green_s": null,
+      "seconds_in_red_observed_s": 0.0,
+      "mfe_usd": 0.37,
+      "mae_usd": -0.1,
+      "peak_executable_pnl_usd": null,
+      "giveback_usd": 0.19999999999999998,
+      "winner_to_loser": false,
+      "state_path": [
+        "OPEN",
+        "CLOSE_WIN"
+      ],
+      "evidence_status": "PARTIAL",
+      "broker_confirmed_net_pnl_usd": 0.17
+    }
+  ]
+}

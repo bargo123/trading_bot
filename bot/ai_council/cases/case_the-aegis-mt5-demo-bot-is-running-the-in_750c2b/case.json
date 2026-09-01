@@ -1,0 +1,130 @@
+{
+  "created_utc": "2026-08-27T17:24:28.612390+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_750c2b\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.7,
+          "finished_utc": "2026-08-27T17:29:02.042715+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-27T17:28:49.344210+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-27T17:29:02.047249+00:00",
+        "text": "This is not a trading proposal; it is an unsupported-model error with no hypothesis, methodology, validation, or measurable outcome. It cannot be evaluated or promoted until the model configuration is corrected and a reproducible research plan is supplied."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_750c2b\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 9.27,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-27T17:29:11.329831+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-27T17:29:36.077395+00:00",
+    "decision": "no_change",
+    "evidence": {
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "DUPLICATE_FAILED_HYPOTHESIS"
+    },
+    "rationale": "REAL: candidate hypothesis overlaps prior record council_the-aegis-mt5-demo-bot-is-running-the-in_37d46c (queued, overlap 0.56); not re-tested"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_750c2b",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_750c2b\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 8.84,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-27T17:24:52.985428+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_750c2b\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 15.1,
+        "finished_utc": "2026-08-27T17:26:05.431369+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-27T17:25:50.331253+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-27T17:26:05.434371+00:00",
+      "text": "Test a stricter validated-state entry gate requiring both a positive net expected value after modeled spread/slippage and confirmation from two consecutive independent scans before a DEMO entry signal is eligible. Compare it with the current gate on sealed holdout data, using identical costs and no parameter tuning on the holdout. Reject it unless net expectancy improves while maximum drawdown and false-positive entry rate do not worsen."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_750c2b\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.42,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-27T17:29:18.763952+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_750c2b\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 17.25,
+        "finished_utc": "2026-08-27T17:29:36.031908+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-27T17:29:18.781484+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-27T17:29:36.034439+00:00",
+      "text": "Test a stricter validated-state entry gate requiring positive net expected value after modeled spread/slippage and confirmation from two consecutive independent scans before a DEMO entry signal is eligible. Evaluate it against the current gate on sealed holdout data with identical costs and no holdout tuning. Use a supported model configuration for the evaluation pipeline, and reject the change unless net expectancy improves without worsening maximum drawdown or false-positive entry rate."
+    }
+  },
+  "status": "decided"
+}

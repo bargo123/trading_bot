@@ -62,8 +62,8 @@ def load_blocked_studies(report_dir: Path) -> list[dict[str, Any]]:
     return [*records.values(), *unkeyed]
 
 
-_INDEX_FIELDS = {"record_type", "study_id", "blocked_event_id", "timestamp", "candidate_state", "strategy_count"}
-_INDEX_FIELD_RE = re.compile(r'"(record_type|study_id|blocked_event_id|timestamp|candidate_state|strategy_count)"\s*:\s*')
+_INDEX_FIELDS = {"record_type", "study_id", "blocked_event_id", "timestamp", "candidate_state", "strategy_count", "algorithm_count"}
+_INDEX_FIELD_RE = re.compile(r'"(record_type|study_id|blocked_event_id|timestamp|candidate_state|strategy_count|algorithm_count)"\s*:\s*')
 _OPINION_RE = re.compile(r'"opinion"\s*:\s*"([^"]+)"')
 _DECODER = json.JSONDecoder()
 
@@ -138,6 +138,10 @@ class StudyStore:
         self._pending_offsets: dict[str, int] = {}
         self._library_signature: tuple[int, int] | None = None
         self._metadata: dict[str, dict[str, Any]] = {}
+        self._complete_strategy_ids: set[str] = set()
+        self._library_is_authoritative = False
+        self._algorithm_stats_signature: tuple[int, int] | None = None
+        self._algorithm_stats: dict[str, dict[str, Any]] = {}
 
     def load(self) -> list[dict[str, Any]]:
         signature_rows: list[tuple[str, int, int]] = []
@@ -225,17 +229,21 @@ class StudyStore:
             signature = None
         if signature != self._library_signature:
             self._metadata = {}
+            self._complete_strategy_ids = set()
+            self._library_is_authoritative = False
             try:
                 library = json.loads(self.library_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 library = {}
+            self._library_is_authoritative = isinstance(library, Mapping) and isinstance(library.get("records"), list)
             for record in library.get("records", []) if isinstance(library, Mapping) else []:
                 if not isinstance(record, Mapping) or record.get("category") != "strategy":
                     continue
                 raw = record.get("raw_record") if isinstance(record.get("raw_record"), Mapping) else {}
                 provenance = record.get("provenance") if isinstance(record.get("provenance"), Mapping) else {}
                 record_id = _text(record.get("record_id"))
-                if record_id:
+                if record_id and _text(record.get("algorithm_status")).upper() == "WATCHER_EXACT_RULE":
+                    self._complete_strategy_ids.add(record_id)
                     self._metadata[record_id] = {
                         "book": provenance.get("book") or raw.get("book"),
                         "source_file": record.get("source_file"),
@@ -243,15 +251,99 @@ class StudyStore:
                         "strategy_family": raw.get("strategy_family") or raw.get("concept"),
                         "side_rule": raw.get("side_rule"),
                         "validation_status": record.get("validation_status"),
+                        "algorithm_status": "WATCHER_EXACT_RULE",
                         "provenance": provenance,
                     }
             self._library_signature = signature
         hydrated = dict(study)
-        hydrated["strategies"] = [
-            {**self._metadata.get(_text(row.get("record_id")), {}), **dict(row)}
-            for row in study.get("strategies", [])
-            if isinstance(row, Mapping)
-        ]
+        strategies = []
+        for row in study.get("strategies", []) if isinstance(study.get("strategies"), list) else []:
+            if not isinstance(row, Mapping):
+                continue
+            record_id = _text(row.get("record_id"))
+            if self._library_is_authoritative and record_id not in self._complete_strategy_ids:
+                continue
+            strategies.append({**self._metadata.get(record_id, {}), **dict(row)})
+        hydrated["strategies"] = strategies
+        hydrated["strategy_count"] = len(strategies)
+        stats_path = self.report_dir / "strategy_stats.json"
+        replay_path = self.report_dir.parent / "research" / "watcher_algorithm_historical_replay.json"
+        signatures: list[tuple[str, int, int]] = []
+        for path in (stats_path, replay_path):
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            signatures.append((str(path), stat.st_mtime_ns, stat.st_size))
+        stats_signature = tuple(signatures)
+        if stats_signature != self._algorithm_stats_signature:
+            self._algorithm_stats = {}
+            try:
+                payload = json.loads(stats_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                payload = {}
+            rows = payload.get("algorithm_perspectives") if isinstance(payload, Mapping) else None
+            if isinstance(rows, Mapping):
+                self._algorithm_stats = {
+                    str(key): dict(value)
+                    for key, value in rows.items()
+                    if isinstance(value, Mapping)
+                }
+            try:
+                replay_payload = json.loads(replay_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                replay_payload = {}
+            replay_rows = replay_payload.get("algorithms") if isinstance(replay_payload, Mapping) else None
+            if isinstance(replay_rows, Mapping):
+                for key, value in replay_rows.items():
+                    if not isinstance(value, Mapping):
+                        continue
+                    replay_stats = {
+                        "evaluated_decisions": int(value.get("evaluated") or 0),
+                        "applicable_decisions": int(value.get("applicable") or 0),
+                        "shadow_sample_size": int(value.get("signal_samples") or 0),
+                        "shadow_wins": int(value.get("wins") or 0),
+                        "shadow_losses": int(value.get("losses") or 0),
+                        "shadow_ambiguous": int(value.get("draws") or 0),
+                        "shadow_win_rate": value.get("win_rate"),
+                        "shadow_win_rate_percent": (
+                            float(value["win_rate"]) * 100.0
+                            if value.get("win_rate") is not None
+                            else None
+                        ),
+                        "shadow_evidence_source": "historical_quote_replay_net_pnl",
+                        "shadow_data_provenance": "chronological_prior_rows_only",
+                    }
+                    current = self._algorithm_stats.get(str(key), {})
+                    if not current or int(current.get("shadow_sample_size") or 0) <= 0:
+                        self._algorithm_stats[str(key)] = replay_stats
+            self._algorithm_stats_signature = stats_signature
+        hydrated["book_perspectives"] = []
+        for row in study.get("book_perspectives", []) if isinstance(study.get("book_perspectives"), list) else []:
+            if not isinstance(row, Mapping):
+                continue
+            perspective = dict(row)
+            perspective_id = _text(perspective.get("perspective_id") or perspective.get("algorithm_id"))
+            latest = self._algorithm_stats.get(perspective_id, {})
+            for field in (
+                "evaluated_decisions",
+                "applicable_decisions",
+                "shadow_closed",
+                "shadow_sample_size",
+                "shadow_wins",
+                "shadow_losses",
+                "shadow_ambiguous",
+                "shadow_win_rate",
+                "shadow_win_rate_percent",
+                "shadow_evidence_source",
+                "shadow_data_provenance",
+            ):
+                if field in latest:
+                    perspective[field] = latest[field]
+            perspective.setdefault("algorithm_outcome_metric", "shadow_win_rate")
+            perspective.setdefault("p_captured_win", None)
+            perspective.setdefault("p_captured_win_source", "NOT_APPLICABLE_SHADOW_ALGORITHM_METRIC")
+            hydrated["book_perspectives"].append(perspective)
         return hydrated
 
 
@@ -298,6 +390,11 @@ def build_blocked_trade_index(studies: Iterable[Mapping[str, Any]]) -> list[dict
             "horizon_s": state.get("horizon_s"),
             "reason": state.get("reason") or state.get("reject_reason") or state.get("block_reason"),
             "strategy_count": study.get("strategy_count") or (len(strategies) if isinstance(strategies, list) else 0),
+            "algorithm_count": study.get("algorithm_count") or (
+                len(study.get("book_perspectives"))
+                if isinstance(study.get("book_perspectives"), list)
+                else 0
+            ),
             "opinion_counts": (
                 opinion_counts
                 if isinstance(opinion_counts, Mapping)
@@ -334,12 +431,15 @@ h1 { margin:0 0 5px; font-size:22px; }
 input { background:var(--panel); border:1px solid var(--line); color:var(--text); border-radius:6px; padding:9px 11px; min-width:300px; }
 main { padding:20px 28px 44px; max-width:1800px; margin:auto; }
 .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; margin:10px 0; overflow:hidden; }
-.summary { display:grid; grid-template-columns:1.6fr .8fr .8fr 1.1fr .6fr 1.1fr; gap:12px; align-items:center; padding:14px 16px; cursor:pointer; }
+.summary { display:grid; grid-template-columns:1.6fr .8fr .8fr 1.1fr .6fr .7fr 1.1fr; gap:12px; align-items:center; padding:14px 16px; cursor:pointer; }
 .summary:hover { border-color:var(--accent); }
 .candidate { color:var(--accent); font-weight:650; }
 .pill { display:inline-block; border:1px solid var(--line); border-radius:999px; padding:2px 8px; margin:2px 3px 2px 0; font-size:12px; }
 .buy { color:var(--good); } .sell, .reason { color:var(--bad); }
 .detail { border-top:1px solid var(--line); padding:16px; overflow:auto; }
+.perspective-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:8px; margin:0 0 16px; }
+.perspective { border:1px solid var(--line); border-radius:6px; padding:8px; background:rgba(255,255,255,.02); }
+.perspective b { color:var(--accent); }
 .facts { display:flex; gap:18px; flex-wrap:wrap; margin-bottom:14px; }
 .fact b { display:block; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
 table { border-collapse:collapse; width:100%; min-width:900px; }
@@ -405,7 +505,7 @@ function render() {
     <div class="summary" role="button" tabindex="0">
       <div><div class="candidate">${esc(x.candidate_id || x.blocked_event_id)}</div><div class="muted">${esc(x.symbol)} · ${esc(x.side)} · ${esc(x.horizon_s)}s</div></div>
       <div>${esc(x.mechanism)}</div><div>${pills(x.opinion_counts)}</div><div class="reason">${esc(x.reason)}</div>
-      <div>Strategies<br><b>${esc(x.strategy_count)}</b></div><div class="muted">${esc(x.timestamp)}</div>
+      <div>Strategies<br><b>${esc(x.strategy_count)}</b></div><div>Book algorithms<br><b>${esc(x.algorithm_count)}</b></div><div class="muted">${esc(x.timestamp)}</div>
     </div><div class="detail" hidden>Click to load all strategy evidence.</div>
   </section>`).join('');
   document.querySelectorAll('.summary').forEach(el => el.addEventListener('click', () => expand(el.parentElement)));
@@ -429,8 +529,11 @@ async function expand(card) {
     const sideComparison = prediction.side_comparison ? JSON.stringify(prediction.side_comparison) : '—';
     const predictionHtml = `<div class="prediction"><b>Candidate ML prediction</b><div>Source: ${esc(prediction.source)} · Probability: ${esc(predictionText)} · Decision: ${esc(prediction.decision)} · Abstain: ${esc(prediction.abstain)} · Reason: ${esc(prediction.abstain_reason || prediction.reason)}</div><div>BUY/SELL evidence: ${esc(sideComparison)}</div></div>`;
     const reasonText = s => (s.reasons || (s.reason_codes || []).map(code => (study.reason_dictionary || [])[code] || `reason_${code}`)).join('; ');
-    const rows = (study.strategies || []).map(s => `<tr><td>${esc(s.record_id)}</td><td>${esc(s.book)}</td><td>${esc(s.strategy_family)}</td><td class="${s.opinion === 'BUY' ? 'buy' : s.opinion === 'SELL' ? 'sell' : ''}">${esc(s.opinion)}</td><td>${esc(s.applicability)}</td><td>${esc(s.evidence_status || 'UNAVAILABLE')}</td><td>${pct(s.p_captured_win_percent)}</td><td>${pct(s.exact_win_rate_percent)}</td><td>${pct(s.proxy_win_rate_percent)}</td><td>${esc(s.p_captured_win_sample_size || 0)}</td><td>${esc(s.p_captured_win_source)}</td><td>${esc(reasonText(s))}</td></tr>`).join('');
-    expandedDetailHtml = `<div class="facts"><div class="fact"><b>Candidate</b>${esc(state.candidate_id)}</div><div class="fact"><b>Symbol / side</b>${esc(state.symbol)} / ${esc(state.side)}</div><div class="fact"><b>Mechanism / horizon</b>${esc(state.mechanism)} / ${esc(state.horizon_s)}s</div><div class="fact"><b>Strategy count</b>${esc(study.strategy_count)}</div><div class="fact"><b>Study ID</b>${esc(study.study_id)}</div></div>${predictionHtml}<table><thead><tr><th>Record ID</th><th>Book</th><th>Family</th><th>Opinion</th><th>Applicability</th><th>Evidence status</th><th>P_CAPTURED_WIN</th><th>Exact %</th><th>Proxy %</th><th>Sample N</th><th>Evidence source</th><th>Reasons</th></tr></thead><tbody>${rows}</tbody></table>`;
+    const shadowRate = p => p.shadow_win_rate_percent == null ? 'Shadow win rate: UNAVAILABLE' : `Shadow win rate: ${Number(p.shadow_win_rate_percent).toFixed(1)}% (N=${esc(p.shadow_sample_size || 0)})`;
+    const perspectiveRows = (study.book_perspectives || []).map(p => `<div class="perspective"><b>${esc(p.perspective_id)}</b> · <span class="${p.view === 'BUY' ? 'buy' : p.view === 'SELL' ? 'sell' : ''}">${esc(p.view)}</span><br><span class="muted">${esc(p.applicability)} · ${esc((p.source_books || []).join('; '))}</span><br><span class="muted">${esc(shadowRate(p))} · ${esc(p.shadow_evidence_source || 'UNAVAILABLE')}</span><br>${esc((p.reasons || []).join('; ') || (p.missing_inputs || []).join('; ') || 'No additional detail recorded')}</div>`).join('');
+    const perspectiveHtml = `<h3>Book-informed perspectives · consensus ${esc(study.book_consensus || 'UNRESOLVED')}</h3><div class="perspective-grid">${perspectiveRows || '<div class="muted">No direct perspective analysis recorded for this study.</div>'}</div>`;
+  const rows = (study.strategies || []).map(s => `<tr><td>${esc(s.record_id)}</td><td>${esc(s.book)}</td><td>${esc(s.strategy_family)}</td><td>${esc(s.algorithm_status || 'SPECIFICATION_ONLY')}</td><td class="${s.opinion === 'BUY' ? 'buy' : s.opinion === 'SELL' ? 'sell' : ''}">${esc(s.opinion)}</td><td>${esc(s.applicability)}</td><td>${esc(s.evidence_status || 'UNAVAILABLE')}</td><td>${pct(s.p_captured_win_percent)}</td><td>${pct(s.exact_win_rate_percent)}</td><td>${pct(s.proxy_win_rate_percent)}</td><td>${esc(s.p_captured_win_sample_size || 0)}</td><td>${esc(s.p_captured_win_source)}</td><td>${esc(reasonText(s))}</td></tr>`).join('');
+    expandedDetailHtml = `<div class="facts"><div class="fact"><b>Candidate</b>${esc(state.candidate_id)}</div><div class="fact"><b>Symbol / side</b>${esc(state.symbol)} / ${esc(state.side)}</div><div class="fact"><b>Mechanism / horizon</b>${esc(state.mechanism)} / ${esc(state.horizon_s)}s</div><div class="fact"><b>Strategy count</b>${esc(study.strategy_count)}</div><div class="fact"><b>Book algorithm count</b>${esc(study.algorithm_count || (study.book_perspectives || []).length)}</div><div class="fact"><b>Study ID</b>${esc(study.study_id)}</div></div>${predictionHtml}${perspectiveHtml}<table><thead><tr><th>Record ID</th><th>Book</th><th>Family</th><th>Algorithm</th><th>Opinion</th><th>Applicability</th><th>Evidence status</th><th>P_CAPTURED_WIN</th><th>Exact %</th><th>Proxy %</th><th>Sample N</th><th>Evidence source</th><th>Reasons</th></tr></thead><tbody>${rows}</tbody></table>`;
     expandedDetailLoaded = true; expandedDetailLoading = false;
     const current = currentExpandedCard();
     if (current) {

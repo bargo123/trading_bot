@@ -1,0 +1,184 @@
+{
+  "all_intervals": {
+    "0.01": {
+      "accepted_events": 256,
+      "accepted_ids_in_order": true,
+      "decision_to_intent_p50_ms": 0.0044,
+      "decision_to_intent_p95_ms": 0.0049,
+      "decision_to_intent_p99_ms": 0.0055,
+      "dropped_events": 0,
+      "duplicate_event_rejected": true,
+      "input_events": 256,
+      "out_of_order_rejected": true,
+      "quarantine_reason_counts": {
+        "duplicate_event": 1,
+        "out_of_order": 1
+      },
+      "target_met": true,
+      "target_ms": 50.0
+    },
+    "0.05": {
+      "accepted_events": 256,
+      "accepted_ids_in_order": true,
+      "decision_to_intent_p50_ms": 0.0044,
+      "decision_to_intent_p95_ms": 0.009,
+      "decision_to_intent_p99_ms": 0.0104,
+      "dropped_events": 0,
+      "duplicate_event_rejected": true,
+      "input_events": 256,
+      "out_of_order_rejected": true,
+      "quarantine_reason_counts": {
+        "duplicate_event": 1,
+        "out_of_order": 1
+      },
+      "target_met": true,
+      "target_ms": 50.0
+    },
+    "0.25": {
+      "accepted_events": 256,
+      "accepted_ids_in_order": true,
+      "decision_to_intent_p50_ms": 0.0045,
+      "decision_to_intent_p95_ms": 0.0067,
+      "decision_to_intent_p99_ms": 0.0117,
+      "dropped_events": 0,
+      "duplicate_event_rejected": true,
+      "input_events": 256,
+      "out_of_order_rejected": true,
+      "quarantine_reason_counts": {
+        "duplicate_event": 1,
+        "out_of_order": 1
+      },
+      "target_met": true,
+      "target_ms": 50.0
+    }
+  },
+  "broker_called": false,
+  "close_confirmation_sequence_valid": true,
+  "duplicate_event_rejected": true,
+  "duplicate_intent_rejected": true,
+  "duplicate_order_rejected": true,
+  "event_count": 256,
+  "no_dropped_events": true,
+  "no_premature_close": true,
+  "no_premature_fill": true,
+  "no_reordering": true,
+  "no_reversal_before_reconciliation": true,
+  "out_of_order_rejected": true,
+  "rapid_lifecycle": {
+    "all_fake_events_accepted_except_duplicate": true,
+    "basket_intent_accepted": true,
+    "broker_called": false,
+    "complete_basket_close": true,
+    "confirmed_reconciliation": true,
+    "duplicate_suppression": true,
+    "four_leg_count": 4,
+    "four_leg_independent_states": true,
+    "four_leg_rapid_opening": true,
+    "immediate_post_close_rescan": true,
+    "ledger": {
+      "accepted": 40,
+      "last_event_ts": 2000002.21,
+      "last_event_ts_by_correlation": {
+        "pending-ladder": 2000000.6,
+        "pending-recovery": 2000000.0,
+        "position-leg-1": 2000001.5,
+        "position-leg-2": 2000000.00501,
+        "position-leg-3": 2000000.0050199998,
+        "position-leg-4": 2000000.00503,
+        "rapid-basket": 2000002.2,
+        "rapid-basket-leg-1": 2000002.101,
+        "rapid-basket-leg-2": 2000002.1020000002,
+        "rapid-basket-leg-3": 2000002.1030000001,
+        "rapid-basket-leg-4": 2000002.104,
+        "rapid-decision": 2000000.0,
+        "rapid-rescan": 2000002.21
+      },
+      "quarantined": 1,
+      "reason_counts": {
+        "duplicate_event": 1
+      }
+    },
+    "leg_states": {
+      "leg-1": {
+        "acknowledgement": true,
+        "fill": true,
+        "independent": true,
+        "preflight": true
+      },
+      "leg-2": {
+        "acknowledgement": true,
+        "fill": true,
+        "independent": true,
+        "preflight": true
+      },
+      "leg-3": {
+        "acknowledgement": true,
+        "fill": true,
+        "independent": true,
+        "preflight": true
+      },
+      "leg-4": {
+        "acknowledgement": true,
+        "fill": true,
+        "independent": true,
+        "preflight": true
+      }
+    },
+    "legacy_timings_ms": {
+      "close_to_reconciliation": 99.0,
+      "decision_to_first_fill": 3.8,
+      "reconciliation_to_rescan": 10.0
+    },
+    "partial_fill": true,
+    "partial_reduction": true,
+    "pending_order_ladder": true,
+    "pending_order_scenarios": {
+      "cancelled": {
+        "cancelled": true,
+        "created": true,
+        "replay_status": "CANCELLED",
+        "status": "CANCELLED"
+      },
+      "expired": {
+        "created": true,
+        "expired": true,
+        "replay_status": "EXPIRED",
+        "status": "EXPIRED"
+      },
+      "replaced_then_filled": {
+        "created": true,
+        "replaced": true,
+        "replay_status": "CLOSED",
+        "status": "FILLED"
+      }
+    },
+    "pending_order_status": "FILLED",
+    "position_safety": {
+      "no_martingale": true,
+      "no_uncontrolled_averaging_down": true
+    },
+    "restart_recovery": {
+      "idempotent_reconciliation": true,
+      "pending_orders_reconstructed": true,
+      "positions_reconstructed": true,
+      "restarted_ledger_replayed_events": 30
+    },
+    "reversal_results": {
+      "reversal_buy_to_sell_after_reconciliation": true,
+      "reversal_sell_to_buy_after_reconciliation": true
+    },
+    "schema": "aegis.rapid_fake_broker_lifecycle.v1",
+    "timings_ms": {
+      "close_confirmation_to_rescan": 10.0,
+      "close_decision_to_request": 1.0,
+      "close_request_to_confirmation": 100.0,
+      "decision_to_intent": 0.3,
+      "event_to_decision": 0.2,
+      "intent_to_preflight": 0.2,
+      "preflight_to_send": 0.3,
+      "send_to_acknowledgement": 1.0
+    }
+  },
+  "schema": "aegis.rapid_benchmark.v1",
+  "scope": "transport_and_lifecycle_only"
+}

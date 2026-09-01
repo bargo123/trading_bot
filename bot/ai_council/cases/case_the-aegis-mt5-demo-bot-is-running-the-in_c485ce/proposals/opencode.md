@@ -1,0 +1,1 @@
+Test a stricter validated-state rule requiring two consecutive qualifying scans before entry. Compare it against the current gate on sealed holdouts, net of existing spread and slippage assumptions. Promote only if it improves net expectancy while preserving or reducing maximum drawdown and maintains sufficient trade count.

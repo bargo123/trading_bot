@@ -9,6 +9,7 @@ from scripts.watch_firehose_live import (
     heartbeat_summary,
     runtime_paths,
     should_display,
+    watch,
 )
 
 
@@ -28,8 +29,15 @@ def test_runtime_paths_follow_configured_test_name(tmp_path):
 def test_expand_event_exposes_each_blocked_candidate_with_exact_details():
     event = {
         "event": "intel_brain_skip",
+        "event_id": "skip-1",
         "symbol": "EURUSD",
         "short_horizon_gate": "short_horizon_not_calibrated",
+        "short_horizon_prediction": {
+            "probability": 0.61,
+            "decision": False,
+            "abstain": True,
+            "abstain_reason": "uncalibrated_model",
+        },
         "candidate_evaluations": [
             {
                 "variant_id": "stoch_mr:sell:3s",
@@ -61,6 +69,8 @@ def test_expand_event_exposes_each_blocked_candidate_with_exact_details():
     assert candidate["reject_reason"] == "RISK_GRANULARITY_BLOCKED, SPREAD_FAILURE"
     assert candidate["distance_to_eligibility"]["risk_excess_usd"] == 0.1429
     assert candidate["source_event"] == "intel_brain_skip"
+    assert candidate["source_event_id"] == "skip-1"
+    assert candidate["short_horizon_prediction"]["probability"] == 0.61
 
     rendered = format_event(candidate)
     assert "RISK_GRANULARITY_BLOCKED, SPREAD_FAILURE" in rendered
@@ -124,3 +134,33 @@ def test_heartbeat_summary_reports_live_funnel_and_safety_state():
     assert "BLOCKED_OMS=1" in rendered
     assert "FILLS=1" in rendered
     assert "OPEN_POSITIONS=1" in rendered
+
+
+def test_watch_knowledge_mode_writes_read_only_analysis(tmp_path):
+    config = tmp_path / "firehose.yaml"
+    config.write_text(
+        "symbol: EURUSD\ntimeframe: M1\nmode: mt5_demo\ntest_name: custom_firehose\n",
+        encoding="utf-8",
+    )
+    report_dir = tmp_path / "reports"
+    report_dir.mkdir()
+    (report_dir / "custom_firehose_journal.jsonl").write_text(
+        json.dumps({
+            "event": "candidate_blocked",
+            "event_id": "blocked-1",
+            "timestamp": 100.0,
+            "symbol": "EURUSD",
+            "side": "buy",
+            "entry": 1.1,
+            "stop": 1.099,
+            "target": 1.101,
+        }) + "\n",
+        encoding="utf-8",
+    )
+
+    watch(config, once=True, from_start=True, knowledge=True)
+
+    watcher_dir = report_dir / "watcher"
+    assert (watcher_dir / "knowledge_library.json").is_file()
+    assert (watcher_dir / "decision_analysis.jsonl").is_file()
+    assert (watcher_dir / "shadow_trades.jsonl").is_file()

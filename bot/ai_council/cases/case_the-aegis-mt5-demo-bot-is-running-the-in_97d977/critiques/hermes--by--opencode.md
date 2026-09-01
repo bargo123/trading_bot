@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal, so it provides no testable hypothesis, validation plan, or risk controls. Treating an unsupported preview model as a strategy signal would be unmeasurable and operationally unsafe; select a supported model and log failure handling before continuing.

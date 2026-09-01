@@ -365,6 +365,78 @@ def test_entry_economics_blocks_negative_net_target():
     assert "NEGATIVE_EXPECTED_NET_AFTER_COST" in result["rejections"]
 
 
+@pytest.mark.parametrize("bad_tick", [-1.0, float("nan"), float("inf")])
+def test_entry_economics_does_not_use_invalid_tick_value_as_negative_risk(bad_tick):
+    cand = MicroCandidate(
+        hypothesis_id="h-invalid-tick", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0990, target=1.1020,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=10, target_pips=20,
+        risk_usd_min_lot=1.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(
+        cand, max_risk_usd=0.15, contract_size=100000.0,
+        tick_value=bad_tick, tick_size=0.00001,
+    )
+    assert "RISK_GRANULARITY_BLOCKED" in result["rejections"]
+
+
+@pytest.mark.parametrize("bad_budget", [0.0, -0.01, float("nan"), float("inf")])
+def test_entry_economics_rejects_invalid_risk_budget(bad_budget):
+    cand = MicroCandidate(
+        hypothesis_id="h-invalid-budget", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0990, target=1.1020,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=10, target_pips=20,
+        risk_usd_min_lot=1.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(cand, max_risk_usd=bad_budget)
+    assert result["allowed"] is False
+    assert "INVALID_RISK_BUDGET" in result["rejections"]
+
+
+@pytest.mark.parametrize("bad_volume", [0.0, -0.01, float("nan"), float("inf")])
+def test_entry_economics_rejects_invalid_minimum_lot(bad_volume):
+    cand = MicroCandidate(
+        hypothesis_id="h-invalid-volume", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0990, target=1.1020,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=10, target_pips=20,
+        risk_usd_min_lot=1.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(cand, max_risk_usd=0.15, volume_min=bad_volume)
+    assert result["allowed"] is False
+    assert "INVALID_VOLUME_SPEC" in result["rejections"]
+
+
+@pytest.mark.parametrize(
+    ("commission_rt_usd", "slippage_pips"),
+    [(float("nan"), 0.3), (float("inf"), 0.3), (-0.01, 0.3), (0.0, float("nan")), (0.0, -0.1)],
+)
+def test_entry_economics_rejects_invalid_cost_inputs(commission_rt_usd, slippage_pips):
+    cand = MicroCandidate(
+        hypothesis_id="h-invalid-cost", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0990, target=1.1020,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=10, target_pips=20,
+        risk_usd_min_lot=1.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(
+        cand, max_risk_usd=0.15,
+        commission_rt_usd=commission_rt_usd, slippage_pips=slippage_pips,
+    )
+    assert result["allowed"] is False
+    assert "INVALID_COST_INPUTS" in result["rejections"]
+
+
+def test_entry_economics_rejects_invalid_stop_geometry():
+    cand = MicroCandidate(
+        hypothesis_id="h-invalid-geometry", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.10, target=1.1020,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=10, target_pips=20,
+        risk_usd_min_lot=1.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(cand, max_risk_usd=0.15)
+    assert result["allowed"] is False
+    assert "INVALID_GEOMETRY" in result["rejections"]
+
+
 # ---------------------------------------------------------------------------
 # Fast exit state machine
 # ---------------------------------------------------------------------------

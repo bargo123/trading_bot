@@ -74,5 +74,8 @@ def test_canonical_registry_replaces_legacy_strategy_sinks(tmp_path):
 
     engine = WatcherKnowledgeEngine(knowledge_dir=knowledge, report_dir=tmp_path / "watcher")
 
-    assert [row["record_id"] for row in engine.library["strategy_records"]] == ["canonical-1"]
-    assert engine.library["counts"]["strategy_records"] == 1
+    # The canonical registry remains the provenance source, but an
+    # untestable passage is not loaded as an executable Watcher strategy.
+    assert engine.library["strategy_records"] == []
+    assert engine.library["counts"]["strategy_records"] == 0
+    assert engine.library["counts"]["filtered_strategy_records"] == 1

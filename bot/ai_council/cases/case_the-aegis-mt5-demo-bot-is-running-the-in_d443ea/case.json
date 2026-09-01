@@ -1,0 +1,130 @@
+{
+  "created_utc": "2026-08-28T01:43:22.876643+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d443ea\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 17.44,
+          "finished_utc": "2026-08-28T01:45:40.124546+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-28T01:45:22.681499+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T01:45:40.128547+00:00",
+        "text": "This is an error message, not a research proposal: it provides no hypothesis, methodology, metrics, or validation plan. It makes no measurable trading claim and cannot be assessed for overfitting, safety, or expected value."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d443ea\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 12.06,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T01:45:52.209599+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-28T01:46:23.126949+00:00",
+    "decision": "no_change",
+    "evidence": {
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "DUPLICATE_FAILED_HYPOTHESIS"
+    },
+    "rationale": "REAL: candidate hypothesis overlaps prior record council_the-aegis-mt5-demo-bot-is-running-the-in_b15405 (queued, overlap 0.56); not re-tested"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_d443ea",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d443ea\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 11.45,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T01:43:49.900406+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d443ea\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 19.58,
+        "finished_utc": "2026-08-28T01:44:30.845799+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T01:44:11.266160+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T01:44:30.847798+00:00",
+      "text": "Test whether tightening the validated-state gate to require 20 consecutive completed outcome records improves net expectancy versus the current threshold on sealed holdouts. Accept it only if net expectancy improves after modeled spread/slippage while trade count remains at least 70% of baseline and worst-case drawdown does not increase. Record the experiment in `ExperimentRegistry`; otherwise reject the candidate."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d443ea\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 12.23,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T01:46:04.447328+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d443ea\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 18.62,
+        "finished_utc": "2026-08-28T01:46:23.083715+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T01:46:04.466384+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T01:46:23.085722+00:00",
+      "text": "Test whether tightening the validated-state gate to require 20 consecutive completed outcome records improves net expectancy versus the current threshold on sealed holdouts. Use a supported configured model rather than `x-preview-f-free`, and record any unavailable-model failure honestly in `ExperimentRegistry`. Accept only if net expectancy improves after modeled spread/slippage, trade count remains at least 70% of baseline, and worst-case drawdown does not increase; otherwise reject the candidate."
+    }
+  },
+  "status": "decided"
+}

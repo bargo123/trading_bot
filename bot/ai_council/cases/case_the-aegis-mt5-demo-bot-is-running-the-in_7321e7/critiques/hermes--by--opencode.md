@@ -1,0 +1,1 @@
+The proposal is not actionable: it only reports an API compatibility error and provides no strategy, hypothesis, or validation plan. It makes no measurable claim and offers no evidence that the unsupported model affects research quality, execution safety, or system performance.

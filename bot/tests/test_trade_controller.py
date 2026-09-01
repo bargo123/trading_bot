@@ -107,6 +107,55 @@ def test_replay_keeps_terminal_endpoint_distinct_from_earlier_captured_exit():
     assert replay["terminal_net_pnl"] < 0.0
 
 
+def test_replay_includes_delayed_close_quote_in_path_extrema():
+    replay = TradeController().replay_quote_path(
+        quotes=[
+            {"time": 0.0, "bid": 1.09999, "ask": 1.10001},
+            # The decision quote reaches the target and requests a harvest.
+            {"time": 1.0, "bid": 1.10005, "ask": 1.10007},
+            # The broker close is delayed; this quote is part of the observed
+            # executable path and must therefore contribute to MFE.
+            {"time": 1.5, "bid": 1.10015, "ask": 1.10017},
+        ],
+        side="buy",
+        horizon_s=1.0,
+        target_price=1.10005,
+        stop_price=1.09993,
+        pip_size=0.0001,
+        close_latency_s=0.5,
+        usd_per_price_unit=100_000.0,
+    )
+
+    assert replay["captured_exit_action"] == "HARVEST"
+    assert replay["captured_exit_time_s"] == 1.5
+    assert replay["mfe_net_pnl"] == replay["captured_exit_net_pnl"]
+    assert replay["time_to_peak_s"] == 1.5
+
+
+def test_replay_includes_delayed_close_quote_in_adverse_path():
+    replay = TradeController().replay_quote_path(
+        quotes=[
+            {"time": 0.0, "bid": 1.09999, "ask": 1.10001},
+            {"time": 1.0, "bid": 1.10005, "ask": 1.10007},
+            # A delayed broker close can move against the entry after the
+            # harvest decision; that quote must contribute to MAE as well.
+            {"time": 1.5, "bid": 1.09980, "ask": 1.09982},
+        ],
+        side="buy",
+        horizon_s=1.0,
+        target_price=1.10005,
+        stop_price=1.09993,
+        pip_size=0.0001,
+        close_latency_s=0.5,
+        usd_per_price_unit=100_000.0,
+    )
+
+    assert replay["captured_exit_action"] == "HARVEST"
+    assert replay["captured_exit_net_pnl"] < 0.0
+    assert replay["mae_net_pnl"] == replay["captured_exit_net_pnl"]
+    assert replay["tail_loss"] is True
+
+
 def test_canonical_controller_allows_green_continuation_when_harvester_supports_it():
     harvest = ProfitHarvester(_harvest_policy()).evaluate(_harvest_input(
         gross_pnl_r=0.84,

@@ -1,0 +1,22 @@
+{
+  "report": "firehose_rejection_fix_before",
+  "measurement_status": "CODE_AUDIT_BASELINE_NOT_RUNTIME_PROOF",
+  "source_revision": "cd9d27a",
+  "before_this_pass": {
+    "watcher_advisory": "present in dirty worktree and read-only",
+    "causal_market_event_ledger": false,
+    "typed_runner_lifecycle_journal": false,
+    "existing_mt5_sender": "aegis.engines.mt5.MT5Engine.place_order",
+    "existing_execution_owner": "bot/scripts/run_broker_paper.py"
+  },
+  "scope": [
+    "book-informed Watcher evidence",
+    "causal quote quarantine",
+    "runner lifecycle audit contracts"
+  ],
+  "not_measured": [
+    "new-code MT5 DEMO smoke",
+    "broker fill/close latency",
+    "runtime outcome improvement"
+  ]
+}

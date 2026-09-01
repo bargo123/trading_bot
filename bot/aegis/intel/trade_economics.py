@@ -123,6 +123,47 @@ def wilson_lower_bound(*, wins: int, n: int, z: float = WILSON_Z) -> float | Non
     return max(0.0, min(1.0, lower))
 
 
+def broker_tick_value(spec: Mapping[str, Any] | None) -> float | None:
+    """Return the conservative usable broker tick value.
+
+    MT5 can expose separate profit/loss values and some terminals report the
+    loss value with a negative sign.  Risk conversion needs a positive
+    magnitude and must use the most conservative finite value, never a
+    negative/NaN value that could make risk appear free.
+    """
+    if not spec:
+        return None
+    values: list[float] = []
+    for key in ("trade_tick_value_loss", "trade_tick_value", "trade_tick_value_profit"):
+        value = spec.get(key)
+        if value is None:
+            continue
+        try:
+            number = abs(float(value))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if math.isfinite(number) and number > 0:
+            values.append(number)
+    return max(values) if values else None
+
+
+def broker_tick_size(spec: Mapping[str, Any] | None) -> float | None:
+    """Return a finite positive broker tick size/point, or ``None``."""
+    if not spec:
+        return None
+    for key in ("trade_tick_size", "point"):
+        value = spec.get(key)
+        if value is None:
+            continue
+        try:
+            number = float(value)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if math.isfinite(number) and number > 0:
+            return number
+    return None
+
+
 def usd_per_price_unit(spec: Mapping[str, Any] | None, *, lots: float) -> float | None:
     """USD change per 1.0 of quote price, for ``lots`` of this contract.
 
@@ -131,7 +172,13 @@ def usd_per_price_unit(spec: Mapping[str, Any] | None, *, lots: float) -> float 
     otherwise. Returns None when the broker gave us nothing usable - callers must
     treat that as "cannot price this trade", never as zero cost.
     """
-    if not spec or lots <= 0:
+    if not spec:
+        return None
+    try:
+        resolved_lots = float(lots)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(resolved_lots) or resolved_lots <= 0:
         return None
     def _num(*keys: str) -> float | None:
         for key in keys:
@@ -146,13 +193,15 @@ def usd_per_price_unit(spec: Mapping[str, Any] | None, *, lots: float) -> float 
                 return number
         return None
 
-    tick_size = _num("trade_tick_size", "point")
-    tick_value = _num("trade_tick_value_loss", "trade_tick_value", "trade_tick_value_profit")
+    tick_size = broker_tick_size(spec)
+    tick_value = broker_tick_value(spec)
     if tick_size and tick_value:
-        return (tick_value / tick_size) * float(lots)
+        result = (tick_value / tick_size) * resolved_lots
+        return result if math.isfinite(result) and result > 0 else None
     contract_size = _num("trade_contract_size")
     if contract_size:
-        return contract_size * float(lots)
+        result = contract_size * resolved_lots
+        return result if math.isfinite(result) and result > 0 else None
     return None
 
 
@@ -182,10 +231,23 @@ def evaluate_trade_economics(
     Supplied probabilities and analogue evidence must identify measured market
     history. Synthetic, proxy, and unknown evidence fail closed.
     """
-    lots = float(lots or 0.0)
+    try:
+        lots = float(lots)
+    except (TypeError, ValueError, OverflowError):
+        lots = float("nan")
     entry = float(entry)
+    if not math.isfinite(lots):
+        return _reject("invalid_position_size", entry=entry, lots=lots)
     if lots <= 0:
         return _reject("no_position_size", entry=entry, lots=lots)
+
+    try:
+        resolved_min_payoff = float(min_payoff_ratio)
+        resolved_min_expected = float(min_expected_net_usd)
+    except (TypeError, ValueError, OverflowError):
+        return _reject("invalid_economic_thresholds", entry=entry, lots=lots)
+    if not math.isfinite(resolved_min_payoff) or not math.isfinite(resolved_min_expected):
+        return _reject("invalid_economic_thresholds", entry=entry, lots=lots)
 
     resolved_side = str(side).lower()
     if resolved_side not in {"buy", "sell"}:
@@ -206,7 +268,7 @@ def evaluate_trade_economics(
         return _reject("no_invalidation_distance", entry=entry, lots=lots, invalidation=invalidation)
 
     per_unit = usd_per_price_unit(spec, lots=lots)
-    if per_unit is None or per_unit <= 0:
+    if per_unit is None or not math.isfinite(per_unit) or per_unit <= 0:
         return _reject(
             "contract_value_unavailable", entry=entry, lots=lots, invalidation=invalidation, risk_price=risk_price
         )
@@ -243,16 +305,68 @@ def evaluate_trade_economics(
     expected_loss_usd = risk_price * per_unit
     expected_win_usd = reward_price * per_unit
 
-    spread = 0.0 if spread_price is None else abs(float(spread_price))
-    if not math.isfinite(spread):
-        spread = 0.0
-    slippage = 0.0 if slippage_price is None else abs(float(slippage_price))
-    if not math.isfinite(slippage):
-        slippage = 0.0
-    cost_usd = (
-        (spread + slippage) * per_unit
-        + max(0.0, float(commission_round_trip_usd or 0.0))
-    )
+    if not math.isfinite(expected_loss_usd) or not math.isfinite(expected_win_usd):
+        return _reject(
+            "invalid_economic_calculation",
+            entry=entry,
+            lots=lots,
+            invalidation=invalidation,
+            target=resolved_target,
+            target_source=target_source,
+            risk_price=risk_price,
+            reward_price=reward_price,
+            expected_win_usd=expected_win_usd,
+            expected_loss_usd=expected_loss_usd,
+            usd_per_price_unit=per_unit,
+        )
+
+    def _nonnegative_cost(value: Any) -> float | None:
+        if value is None:
+            return 0.0
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if not math.isfinite(parsed) or parsed < 0.0:
+            return None
+        return parsed
+
+    spread = _nonnegative_cost(spread_price)
+    slippage = _nonnegative_cost(slippage_price)
+    commission = _nonnegative_cost(commission_round_trip_usd)
+    if spread is None or slippage is None or commission is None:
+        return _reject(
+            "invalid_cost_inputs",
+            entry=entry,
+            lots=lots,
+            invalidation=invalidation,
+            target=resolved_target,
+            target_source=target_source,
+            risk_price=risk_price,
+            reward_price=reward_price,
+            expected_win_usd=expected_win_usd,
+            expected_loss_usd=expected_loss_usd,
+            payoff_ratio=expected_win_usd / expected_loss_usd
+            if expected_loss_usd > 0 else None,
+            usd_per_price_unit=per_unit,
+        )
+    cost_usd = (spread + slippage) * per_unit + commission
+
+    if not math.isfinite(cost_usd):
+        return _reject(
+            "invalid_economic_calculation",
+            entry=entry,
+            lots=lots,
+            invalidation=invalidation,
+            target=resolved_target,
+            target_source=target_source,
+            risk_price=risk_price,
+            reward_price=reward_price,
+            expected_win_usd=expected_win_usd,
+            expected_loss_usd=expected_loss_usd,
+            cost_usd=cost_usd,
+            usd_per_price_unit=per_unit,
+        )
 
     payoff_ratio = expected_win_usd / expected_loss_usd if expected_loss_usd > 0 else None
 
@@ -315,6 +429,37 @@ def evaluate_trade_economics(
     denominator = expected_win_usd + expected_loss_usd
     breakeven_wr = (expected_loss_usd + cost_usd) / denominator if denominator > 0 else None
 
+    if (
+        expected_loss_usd <= 0.0
+        or expected_win_usd <= 0.0
+        or not math.isfinite(expected_net)
+        or payoff_ratio is None
+        or not math.isfinite(payoff_ratio)
+        or not math.isfinite(denominator)
+        or breakeven_wr is None
+        or not math.isfinite(breakeven_wr)
+    ):
+        return _reject(
+            "invalid_economic_calculation",
+            entry=entry,
+            lots=lots,
+            invalidation=invalidation,
+            target=resolved_target,
+            target_source=target_source,
+            risk_price=risk_price,
+            reward_price=reward_price,
+            expected_win_usd=expected_win_usd,
+            expected_loss_usd=expected_loss_usd,
+            cost_usd=cost_usd,
+            p_win=resolved_p,
+            p_win_source=p_win_source,
+            probability_provenance=provenance,
+            expected_net_value_usd=expected_net,
+            payoff_ratio=payoff_ratio,
+            breakeven_win_rate=breakeven_wr,
+            usd_per_price_unit=per_unit,
+        )
+
     fields: dict[str, Any] = {
         "invalidation": invalidation,
         "target": resolved_target,
@@ -333,7 +478,7 @@ def evaluate_trade_economics(
         "usd_per_price_unit": per_unit,
     }
 
-    floor = max(float(min_payoff_ratio), 0.0)
+    floor = max(resolved_min_payoff, 0.0)
     if payoff_ratio is not None and floor > 0 and payoff_ratio + 1e-12 < floor:
         # This is the 1-pip-target / 30-pip-stop shape. Reject on structure alone,
         # before any win-rate argument can rescue it.
@@ -341,7 +486,7 @@ def evaluate_trade_economics(
             acceptable=False, reason="payoff_below_floor", entry=entry, lots=lots, **fields
         )
 
-    if expected_net <= float(min_expected_net_usd):
+    if expected_net <= resolved_min_expected:
         return TradeEconomics(
             acceptable=False, reason="expected_net_value_not_positive", entry=entry, lots=lots, **fields
         )

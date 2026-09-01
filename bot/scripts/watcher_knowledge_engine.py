@@ -14,7 +14,7 @@ import math
 import os
 import re
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -28,6 +28,21 @@ try:
     from aegis.research.book_strategy_evidence import evaluate_strategy_evidence
 except ImportError:  # pragma: no cover - direct script execution fallback
     evaluate_strategy_evidence = None
+
+try:
+    from aegis.research.book_strategy_extraction import source_label_from_path
+except ImportError:  # pragma: no cover - direct script execution fallback
+    from book_strategy_extraction import source_label_from_path
+
+try:
+    from aegis.research.watcher_book_perspectives import analyze_book_perspectives, evaluate_book_algorithm, strategy_implementation_status
+except ImportError:  # pragma: no cover - direct script execution fallback
+    from watcher_book_perspectives import analyze_book_perspectives, evaluate_book_algorithm, strategy_implementation_status
+
+try:
+    from aegis.research.watcher_feature_engine import enrich_watcher_state
+except ImportError:  # pragma: no cover - direct script execution fallback
+    from watcher_feature_engine import enrich_watcher_state
 
 
 STRUCTURED_KB_FILES = (
@@ -58,6 +73,15 @@ _CATEGORY_BY_FILE = {
     "risk_rules.jsonl": "risk",
     "research/book_memory/knowledge_records.jsonl": "knowledge",
 }
+
+
+def _book_label(record: Mapping[str, Any]) -> str:
+    path = _text(record.get("source_path"))
+    if path:
+        label = source_label_from_path(path)
+        if label:
+            return label
+    return _text(record.get("book") or record.get("source_title"))
 
 _DECISION_EVENTS = {
     "candidate_blocked",
@@ -156,12 +180,29 @@ def _mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
 
+def _state_value_present(value: Any) -> bool:
+    """Return whether a state value contains usable evidence."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        return bool(normalized) and normalized not in {
+            "unknown", "unavailable", "not_available", "not_observed",
+        } and not normalized.startswith(("unknown_", "unavailable_"))
+    if isinstance(value, Mapping):
+        return bool(value) and any(_state_value_present(item) for item in value.values())
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return bool(value) and any(_state_value_present(item) for item in value)
+    # False and zero are valid observations (for example market_open=False).
+    return True
+
+
 def _state_has(state: Mapping[str, Any], *keys: str) -> bool:
     for key in keys:
-        if key in state and state[key] is not None and state[key] != "":
+        if key in state and _state_value_present(state[key]):
             return True
     contexts = _mapping(state.get("context"))
-    return any(key in contexts and contexts[key] is not None for key in keys)
+    return any(key in contexts and _state_value_present(contexts[key]) for key in keys)
 
 
 def _required_data_fields(value: Any) -> list[str]:
@@ -235,7 +276,7 @@ def load_knowledge_library(knowledge_dir: Path, *, registry_path: Path | None = 
                             "source_line": line_number,
                             "raw_record": raw_record,
                             "provenance": {
-                                "book": raw_record.get("book") or raw_record.get("source_title"),
+                                "book": _book_label(raw_record),
                                 "book_hash": raw_record.get("file_hash") or raw_record.get("source_hash"),
                                 "passage_hash": raw_record.get("passage_hash"),
                                 "location": raw_record.get("location") or raw_record.get("provenance"),
@@ -259,6 +300,7 @@ def load_knowledge_library(knowledge_dir: Path, *, registry_path: Path | None = 
     # strategy records over the older duplicated hypothesis sinks. Other
     # knowledge categories remain available to the Watcher.
     registry_path = Path(registry_path) if registry_path is not None else root.parent.parent / "reports" / "research" / CANONICAL_REGISTRY_NAME
+    filtered_strategy_records = 0
     if registry_path.is_file():
         records = [row for row in records if row["category"] != "strategy"]
         registry_rows = 0
@@ -282,14 +324,14 @@ def load_knowledge_library(knowledge_dir: Path, *, registry_path: Path | None = 
                         registry_invalid += 1
                         continue
                     registry_rows += 1
-                    records.append({
+                    record = {
                         "record_id": strategy_id,
                         "category": "strategy",
                         "source_file": CANONICAL_REGISTRY_NAME,
                         "source_line": line_number,
                         "raw_record": raw_record,
                         "provenance": {
-                            "book": raw_record.get("source_title"),
+                            "book": _book_label(raw_record),
                             "book_hash": raw_record.get("source_sha256"),
                             "passage_hash": raw_record.get("passage_hash"),
                             "location": {
@@ -306,7 +348,17 @@ def load_knowledge_library(knowledge_dir: Path, *, registry_path: Path | None = 
                         },
                         "validation_status": raw_record.get("validation_status") or "UNVALIDATED_RESEARCH",
                         "testability": raw_record.get("testability") or raw_record.get("status"),
-                    })
+                    }
+                    record["algorithm_status"] = strategy_implementation_status(record)
+                    # The canonical Watcher lane contains only complete,
+                    # compiled source rules.  Family proxies, contextual
+                    # notes, and incomplete specifications remain in the raw
+                    # registry for provenance but are not loaded as executable
+                    # strategy records.
+                    if record["algorithm_status"] != "WATCHER_EXACT_RULE":
+                        filtered_strategy_records += 1
+                        continue
+                    records.append(record)
         except OSError:
             registry_invalid += 1
         counts_by_file[CANONICAL_REGISTRY_NAME] = registry_rows
@@ -327,6 +379,7 @@ def load_knowledge_library(knowledge_dir: Path, *, registry_path: Path | None = 
         "validation_records": sum(row["category"] == "validation" for row in records),
         "risk_records": sum(row["category"] == "risk" for row in records),
         "book_memory_records": sum(row["category"] == "knowledge" for row in records),
+        "filtered_strategy_records": filtered_strategy_records,
     }
     source_files = source_index.get("files") if isinstance(source_index, Mapping) else []
     books = []
@@ -408,6 +461,7 @@ def evaluate_strategy(record: Mapping[str, Any], state: Mapping[str, Any]) -> di
     exact_statuses = {"CODED_EXACT", "FAMILY_PROXY", "UNTESTABLE_SOURCE", "COMPILE_ERROR"}
     if evaluate_strategy_evidence is not None and str(raw_record.get("status") or "").upper() in exact_statuses:
         evidence = evaluate_strategy_evidence(raw_record, state)
+        book_algorithm = evaluate_book_algorithm(record, state)
         evaluation_status = str(evidence.get("evaluation_status") or evidence.get("status") or "UNKNOWN")
         if evaluation_status == "MATCH":
             applicability = {"status": "APPLICABLE", "missing": [], "reasons": ["exact_predicates_satisfied"]}
@@ -436,6 +490,8 @@ def evaluate_strategy(record: Mapping[str, Any], state: Mapping[str, Any]) -> di
             "source_line": record.get("source_line"),
             "provenance": record.get("provenance", {}),
             "strategy_family": raw_record.get("strategy_family"),
+            "algorithm": raw_record.get("algorithm"),
+            "algorithm_status": strategy_implementation_status(record),
             "opinion": opinion,
             "reason": str(evidence.get("reason") or evaluation_status.lower()),
             "applicability": applicability,
@@ -448,8 +504,10 @@ def evaluate_strategy(record: Mapping[str, Any], state: Mapping[str, Any]) -> di
             "execution_authority": False,
             "uses_future_data": False,
             "validation_status": record.get("validation_status") or raw_record.get("validation_status"),
+            "book_algorithm_analysis": book_algorithm,
         }
     applicability = evaluate_applicability(record, state)
+    book_algorithm = evaluate_book_algorithm(record, state)
     side_rule = _side(record.get("side_rule") or raw_record.get("side_rule"))
     opinion = side_rule or "NO_TRADE"
     reason = "source_direction_rule" if side_rule else "no_directional_rule"
@@ -463,6 +521,8 @@ def evaluate_strategy(record: Mapping[str, Any], state: Mapping[str, Any]) -> di
         "source_line": record.get("source_line"),
         "provenance": record.get("provenance", {}),
         "strategy_family": raw_record.get("strategy_family"),
+        "algorithm": raw_record.get("algorithm"),
+        "algorithm_status": strategy_implementation_status(record),
         "opinion": opinion.upper(),
         "reason": reason,
         "applicability": applicability,
@@ -472,13 +532,27 @@ def evaluate_strategy(record: Mapping[str, Any], state: Mapping[str, Any]) -> di
         "execution_authority": False,
         "uses_future_data": False,
         "validation_status": record.get("validation_status"),
+        "book_algorithm_analysis": book_algorithm,
     }
 
 
-def _state_from_event(event: Mapping[str, Any]) -> dict[str, Any]:
+def _state_from_event(
+    event: Mapping[str, Any],
+    *,
+    symbol_history: Iterable[Mapping[str, Any]] = (),
+    universe_history: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
+) -> dict[str, Any]:
     state: dict[str, Any] = {}
     for key, value in event.items():
-        if key not in {"candidate_evaluations", "counterfactual_quotes", "quotes"}:
+        if key not in {
+            "candidate_evaluations",
+            "counterfactual_quotes",
+            "quotes",
+            "future_quotes",
+            "future_ticks",
+            "outcome_quotes",
+            "post_entry_quotes",
+        }:
             state[key] = value
     for key in ("candidate_details", "entry_state", "decision_snapshot", "context"):
         value = event.get(key)
@@ -488,7 +562,13 @@ def _state_from_event(event: Mapping[str, Any]) -> dict[str, Any]:
     state.setdefault("side", _first(event, "side", "position_side"))
     state.setdefault("mechanism", _first(event, "mechanism", "family", "setup_family"))
     state.setdefault("horizon_s", _first(event, "horizon_s", "search_horizon_s", "max_hold_s"))
-    return {key: value for key, value in state.items() if value is not None}
+    state = {key: value for key, value in state.items() if value is not None}
+    return enrich_watcher_state(
+        state,
+        event,
+        symbol_history=symbol_history,
+        universe_history=universe_history,
+    )
 
 
 def _strategy_identity(state: Mapping[str, Any]) -> str | None:
@@ -586,8 +666,15 @@ def analyze_decision(
     library: Mapping[str, Any],
     *,
     include_strategy_opinions: bool = True,
+    symbol_history: Iterable[Mapping[str, Any]] = (),
+    universe_history: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
 ) -> dict[str, Any]:
-    state = _state_from_event(event)
+    state = _state_from_event(
+        event,
+        symbol_history=symbol_history,
+        universe_history=universe_history,
+    )
+    perspective_analysis = analyze_book_perspectives(state)
     evaluated = [evaluate_strategy(row, state) for row in library.get("strategy_records", [])]
     consensus = {key: sum(item["opinion"] == key for item in evaluated) for key in (
         "BUY", "SELL", "NO_TRADE", "NOT_APPLICABLE"
@@ -599,6 +686,8 @@ def analyze_decision(
         "book": item.get("book"),
         "source_file": item.get("source_file"),
         "strategy_family": item.get("strategy_family"),
+        "algorithm_status": item.get("algorithm_status", "SPECIFICATION_ONLY"),
+        "book_algorithm_analysis": item.get("book_algorithm_analysis", {}),
         "opinion": item.get("opinion"),
         "applicability_status": item.get("applicability", {}).get("status"),
         "reasons": item.get("applicability", {}).get("reasons", []),
@@ -631,10 +720,15 @@ def analyze_decision(
         "evaluated_strategy_count": len(evaluated),
         "consensus": consensus,
         "consensus_by_book": {book: dict(values) for book, values in by_book.items()},
+        "book_perspectives": perspective_analysis["perspectives"],
+        "book_consensus": perspective_analysis["consensus"],
+        "book_perspective_counts": perspective_analysis["counts"],
+        "book_perspective_coverage": perspective_analysis["coverage"],
         "library_coverage": {
             "processed_all_structured_kb": library.get("processed_all_structured_kb", False),
             "records": library.get("counts", {}).get("records", 0),
             "strategy_records": len(evaluated),
+            "filtered_strategy_records": library.get("counts", {}).get("filtered_strategy_records", 0),
             "corpus_version": library.get("corpus_version"),
         },
         "no_lookahead": True,
@@ -727,7 +821,17 @@ class WatcherKnowledgeEngine:
         self.production_open: dict[str, dict[str, Any]] = {}
         self.production_outcomes: list[dict[str, Any]] = []
         self.strategy_observations: dict[str, dict[str, Any]] = {}
-        self.stats: dict[str, Any] = {"production": self._empty_stats(), "shadow": self._empty_stats(), "by_strategy": {}, "per_strategy": {}}
+        self.algorithm_observations: dict[str, dict[str, Any]] = {}
+        self.quote_history_by_symbol: dict[str, deque[dict[str, Any]]] = defaultdict(
+            lambda: deque(maxlen=5000)
+        )
+        self.stats: dict[str, Any] = {
+            "production": self._empty_stats(),
+            "shadow": self._empty_stats(),
+            "by_strategy": {},
+            "per_strategy": {},
+            "algorithm_perspectives": {},
+        }
         self._last_retention_check = time.time()
         self._last_parquet_flush = self._last_retention_check
         self.state_path = self.report_dir / "state.json"
@@ -738,6 +842,13 @@ class WatcherKnowledgeEngine:
                 str(key): dict(value) for key, value in previous_stats["per_strategy"].items()
                 if isinstance(value, Mapping)
             }
+        if isinstance(previous_stats, Mapping) and isinstance(previous_stats.get("algorithm_perspectives"), Mapping):
+            self.algorithm_observations = {
+                str(key): dict(value) for key, value in previous_stats["algorithm_perspectives"].items()
+                if isinstance(value, Mapping)
+            }
+        self.stats["per_strategy"] = self.strategy_observations
+        self.stats["algorithm_perspectives"] = self.algorithm_observations
 
     @staticmethod
     def _empty_stats() -> dict[str, Any]:
@@ -900,6 +1011,139 @@ class WatcherKnowledgeEngine:
                 row["applicable_decisions"] += 1
             row["last_event"] = _text(event.get("event"))
 
+    def _record_algorithm_observations(
+        self,
+        perspectives: Sequence[Mapping[str, Any]],
+        event: Mapping[str, Any],
+    ) -> None:
+        """Record one causal evaluation for every Watcher algorithm module."""
+        for perspective in perspectives:
+            if not isinstance(perspective, Mapping):
+                continue
+            perspective_id = _text(perspective.get("perspective_id") or perspective.get("algorithm_id"))
+            if not perspective_id:
+                continue
+            row = self.algorithm_observations.setdefault(perspective_id, {
+                "perspective_id": perspective_id,
+                "evaluated_decisions": 0,
+                "applicable_decisions": 0,
+                "view_counts": {"BUY": 0, "SELL": 0, "WAIT": 0, "NOT_APPLICABLE": 0, "MISSING_DATA": 0},
+                "shadow_closed": 0,
+                "shadow_sample_size": 0,
+                "shadow_wins": 0,
+                "shadow_losses": 0,
+                "shadow_ambiguous": 0,
+                "shadow_price_move_sum": 0.0,
+                "shadow_win_rate": None,
+                "shadow_win_rate_percent": None,
+                "shadow_evidence_source": "UNAVAILABLE",
+                "shadow_data_provenance": "not_yet_observed",
+                "source_books": [],
+                "last_event": None,
+                "last_evaluated_timestamp": None,
+            })
+            row.setdefault("view_counts", {})
+            for label in ("BUY", "SELL", "WAIT", "NOT_APPLICABLE", "MISSING_DATA"):
+                row["view_counts"].setdefault(label, 0)
+            row.setdefault("source_books", [])
+            row.setdefault("shadow_closed", 0)
+            row.setdefault("shadow_sample_size", 0)
+            row.setdefault("shadow_wins", 0)
+            row.setdefault("shadow_losses", 0)
+            row.setdefault("shadow_ambiguous", 0)
+            row.setdefault("shadow_price_move_sum", 0.0)
+            row.setdefault("shadow_win_rate", None)
+            row.setdefault("shadow_win_rate_percent", None)
+            row.setdefault("shadow_evidence_source", "UNAVAILABLE")
+            row.setdefault("shadow_data_provenance", "not_yet_observed")
+            row["evaluated_decisions"] = int(row.get("evaluated_decisions") or 0) + 1
+            applicability = _text(perspective.get("applicability")).upper()
+            if applicability == "APPLICABLE":
+                row["applicable_decisions"] = int(row.get("applicable_decisions") or 0) + 1
+            view = _text(perspective.get("view")).upper()
+            if view not in row["view_counts"]:
+                view = "MISSING_DATA"
+            row["view_counts"][view] += 1
+            for book in perspective.get("source_books") or ():
+                book_name = _text(book)
+                if book_name and book_name not in row["source_books"]:
+                    row["source_books"].append(book_name)
+            row["last_event"] = _text(event.get("event"))
+            row["last_evaluated_timestamp"] = _event_time(event)
+
+    def _algorithm_perspective_snapshot(self, perspective: Mapping[str, Any]) -> dict[str, Any]:
+        """Attach research outcome metrics without changing the algorithm result."""
+        item = dict(perspective)
+        perspective_id = _text(item.get("perspective_id") or item.get("algorithm_id"))
+        observation = self.algorithm_observations.get(perspective_id, {})
+        for field in (
+            "evaluated_decisions",
+            "applicable_decisions",
+            "shadow_closed",
+            "shadow_sample_size",
+            "shadow_wins",
+            "shadow_losses",
+            "shadow_ambiguous",
+            "shadow_win_rate",
+            "shadow_win_rate_percent",
+            "shadow_evidence_source",
+            "shadow_data_provenance",
+        ):
+            if field in observation:
+                item[field] = observation[field]
+            elif field == "shadow_evidence_source":
+                item[field] = "UNAVAILABLE"
+            elif field == "shadow_data_provenance":
+                item[field] = "not_yet_observed"
+            elif field.startswith("shadow_"):
+                item[field] = None if field in {"shadow_win_rate", "shadow_win_rate_percent"} else 0
+            else:
+                item[field] = 0
+        item["algorithm_outcome_metric"] = "shadow_win_rate"
+        item["p_captured_win"] = None
+        item["p_captured_win_source"] = "NOT_APPLICABLE_SHADOW_ALGORITHM_METRIC"
+        return item
+
+    def _record_algorithm_shadow_outcome(
+        self,
+        record: dict[str, Any],
+        *,
+        price_move: float | None,
+    ) -> dict[str, dict[str, Any]]:
+        """Attribute a deterministic target/stop replay result to supporting modules."""
+        results: dict[str, dict[str, Any]] = {}
+        for raw_id in record.get("supporting_book_perspective_ids") or ():
+            perspective_id = _text(raw_id)
+            if not perspective_id:
+                continue
+            row = self.algorithm_observations.get(perspective_id)
+            if not isinstance(row, dict):
+                continue
+            row["shadow_closed"] = int(row.get("shadow_closed") or 0) + 1
+            if price_move is None or price_move == 0.0:
+                row["shadow_ambiguous"] = int(row.get("shadow_ambiguous") or 0) + 1
+                results[perspective_id] = {
+                    "outcome": "AMBIGUOUS",
+                    "evidence_source": "shadow_replay_price_only",
+                }
+                continue
+            outcome = "WIN" if price_move > 0.0 else "LOSS"
+            row["shadow_sample_size"] = int(row.get("shadow_sample_size") or 0) + 1
+            row["shadow_wins"] = int(row.get("shadow_wins") or 0) + int(outcome == "WIN")
+            row["shadow_losses"] = int(row.get("shadow_losses") or 0) + int(outcome == "LOSS")
+            row["shadow_price_move_sum"] = float(row.get("shadow_price_move_sum") or 0.0) + price_move
+            sample_size = row["shadow_sample_size"]
+            row["shadow_win_rate"] = row["shadow_wins"] / sample_size
+            row["shadow_win_rate_percent"] = row["shadow_win_rate"] * 100.0
+            row["shadow_evidence_source"] = "shadow_replay_price_only"
+            row["shadow_data_provenance"] = "target_stop_quote_replay_without_costs"
+            results[perspective_id] = {
+                "outcome": outcome,
+                "price_move": price_move,
+                "evidence_source": "shadow_replay_price_only",
+            }
+        return results
+
     def _record_strategy_outcome(self, outcome: Mapping[str, Any]) -> None:
         net = _finite(outcome.get("realized_net_usd"))
         state = _mapping(outcome.get("features"))
@@ -986,6 +1230,8 @@ class WatcherKnowledgeEngine:
                 "applicability": item.get("applicability_status"),
                 "reason_codes": codes,
                 "opinion": item.get("opinion"),
+                "algorithm_status": item.get("algorithm_status", "SPECIFICATION_ONLY"),
+                "book_algorithm_analysis": item.get("book_algorithm_analysis", {}),
                 "evidence_status": item.get("evidence_status", "LEGACY_UNCOMPILED"),
                 "evaluation_status": item.get("evaluation_status"),
                 "context_hash": item.get("context_hash"),
@@ -1014,6 +1260,11 @@ class WatcherKnowledgeEngine:
                 item["p_captured_win_source"] = "UNTESTABLE_SOURCE"
             else:
                 item["p_captured_win_source"] = "UNAVAILABLE"
+        book_perspectives = [
+            self._algorithm_perspective_snapshot(item)
+            for item in (analysis.get("book_perspectives") or [])
+            if isinstance(item, Mapping)
+        ]
         return {
             "record_type": "blocked_strategy_study",
             "study_id": _hash({"event": self._event_id(event), "kind": "blocked_strategy_study"}),
@@ -1022,10 +1273,15 @@ class WatcherKnowledgeEngine:
             "candidate_state": _compact_candidate_state(analysis.get("state", {})),
             "raw_observation_event_id": self._event_id(event),
             "strategy_count": len(strategies),
+            "algorithm_count": len(book_perspectives),
             "strategy_metadata_source": "knowledge_library.json",
             "reason_dictionary": reason_dictionary,
             "strategies": strategies,
             "prediction_evidence": _prediction_evidence(event),
+            "book_perspectives": book_perspectives,
+            "book_consensus": analysis.get("book_consensus", "UNRESOLVED"),
+            "book_perspective_counts": analysis.get("book_perspective_counts", {}),
+            "book_perspective_coverage": analysis.get("book_perspective_coverage", {}),
             "library_coverage": analysis.get("library_coverage", {}),
             "no_lookahead": True,
             "research_only": True,
@@ -1075,6 +1331,27 @@ class WatcherKnowledgeEngine:
                 item.get("record_id") for item in (opinions or analysis.get("strategy_opinions", []))
                 if item.get("opinion") == str(side or "").upper() and item.get("applicability_status") == "APPLICABLE"
             ],
+            "book_perspectives": [
+                self._algorithm_perspective_snapshot({
+                    "perspective_id": item.get("perspective_id"),
+                    "view": item.get("view"),
+                    "applicability": item.get("applicability"),
+                    "candidate_alignment": item.get("candidate_alignment"),
+                    "reasons": item.get("reasons", []),
+                    "source_books": item.get("source_books", []),
+                    "research_only": True,
+                    "no_lookahead": True,
+                })
+                for item in (analysis.get("book_perspectives") or [])
+                if isinstance(item, Mapping)
+            ],
+            "supporting_book_perspective_ids": [
+                item.get("perspective_id")
+                for item in (analysis.get("book_perspectives") or [])
+                if isinstance(item, Mapping)
+                and item.get("applicability") == "APPLICABLE"
+                and item.get("view") == str(side or "").upper()
+            ],
             "shadow_status": "OPEN" if geometry_valid else "NOT_CREATED",
             "missing_features": missing,
             "quotes": [],
@@ -1098,6 +1375,10 @@ class WatcherKnowledgeEngine:
         entry = _finite(record.get("entry"))
         if entry is not None and exit_price is not None:
             record["gross_price_move"] = (exit_price - entry) if side == "buy" else (entry - exit_price)
+        record["algorithm_shadow_outcomes"] = self._record_algorithm_shadow_outcome(
+            record,
+            price_move=_finite(record.get("gross_price_move")),
+        )
         self.open_shadow.pop(record["shadow_id"], None)
         self._append("shadow_trades.jsonl", record)
         return {**record, "record_type": "shadow_outcome"}
@@ -1156,10 +1437,20 @@ class WatcherKnowledgeEngine:
                 return value
         return None
 
-    def _process_open(self, event: Mapping[str, Any]) -> None:
+    def _process_open(
+        self,
+        event: Mapping[str, Any],
+        *,
+        symbol_history: Iterable[Mapping[str, Any]] = (),
+        universe_history: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
+    ) -> None:
         ticket = _text(event.get("ticket"))
         if ticket:
-            pre_entry_state = _state_from_event(event)
+            pre_entry_state = _state_from_event(
+                event,
+                symbol_history=symbol_history,
+                universe_history=universe_history,
+            )
             strategy_ids = _strategy_ids(pre_entry_state)
             self.production_open[ticket] = {
                 "ticket": ticket,
@@ -1327,6 +1618,7 @@ class WatcherKnowledgeEngine:
             by_strategy[key].append(outcome)
         self.stats["by_strategy"] = {key: summarize(rows) for key, rows in by_strategy.items()}
         self.stats["per_strategy"] = self.strategy_observations
+        self.stats["algorithm_perspectives"] = self.algorithm_observations
 
     def process_event(
         self,
@@ -1350,11 +1642,17 @@ class WatcherKnowledgeEngine:
             if _text(candidate.get("event")) == "candidate_blocked":
                 analysis_events.append(candidate)
         for decision_event in analysis_events:
+            symbol = _text(decision_event.get("symbol") or decision_event.get("position_symbol")).upper()
             analysis = analyze_decision(
-                decision_event, self.library, include_strategy_opinions=False
+                decision_event,
+                self.library,
+                include_strategy_opinions=False,
+                symbol_history=self.quote_history_by_symbol.get(symbol, ()),
+                universe_history=self.quote_history_by_symbol,
             )
             opinions = analysis.pop("_evaluated_opinions", [])
             self._record_strategy_observations(opinions, decision_event)
+            self._record_algorithm_observations(analysis.get("book_perspectives", []), decision_event)
             self._append("decision_analysis.jsonl", analysis)
             outputs.append(analysis)
             if _is_blocked(decision_event):
@@ -1365,13 +1663,30 @@ class WatcherKnowledgeEngine:
                 outputs.append(shadow)
         name = _text(event.get("event"))
         if name == "firehose_open":
-            self._process_open(event)
+            symbol = _text(event.get("symbol") or event.get("position_symbol")).upper()
+            self._process_open(
+                event,
+                symbol_history=self.quote_history_by_symbol.get(symbol, ()),
+                universe_history=self.quote_history_by_symbol,
+            )
         if name in _QUOTE_EVENTS:
             outputs.extend(self._process_quote(event))
         if name in _CLOSE_EVENTS:
             outcome = self._process_close(event)
             if outcome is not None:
                 outputs.append(outcome)
+        symbol = _text(event.get("symbol") or event.get("position_symbol")).upper()
+        if symbol and isinstance(event, Mapping) and any(
+            event.get(key) is not None for key in ("bid", "ask", "mid")
+        ):
+            # Current observations become available to the next decision only.
+            # This preserves the Watcher's point-in-time/no-lookahead contract.
+            history = self.quote_history_by_symbol[symbol]
+            event_time = event.get("time", event.get("timestamp", event.get("time_msc")))
+            if history and event_time is not None and history[-1].get("time", history[-1].get("timestamp", history[-1].get("time_msc"))) == event_time:
+                history[-1] = dict(event)
+            else:
+                history.append(dict(event))
         self._refresh_stats()
         self._persist_state()
         self._maybe_run_retention()
@@ -1383,6 +1698,7 @@ class WatcherKnowledgeEngine:
             f"KNOWLEDGE_BOOKS={len(self.library.get('books') or [])} "
             f"KNOWLEDGE_RECORDS={counts.get('records', 0)} "
             f"STRATEGY_HYPOTHESES={counts.get('strategy_records', 0)} "
+            f"FILTERED_INCOMPLETE_STRATEGIES={counts.get('filtered_strategy_records', 0)} "
             f"PROCESSED_ALL_STRUCTURED_KB={self.library.get('processed_all_structured_kb', False)} "
             f"CORPUS_VERSION={self.library.get('corpus_version')}"
         )

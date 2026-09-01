@@ -1,0 +1,1 @@
+Test a stricter validated-state gate requiring 10 consecutive qualifying snapshots before entry. Promote it only if sealed-holdout net expectancy improves by at least 0.05R with no increase in maximum drawdown versus the current gate. Otherwise retain the current champion unchanged.

@@ -12,6 +12,15 @@ from aegis.research.book_strategy_extraction import (
 )
 
 
+def test_source_title_uses_book_filename_not_page_header():
+    path = Path("[Wiley finance series] Adam Grimes - The art and science of technical analysis (2012, Wiley) - libgen.li.pdf")
+
+    title = extraction._source_title(path, [{"page": 1, "text": "P1: printer header 178 TRADING STRATEGIES"}])
+
+    assert title.startswith("Adam Grimes — The art and science of technical analysis")
+    assert "P1:" not in title
+
+
 def test_discovery_excludes_duplicates_and_non_books(tmp_path):
     (tmp_path / "book.pdf").write_bytes(b"pdf")
     (tmp_path / "book-copy.pdf").write_bytes(b"pdf")
@@ -36,12 +45,24 @@ def test_explicit_rule_is_measurable_but_not_validated():
     assert result["validation_status"] == "UNVALIDATED_RESEARCH"
     assert result["side_rule"] == "BUY"
     assert result["compiled_rule"] == {"structure_eq": "breakout"}
+    assert result["algorithm"]["schema"] == "book_algorithm.v1"
+    assert result["algorithm"]["watcher_evaluable"] is True
+    assert result["algorithm"]["compiled_entry_predicates"] == {"structure_eq": "breakout"}
 
 
 def test_explicit_but_underparameterized_rule_is_not_promoted_to_exact():
     result = classify_passage("Buy on a breakout and exit when the setup fails.")
     assert result["status"] == "COMPILE_ERROR"
     assert result["reason"] == "explicit_rule_missing_parameter"
+    assert result["algorithm"]["watcher_evaluable"] is False
+    assert "parameters" in result["algorithm"]["missing_components"]
+
+
+def test_every_extracted_passage_gets_an_algorithm_specification():
+    result = classify_passage("Momentum and resistance may help identify a reversal.")
+    assert result["algorithm"]["algorithm_kind"] == "RESEARCH_SPECIFICATION"
+    assert result["algorithm"]["source_rule"] == result["excerpt"]
+    assert result["algorithm"]["watcher_evaluable"] is False
 
 
 def test_same_source_passage_has_stable_strategy_id():
@@ -75,4 +96,5 @@ def test_registry_deduplicates_source_bytes_and_preserves_provenance(tmp_path, m
     assert rows[0]["status"] == "CODED_EXACT"
     assert rows[0]["page_start"] == 7
     assert rows[0]["source_sha256"] == extraction.sha256_file(first)
+    assert rows[0]["algorithm"]["algorithm_id"] == rows[0]["strategy_id"]
     assert json.loads(summary_path.read_text(encoding="utf-8"))["records_by_status"]["CODED_EXACT"] == 1

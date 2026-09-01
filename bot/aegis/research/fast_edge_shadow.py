@@ -73,6 +73,19 @@ _OUTCOME_COLUMNS = frozenset(
     }
 )
 
+# These columns document the executable cost model used to produce each
+# replay row.  They are required for audit/provenance, but are fixed inputs of
+# the replay rather than point-in-time market features and must not be learned
+# by the predictive models.
+_COST_METADATA_COLUMNS = frozenset(
+    {
+        "cost_model_schema", "cost_model_outcome_units",
+        "slippage_bps", "commission_round_trip_usd", "slippage_price",
+        "commission_usd", "entry_latency_s", "close_latency_s",
+        "usd_per_price_unit",
+    }
+)
+
 
 @dataclass(frozen=True)
 class ShadowSlices:
@@ -139,6 +152,11 @@ def replay_executable_path(
     side: str,
     horizon_s: int,
     exit_policy: str = "captured_exit_replay",
+    slippage_price: float = 0.0,
+    commission_usd: float = 0.0,
+    usd_per_price_unit: float = 1.0,
+    entry_latency_s: float = 0.0,
+    close_latency_s: float = 0.0,
 ) -> dict[str, Any]:
     """Replay a single entry with only the next quote visible at each step."""
     side = str(side).strip().lower()
@@ -153,6 +171,24 @@ def replay_executable_path(
     }
     if exit_policy not in valid_policies:
         raise ValueError(f"unsupported exit_policy: {exit_policy}")
+    try:
+        slippage_price = float(slippage_price)
+        commission_usd = float(commission_usd)
+        usd_per_price_unit = float(usd_per_price_unit)
+        entry_latency_s = float(entry_latency_s)
+        close_latency_s = float(close_latency_s)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("invalid_replay_cost_or_latency") from exc
+    for name, value in (
+        ("slippage_price", slippage_price),
+        ("commission_usd", commission_usd),
+        ("entry_latency_s", entry_latency_s),
+        ("close_latency_s", close_latency_s),
+    ):
+        if not np.isfinite(value) or value < 0.0:
+            raise ValueError(f"invalid_{name}")
+    if not np.isfinite(usd_per_price_unit) or usd_per_price_unit <= 0.0:
+        raise ValueError("invalid_usd_per_price_unit")
     entry_timestamp = pd.Timestamp(entry_time)
     if entry_timestamp.tzinfo is None:
         entry_timestamp = entry_timestamp.tz_localize("UTC")
@@ -163,6 +199,28 @@ def replay_executable_path(
     ask = np.asarray(future_ask, dtype=float)
     if len(times) != len(bid) or len(times) != len(ask) or not len(times):
         raise ValueError("future quote arrays must be non-empty and aligned")
+    decision_timestamp = entry_timestamp
+    effective_entry_index = 0
+    if entry_latency_s > 0.0:
+        decision_epoch = entry_timestamp.timestamp() + entry_latency_s
+        effective_entry_index = next(
+            (index for index, timestamp in enumerate(times)
+             if float(timestamp.timestamp()) >= decision_epoch),
+            -1,
+        )
+        if effective_entry_index < 0:
+            raise ValueError("entry_latency_quote_missing")
+        entry_timestamp = pd.Timestamp(times[effective_entry_index])
+        entry_bid = float(bid[effective_entry_index])
+        entry_ask = float(ask[effective_entry_index])
+    else:
+        entry_bid = float(entry_bid)
+        entry_ask = float(entry_ask)
+    times = times[effective_entry_index:]
+    bid = bid[effective_entry_index:]
+    ask = ask[effective_entry_index:]
+    if len(times) < 1:
+        raise ValueError("entry_latency_quote_missing")
     entry = float(entry_ask if side == "buy" else entry_bid)
     entry_mid = (float(entry_bid) + float(entry_ask)) / 2.0
     entry_spread = max(float(entry_ask) - float(entry_bid), 1e-12)
@@ -184,6 +242,10 @@ def replay_executable_path(
             target_price=entry + (2.0 * entry_spread if side == "buy" else -2.0 * entry_spread),
             stop_price=entry - (3.0 * entry_spread if side == "buy" else -3.0 * entry_spread),
             pip_size=entry_spread,
+            slippage_price=slippage_price,
+            commission_usd=commission_usd,
+            usd_per_price_unit=usd_per_price_unit,
+            close_latency_s=close_latency_s,
         )
         if replay.get("status") != "REPLAYED":
             raise ValueError(str(replay.get("reason") or "quote replay unavailable"))
@@ -196,15 +258,24 @@ def replay_executable_path(
         )
         first_failure_index = next((i for i, value in enumerate(signed) if value <= -3.0 * entry_spread), None)
         captured_time = float(replay["captured_exit_time_s"])
+        denominator = entry_mid * usd_per_price_unit
+        captured_net = float(replay["captured_exit_net_pnl"])
+        terminal_net = float(replay["terminal_net_pnl"])
+        mfe_net = float(replay.get("mfe_net_pnl") or 0.0)
+        mae_net = float(replay.get("mae_net_pnl") or 0.0)
         return {
-            "captured_exit_net_pnl": float(replay["captured_exit_net_pnl"]),
-            "captured_exit_return": float(replay["captured_exit_net_pnl"]) / entry_mid if entry_mid > 0 else np.nan,
+            "captured_exit_net_pnl": captured_net,
+            "captured_exit_return": captured_net / denominator if denominator > 0 else np.nan,
             "captured_exit_reason": str(replay["captured_exit_reason"]),
             "captured_exit_action": str(replay.get("captured_exit_action") or "TIMEOUT"),
-            "terminal_net_pnl": float(replay["terminal_net_pnl"]),
-            "terminal_return": float(replay["terminal_net_pnl"]) / entry_mid if entry_mid > 0 else np.nan,
-            "mfe": float(np.max(signed)),
-            "mae": float(np.min(signed)),
+            "terminal_net_pnl": terminal_net,
+            "terminal_return": terminal_net / denominator if denominator > 0 else np.nan,
+            "mfe": mfe_net,
+            "mae": mae_net,
+            "mfe_net_pnl": mfe_net,
+            "mae_net_pnl": mae_net,
+            "mfe_return": mfe_net / denominator if denominator > 0 else np.nan,
+            "mae_return": mae_net / denominator if denominator > 0 else np.nan,
             "tail_loss": bool(np.min(signed) <= -3.0 * entry_spread),
             "immediate_adverse_move": bool(float(signed[0]) <= -entry_spread),
             "first_green": bool(first_green_index is not None),
@@ -220,7 +291,7 @@ def replay_executable_path(
                 max(0.0, (pd.Timestamp(times[i]) - (entry_timestamp if i == 0 else pd.Timestamp(times[i - 1]))).total_seconds())
                 for i, value in enumerate(signed) if float(value) < 0.0
             )),
-            "winner_giveback": bool(np.max(signed) > 0.0 and float(replay["captured_exit_net_pnl"]) < np.max(signed)),
+            "winner_giveback": bool(mfe_net > 0.0 and captured_net < mfe_net),
             "first_profitable_executable_close": bool(first_green_index is not None),
             "first_profitable_close_net_pnl": (
                 float(replay_actions[first_green_index]["net_pnl_usd"])
@@ -230,15 +301,25 @@ def replay_executable_path(
             "exit_policy": exit_policy,
             "exit_time_s": captured_time,
             "horizon_s": int(horizon_s),
+            "entry_price": entry,
+            "entry_spread_price": entry_spread,
+            "slippage_price": slippage_price,
+            "commission_usd": commission_usd,
+            "usd_per_price_unit": usd_per_price_unit,
+            "decision_time": decision_timestamp.isoformat(),
+            "entry_latency_s": entry_latency_s,
+            "close_latency_s": close_latency_s,
             "controller_actions": list(replay.get("actions") or []),
         }
+    friction_price = slippage_price + commission_usd / usd_per_price_unit
     signed = bid - entry if side == "buy" else entry - ask
+    net_signed = signed - friction_price
     harvest_threshold = 2.0 * entry_spread
     abort_threshold = 3.0 * entry_spread
-    first_green_index = next((i for i, value in enumerate(signed) if value > 0.0), None)
+    first_green_index = next((i for i, value in enumerate(net_signed) if value > 0.0), None)
     first_failure_index = next((i for i, value in enumerate(signed) if value <= -3.0 * entry_spread), None)
     mfe_index = int(np.argmax(signed))
-    captured = float(signed[-1])
+    captured = float(net_signed[-1])
     captured_reason = "timeout"
     captured_index: int | None = None
     time_in_red = 0.0
@@ -248,40 +329,55 @@ def replay_executable_path(
     for index, value in enumerate(signed):
         current = pd.Timestamp(times[index])
         elapsed = max(0.0, (current - prior).total_seconds())
-        if float(value) < 0.0:
+        net_value = float(net_signed[index])
+        if net_value < 0.0:
             time_in_red += elapsed
         prior = current
         elapsed_from_entry = max(0.0, (current - entry_timestamp).total_seconds())
-        if float(value) > 0.0:
+        if net_value > 0.0:
             seen_positive = True
         if float(value) <= -abort_threshold:
-            captured = float(value)
+            # The abort trigger remains based on the raw executable move, but
+            # the recorded close must include the same friction as every
+            # other exit path.  Recording ``value`` here silently dropped
+            # slippage/commission from stopped trades.
+            captured = net_value
             captured_reason = "abort"
             captured_index = index
             break
         if exit_policy == "no_progress_3s" and elapsed_from_entry >= 3.0 and not seen_positive:
-            captured = float(value)
+            captured = net_value
             captured_reason = "no_progress"
             captured_index = index
             break
         if exit_policy == "mfe_protection" and seen_positive:
-            peak_after_green = max(peak_after_green, float(value))
+            peak_after_green = max(peak_after_green, net_value)
             if peak_after_green >= harvest_threshold and float(value) <= peak_after_green - entry_spread:
-                captured = float(value)
+                captured = net_value
                 captured_reason = "giveback"
                 captured_index = index
                 break
         harvest_now = (
-            float(value) > 0.0 if exit_policy == "first_green"
-            else float(value) >= harvest_threshold
+            net_value > 0.0 if exit_policy == "first_green"
+            else net_value >= harvest_threshold
         )
         if harvest_now and exit_policy != "mfe_protection":
-            captured = float(value)
+            captured = net_value
             captured_reason = "harvest"
             captured_index = index
             break
-    mfe = float(np.max(signed))
-    mae = float(np.min(signed))
+    if captured_index is not None and close_latency_s > 0.0:
+        delayed_index = next(
+            (candidate for candidate in range(captured_index, len(times))
+             if float((pd.Timestamp(times[candidate]) - pd.Timestamp(times[captured_index])).total_seconds()) >= close_latency_s),
+            -1,
+        )
+        if delayed_index < 0:
+            raise ValueError("close_latency_quote_missing")
+        captured_index = delayed_index
+        captured = float(net_signed[captured_index])
+    mfe = float(np.max(net_signed))
+    mae = float(np.min(net_signed))
     first_green = first_green_index is not None
     green_time = (
         float((pd.Timestamp(times[first_green_index]) - entry_timestamp).total_seconds())
@@ -293,13 +389,13 @@ def replay_executable_path(
         if first_failure_index is not None else None
     )
     return {
-        "captured_exit_net_pnl": captured,
+        "captured_exit_net_pnl": captured * usd_per_price_unit,
         "captured_exit_return": captured / entry_mid if entry_mid > 0 else np.nan,
         "captured_exit_reason": captured_reason,
-        "terminal_net_pnl": float(signed[-1]),
-        "terminal_return": float(signed[-1]) / entry_mid if entry_mid > 0 else np.nan,
-        "mfe": mfe,
-        "mae": mae,
+        "terminal_net_pnl": float(net_signed[-1]) * usd_per_price_unit,
+        "terminal_return": float(net_signed[-1]) / entry_mid if entry_mid > 0 else np.nan,
+        "mfe": mfe * usd_per_price_unit,
+        "mae": mae * usd_per_price_unit,
         "tail_loss": bool(mae <= -abort_threshold),
         "immediate_adverse_move": bool(float(signed[0]) <= -entry_spread),
         "first_green": bool(first_green),
@@ -312,7 +408,8 @@ def replay_executable_path(
         "winner_giveback": bool(mfe > 0.0 and captured < mfe),
         "first_profitable_executable_close": bool(first_green),
         "first_profitable_close_net_pnl": (
-            float(signed[first_green_index]) if first_green_index is not None else None
+            float(net_signed[first_green_index]) * usd_per_price_unit
+            if first_green_index is not None else None
         ),
         "future_path_observed_n": int(len(signed) if captured_index is None else captured_index + 1),
         "exit_policy": exit_policy,
@@ -321,6 +418,18 @@ def replay_executable_path(
             if captured_index is not None else (pd.Timestamp(times[-1]) - entry_timestamp).total_seconds()
         ),
         "horizon_s": int(horizon_s),
+        "mfe_net_pnl": mfe * usd_per_price_unit,
+        "mae_net_pnl": mae * usd_per_price_unit,
+        "mfe_return": mfe / entry_mid if entry_mid > 0 else np.nan,
+        "mae_return": mae / entry_mid if entry_mid > 0 else np.nan,
+        "entry_price": entry,
+        "entry_spread_price": entry_spread,
+        "slippage_price": slippage_price,
+        "commission_usd": commission_usd,
+        "usd_per_price_unit": usd_per_price_unit,
+        "decision_time": decision_timestamp.isoformat(),
+        "entry_latency_s": entry_latency_s,
+        "close_latency_s": close_latency_s,
     }
 
 
@@ -329,6 +438,12 @@ def build_shadow_dataset(
     *,
     horizons: Sequence[int] = SHADOW_HORIZONS_S,
     sample_every_s: int = 1,
+    slippage_bps: float = 0.0,
+    commission_round_trip_usd: float = 0.0,
+    usd_per_price_unit_by_symbol: Mapping[str, float] | None = None,
+    entry_latency_s: float = 0.0,
+    close_latency_s: float = 0.0,
+    include_auxiliary_exit_policies: bool = True,
 ) -> pd.DataFrame:
     """Build all plausible quote-entry candidates across every supplied symbol."""
     horizon_values = tuple(sorted({int(value) for value in horizons if int(value) > 0}))
@@ -336,6 +451,29 @@ def build_shadow_dataset(
         raise ValueError("at least one positive horizon is required")
     if int(sample_every_s) <= 0:
         raise ValueError("sample_every_s must be positive")
+    try:
+        slippage_bps = float(slippage_bps)
+        commission_round_trip_usd = float(commission_round_trip_usd)
+        entry_latency_s = float(entry_latency_s)
+        close_latency_s = float(close_latency_s)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("invalid_shadow_cost_or_latency") from exc
+    if not np.isfinite(slippage_bps) or slippage_bps < 0.0:
+        raise ValueError("invalid_slippage_bps")
+    if not np.isfinite(commission_round_trip_usd) or commission_round_trip_usd < 0.0:
+        raise ValueError("invalid_commission_round_trip_usd")
+    if not np.isfinite(entry_latency_s) or entry_latency_s < 0.0:
+        raise ValueError("invalid_entry_latency_s")
+    if not np.isfinite(close_latency_s) or close_latency_s < 0.0:
+        raise ValueError("invalid_close_latency_s")
+    if commission_round_trip_usd > 0.0 and usd_per_price_unit_by_symbol is None:
+        raise ValueError("usd_per_price_unit_by_symbol_required_for_commission")
+    units = {
+        str(symbol).upper(): float(value)
+        for symbol, value in (usd_per_price_unit_by_symbol or {}).items()
+    }
+    if any(not np.isfinite(value) or value <= 0.0 for value in units.values()):
+        raise ValueError("invalid_usd_per_price_unit_by_symbol")
     rows: list[dict[str, Any]] = []
     for raw_symbol, quotes in sorted(quotes_by_symbol.items()):
         symbol = str(raw_symbol).upper()
@@ -352,7 +490,13 @@ def build_shadow_dataset(
         epoch = (times - times.iloc[0]).dt.total_seconds().to_numpy(dtype=float)
         bid = features["bid"].to_numpy(dtype=float)
         ask = features["ask"].to_numpy(dtype=float)
-        eligible = np.flatnonzero(epoch <= epoch[-1] - max(horizon_values))
+        intervals = np.diff(epoch)
+        positive_intervals = intervals[intervals > 0.0]
+        quote_guard_s = float(np.median(positive_intervals)) if len(positive_intervals) else 0.0
+        max_required_horizon = (
+            max(horizon_values) + entry_latency_s + close_latency_s + quote_guard_s
+        )
+        eligible = np.flatnonzero(epoch <= epoch[-1] - max_required_horizon)
         last_sample: float | None = None
         for index in eligible:
             if last_sample is not None and epoch[index] - last_sample < int(sample_every_s):
@@ -362,20 +506,52 @@ def build_shadow_dataset(
                 "buy": {}, "sell": {}
             }
             for path_horizon in horizon_values:
-                path_end = int(
-                    np.searchsorted(epoch, epoch[index] + path_horizon, side="right") - 1
+                # Include the first observable quote after the delayed close
+                # window.  ``searchsorted(..., side='right')`` returns that
+                # quote index; clamping preserves the final available quote.
+                path_limit = (
+                    epoch[index]
+                    + entry_latency_s
+                    + path_horizon
+                    + close_latency_s
+                    + quote_guard_s
+                )
+                path_end = min(
+                    len(epoch) - 1,
+                    int(np.searchsorted(epoch, path_limit, side="right")),
                 )
                 if path_end <= index:
                     continue
+                unit = units.get(symbol, 1.0)
+                entry_mid = (float(bid[index]) + float(ask[index])) / 2.0
+                # ``slippage_bps`` is the configured round-trip assumption,
+                # matching the governed runner and the short-horizon artifact.
+                # Charge one side on entry and one on close.
+                slippage_price = 2.0 * entry_mid * slippage_bps / 10000.0
                 for side in ("buy", "sell"):
-                    outcomes_by_side_horizon[side][path_horizon] = replay_executable_path(
-                        entry_time=times.iloc[index],
-                        entry_bid=bid[index], entry_ask=ask[index],
-                        future_times=times.iloc[index + 1 : path_end + 1],
-                        future_bid=bid[index + 1 : path_end + 1],
-                        future_ask=ask[index + 1 : path_end + 1],
-                        side=side, horizon_s=path_horizon,
-                    )
+                    try:
+                        outcomes_by_side_horizon[side][path_horizon] = replay_executable_path(
+                            entry_time=times.iloc[index],
+                            entry_bid=bid[index], entry_ask=ask[index],
+                            future_times=times.iloc[index + 1 : path_end + 1],
+                            future_bid=bid[index + 1 : path_end + 1],
+                            future_ask=ask[index + 1 : path_end + 1],
+                            side=side, horizon_s=path_horizon,
+                            slippage_price=slippage_price,
+                            commission_usd=commission_round_trip_usd,
+                            usd_per_price_unit=unit,
+                            entry_latency_s=entry_latency_s,
+                            close_latency_s=close_latency_s,
+                        )
+                    except ValueError as exc:
+                        # A candidate without a post-latency quote is not a
+                        # valid execution observation.  Omit it rather than
+                        # imputing a close or weakening the gate.
+                        if not any(
+                            marker in str(exc)
+                            for marker in ("latency_quote_missing", "quote_history_missing")
+                        ):
+                            raise
             for horizon in horizon_values:
                 for side in ("buy", "sell"):
                     outcome = outcomes_by_side_horizon[side].get(horizon)
@@ -389,34 +565,100 @@ def build_shadow_dataset(
                             "side": side,
                             "side_buy": 1.0 if side == "buy" else 0.0,
                             "horizon_s": float(horizon),
-                            "entry_price": float(ask[index] if side == "buy" else bid[index]),
-                            "entry_spread": float(ask[index] - bid[index]),
-                            "cost": float(ask[index] - bid[index]),
+                            "entry_price": float(
+                                outcome.get("entry_price")
+                                or (ask[index] if side == "buy" else bid[index])
+                            ),
+                            "entry_spread": float(
+                                outcome.get("entry_spread_price")
+                                or (ask[index] - bid[index])
+                            ),
+                            "decision_spread": float(ask[index] - bid[index]),
+                            "cost": float(
+                                (ask[index] - bid[index])
+                                + slippage_price
+                                + commission_round_trip_usd / unit
+                            ),
                             "target": int(outcome["captured_exit_net_pnl"] > 0.0),
                             "session": _session_name(int(times.iloc[index].hour)),
                             "candidate_source": "all_quote_entries",
                             "candidate_authority": "SHADOW_ONLY",
+                            "cost_model_schema": "aegis.shadow_cost_model.v1",
+                            "slippage_bps": float(slippage_bps),
+                            "commission_round_trip_usd": float(commission_round_trip_usd),
+                            "entry_latency_s": float(entry_latency_s),
+                            "close_latency_s": float(close_latency_s),
+                            "cost_model_outcome_units": (
+                                "captured_exit_return is broker-unit-normalized after-cost return"
+                            ),
                             "regime": str(features.iloc[index].get("regime_context") or "unknown_quote_regime"),
                             "structure": str(features.iloc[index].get("structure_context") or "unknown_structure"),
                             "family": "universal_quote_entry",
                             "family_version": "quote_microstructure_v1",
                         }
                     )
-                    for policy in SHADOW_EXIT_POLICIES:
+                    policies = (
+                        SHADOW_EXIT_POLICIES
+                        if include_auxiliary_exit_policies
+                        else ("captured_exit_replay",)
+                    )
+                    for policy in policies:
                         policy_end = int(
-                            np.searchsorted(epoch, epoch[index] + horizon, side="right") - 1
+                            np.searchsorted(
+                                epoch,
+                                epoch[index] + entry_latency_s + horizon + close_latency_s,
+                                side="right",
+                            ) - 1
                         )
-                        policy_outcome = (
-                            outcome if policy == "captured_exit_replay"
-                            else replay_executable_path(
-                                entry_time=times.iloc[index],
-                                entry_bid=bid[index], entry_ask=ask[index],
-                                future_times=times.iloc[index + 1 : policy_end + 1],
-                                future_bid=bid[index + 1 : policy_end + 1],
-                                future_ask=ask[index + 1 : policy_end + 1],
-                                side=side, horizon_s=horizon, exit_policy=policy,
-                            )
-                        )
+                        if policy == "captured_exit_replay":
+                            policy_outcome = outcome
+                        elif policy_end <= index:
+                            # The primary controller path already proved a
+                            # delayed executable observation.  An auxiliary
+                            # policy whose strict horizon has no quote remains
+                            # unavailable; do not extend its window or impute
+                            # a price merely to populate a comparison column.
+                            policy_outcome = {
+                                "captured_exit_net_pnl": np.nan,
+                                "captured_exit_return": np.nan,
+                                "captured_exit_reason": "unavailable",
+                                "exit_time_s": np.nan,
+                            }
+                        else:
+                            try:
+                                policy_outcome = replay_executable_path(
+                                    entry_time=times.iloc[index],
+                                    entry_bid=bid[index], entry_ask=ask[index],
+                                    future_times=times.iloc[index + 1 : policy_end + 1],
+                                    future_bid=bid[index + 1 : policy_end + 1],
+                                    future_ask=ask[index + 1 : policy_end + 1],
+                                    side=side, horizon_s=horizon, exit_policy=policy,
+                                    slippage_price=slippage_price,
+                                    commission_usd=commission_round_trip_usd,
+                                    usd_per_price_unit=unit,
+                                    entry_latency_s=entry_latency_s,
+                                    # Auxiliary exit-policy comparisons do not
+                                    # authorize execution; keep their legacy
+                                    # window intact when a delayed close quote
+                                    # is unavailable.  The captured controller
+                                    # path above remains fully latency-aware.
+                                    close_latency_s=0.0,
+                                )
+                            except ValueError as exc:
+                                if not any(
+                                    marker in str(exc)
+                                    for marker in (
+                                        "latency_quote_missing",
+                                        "quote_history_missing",
+                                    )
+                                ):
+                                    raise
+                                policy_outcome = {
+                                    "captured_exit_net_pnl": np.nan,
+                                    "captured_exit_return": np.nan,
+                                    "captured_exit_reason": "unavailable",
+                                    "exit_time_s": np.nan,
+                                }
                         policy_key = policy.replace("_", "")
                         row[f"exit_{policy_key}_net_pnl"] = policy_outcome["captured_exit_net_pnl"]
                         row[f"exit_{policy_key}_return"] = policy_outcome["captured_exit_return"]
@@ -443,7 +685,7 @@ def shadow_model_frame(frame: pd.DataFrame) -> pd.DataFrame:
     """Return the numeric point-in-time feature matrix plus the target."""
     if "target" not in frame:
         raise ValueError("shadow frame requires target")
-    excluded = _OUTCOME_COLUMNS | frozenset(
+    excluded = _OUTCOME_COLUMNS | _COST_METADATA_COLUMNS | frozenset(
         {
             "time", "symbol", "side", "session", "regime", "structure", "family",
             "family_version", "structure_context", "regime_context",

@@ -446,3 +446,34 @@ def test_historical_import_requires_explicit_broker_confirmation(tmp_path):
     assert store.records[0]["outcome_id"] == "H1"
     assert store.records[0]["realized_net_usd"] == pytest.approx(-0.09)
     assert store.records[0]["pre_entry_state"]["mechanism"] == "pullback"
+
+
+def test_historical_import_sanitizes_missing_optional_counterfactual_costs(tmp_path):
+    source = tmp_path / "outcome_log.jsonl"
+    source.write_text(
+        json.dumps({
+            "ticket": "H-PENDING",
+            "evidence_status": "BROKER_CONFIRMED",
+            "realized_net_usd": -0.03,
+        }),
+        encoding="utf-8",
+    )
+    store = OutcomeMemoryStore(tmp_path / "outcome_memory.json")
+    store.stage_pending_close(
+        outcome_id="H-PENDING",
+        features={
+            "symbol": "EURUSD", "side": "buy", "mechanism": "pullback",
+            "entry_time": 1.0, "stop_price": 0.9, "target_price": 1.2,
+        },
+        mfe_usd=None,
+        mae_usd=None,
+        time_to_green_s=None,
+        counterfactual_quotes=[{"timestamp": 2.0, "bid": 1.1, "ask": 1.11}],
+        counterfactual_cost_usd=None,
+        counterfactual_usd_per_price_unit=None,
+    )
+
+    assert store.import_historical_confirmed_trades(source) == {
+        "imported": 1, "skipped": 0, "unavailable": 0,
+    }
+    assert store.records[0]["realized_net_usd"] == pytest.approx(-0.03)

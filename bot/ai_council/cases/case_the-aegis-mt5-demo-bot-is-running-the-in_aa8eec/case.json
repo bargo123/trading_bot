@@ -1,0 +1,130 @@
+{
+  "created_utc": "2026-08-28T22:04:12.945772+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aa8eec\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.36,
+          "finished_utc": "2026-08-28T22:07:41.989541+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-28T22:07:29.625212+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T22:07:41.992543+00:00",
+        "text": "The proposal is not a trading or research strategy; it only reports an unsupported-model error and contains no actionable hypothesis, methodology, or measurable claim. It provides no validation plan, cost assumptions, holdout testing, or safety controls, so it cannot be evaluated or approved."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aa8eec\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 8.67,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T22:07:50.663876+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-28T22:08:12.784229+00:00",
+    "decision": "no_change",
+    "evidence": {
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "DUPLICATE_FAILED_HYPOTHESIS"
+    },
+    "rationale": "REAL: candidate hypothesis overlaps prior record council_the-aegis-mt5-demo-bot-is-running-the-in_65491e (queued, overlap 0.55); not re-tested"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_aa8eec",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aa8eec\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 8.19,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T22:04:40.186656+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aa8eec\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.82,
+        "finished_utc": "2026-08-28T22:05:08.854773+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T22:04:56.034853+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T22:05:08.857770+00:00",
+      "text": "Test whether requiring two consecutive validated-state observations before entry reduces false-positive signals. Compare it against the current single-observation gate on sealed MT5 DEMO historical slices, using identical spreads, slippage, risk limits, and no code promotion. Accept the candidate only if net expectancy improves while trade count remains at least 70% of baseline and maximum drawdown does not increase."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aa8eec\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 8.45,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T22:07:59.136653+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_aa8eec\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.56,
+        "finished_utc": "2026-08-28T22:08:12.720087+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T22:07:59.159030+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T22:08:12.723092+00:00",
+      "text": "Test whether requiring two consecutive validated-state observations before entry reduces false-positive signals. Compare it with the current single-observation gate on sealed MT5 DEMO historical slices under identical costs and risk limits, with no code promotion. Run the analysis using a supported model or local deterministic evaluation path; record any unavailable-model failure in the experiment registry. Accept only if net expectancy improves, trade count remains at least 70% of baseline, and maximum drawdown does not increase."
+    }
+  },
+  "status": "decided"
+}

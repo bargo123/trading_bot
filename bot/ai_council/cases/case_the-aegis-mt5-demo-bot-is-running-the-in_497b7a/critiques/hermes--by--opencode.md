@@ -1,0 +1,1 @@
+This is an error message, not a research proposal, so it provides no testable hypothesis, methodology, metrics, or validation plan. It is unmeasurable as written and should not drive model selection or execution changes without documented provider support and controlled fallback testing.

@@ -1,122 +1,123 @@
 # Intelligent Firehose Failure Audit
-_generated 2026-08-20T22:29:15.940220+00:00 | HEAD 13fe5090f8c7945238272aafbb8e87c64a466ff7_
+_generated 2026-08-28T10:02:26.417363+00:00 | HEAD b757254e1ab75d52d6c2a7fbabca934ff7038790_
 
 ## Runtime snapshot
 
-- heartbeat: `{"pid": 14808, "status": "running", "brain": "intelligent_firehose", "equity": 95.66, "open": 2, "fire": null, "scale": null, "reduce": null, "exit": null, "skip": null, "quote_stale": 9710, "validated_states": 2, "gate_validated_states": true, "champion": null}`
-- risk_state: `{"halted": false, "permanent_halt": false, "peak_equity": 101.91, "day_start_equity": 99.59, "reason": ""}`
-- validated states artifact: `{"schema": "validated_states.v2", "built_at": "2026-08-20T22:26:22.064001+00:00", "n_survive": 2, "states": [{"regime": "range", "structure": "none", "session": "asia", "side": "sell", "n_validate": 237, "n_losses_validate": 85, "expectancy_validate": 3.149367088607608, "profit_factor_validate": 2.7796852646637746, "win_rate_validate": 0.6413502109704642, "bootstrap_p05_validate": 2.10296284903301`
+- heartbeat: `{"pid": 19112, "status": "running", "brain": "intelligent_firehose", "equity": 43.07, "open": 2, "fire": null, "scale": null, "reduce": null, "exit": null, "skip": null, "quote_stale": 0, "validated_states": 0, "gate_validated_states": true, "champion": null}`
+- risk_state: `{"halted": false, "permanent_halt": false, "peak_equity": 94.78, "day_start_equity": 53.12, "reason": ""}`
+- validated states artifact: `{"schema": "validated_states.v2", "built_at": "2026-08-28T09:48:59.545223+00:00", "n_survive": 0, "states": [], "path_exists": true}`
 - champion artifact: `{"id": "CORE_STRATEGY_V1", "decision": null, "expectancy": null, "profit_factor": null, "updated_utc": "2026-08-14T17:39:57.555318+00:00"}`
 - intelligent champion present: `False`
-- ml_pipeline strategy_selection: `{"n_shortlisted": 10, "n_validated": 10, "n_survive": 2, "cost_pips_assumed": 0.3}`
+- ml_pipeline strategy_selection: `{"n_shortlisted": 166, "n_validated": 200, "n_survive": 25, "cost_pips_assumed": null}`
 
 ## Decision distribution
 
-- window: 2026-08-13 01:46:00+00:00 -> 2026-08-20 22:28:02+00:00
-- FIRE 1704 | SCALE 0 | REDUCE 16 | EXIT 831 | BRAIN_SKIP 31718 (skip rate 0.9256)
+- window: 2026-08-21 00:04:02+00:00 -> 2026-08-28 10:01:00+00:00
+- FIRE 56226 | SCALE 0 | REDUCE 0 | EXIT 0 | BRAIN_SKIP 136244 (skip rate 0.7079)
 
 ### brain skip reasons
 
 | reason | count |
 |---|---|
-| no_validated_strategy_model | 23805 |
-| state_not_in_validated_set | 4255 |
-| redundant_information | 3087 |
-| hold_at_target_exposure | 343 |
-| edge_gone:no_validated_strategy_model | 88 |
-| trade_economics:payoff_below_floor | 87 |
-| sizing:minimum_lot_exceeds_clip_budget | 50 |
-| trade_economics:expected_net_value_not_positive | 2 |
-| currency_factor:USD:long | 1 |
+| short_horizon_not_calibrated | 75290 |
+| state_not_in_validated_set | 33258 |
+| spread_above_measured_session_limit | 16203 |
+| short_horizon_abstain | 8469 |
+| short_horizon_probability_below_threshold | 2992 |
+| no_validated_strategy_model | 31 |
+| short_horizon_negative_expected_value | 1 |
 
 ## Execution
 
-- orders ok 3380 / rejected 3021; oms_reject total 470
-- top order reject reasons: `{"firehose_bar_up": 1494, "firehose_bar_dn": 1150, "positive_state_ev_on_validated_strategy": 239, "new_evidence_increase_exposure": 138}`
-- top oms rejects: `{"stops": 470}`
-- halts: `{"daily_loss 3.54%": 883, "no_money_backoff": 310, "max_drawdown 12.01%": 260, "max_drawdown 39.11%": 80, "daily_loss 4.07%": 43}`
-- flatten reasons: `{"quick_win": 1383, "never_green": 1288, "gave_back": 229}`
+- orders ok 758 / rejected 19; oms_reject total 146
+- top order reject reasons: `{"10016 Invalid stops": 19}`
+- top oms rejects: `{"stops": 146}`
+- halts: `{"daily_loss 11.33%": 188, "max_drawdown 25.05%": 70, "daily_loss 10.07%": 36, "daily_loss 10.11%": 28}`
+- flatten reasons: `{}`
 
 ## Quotes
 
-- stale events 12463 (median age 10.1419s, p95 71011.6306s)
-- future-quote events 7069 (median skew 10798.318121s, max 10800.049101s)
+- stale events 981105 (median age 78271.977559s, p95 163397.6489s)
+- future-quote events 29199 (median skew 14133.51259s, max 14134.869926s)
 
 ## Spread skips by symbol (top)
 
-- CADJPY: 33060 skips, median spread at skip 0.007
-- AUDSGD: 32925 skips, median spread at skip 7e-05
-- GBPJPY: 32552 skips, median spread at skip 0.008
-- CADCHF: 32537 skips, median spread at skip 9e-05
-- EURNZD: 32444 skips, median spread at skip 9e-05
-- GBPAUD: 31965 skips, median spread at skip 8e-05
-- GBPNZD: 31612 skips, median spread at skip 9e-05
-- GBPCAD: 30224 skips, median spread at skip 6e-05
-- NZDJPY: 27930 skips, median spread at skip 0.005
-- AUDCAD: 27588 skips, median spread at skip 5e-05
-- AUDJPY: 16062 skips, median spread at skip 0.005
-- EURAUD: 14540 skips, median spread at skip 5e-05
-- GBPCHF: 14228 skips, median spread at skip 5e-05
-- EURCAD: 12633 skips, median spread at skip 5e-05
-- AUDNZD: 11552 skips, median spread at skip 4e-05
+- GBPJPY: 20868 skips, median spread at skip 0.008
+- GBPAUD: 20530 skips, median spread at skip 8e-05
+- EURNZD: 20381 skips, median spread at skip 9e-05
+- CADJPY: 20349 skips, median spread at skip 0.007
+- GBPNZD: 20163 skips, median spread at skip 9e-05
+- GBPCAD: 19416 skips, median spread at skip 6e-05
+- AUDSGD: 19052 skips, median spread at skip 7e-05
+- CADCHF: 18849 skips, median spread at skip 9e-05
+- AUDCAD: 17812 skips, median spread at skip 5e-05
+- NZDJPY: 16772 skips, median spread at skip 0.005
+- AUDJPY: 8819 skips, median spread at skip 0.005
+- EURAUD: 8148 skips, median spread at skip 5e-05
+- GBPCHF: 7763 skips, median spread at skip 5e-05
+- EURCAD: 6884 skips, median spread at skip 5e-05
+- EURJPY: 5991 skips, median spread at skip 0.004
 
 ## Fires by symbol|side (top)
 
-- EURUSD|buy: 202
-- USDCHF|buy: 165
-- USDCAD|buy: 152
-- GBPUSD|buy: 138
-- USDJPY|buy: 117
-- EURUSD|sell: 114
-- AUDUSD|sell: 106
-- AUDUSD|buy: 103
-- NZDUSD|sell: 92
-- NZDUSD|buy: 88
-- USDCHF|sell: 81
-- GBPUSD|sell: 79
-- EURJPY|buy: 71
-- USDCAD|sell: 69
-- USDJPY|sell: 59
+- GBPUSD|buy: 3081
+- EURUSD|buy: 2873
+- NZDUSD|buy: 2680
+- AUDUSD|buy: 2672
+- EURGBP|buy: 2593
+- USDJPY|sell: 2547
+- USDCHF|buy: 2327
+- EURCHF|sell: 2109
+- USDCAD|buy: 2087
+- EURUSD|sell: 2033
+- EURCHF|buy: 2004
+- USDJPY|buy: 1975
+- EURGBP|sell: 1942
+- USDCAD|sell: 1643
+- USDCHF|sell: 1616
 
 ## Realized outcomes (MT5 deals)
 
-- closed trades 2404; overall `{"n": 2404, "wins": 1644, "losses": 760, "win_rate": 0.6839, "gross_profit": 81.13, "gross_loss": 108.03, "profit_factor": 0.751, "expectancy": -0.01119, "net": -26.9, "avg_win": 0.0493, "avg_loss": -0.1421, "tail_loss_5pct": -0.49}`
+- closed trades 3462; overall `{"n": 3462, "wins": 1929, "losses": 1533, "win_rate": 0.5572, "gross_profit": 136.77, "gross_loss": 216.23, "profit_factor": 0.6325, "expectancy": -0.02295, "net": -79.46, "avg_win": 0.0709, "avg_loss": -0.1411, "tail_loss_5pct": -0.56}`
 
 ### by symbol
 
 | symbol | n | WR | PF | expectancy | net |
 |---|---|---|---|---|---|
-| AUDCAD | 6 | 0.1667 | 0.0897 | -0.11833 | -0.71 |
-| AUDCHF | 10 | 0.5 | 0.1579 | -0.064 | -0.64 |
-| AUDJPY | 7 | 0.4286 | 0.75 | -0.02 | -0.14 |
-| AUDNZD | 3 | 1.0 | None | 0.01667 | 0.05 |
-| AUDUSD | 307 | 0.684 | 0.8139 | -0.00691 | -2.12 |
-| CADJPY | 1 | 1.0 | None | 0.02 | 0.02 |
-| EURAUD | 18 | 0.7222 | 0.4839 | -0.01778 | -0.32 |
-| EURCAD | 27 | 0.963 | 0.9492 | -0.00111 | -0.03 |
-| EURCHF | 42 | 0.8333 | 0.4664 | -0.02833 | -1.19 |
-| EURGBP | 65 | 0.8 | 0.4134 | -0.02292 | -1.49 |
-| EURJPY | 107 | 0.4673 | 0.3987 | -0.04243 | -4.54 |
-| EURUSD | 335 | 0.6955 | 0.6058 | -0.01818 | -6.09 |
-| GBPAUD | 1 | 1.0 | None | 0.01 | 0.01 |
-| GBPCAD | 2 | 0.5 | 0.1207 | -0.255 | -0.51 |
-| GBPCHF | 26 | 0.8462 | 0.4706 | -0.03115 | -0.81 |
-| GBPJPY | 1 | 0.0 | 0.0 | -0.45 | -0.45 |
-| GBPNZD | 5 | 0.6 | 0.3333 | -0.032 | -0.16 |
-| GBPUSD | 315 | 0.7524 | 1.0325 | 0.0013 | 0.41 |
-| NZDUSD | 290 | 0.6655 | 0.6507 | -0.01383 | -4.01 |
-| USDCAD | 336 | 0.6815 | 1.1002 | 0.00357 | 1.2 |
-| USDCHF | 321 | 0.7321 | 0.9171 | -0.00417 | -1.34 |
-| USDJPY | 179 | 0.5084 | 0.6167 | -0.02257 | -4.04 |
+| AUDCAD | 31 | 0.129 | 0.0492 | -0.13097 | -4.06 |
+| AUDCHF | 29 | 0.4138 | 0.3978 | -0.11276 | -3.27 |
+| AUDJPY | 69 | 0.1739 | 0.2601 | -0.05812 | -4.01 |
+| AUDNZD | 79 | 0.1772 | 0.4772 | -0.04937 | -3.9 |
+| AUDSGD | 4 | 0.0 | 0.0 | -0.0925 | -0.37 |
+| AUDUSD | 358 | 0.6425 | 0.7441 | -0.0112 | -4.01 |
+| CADCHF | 1 | 0.0 | 0.0 | -0.41 | -0.41 |
+| CADJPY | 15 | 0.1333 | 0.0894 | -0.07467 | -1.12 |
+| EURAUD | 97 | 0.2784 | 0.402 | -0.05 | -4.85 |
+| EURCAD | 53 | 0.6415 | 0.7506 | -0.02094 | -1.11 |
+| EURCHF | 71 | 0.6338 | 0.4198 | -0.06423 | -4.56 |
+| EURGBP | 90 | 0.7 | 0.9619 | -0.00211 | -0.19 |
+| EURJPY | 178 | 0.3652 | 0.4546 | -0.03815 | -6.79 |
+| EURNZD | 58 | 0.1724 | 0.0929 | -0.07741 | -4.49 |
+| EURUSD | 390 | 0.6692 | 0.5835 | -0.028 | -10.92 |
+| GBPAUD | 38 | 0.0526 | 0.0224 | -0.09184 | -3.49 |
+| GBPCAD | 20 | 0.15 | 0.0365 | -0.145 | -2.9 |
+| GBPCHF | 47 | 0.5745 | 0.3288 | -0.07426 | -3.49 |
+| GBPJPY | 22 | 0.0455 | 0.0045 | -0.09955 | -2.19 |
+| GBPNZD | 44 | 0.2045 | 0.1299 | -0.07614 | -3.35 |
+| GBPUSD | 398 | 0.6985 | 0.9401 | -0.00334 | -1.33 |
+| NZDUSD | 335 | 0.6149 | 0.5204 | -0.02316 | -7.76 |
+| USDCAD | 396 | 0.6439 | 1.2131 | 0.0078 | 3.09 |
+| USDCHF | 385 | 0.6883 | 1.1271 | 0.00701 | 2.7 |
+| USDJPY | 254 | 0.4094 | 0.5544 | -0.0263 | -6.68 |
 
 ### by side
 
-- buy: `{"n": 1170, "wins": 870, "losses": 300, "win_rate": 0.7436, "gross_profit": 32.73, "gross_loss": 45.96, "profit_factor": 0.7121, "expectancy": -0.01131, "net": -13.23, "avg_win": 0.0376, "avg_loss": -0.1532, "tail_loss_5pct": -0.54}`
-- sell: `{"n": 1234, "wins": 774, "losses": 460, "win_rate": 0.6272, "gross_profit": 48.4, "gross_loss": 62.07, "profit_factor": 0.7798, "expectancy": -0.01108, "net": -13.67, "avg_win": 0.0625, "avg_loss": -0.1349, "tail_loss_5pct": -0.4}`
+- buy: `{"n": 1684, "wins": 1002, "losses": 682, "win_rate": 0.595, "gross_profit": 56.06, "gross_loss": 97.86, "profit_factor": 0.5729, "expectancy": -0.02482, "net": -41.8, "avg_win": 0.0559, "avg_loss": -0.1435, "tail_loss_5pct": -0.58}`
+- sell: `{"n": 1778, "wins": 927, "losses": 851, "win_rate": 0.5214, "gross_profit": 80.71, "gross_loss": 118.37, "profit_factor": 0.6818, "expectancy": -0.02118, "net": -37.66, "avg_win": 0.0871, "avg_loss": -0.1391, "tail_loss_5pct": -0.49}`
 
 ### by close reason
 
-- manual: `{"n": 1891, "wins": 1210, "losses": 681, "win_rate": 0.6399, "gross_profit": 40.88, "gross_loss": 72.11, "profit_factor": 0.5669, "expectancy": -0.01652, "net": -31.23, "avg_win": 0.0338, "avg_loss": -0.1059, "tail_loss_5pct": -0.33}`
-- sl: `{"n": 70, "wins": 0, "losses": 70, "win_rate": 0.0, "gross_profit": 0, "gross_loss": 35.21, "profit_factor": 0.0, "expectancy": -0.503, "net": -35.21, "avg_win": null, "avg_loss": -0.503, "tail_loss_5pct": -0.99}`
-- tp: `{"n": 432, "wins": 426, "losses": 6, "win_rate": 0.9861, "gross_profit": 39.09, "gross_loss": 0.0, "profit_factor": null, "expectancy": 0.09049, "net": 39.09, "avg_win": 0.0918, "avg_loss": -0.0, "tail_loss_5pct": 0.0}`
-- unknown: `{"n": 11, "wins": 8, "losses": 3, "win_rate": 0.7273, "gross_profit": 1.16, "gross_loss": 0.71, "profit_factor": 1.6338, "expectancy": 0.04091, "net": 0.45, "avg_win": 0.145, "avg_loss": -0.2367, "tail_loss_5pct": -0.26}`
+- manual: `{"n": 2486, "wins": 1407, "losses": 1079, "win_rate": 0.566, "gross_profit": 63.25, "gross_loss": 95.58, "profit_factor": 0.6617, "expectancy": -0.013, "net": -32.33, "avg_win": 0.045, "avg_loss": -0.0886, "tail_loss_5pct": -0.28}`
+- sl: `{"n": 431, "wins": 11, "losses": 420, "win_rate": 0.0255, "gross_profit": 0.63, "gross_loss": 111.89, "profit_factor": 0.0056, "expectancy": -0.25814, "net": -111.26, "avg_win": 0.0573, "avg_loss": -0.2664, "tail_loss_5pct": -0.85}`
+- tp: `{"n": 479, "wins": 473, "losses": 6, "win_rate": 0.9875, "gross_profit": 62.08, "gross_loss": 0.0, "profit_factor": null, "expectancy": 0.1296, "net": 62.08, "avg_win": 0.1312, "avg_loss": -0.0, "tail_loss_5pct": 0.0}`
+- unknown: `{"n": 66, "wins": 38, "losses": 28, "win_rate": 0.5758, "gross_profit": 10.81, "gross_loss": 8.76, "profit_factor": 1.234, "expectancy": 0.03106, "net": 2.05, "avg_win": 0.2845, "avg_loss": -0.3129, "tail_loss_5pct": -0.79}`

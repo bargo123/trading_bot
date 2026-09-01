@@ -12,8 +12,10 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 from aegis.config import load_config  # noqa: E402
+from watcher_knowledge_engine import WatcherKnowledgeEngine  # noqa: E402
 
 
 IMPORTANT_EVENTS = {
@@ -125,6 +127,7 @@ def expand_event(event: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "candidate_id": _first(
                     evaluation, "candidate_id", "variant_id", "hypothesis_id"
                 ),
+                "source_event_id": _first(raw, "event_id", "scan_id"),
                 "symbol": _first(evaluation, "symbol") or raw.get("symbol"),
                 "side": _first(evaluation, "side"),
                 "mechanism": _first(evaluation, "mechanism", "family")
@@ -143,6 +146,19 @@ def expand_event(event: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "entry": _first(evaluation, "entry", "econ_entry"),
                 "stop": _first(evaluation, "stop", "virtual_stop", "econ_invalidation"),
                 "target": _first(evaluation, "target", "virtual_target", "econ_target"),
+                "short_horizon_prediction": raw.get("short_horizon_prediction"),
+                "watcher_advisory": raw.get("watcher_advisory"),
+                "watcher_status": raw.get("watcher_status"),
+                "watcher_algorithm_count": raw.get("watcher_algorithm_count"),
+                "watcher_evaluated_count": raw.get("watcher_evaluated_count"),
+                "watcher_applicable_count": raw.get("watcher_applicable_count"),
+                "watcher_consensus": raw.get("watcher_consensus"),
+                "watcher_supporting_count": raw.get("watcher_supporting_count"),
+                "watcher_opposing_count": raw.get("watcher_opposing_count"),
+                "watcher_result_sha256": raw.get("watcher_result_sha256"),
+                "watcher_execution_authority": raw.get("watcher_execution_authority"),
+                "watcher_research_only": raw.get("watcher_research_only"),
+                "watcher_order_intent": raw.get("watcher_order_intent"),
                 "lots": _first(evaluation, "lots", "quantity", "requested_lot"),
                 "risk_usd": _first(evaluation, "risk_usd", "estimated_risk_usd"),
                 "distance_to_eligibility": evaluation.get("distance_to_eligibility") or {},
@@ -243,6 +259,13 @@ def format_event(event: Mapping[str, Any]) -> str:
         ("TARGET", ("target", "virtual_target", "tp", "econ_target")),
         ("LOTS", ("lots", "quantity", "qty", "requested_lot")),
         ("RISK_USD", ("risk_usd", "estimated_risk_usd", "econ_expected_loss_usd")),
+        ("WATCHER_STATUS", ("watcher_status",)),
+        ("WATCHER_ALGORITHMS", ("watcher_algorithm_count",)),
+        ("WATCHER_APPLICABLE", ("watcher_applicable_count",)),
+        ("WATCHER_CONSENSUS", ("watcher_consensus",)),
+        ("WATCHER_SUPPORTING", ("watcher_supporting_count",)),
+        ("WATCHER_OPPOSING", ("watcher_opposing_count",)),
+        ("WATCHER_RESULT_SHA256", ("watcher_result_sha256",)),
     )
     for label, keys in fields:
         value = _first(event, *keys)
@@ -365,10 +388,18 @@ def _iter_new_events(handle: Any) -> Iterable[dict[str, Any]]:
 def watch(
     config_path: Path, *, interval_s: float = 10.0, all_events: bool = False,
     blocked_only: bool = False, symbol: str | None = None,
-    from_start: bool = False, once: bool = False,
+    from_start: bool = False, once: bool = False, knowledge: bool = False,
 ) -> None:
     journal_path, heartbeat_path = runtime_paths(config_path)
     print(f"WATCHER=READ_ONLY\nJOURNAL_SOURCE={journal_path}\nHEARTBEAT_SOURCE={heartbeat_path}", flush=True)
+    knowledge_engine = None
+    if knowledge:
+        config_path = Path(config_path).expanduser().resolve()
+        knowledge_engine = WatcherKnowledgeEngine(
+            knowledge_dir=config_path.parent / "knowledge",
+            report_dir=config_path.parent / "reports" / "watcher",
+        )
+        print(f"WATCHER_KNOWLEDGE=ACTIVE\n{knowledge_engine.coverage_line()}", flush=True)
     offset = 0
     if not from_start:
         try:
@@ -390,7 +421,10 @@ def watch(
                 handle.seek(offset)
                 for event in _iter_new_events(handle):
                     offset = handle.tell()
-                    for display_event in expand_event(event):
+                    expanded_events = expand_event(event)
+                    if knowledge_engine is not None:
+                        knowledge_engine.process_event(event, expanded_events=expanded_events)
+                    for display_event in expanded_events:
                         if should_display(
                             display_event, all_events=all_events,
                             blocked_only=blocked_only, symbol=symbol,
@@ -415,6 +449,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--symbol")
     parser.add_argument("--from-start", action="store_true")
     parser.add_argument("--once", action="store_true")
+    parser.add_argument("--knowledge", action="store_true", help="enable read-only knowledge and shadow analysis")
     args = parser.parse_args(argv)
     watch(
         args.config,
@@ -424,6 +459,7 @@ def main(argv: list[str] | None = None) -> int:
         symbol=args.symbol,
         from_start=args.from_start,
         once=args.once,
+        knowledge=args.knowledge,
     )
     return 0
 

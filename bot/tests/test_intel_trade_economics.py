@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from aegis.intel.trade_economics import (
+    broker_tick_size,
+    broker_tick_value,
     evaluate_trade_economics,
     usd_per_price_unit,
     wilson_lower_bound,
@@ -59,6 +61,30 @@ def test_usd_per_price_unit_uses_broker_tick_pair():
     # 1.0 / 1e-05 = 100_000 per lot; 0.01 lots -> $1000 per 1.0 of price.
     assert usd_per_price_unit(EURUSD_SPEC, lots=0.01) == pytest.approx(1000.0)
     assert usd_per_price_unit(EURUSD_SPEC, lots=1.0) == pytest.approx(100000.0)
+
+
+def test_broker_tick_value_uses_conservative_absolute_loss_value():
+    spec = {
+        "trade_tick_value": 0.95,
+        "trade_tick_value_profit": 0.98,
+        "trade_tick_value_loss": -1.02,
+        "trade_tick_size": 0.00001,
+    }
+    assert broker_tick_value(spec) == pytest.approx(1.02)
+    assert broker_tick_size(spec) == pytest.approx(0.00001)
+
+
+@pytest.mark.parametrize("bad", [-1.0, float("nan"), float("inf")])
+def test_invalid_tick_value_never_makes_risk_free(bad):
+    result = _econ(
+        spec={
+            "trade_tick_value": bad,
+            "trade_tick_size": 0.00001,
+            "trade_contract_size": 100000.0,
+        },
+    )
+    assert result.usd_per_price_unit is not None
+    assert result.usd_per_price_unit > 0
 
 
 def test_usd_per_price_unit_prefers_tick_pair_over_contract_size_on_crosses():
@@ -164,6 +190,22 @@ def test_measured_slippage_is_included_and_can_reject_net_ev():
     assert slipped.cost_usd == pytest.approx(free.cost_usd + 0.80)
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("spread_price", float("nan")),
+        ("spread_price", float("inf")),
+        ("slippage_price", float("nan")),
+        ("commission_round_trip_usd", float("nan")),
+        ("commission_round_trip_usd", -1.0),
+    ],
+)
+def test_nonfinite_or_negative_cost_inputs_fail_closed(field, value):
+    result = _econ(**{field: value})
+    assert not result.acceptable
+    assert result.reason == "invalid_cost_inputs"
+
+
 def test_invalidation_must_sit_on_the_losing_side():
     assert _econ(invalidation=1.10500).reason == "invalidation_not_below_entry"
     assert (
@@ -236,6 +278,48 @@ def test_generic_m1_structural_evidence_cannot_authorize_seconds_probability():
 
 def test_zero_size_is_rejected():
     assert _econ(lots=0.0).reason == "no_position_size"
+
+
+@pytest.mark.parametrize("bad_lots", [float("nan"), float("inf"), float("-inf")])
+def test_nonfinite_position_size_fails_closed(bad_lots):
+    result = _econ(lots=bad_lots)
+    assert not result.acceptable
+    assert result.reason == "invalid_position_size"
+    assert result.expected_net_value_usd is None
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["min_payoff_ratio", "min_expected_net_usd"],
+)
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), float("-inf")])
+def test_nonfinite_economic_thresholds_fail_closed(field, bad_value):
+    result = _econ(**{field: bad_value})
+    assert not result.acceptable
+    assert result.reason == "invalid_economic_thresholds"
+
+
+def test_nonfinite_contract_conversion_fails_closed():
+    result = _econ(
+        spec={
+            "trade_tick_value": 1e308,
+            "trade_tick_size": 1e-308,
+            "trade_contract_size": 100000.0,
+        }
+    )
+    assert not result.acceptable
+    assert result.reason == "contract_value_unavailable"
+
+
+def test_underflowed_usd_calculation_fails_closed():
+    result = _econ(
+        entry=1.0,
+        invalidation=1.0 - 1e-10,
+        target=1.0 + 1e-10,
+        spec={"trade_tick_value": 1e-320, "trade_tick_size": 1.0},
+    )
+    assert not result.acceptable
+    assert result.reason == "invalid_economic_calculation"
 
 
 def test_journal_payload_explains_the_decision():

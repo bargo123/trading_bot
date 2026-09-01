@@ -181,4 +181,10 @@ def test_runner_heartbeat_emits_metrics_without_research_or_council_calls(tmp_pa
 
     assert calls == [123.0]
     assert not [name for name in imported if name.startswith(("aegis.research_factory", "ai_council"))]
-    assert json.loads(heartbeat.read_text(encoding="utf-8"))["firehose_turnover"] == {"round_trips_per_hour": None}
+    payload = json.loads(heartbeat.read_text(encoding="utf-8"))
+    assert payload["firehose_turnover"] == {"round_trips_per_hour": None}
+    assert payload["prediction_scope"] == "GITHUB_TOOLS_AND_BOOK_ALGORITHMS_ONLY"
+    assert payload["council_influence"] is False
+    assert payload["research_factory_influence"] is False
+    assert payload["book_algorithm_registry_count"] == 616
+    assert payload["book_ranking_role"] == "secondary_tiebreak_after_capture_confidence_and_ev"

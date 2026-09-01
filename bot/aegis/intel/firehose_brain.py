@@ -44,6 +44,8 @@ from aegis.intel.thesis_sizing import evidence_confidence, size_thesis_clip
 from aegis.intel.trade_economics import (
     DEFAULT_MIN_PAYOFF_RATIO,
     TradeEconomics,
+    broker_tick_size,
+    broker_tick_value,
     evaluate_trade_economics,
 )
 from aegis.intel.video_style import (
@@ -51,6 +53,12 @@ from aegis.intel.video_style import (
     VideoStyleSignal,
     video_style_geometry,
     video_style_signal,
+)
+from aegis.intel.watcher_advisory import (
+    book_feature_snapshot,
+    book_signal_rows,
+    book_support_score,
+    watcher_advisory_for_firehose,
 )
 
 
@@ -89,6 +97,26 @@ _EXPLORATION_HARD_ECONOMIC_REASONS = frozenset({
     "payoff_below_floor",
 })
 
+_PREDICTION_SCOPE = "GITHUB_TOOLS_AND_BOOK_ALGORITHMS_ONLY"
+_BOOK_RANKING_ROLE = "secondary_tiebreak_after_capture_confidence_and_ev"
+
+
+def _exploration_sizing_kwargs(spec: Mapping[str, Any]) -> dict[str, Any]:
+    """Build broker-native sizing inputs once for every exploration gate.
+
+    MT5 can expose distinct generic, profit, and loss tick values.  Risk must
+    use the conservative magnitude (the largest finite value), and preview
+    and final sizing must receive the same conversion inputs.
+    """
+    return {
+        "contract_size": float(spec.get("trade_contract_size", 100000.0) or 100000.0),
+        "tick_value": broker_tick_value(spec),
+        "tick_size": broker_tick_size(spec),
+        "volume_min": float(spec.get("volume_min", 0.01) or 0.01),
+        "volume_step": float(spec.get("volume_step", 0.01) or 0.01),
+    }
+
+
 def _shadow_probe_is_hard_economic_rejection(
     *, fire_base: str, economics_reason: str | None,
 ) -> bool:
@@ -106,15 +134,15 @@ def _shadow_probe_is_hard_economic_rejection(
 
 
 def _forced_demo_exploration_enabled(cfg: Mapping[str, Any]) -> bool:
-    """Return whether the explicitly governed MT5 DEMO fallback is enabled."""
-    return (
-        str(cfg.get("engine") or "").lower() in {"mt5", "metatrader5"}
-        and str(cfg.get("mode") or "").lower() == "mt5_demo"
-        and cfg.get("allow_live") is False
-        and cfg.get("paper_trading_enabled") is True
-        and cfg.get("dry_run") is False
-        and bool(cfg.get("intelligent_exploration_enabled", True))
-    )
+    """The uncalibrated forced-order lane is retired.
+
+    DEMO exploration may operate below the 95% optimization target, but it
+    must still have point-in-time executable probability and positive net
+    economics.  Missing evidence is a candidate-level abstention, never
+    broker authority.
+    """
+    del cfg
+    return False
 
 
 _FORCED_DEMO_HARD_REASONS = frozenset({
@@ -768,8 +796,16 @@ def _bootstrap_from_evidence(cfg: Mapping[str, Any], evidence: Any,
 
 
 class IntelligentFirehoseBrain:
-    def __init__(self, cfg: Mapping[str, Any]) -> None:
+    def __init__(
+        self,
+        cfg: Mapping[str, Any],
+        *,
+        execution_context: Any | None = None,
+    ) -> None:
         self.cfg = dict(cfg)
+        # This is an already-loaded immutable runtime context.  The brain
+        # never reads bundle files and never starts external research tools.
+        self.execution_context = execution_context
         index_path = resolve_bot_path(
             cfg.get("analogue_index_path"), INTEL_DIR / "analogue_index.json"
         )
@@ -872,6 +908,189 @@ class IntelligentFirehoseBrain:
             "validated_selected": 0,
             "calibrated_exploration_selected": 0,
             "forced_demo_exploration_selected": 0,
+        }
+
+    def execution_bundle_prediction(
+        self,
+        *,
+        symbol: str,
+        side: str,
+        mechanism: str,
+        horizon_s: int,
+    ) -> dict[str, Any] | None:
+        """Return validated evidence for one exact candidate identity.
+
+        This method is deliberately memory-only.  It cannot load artifacts,
+        run subprocesses, or grant order authority to book consensus.
+        """
+        context = getattr(self, "execution_context", None)
+        if context is None:
+            return None
+        model = context.model_for(symbol, side, mechanism, horizon_s)
+        metadata = context.runtime_metadata(symbol, side, mechanism, horizon_s)
+        if not isinstance(model, Mapping) or not isinstance(metadata, Mapping):
+            return None
+        from aegis.intel.prediction_fusion import fuse_prediction_evidence
+
+        prediction_fusion = fuse_prediction_evidence(
+            model,
+            book_context=metadata.get("book_context"),
+            research_provenance=metadata.get("research_provenance"),
+            symbol=symbol,
+            side=side,
+            mechanism=mechanism,
+            horizon_s=horizon_s,
+        )
+        return {
+            **dict(model),
+            "probability": model.get("p_captured_win"),
+            "decision_horizon_s": int(horizon_s),
+            "mechanism": str(mechanism),
+            "selected_side": str(side).lower(),
+            "source": "validated_execution_bundle",
+            "execution_bundle": dict(metadata),
+            "prediction_fusion": prediction_fusion,
+            "book_support_score": prediction_fusion.get("book_support_score"),
+        }
+
+    def _watcher_advisory(
+        self,
+        *,
+        symbol: str,
+        side: str,
+        mechanism: str,
+        horizon_s: int | float | None,
+        runtime_state: Mapping[str, Any] | None,
+        row: Mapping[str, Any] | Any,
+        quote_buffer: Any = None,
+        actual_bid: float | None = None,
+        actual_ask: float | None = None,
+        now_ts: float | None = None,
+    ) -> dict[str, Any]:
+        """Return causal Watcher evidence without granting order authority."""
+        if not bool(self.cfg.get("watcher_runtime_enabled", False)):
+            return {
+                "status": "DISABLED",
+                "execution_authority": False,
+                "research_only": True,
+                "order_intent": False,
+            }
+        try:
+            advisory = watcher_advisory_for_firehose(
+                symbol=symbol,
+                side=side,
+                mechanism=mechanism,
+                horizon_s=horizon_s,
+                runtime_state=runtime_state,
+                row=row,
+                quote_buffer=quote_buffer,
+                actual_bid=actual_bid,
+                actual_ask=actual_ask,
+                now_ts=now_ts,
+            )
+        except Exception as exc:
+            return {
+                "status": "UNAVAILABLE",
+                "reason": f"watcher_advisory_error:{type(exc).__name__}",
+                "execution_authority": False,
+                "research_only": True,
+                "order_intent": False,
+            }
+        if (
+            not isinstance(advisory, Mapping)
+            or advisory.get("execution_authority") is not False
+            or advisory.get("research_only") is not True
+            or advisory.get("order_intent") is not False
+        ):
+            return {
+                "status": "UNAVAILABLE",
+                "reason": "watcher_advisory_contract_violation",
+                "execution_authority": False,
+                "research_only": True,
+                "order_intent": False,
+            }
+        return dict(advisory)
+
+    def _book_journal_for_candidate(
+        self,
+        *,
+        symbol: str,
+        side: str,
+        mechanism: str,
+        horizon_s: int | float | None,
+        runtime_state: Mapping[str, Any] | None,
+        row: Mapping[str, Any] | Any,
+        quote_buffer: Any = None,
+        actual_bid: float | None = None,
+        actual_ask: float | None = None,
+        now_ts: float | None = None,
+        cache: dict[tuple[str, str, str, int | float | None], dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Evaluate/cache book evidence for one exact candidate identity."""
+        if not bool(self.cfg.get("watcher_runtime_enabled", False)):
+            return {}
+        try:
+            normalized_horizon: int | float | None = (
+                int(horizon_s) if horizon_s is not None and float(horizon_s).is_integer()
+                else float(horizon_s) if horizon_s is not None
+                else None
+            )
+        except (TypeError, ValueError, OverflowError):
+            normalized_horizon = horizon_s
+        key = (
+            str(symbol or "").upper(),
+            str(side or "").lower(),
+            str(mechanism or ""),
+            normalized_horizon,
+        )
+        if cache is not None and key in cache:
+            cached = cache[key]
+            return {
+                "watcher_advisory": cached.get("watcher_advisory"),
+                "book_signal_rows": list(cached.get("book_signal_rows") or []),
+                "book_support_score": cached.get("book_support_score"),
+                "book_features": dict(cached.get("book_features") or {}),
+                "book_rank_score": cached.get("book_rank_score"),
+            }
+        advisory = self._watcher_advisory(
+            symbol=symbol,
+            side=side,
+            mechanism=mechanism,
+            horizon_s=normalized_horizon,
+            runtime_state=runtime_state,
+            row=row,
+            quote_buffer=quote_buffer,
+            actual_bid=actual_bid,
+            actual_ask=actual_ask,
+            now_ts=now_ts,
+        )
+        rows = book_signal_rows(
+            advisory,
+            symbol=symbol,
+            side=side,
+            mechanism=mechanism,
+            horizon_s=normalized_horizon,
+        )
+        features = book_feature_snapshot(advisory, candidate_side=side)
+        journal = {
+            "watcher_advisory": advisory,
+            "book_signal_rows": list(rows),
+            "book_support_score": book_support_score(rows, candidate_side=side),
+            "book_features": dict(features),
+            "book_rank_score": (
+                float(features["book_rank_score"])
+                if features.get("book_available") == 1.0
+                else None
+            ),
+        }
+        if cache is not None:
+            cache[key] = journal
+        return {
+            "watcher_advisory": advisory,
+            "book_signal_rows": list(rows),
+            "book_support_score": journal["book_support_score"],
+            "book_features": dict(journal["book_features"]),
+            "book_rank_score": journal["book_rank_score"],
         }
 
     def _note_skip(self, reason: str) -> None:
@@ -1474,6 +1693,110 @@ class IntelligentFirehoseBrain:
         # variant. The candidate owns its geometry before any gate is scored.
         viable: list[tuple[Any, dict[str, Any], TradeEconomics, Any, Any, float | None, dict[str, Any], list[str]]] = []
         forced_pool: list[dict[str, Any]] = []
+        book_journal_cache: dict[
+            tuple[str, str, str, int | float | None], dict[str, Any]
+        ] = {}
+        bundle_prediction_cache: dict[
+            tuple[str, str, str, int], dict[str, Any]
+        ] = {}
+        candidate_book_score_cache: dict[
+            tuple[str, str, str, int, str], float | None
+        ] = {}
+        candidate_book_rank_cache: dict[
+            tuple[str, str, str, int, str], float | None
+        ] = {}
+
+        def candidate_identity(candidate: Any) -> tuple[str, str, str, int, str]:
+            """Return the exact rapid-search identity used for book ranking."""
+            return (
+                str(getattr(candidate, "symbol", symbol) or symbol).upper(),
+                str(getattr(candidate, "side", "") or "").lower(),
+                str(getattr(candidate, "family", "") or ""),
+                int(getattr(candidate, "max_hold_s", 0) or 0),
+                str(getattr(candidate, "variant_id", "") or ""),
+            )
+
+        def bundle_for_candidate(candidate: Any) -> Mapping[str, Any] | None:
+            identity = candidate_identity(candidate)
+            bundle = bundle_prediction_cache.get(identity[:4])
+            return bundle if isinstance(bundle, Mapping) else None
+
+        def book_support_for_candidate(candidate: Any) -> float | None:
+            """Read book support for ranking without creating model authority."""
+            identity = candidate_identity(candidate)
+            if identity in candidate_book_score_cache:
+                return candidate_book_score_cache[identity]
+            book_journal = self._book_journal_for_candidate(
+                symbol=str(getattr(candidate, "symbol", symbol) or symbol),
+                side=str(getattr(candidate, "side", "") or ""),
+                mechanism=str(getattr(candidate, "family", "") or ""),
+                horizon_s=int(getattr(candidate, "max_hold_s", 0) or 0),
+                runtime_state=state,
+                row=row,
+                quote_buffer=quote_buffer,
+                actual_bid=actual_bid,
+                actual_ask=actual_ask,
+                now_ts=now_ts,
+                cache=book_journal_cache,
+            )
+            score: Any = (
+                book_journal.get("book_support_score")
+                if isinstance(book_journal, Mapping)
+                else None
+            )
+            if score is None:
+                bundle = bundle_for_candidate(candidate)
+                fused = bundle.get("prediction_fusion") if bundle else None
+                if isinstance(fused, Mapping):
+                    score = fused.get("book_support_score")
+            try:
+                score_value = float(score)
+            except (TypeError, ValueError, OverflowError):
+                score_value = None
+            if score_value is None or not math.isfinite(score_value) or not 0.0 <= score_value <= 1.0:
+                score_value = None
+            candidate_book_score_cache[identity] = score_value
+            return score_value
+
+        def book_rank_value(candidate: Any) -> float:
+            identity = candidate_identity(candidate)
+            if identity in candidate_book_rank_cache:
+                score = candidate_book_rank_cache[identity]
+                return score if score is not None else float("-inf")
+            book_journal = self._book_journal_for_candidate(
+                symbol=str(getattr(candidate, "symbol", symbol) or symbol),
+                side=str(getattr(candidate, "side", "") or ""),
+                mechanism=str(getattr(candidate, "family", "") or ""),
+                horizon_s=int(getattr(candidate, "max_hold_s", 0) or 0),
+                runtime_state=state,
+                row=row,
+                quote_buffer=quote_buffer,
+                actual_bid=actual_bid,
+                actual_ask=actual_ask,
+                now_ts=now_ts,
+                cache=book_journal_cache,
+            )
+            score: Any = (
+                book_journal.get("book_rank_score")
+                if isinstance(book_journal, Mapping)
+                else None
+            )
+            if score is None:
+                bundle = bundle_for_candidate(candidate)
+                fused = bundle.get("prediction_fusion") if bundle else None
+                if isinstance(fused, Mapping):
+                    score = fused.get("book_rank_score")
+            if score is None:
+                score = book_support_for_candidate(candidate)
+            try:
+                score_value = float(score)
+            except (TypeError, ValueError, OverflowError):
+                score_value = None
+            if score_value is None or not math.isfinite(score_value) or not 0.0 <= score_value <= 1.0:
+                score_value = None
+            candidate_book_rank_cache[identity] = score_value
+            return score_value if score_value is not None else float("-inf")
+
         all_rejections: list[str] = []
         candidate_model_rejections: list[dict[str, str]] = []
         spec = symbol_spec or {}
@@ -1485,8 +1808,8 @@ class IntelligentFirehoseBrain:
                     str(getattr(mc, "side", "") or ""),
                     int(getattr(mc, "max_hold_s", 0) or 0) or None,
                 )
-            spec_tick_val = (symbol_spec or {}).get("trade_tick_value")
-            spec_tick_sz = (symbol_spec or {}).get("trade_tick_size")
+            spec_tick_val = broker_tick_value(symbol_spec)
+            spec_tick_sz = broker_tick_size(symbol_spec)
             econ = check_entry_economics(
                 mc,
                 max_risk_usd=self._exploration_limits.max_risk_per_trade_usd,
@@ -1509,6 +1832,23 @@ class IntelligentFirehoseBrain:
                 horizon_s=int(mc.max_hold_s),
                 mechanism=str(getattr(mc, "family", "") or ""),
             )
+            bundle_prediction = self.execution_bundle_prediction(
+                symbol=str(mc.symbol),
+                side=str(mc.side),
+                mechanism=str(getattr(mc, "family", "") or ""),
+                horizon_s=int(mc.max_hold_s),
+            )
+            if isinstance(bundle_prediction, Mapping):
+                bundle_prediction_cache[
+                    (
+                        str(mc.symbol).upper(),
+                        str(mc.side).lower(),
+                        str(getattr(mc, "family", "") or ""),
+                        int(mc.max_hold_s),
+                    )
+                ] = dict(bundle_prediction)
+            if candidate_prediction is None and bundle_prediction is not None:
+                candidate_prediction = bundle_prediction
             shadow_probe = bool(
                 exploration_shadow_model_probe
                 and str((short_horizon_prediction or {}).get("abstain_reason") or "")
@@ -1527,7 +1867,7 @@ class IntelligentFirehoseBrain:
                 except (TypeError, ValueError):
                     p_green = None
             model_gate_reason: str | None = None
-            if short_horizon_prediction is not None:
+            if short_horizon_prediction is not None or bundle_prediction is not None:
                 if not shadow_probe:
                     if candidate_prediction is None:
                         model_gate_reason = "horizon_prediction_missing"
@@ -1611,38 +1951,24 @@ class IntelligentFirehoseBrain:
                 entry=mc.entry_price,
                 invalidation=mc.invalidation,
                 pip=pip,
-                contract_size=float(spec.get("trade_contract_size", 100000.0) or 100000.0),
-                tick_value=spec.get("trade_tick_value"),
-                tick_size=spec.get("trade_tick_size"),
-                volume_min=float(spec.get("volume_min", 0.01) or 0.01),
-                volume_step=float(spec.get("volume_step", 0.01) or 0.01),
+                **_exploration_sizing_kwargs(spec),
             )
             if not sizing_preview.get("allowed"):
                 _min_lot_risk = float(sizing_preview.get("actual_min_lot_risk_usd") or 0.0)
                 _desired_risk = float(sizing_preview.get("desired_risk_usd") or 0.0)
                 _excess_usd = round(max(0.0, _min_lot_risk - _desired_risk), 4)
                 reason = str(sizing_preview.get("reason") or "RISK_GRANULARITY_BLOCKED")
-                _risk_cap = _desired_risk * float(self.cfg.get("forced_demo_risk_cap_multiplier", 5.0) or 5.0)
-                _forced_ok = forced_demo_lane and _min_lot_risk > 0 and _min_lot_risk <= _risk_cap + 1e-9
-                if _forced_ok:
-                    _vmin = float(spec.get("volume_min", 0.01) or 0.01)
-                    sizing_preview = {"allowed": True, "lots": _vmin,
-                                      "reason": "forced_demo_min_lot",
-                                      "desired_risk_usd": round(_desired_risk, 4),
-                                      "actual_min_lot_risk_usd": round(_min_lot_risk, 4)}
-                    quality_reasons.append(f"forced_demo_min_lot:excess={_excess_usd}")
-                else:
-                    all_rejections.append(reason)
-                    distance = dict(econ.get("distance_to_eligibility") or {})
-                    distance["risk_excess_usd"] = _excess_usd
-                    candidate_evaluations.append(self._record_search_evaluation(
-                        candidate=mc,
-                        reasons=[reason],
-                        distance=distance,
-                        near_eligible=False,
-                        p_green=p_green,
-                    ))
-                    continue
+                all_rejections.append(reason)
+                distance = dict(econ.get("distance_to_eligibility") or {})
+                distance["risk_excess_usd"] = _excess_usd
+                candidate_evaluations.append(self._record_search_evaluation(
+                    candidate=mc,
+                    reasons=[reason],
+                    distance=distance,
+                    near_eligible=False,
+                    p_green=p_green,
+                ))
+                continue
 
 
             candidate_portfolio_ok, candidate_portfolio_reason = pretrade_ok(
@@ -1701,13 +2027,9 @@ class IntelligentFirehoseBrain:
                     expected_net_value_usd=candidate_econ.expected_net_value_usd,
                 ))
                 # A DEMO exploration lane may operate below the 95% target,
-                # but it still needs a measured executable probability for
-                # after-cost economics.  Missing probability is not an
-                # opportunity; do not turn it into a broker order merely to
-                # keep throughput non-zero.  In forced_demo_lane, however,
-                # evidence-collection with minimum risk is explicitly allowed.
-                if not (forced_demo_lane and reason == "no_win_probability_evidence"):
-                    continue
+                # but it still needs measured executable probability and
+                # positive after-cost economics.
+                continue
             authority_observations = int(
                 getattr(candidate_evidence, "analogue_n", 0) or 0
             ) if measured_candidate_evidence else 0
@@ -1738,8 +2060,7 @@ class IntelligentFirehoseBrain:
                     p_green=authority_probability,
                     expected_net_value_usd=candidate_econ.expected_net_value_usd,
                 ))
-                if not forced_demo_lane:
-                    continue
+                continue
             memory_features = {
                 "symbol": mc.symbol,
                 "side": mc.side,
@@ -1776,8 +2097,7 @@ class IntelligentFirehoseBrain:
                     p_green=candidate_econ.p_win,
                     expected_net_value_usd=candidate_econ.expected_net_value_usd,
                 ))
-                if not forced_demo_lane:
-                    continue
+                continue
             if forced_demo_lane and (
                 not candidate_econ.acceptable or not capture_authorization.authorized
                 or quality_reasons
@@ -1860,6 +2180,7 @@ class IntelligentFirehoseBrain:
                     item[6], item[7],
                 ),
                 float(item[6].get("loser_similarity", 0.0)),
+                -book_rank_value(item[0]),
                 str(getattr(item[0], "variant_id", "")),
             ))
         else:
@@ -1868,16 +2189,19 @@ class IntelligentFirehoseBrain:
                   if item[4].lower_95 is not None else float("-inf")),
                 -(float(item[4].probability)
                   if item[4].probability is not None else float("-inf")),
+                -float(item[2].expected_net_value_usd)
+                if item[2].expected_net_value_usd is not None else float("inf"),
                 float(item[6].get("loser_similarity", 0.0)),
-                float(item[2].expected_net_value_usd)
-                if item[2].expected_net_value_usd is not None else float("-inf"),
+                -book_rank_value(item[0]),
                 -item[0].payoff,
+                str(getattr(item[0], "variant_id", "")),
             ))
         (
             mc, sizing_preview, exploration_econ, candidate_evidence,
             capture_authorization, shadow_model_probability, memory_summary,
             selected_quality_reasons,
         ) = viable[0]
+        selected_book_support = book_support_for_candidate(mc)
         self._search_telemetry["best_available"] = {
             "symbol": str(getattr(mc, "symbol", "") or "").upper(),
             "side": str(getattr(mc, "side", "") or "").lower(),
@@ -1898,6 +2222,7 @@ class IntelligentFirehoseBrain:
                     else float(exploration_econ.expected_net_value_usd)
                 )
             ),
+            "book_support_score": selected_book_support,
             "score_type": "forced_demo_comparative" if forced_mode else "expected_net_ev",
         }
         self._last_exploration_micro_diagnostics = {
@@ -1943,6 +2268,33 @@ class IntelligentFirehoseBrain:
         invalidation = mc.invalidation
         target = mc.target
         setup = mc.family       # family from source mechanism
+        selected_watcher_journal = self._book_journal_for_candidate(
+            symbol=symbol,
+            side=side,
+            mechanism=setup,
+            horizon_s=mc.max_hold_s,
+            runtime_state=state,
+            row=row,
+            quote_buffer=quote_buffer,
+            actual_bid=actual_bid,
+            actual_ask=actual_ask,
+            now_ts=now_ts,
+            cache=book_journal_cache,
+        )
+        selected_bundle_prediction = bundle_prediction_cache.get(
+            (
+                str(mc.symbol).upper(),
+                str(mc.side).lower(),
+                str(getattr(mc, "family", "") or ""),
+                int(mc.max_hold_s),
+            )
+        )
+        selected_prediction_fusion = (
+            dict(selected_bundle_prediction.get("prediction_fusion"))
+            if isinstance(selected_bundle_prediction, Mapping)
+            and isinstance(selected_bundle_prediction.get("prediction_fusion"), Mapping)
+            else None
+        )
 
         # Recompute ALL identity from FINAL candidate.
         variant_identity = str(
@@ -1965,11 +2317,7 @@ class IntelligentFirehoseBrain:
             entry=entry,
             invalidation=invalidation,
             pip=pip,
-            contract_size=float(spec.get("trade_contract_size", 100000.0) or 100000.0),
-            tick_value=spec.get("trade_tick_value"),
-            tick_size=spec.get("trade_tick_size"),
-            volume_min=float(spec.get("volume_min", 0.01) or 0.01),
-            volume_step=float(spec.get("volume_step", 0.01) or 0.01),
+            **_exploration_sizing_kwargs(spec),
         )
         if not sizing.get("allowed"):
             # Hard risk rejection: broker-minimum lot would breach the budget.
@@ -2149,6 +2497,10 @@ class IntelligentFirehoseBrain:
             "brain": "intelligent_firehose",
             "action": "fire",
             "shadow_action": None,
+            "prediction_scope": _PREDICTION_SCOPE,
+            "council_influence": False,
+            "research_factory_influence": False,
+            "book_ranking_role": _BOOK_RANKING_ROLE,
             "setup_family": setup,
             "variant_id": variant_identity,
             "search_horizon_s": mc.max_hold_s,
@@ -2194,6 +2546,7 @@ class IntelligentFirehoseBrain:
             "selection_score_type": self._search_telemetry["best_available"].get("score_type"),
             "forced_quality_penalties": list(selected_quality_reasons),
             "shadow_model_probability": shadow_model_probability,
+            "prediction_fusion": selected_prediction_fusion,
             "decision_authority": "buy_sell_abstain",
             "why_buy": (
                 selected_side_reason if side == "buy"
@@ -2204,6 +2557,7 @@ class IntelligentFirehoseBrain:
                 else "; ".join(rejected_by_side["sell"]) or "sell variant not supported"
             ),
             "why_not_abstain": selected_side_reason,
+            **selected_watcher_journal,
             **self._last_exploration_micro_diagnostics,
         }
         viable_candidate_rows: list[dict[str, Any]] = []
@@ -2228,6 +2582,42 @@ class IntelligentFirehoseBrain:
                 regime=regime, session=session,
             )
             option_journal = dict(journal)
+            option_is_selected = option_variant == variant_identity
+            option_book_journal = self._book_journal_for_candidate(
+                symbol=symbol,
+                side=str(option_mc.side),
+                mechanism=str(option_mc.family),
+                horizon_s=int(option_mc.max_hold_s),
+                runtime_state=state,
+                row=row,
+                quote_buffer=quote_buffer,
+                actual_bid=actual_bid,
+                actual_ask=actual_ask,
+                now_ts=now_ts,
+                cache=book_journal_cache,
+            )
+            option_bundle_prediction = bundle_prediction_cache.get(
+                (
+                    str(option_mc.symbol).upper(),
+                    str(option_mc.side).lower(),
+                    str(getattr(option_mc, "family", "") or ""),
+                    int(option_mc.max_hold_s),
+                )
+            )
+            option_prediction_fusion = (
+                dict(option_bundle_prediction.get("prediction_fusion"))
+                if isinstance(option_bundle_prediction, Mapping)
+                and isinstance(option_bundle_prediction.get("prediction_fusion"), Mapping)
+                else None
+            )
+            if option_book_journal:
+                option_journal.update(option_book_journal)
+            else:
+                option_journal.pop("watcher_advisory", None)
+                option_journal.pop("book_signal_rows", None)
+                option_journal.pop("book_support_score", None)
+            if option_prediction_fusion is not None:
+                option_journal["prediction_fusion"] = option_prediction_fusion
             option_journal.update({
                 "setup_family": str(option_mc.family),
                 "variant_id": option_variant,
@@ -2268,6 +2658,10 @@ class IntelligentFirehoseBrain:
                     "FORCED_DEMO_EXPLORATION" if forced_mode else "CALIBRATED_EXPLORATION"
                 ),
                 "shadow_model_probability": option_shadow_p,
+                "prediction_scope": _PREDICTION_SCOPE,
+                "council_influence": False,
+                "research_factory_influence": False,
+                "book_ranking_role": _BOOK_RANKING_ROLE,
                 "fast_winner_similarity": option_memory_summary.get("winner_similarity", 0.0),
                 "fast_loser_similarity": option_memory_summary.get("loser_similarity", 0.0),
                 "book_logic": {
@@ -2302,6 +2696,21 @@ class IntelligentFirehoseBrain:
                 "shadow_model_probability": option_shadow_p,
                 "fast_winner_similarity": option_memory_summary.get("winner_similarity", 0.0),
                 "fast_loser_similarity": option_memory_summary.get("loser_similarity", 0.0),
+                "book_support_score": (
+                    option_book_journal.get("book_support_score")
+                    if option_book_journal
+                    else option_prediction_fusion.get("book_support_score")
+                    if option_prediction_fusion is not None
+                    else None
+                ),
+                "prediction_scope": _PREDICTION_SCOPE,
+                "council_influence": False,
+                "research_factory_influence": False,
+                "book_ranking_role": _BOOK_RANKING_ROLE,
+                "book_signal_rows": (
+                    list(option_book_journal.get("book_signal_rows") or [])
+                ),
+                "prediction_fusion": option_prediction_fusion,
                 "portfolio_ok": True,
                 "decision_journal": option_journal,
                 "lane": "FORCED_DEMO_EXPLORATION" if forced_mode else "CALIBRATED_EXPLORATION",
@@ -2757,6 +3166,37 @@ class IntelligentFirehoseBrain:
                 cfg=video_cfg,
             )
         signature = runtime_signature(state, side=side, setup=setup)
+        watcher_journal: dict[str, Any] = {}
+        if bool(self.cfg.get("watcher_runtime_enabled", False)):
+            watcher_horizon = getattr(video_candidate, "max_hold_s", None)
+            if watcher_horizon is None and isinstance(short_horizon_prediction, Mapping):
+                watcher_horizon = short_horizon_prediction.get("decision_horizon_s")
+            watcher_advisory = self._watcher_advisory(
+                symbol=symbol,
+                side=side,
+                mechanism=setup,
+                horizon_s=watcher_horizon,
+                runtime_state=state,
+                row=row,
+                quote_buffer=quote_buffer,
+                actual_bid=actual_bid,
+                actual_ask=actual_ask,
+                now_ts=now_ts,
+            )
+            watcher_rows = book_signal_rows(
+                watcher_advisory,
+                symbol=symbol,
+                side=side,
+                mechanism=setup,
+                horizon_s=watcher_horizon,
+            )
+            watcher_journal = {
+                "watcher_advisory": watcher_advisory,
+                "book_signal_rows": watcher_rows,
+                "book_support_score": book_support_score(
+                    watcher_rows, candidate_side=side
+                ),
+            }
         measured_spread = self._measured_spread_limit(
             symbol, str(signature.get("session") or "")
         )
@@ -2771,7 +3211,12 @@ class IntelligentFirehoseBrain:
                     self._note_skip("spread_policy_no_measured_evidence")
                     self._search_telemetry["why_no_order"] = "spread_policy_no_measured_evidence"
                     self.counts["skip"] += 1
-                    return DemoDecision("skip", "spread_policy_no_measured_evidence", side=side)
+                    return DemoDecision(
+                        "skip",
+                        "spread_policy_no_measured_evidence",
+                        side=side,
+                        journal=dict(watcher_journal),
+                    )
             if measured_spread is not None and not measured_spread.allows(spread_pips):
                 if _forced_demo_exploration_enabled(self.cfg):
                     self.counts["forced_spread_quality"] = int(
@@ -2781,7 +3226,12 @@ class IntelligentFirehoseBrain:
                     self._note_skip("spread_above_measured_session_limit")
                     self._search_telemetry["why_no_order"] = "spread_above_measured_session_limit"
                     self.counts["skip"] += 1
-                    return DemoDecision("skip", "spread_above_measured_session_limit", side=side)
+                    return DemoDecision(
+                        "skip",
+                        "spread_above_measured_session_limit",
+                        side=side,
+                        journal=dict(watcher_journal),
+                    )
         self.regime_by_symbol[str(symbol).upper()] = str(
             signature.get("regime") or ""
         )
@@ -3288,7 +3738,8 @@ class IntelligentFirehoseBrain:
                     information_id=info_id,
                     analogue_n=evidence.analogue_n,
                     close_clips=0,
-                    journal={**exp_decision.journal,
+                    journal={**watcher_journal,
+                             **exp_decision.journal,
                              **short_horizon_journal,
                              "exploration_shadow_model_probe": exploration_shadow_model_probe,
                              "equity": equity,
@@ -3377,6 +3828,7 @@ class IntelligentFirehoseBrain:
             **({} if sizing is None else sizing.journal()),
             **short_horizon_journal,
             **(exploration_journal or {}),
+            **watcher_journal,
         }
         return DemoDecision(
             mapped,

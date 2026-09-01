@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 from research_fast_edge_shadow import (
     _load_experiment_handoff,
+    exit_policy_comparison_for_frame,
     primary_oos_metrics,
     select_research_symbols,
 )
@@ -43,6 +44,14 @@ def test_research_symbol_filter_preserves_configured_order_and_rejects_unknowns(
     configured = ["EURUSD", "EURCAD", "GBPJPY"]
     assert select_research_symbols(configured, ["eurcad", "missing"]) == ["EURCAD"]
     assert select_research_symbols(configured, None) == configured
+
+
+def test_captured_only_generation_skips_unavailable_auxiliary_exit_comparison(monkeypatch):
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("auxiliary exit comparison must not run")
+
+    monkeypatch.setattr("research_fast_edge_shadow.evaluate_exit_policies", fail_if_called)
+    assert exit_policy_comparison_for_frame(pd.DataFrame(), captured_only=True) == []
 
 
 def test_experiment_handoff_is_optional_and_research_only(tmp_path):
@@ -122,6 +131,54 @@ def test_replay_uses_executable_sides_and_stops_sequentially():
     assert outcome["time_in_red_s"] == 0.0
 
 
+def test_replay_costs_use_broker_units_and_delay_entry_causally():
+    kwargs = {
+        "entry_time": pd.Timestamp("2026-01-01T00:00:00Z"),
+        "entry_bid": 1.09999,
+        "entry_ask": 1.10001,
+        "future_times": pd.date_range("2026-01-01T00:00:01Z", periods=4, freq="1s"),
+        "future_bid": np.array([1.10002, 1.10010, 1.10020, 1.10022]),
+        "future_ask": np.array([1.10004, 1.10012, 1.10022, 1.10024]),
+        "side": "buy",
+        "horizon_s": 4,
+    }
+    outcome = replay_executable_path(
+        **kwargs,
+        slippage_price=0.00001,
+        commission_usd=1.0,
+        usd_per_price_unit=100_000.0,
+        entry_latency_s=1.0,
+        close_latency_s=1.0,
+    )
+    assert outcome["entry_latency_s"] == pytest.approx(1.0)
+    assert outcome["close_latency_s"] == pytest.approx(1.0)
+    assert outcome["entry_price"] == pytest.approx(1.10004)
+    assert outcome["captured_exit_net_pnl"] == pytest.approx(14.0)
+    assert outcome["captured_exit_return"] == pytest.approx(
+        outcome["captured_exit_net_pnl"] / (1.10003 * 100_000.0)
+    )
+    assert outcome["mfe_return"] == pytest.approx(
+        outcome["mfe_net_pnl"] / (1.10003 * 100_000.0)
+    )
+
+
+def test_replay_rejects_invalid_cost_or_latency_assumptions():
+    kwargs = {
+        "entry_time": pd.Timestamp("2026-01-01T00:00:00Z"),
+        "entry_bid": 1.09999,
+        "entry_ask": 1.10001,
+        "future_times": pd.date_range("2026-01-01T00:00:01Z", periods=3, freq="1s"),
+        "future_bid": np.array([1.10002, 1.10010, 1.10020]),
+        "future_ask": np.array([1.10004, 1.10012, 1.10022]),
+        "side": "buy",
+        "horizon_s": 3,
+    }
+    with pytest.raises(ValueError, match="invalid_slippage_price"):
+        replay_executable_path(**kwargs, slippage_price=-1.0)
+    with pytest.raises(ValueError, match="invalid_entry_latency_s"):
+        replay_executable_path(**kwargs, entry_latency_s=-1.0)
+
+
 def test_causal_exit_policy_variants_do_not_use_future_max_as_entry_authority():
     kwargs = {
         "entry_time": pd.Timestamp("2026-01-01T00:00:00Z"),
@@ -171,10 +228,54 @@ def test_shadow_dataset_is_universal_and_outcome_columns_are_not_features():
     assert "pnl_1s" not in features.columns
     assert "green_within_5s" not in features.columns
     assert "structure_context" not in features.columns
+    # Cost-provenance metadata is audit evidence, not a predictive feature.
+    # Keeping it out of the model frame prevents configured friction/latency
+    # constants from becoming accidental training inputs.
+    assert "slippage_bps" not in features.columns
+    assert "commission_round_trip_usd" not in features.columns
+    assert "slippage_price" not in features.columns
+    assert "commission_usd" not in features.columns
+    assert "entry_latency_s" not in features.columns
+    assert "close_latency_s" not in features.columns
+    assert "usd_per_price_unit" not in features.columns
     assert {"return_1s", "return_2s", "return_3s", "micro_reversal", "volatility_expansion"}.issubset(
         features.columns
     )
     assert "target" in features.columns
+
+
+def test_shadow_dataset_propagates_configured_costs_and_point_in_time_latency():
+    frame = build_shadow_dataset(
+        {"EURUSD": _quotes(80)},
+        horizons=(5,),
+        sample_every_s=10,
+        slippage_bps=0.1,
+        commission_round_trip_usd=1.0,
+        usd_per_price_unit_by_symbol={"EURUSD": 100_000.0},
+        entry_latency_s=0.2,
+        close_latency_s=0.2,
+    )
+    assert len(frame) > 0
+    assert frame["slippage_price"].gt(0.0).all()
+    assert frame["commission_usd"].eq(1.0).all()
+    assert frame["usd_per_price_unit"].eq(100_000.0).all()
+    assert frame["entry_latency_s"].eq(0.2).all()
+    assert frame["close_latency_s"].eq(0.2).all()
+    assert frame["cost_model_schema"].eq("aegis.shadow_cost_model.v1").all()
+    assert frame["slippage_bps"].eq(0.1).all()
+    assert frame["commission_round_trip_usd"].eq(1.0).all()
+    assert frame["captured_exit_return"].abs().max() < 0.01
+
+
+def test_shadow_dataset_charges_round_trip_slippage():
+    frame = build_shadow_dataset(
+        {"EURUSD": _quotes(80)},
+        horizons=(5,),
+        sample_every_s=10,
+        slippage_bps=0.1,
+    )
+    expected = 2.0 * frame["mid"].to_numpy(dtype=float) * 0.1 / 10_000.0
+    np.testing.assert_allclose(frame["slippage_price"].to_numpy(dtype=float), expected)
 
 
 def test_shadow_slices_are_strictly_chronological():

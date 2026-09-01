@@ -1,0 +1,1 @@
+This is an error message, not a research proposal, so it makes no measurable claim or testable trading hypothesis. It provides no validation plan, data, risk controls, or execution context; treating it as strategy input would be unsafe and operationally irrelevant.

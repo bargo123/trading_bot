@@ -432,3 +432,21 @@ def test_calibrated_ensemble_abstains_when_calibration_or_model_count_is_missing
 
     assert result["calibration_status"] == "not_calibrated"
     assert result["abstain"].all()
+
+
+def test_save_emits_factory_independent_runtime_estimators(tmp_path) -> None:
+    import json
+    import joblib
+
+    frame = labeled_frame(80)
+    pipeline = MLPipeline(
+        configs=[small_logistic_config(), small_random_forest_config()]
+    )
+    pipeline.train(frame.iloc[:60], frame.iloc[60:])
+    pipeline.save(tmp_path)
+
+    metadata = json.loads((tmp_path / "metadata.json").read_text(encoding="utf-8"))
+    assert all(row.get("runtime_model_file") for row in metadata["models"])
+    for row in metadata["models"]:
+        estimator = joblib.load(tmp_path / row["runtime_model_file"])
+        assert not type(estimator).__module__.startswith("aegis.research_factory")

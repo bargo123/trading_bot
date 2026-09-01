@@ -322,6 +322,10 @@ def replay_counterfactuals(
     """
     side = str(actual_side or "").strip().lower()
     geometries = dict(counterfactual_geometries or {})
+    horizon_value = _finite(actual_horizon_s)
+    actual_horizon = (
+        int(horizon_value) if horizon_value is not None and horizon_value > 0 else 0
+    )
     results: dict[str, Any] = {}
     for candidate_side in ("buy", "sell"):
         geometry = {
@@ -347,7 +351,7 @@ def replay_counterfactuals(
         )
         results[f"what_if_{candidate_side}"] = {
             "side": candidate_side,
-            "horizon_s": int(float(actual_horizon_s)),
+            "horizon_s": actual_horizon or None,
             **replay,
             "net_pnl_usd": replay.get("chosen_net_usd"),
         }
@@ -357,10 +361,6 @@ def replay_counterfactuals(
     horizons = alternative_horizons_s
     if horizons is None:
         horizons = (1, 2, 3, 5, 8, 10, 15, 20)
-    try:
-        actual_horizon = int(float(actual_horizon_s))
-    except (TypeError, ValueError, OverflowError):
-        actual_horizon = 0
     actual_geometry = {"stop_price": actual_stop, "target_price": actual_target}
     for raw_horizon in horizons:
         try:

@@ -62,6 +62,76 @@ def test_global_ranking_uses_capture_probability_before_winner_similarity_and_ev
     assert ranked[0]["candidate_id"] == "high-confidence"
 
 
+def test_book_support_is_secondary_to_probability_but_breaks_equal_evidence_ties():
+    higher_probability = _candidate(
+        "higher-probability", symbol="EURUSD", thesis="t1",
+        p_capture=0.81, ev=0.01, lcb=0.70,
+    )
+    higher_probability["book_support_score"] = 0.10
+    equal_probability_more_support = _candidate(
+        "more-book-support", symbol="GBPUSD", thesis="t2",
+        p_capture=0.80, ev=0.01, lcb=0.70,
+    )
+    equal_probability_more_support["book_support_score"] = 0.95
+
+    ranked, _ = rank_and_allocate(
+        [equal_probability_more_support, higher_probability], max_positions=1
+    )
+    assert ranked[0]["candidate_id"] == "higher-probability"
+
+    tied_a = _candidate(
+        "tied-low-book", symbol="EURUSD", thesis="t3",
+        p_capture=0.80, ev=0.01, lcb=0.70,
+    )
+    tied_a["book_support_score"] = 0.20
+    tied_b = _candidate(
+        "tied-high-book", symbol="GBPUSD", thesis="t4",
+        p_capture=0.80, ev=0.01, lcb=0.70,
+    )
+    tied_b["book_support_score"] = 0.90
+
+    ranked, _ = rank_and_allocate([tied_a, tied_b], max_positions=1)
+    assert ranked[0]["candidate_id"] == "tied-high-book"
+
+
+def test_fused_prediction_book_support_is_used_as_secondary_tiebreaker():
+    low = _candidate(
+        "a-low-fused-book", symbol="EURUSD", thesis="t1",
+        p_capture=0.80, ev=0.01, lcb=0.70,
+    )
+    low["prediction_fusion"] = {"book_support_score": 0.10}
+    high = _candidate(
+        "b-high-fused-book", symbol="GBPUSD", thesis="t2",
+        p_capture=0.80, ev=0.01, lcb=0.70,
+    )
+    high["prediction_fusion"] = {"book_support_score": 0.90}
+
+    ranked, _ = rank_and_allocate([low, high], max_positions=1)
+
+    assert ranked[0]["candidate_id"] == "b-high-fused-book"
+
+
+def test_book_rank_score_is_preferred_over_raw_sparse_support():
+    low_confidence = _candidate(
+        "sparse", symbol="EURUSD", thesis="t1",
+        p_capture=0.80, ev=0.01, lcb=0.70,
+    )
+    low_confidence["book_support_score"] = 0.99
+    low_confidence["book_rank_score"] = 0.51
+    high_confidence = _candidate(
+        "covered", symbol="GBPUSD", thesis="t2",
+        p_capture=0.80, ev=0.01, lcb=0.70,
+    )
+    high_confidence["book_support_score"] = 0.80
+    high_confidence["book_rank_score"] = 0.70
+
+    ranked, _ = rank_and_allocate(
+        [low_confidence, high_confidence], max_positions=1
+    )
+
+    assert ranked[0]["candidate_id"] == "covered"
+
+
 def test_global_allocator_blocks_duplicate_theses_but_allows_independent_entries():
     ranked, selected = rank_and_allocate(
         [
@@ -175,6 +245,34 @@ def test_forced_demo_lane_is_rankable_without_probability_or_positive_ev():
     assert len(ranked) == 1
     assert selected[0]["candidate_id"] == "forced"
     assert selected[0]["p_captured_win"] is None
+
+
+def test_forced_demo_book_support_breaks_comparative_score_ties_only():
+    low_support = _candidate(
+        "forced-low-support", symbol="EURUSD", thesis="forced-1",
+        p_capture=None, ev=None, lane="FORCED_DEMO_EXPLORATION",
+    )
+    low_support.update({
+        "authority_type": "FORCED_DEMO_EXPLORATION",
+        "selection_score": 0.50,
+        "book_support_score": 0.10,
+    })
+    high_support = _candidate(
+        "forced-high-support", symbol="GBPUSD", thesis="forced-2",
+        p_capture=None, ev=None, lane="FORCED_DEMO_EXPLORATION",
+    )
+    high_support.update({
+        "authority_type": "FORCED_DEMO_EXPLORATION",
+        "selection_score": 0.50,
+        "book_support_score": 0.90,
+    })
+
+    ranked, selected = rank_and_allocate(
+        [low_support, high_support], max_positions=1
+    )
+
+    assert ranked[0]["candidate_id"] == "forced-high-support"
+    assert selected[0]["candidate_id"] == "forced-high-support"
 
 
 def test_forced_demo_score_penalizes_repeated_broker_negative_net_states():

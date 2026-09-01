@@ -1,0 +1,1 @@
+The proposal is not a trading or research strategy; it only reports an unsupported-model error and contains no actionable hypothesis, methodology, or measurable claim. It provides no validation plan, cost assumptions, holdout testing, or safety controls, so it cannot be evaluated or approved.

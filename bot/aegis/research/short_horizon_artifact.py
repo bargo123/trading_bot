@@ -31,12 +31,48 @@ from aegis.research_factory.ml_pipeline import MLPipeline, ModelConfig
 from aegis.intel.analogue_store import is_executable_capture_provenance
 from aegis.intel.trade_controller import TradeController
 from aegis.intel.trade_economics import wilson_lower_bound
+from aegis.intel.short_horizon_policy import (
+    MIN_CAPTURED_EXIT_LOSSES,
+    MIN_CAPTURED_EXIT_WIN_LCB95,
+    build_feature_provenance,
+)
 
 
 ARTIFACT_SCHEMA = "short_horizon_ensemble.v1"
-MIN_CAPTURED_EXIT_LOSSES = 5  # align with the repo's sampled-loss promotion standard
-MIN_CAPTURED_EXIT_WIN_LCB95 = 0.95
 FAST_GREEN_CEILING_S = 3
+FUTURE_FEATURE_PREFIXES = (
+    "pnl_", "green_", "captured_", "exit_", "future_", "time_to_",
+    "terminal_", "label_",
+)
+FUTURE_FEATURE_NAMES = frozenset(
+    {
+        "first_green", "first_profitable_executable_close",
+        "first_profitable_close_net_pnl", "immediate_adverse_move",
+        "winner_giveback", "never_green", "time_in_red_s",
+        "future_path_observed_n", "exit_policy", "exit_time_s",
+    }
+)
+
+
+def future_feature_aliases(feature_names: Sequence[Any]) -> list[str]:
+    """Return feature names that can only be known after the entry point."""
+    aliases: list[str] = []
+    for raw_name in feature_names:
+        name = str(raw_name).strip()
+        lowered = name.lower()
+        if lowered in FUTURE_FEATURE_NAMES or lowered.startswith(FUTURE_FEATURE_PREFIXES):
+            aliases.append(name)
+    return aliases
+
+
+def validate_point_in_time_feature_names(feature_names: Sequence[Any]) -> None:
+    """Fail closed if a trained artifact contains a post-entry outcome alias."""
+    aliases = future_feature_aliases(feature_names)
+    if aliases:
+        raise ValueError(
+            "short-horizon feature set contains future outcome alias: "
+            + ",".join(aliases[:10])
+        )
 
 
 @dataclass(frozen=True)
@@ -161,10 +197,14 @@ def _asof_index(times: np.ndarray, seconds: int) -> np.ndarray:
 
 
 def _epoch_seconds(values: pd.Series) -> np.ndarray:
-    # Explicitly normalize the pandas resolution; it may be seconds,
-    # milliseconds, microseconds, or nanoseconds depending on the source.
-    normalized = pd.to_datetime(values, utc=True).dt.as_unit("s")
-    return normalized.astype("int64").to_numpy(dtype=np.float64)
+    # Keep sub-second precision from MT5 ``time_msc``.  Truncating to whole
+    # seconds can make a quote observed late in a second appear earlier than
+    # the entry that used it, which corrupts short-horizon labels.
+    normalized = pd.to_datetime(values, utc=True, errors="coerce")
+    if normalized.isna().any():
+        raise ValueError("quote timestamps contain invalid values")
+    normalized_ns = normalized.dt.as_unit("ns")
+    return normalized_ns.astype("int64").to_numpy(dtype=np.float64) / 1_000_000_000.0
 
 
 def _feature_frame(
@@ -186,12 +226,17 @@ def _feature_frame(
         raise ValueError(f"no valid quotes for {symbol}")
     # One observation per second avoids overweighting bursts while preserving
     # genuine observed prices; no interpolation or forward fill is performed.
+    # Keep the actual timestamp of the last tick in each bucket.  Resample's
+    # default bucket label is the bucket start, which would move a late tick
+    # backwards in time and leak it into an earlier entry.
+    frame["_second"] = frame["time"].dt.floor("1s")
     frame = (
-        frame.set_index("time")
-        .resample("1s")[["bid", "ask"]]
-        .last()
-        .dropna()
-        .reset_index()
+        frame.sort_values("time", kind="stable")
+        .groupby("_second", sort=True, as_index=False)
+        .tail(1)
+        .sort_values("time", kind="stable")
+        .drop(columns="_second")
+        .reset_index(drop=True)
     )
     minimum_rows = max(DEFAULT_HORIZONS_S) + 20 if minimum_history_rows is None else int(minimum_history_rows)
     if len(frame) < max(minimum_rows, 2):
@@ -341,6 +386,9 @@ def build_quote_training_frame(
         raise ValueError("commission_round_trip_usd must be finite and non-negative")
     rows: list[dict[str, Any]] = []
     for symbol, quotes in sorted(quotes_by_symbol.items()):
+        symbol_usd_per_price_unit = float(
+            (usd_per_price_unit_by_symbol or {}).get(str(symbol).upper(), 1.0)
+        )
         features = _feature_frame(
             quotes,
             symbol,
@@ -351,11 +399,18 @@ def build_quote_training_frame(
         ask = features["ask"].to_numpy(dtype=float)
         mid = features["mid"].to_numpy(dtype=float)
         spreads = features["spread"].to_numpy(dtype=float)
+        # Geometry must be determined from information available at each
+        # entry.  A sample-wide median would let future spread changes alter
+        # an earlier label's harvest/abort thresholds.
+        spread_baseline = (
+            pd.Series(spreads)
+            .rolling(60, min_periods=1)
+            .median()
+            .to_numpy(dtype=float)
+        )
         # The executable entry/exit sides already include the observed spread.
         # Configured slippage is charged separately on both sides of the round
         # trip, matching the runner's round-trip-notional cost convention.
-        tail_threshold = max(float(np.nanmedian(spreads)) * 3.0, 1e-12)
-        harvest_threshold = max(float(np.nanmedian(spreads)) * 2.0, 1e-12)
         replay_controller = TradeController()
         eligible = np.flatnonzero(times <= times[-1] - max(horizon_values))
         if not len(eligible):
@@ -363,13 +418,23 @@ def build_quote_training_frame(
         sampled: list[int] = []
         last_time = None
         for index in eligible:
-            if last_time is None or int(times[index]) - int(last_time) >= int(sample_every_s):
+            if last_time is None or float(times[index]) - float(last_time) >= float(sample_every_s):
                 sampled.append(int(index))
-                last_time = int(times[index])
+                last_time = float(times[index])
         for index in sampled:
             for horizon in horizon_values:
-                end = int(np.searchsorted(times, times[index] + horizon, side="right") - 1)
-                if end <= index:
+                horizon_end = times[index] + float(horizon)
+                # Ticks retain their observed sub-second timestamps, so an
+                # exact timestamp at ``horizon_end`` is not expected.  Use the
+                # first quote at/after the endpoint, but only within the one
+                # second bucket represented by this downsampling.  A larger
+                # gap means the requested horizon is not fully observed.
+                end = int(np.searchsorted(times, horizon_end, side="left"))
+                if (
+                    end <= index
+                    or end >= len(times)
+                    or float(times[end] - horizon_end) > 1.0 + 1e-6
+                ):
                     continue
                 future_bid = bid[index + 1 : end + 1]
                 future_ask = ask[index + 1 : end + 1]
@@ -378,6 +443,11 @@ def build_quote_training_frame(
                     ("buy", future_bid - ask[index]),
                     ("sell", bid[index] - future_ask),
                 ):
+                    entry_spread_baseline = float(spread_baseline[index])
+                    if not np.isfinite(entry_spread_baseline):
+                        entry_spread_baseline = float(spreads[index])
+                    tail_threshold = max(entry_spread_baseline * 3.0, 1e-12)
+                    harvest_threshold = max(entry_spread_baseline * 2.0, 1e-12)
                     signed = np.asarray(raw_signed, dtype=float) - slippage_price
                     if not len(signed):
                         continue
@@ -422,9 +492,7 @@ def build_quote_training_frame(
                             pip_size=max(float(spreads[index]), 1e-12),
                             slippage_price=slippage_price,
                             commission_usd=commission_round_trip_usd,
-                            usd_per_price_unit=float(
-                                (usd_per_price_unit_by_symbol or {}).get(str(symbol).upper(), 1.0)
-                            ),
+                            usd_per_price_unit=symbol_usd_per_price_unit,
                         )
                         if shared_replay.get("status") != "REPLAYED":
                             continue
@@ -454,6 +522,10 @@ def build_quote_training_frame(
                         mae = float(shared_replay["mae_net_pnl"])
                         time_to_profit = shared_replay.get("time_to_green_s")
                     row = features.iloc[index].to_dict()
+                    return_denominator = float(mid[index]) * (
+                        symbol_usd_per_price_unit
+                        if shared_replay is not None else 1.0
+                    )
                     target = (
                         int(len(harvestable) > 0)
                         if target_mode == "fast_harvest"
@@ -489,19 +561,33 @@ def build_quote_training_frame(
                             # within the stated horizon, after spread.
                             "target": target,
                             "terminal_net_pnl": terminal,
-                            "terminal_return": terminal / float(mid[index]) if mid[index] > 0 else np.nan,
+                            "terminal_return": (
+                                terminal / return_denominator
+                                if return_denominator > 0 else np.nan
+                            ),
                             # The first-green harvest proxy is executable-side
                             # and cost-aware: take the first positive mark, or
                             # retain the terminal outcome when no green mark
                             # occurred within the horizon.
-                            "harvest_return": harvest / float(mid[index]) if mid[index] > 0 else np.nan,
+                            "harvest_return": (
+                                harvest / return_denominator
+                                if return_denominator > 0 else np.nan
+                            ),
                             "captured_exit_net_pnl": captured,
-                            "captured_exit_return": captured / float(mid[index]) if mid[index] > 0 else np.nan,
+                            "captured_exit_return": (
+                                captured / return_denominator
+                                if return_denominator > 0 else np.nan
+                            ),
                             "captured_exit_reason": captured_reason,
                             "captured_exit_action": (
                                 shared_replay.get("captured_exit_action")
                                 if shared_replay is not None else None
                             ),
+                            "usd_per_price_unit": (
+                                symbol_usd_per_price_unit
+                                if shared_replay is not None else 1.0
+                            ),
+                            "entry_notional_usd": return_denominator,
                             "captured_net_win": bool(captured > 0.0),
                             "captured_win_label": (
                                 int(captured > 0.0)
@@ -525,6 +611,14 @@ def build_quote_training_frame(
                             ),
                             "mfe": mfe,
                             "mae": mae,
+                            "mfe_return": (
+                                mfe / return_denominator
+                                if return_denominator > 0 else np.nan
+                            ),
+                            "mae_return": (
+                                mae / return_denominator
+                                if return_denominator > 0 else np.nan
+                            ),
                             "maximum_favorable_executable_move": mfe,
                             "maximum_adverse_executable_move": mae,
                             "time_to_peak_s": (
@@ -559,22 +653,52 @@ def build_quote_training_frame(
     return pd.DataFrame(rows).sort_values(["time", "symbol", "side", "horizon_s"], kind="stable").reset_index(drop=True)
 
 
+def _chronological_purge_seconds(frame: pd.DataFrame) -> float:
+    """Return the maximum forward label horizon used by ``frame``.
+
+    Labels observe quotes after entry, so a row at the end of one OOS split
+    can otherwise consume observations that belong to the next split.  The
+    maximum horizon is a conservative embargo that prevents that overlap for
+    every symbol and horizon in the frame.
+    """
+    if "horizon_s" not in frame.columns:
+        return 0.0
+    horizons = pd.to_numeric(frame["horizon_s"], errors="coerce").dropna()
+    if horizons.empty:
+        return 0.0
+    values = horizons.to_numpy(dtype=float)
+    if not np.isfinite(values).all() or (values < 0.0).any():
+        raise ValueError("horizon_s must be finite and non-negative")
+    return float(values.max())
+
+
 def chronological_slices(frame: pd.DataFrame) -> ChronologicalSlices:
     if frame.empty or "time" not in frame:
         raise ValueError("training frame requires time")
     ordered = frame.sort_values("time", kind="stable").reset_index(drop=True)
+    timestamps = pd.to_datetime(ordered["time"], utc=True, errors="coerce")
+    if timestamps.isna().any():
+        raise ValueError("training frame contains invalid timestamps")
+    ordered = ordered.assign(time=timestamps)
     unique_times = ordered["time"].drop_duplicates().sort_values().to_numpy()
     if len(unique_times) < 20:
         raise ValueError("insufficient distinct timestamps for chronological OOS")
     train_end = unique_times[max(0, int(len(unique_times) * 0.60) - 1)]
     validation_end = unique_times[max(0, int(len(unique_times) * 0.80) - 1)]
     test_end = unique_times[max(0, int(len(unique_times) * 0.90) - 1)]
+    purge = pd.Timedelta(seconds=_chronological_purge_seconds(ordered))
     train = ordered[ordered["time"] <= train_end].copy()
-    validation = ordered[(ordered["time"] > train_end) & (ordered["time"] <= validation_end)].copy()
-    test = ordered[(ordered["time"] > validation_end) & (ordered["time"] <= test_end)].copy()
-    sealed = ordered[ordered["time"] > test_end].copy()
+    validation = ordered[
+        (ordered["time"] > train_end + purge)
+        & (ordered["time"] <= validation_end)
+    ].copy()
+    test = ordered[
+        (ordered["time"] > validation_end + purge)
+        & (ordered["time"] <= test_end)
+    ].copy()
+    sealed = ordered[ordered["time"] > test_end + purge].copy()
     if min(map(len, (train, validation, test, sealed))) == 0:
-        raise ValueError("chronological slices must all be non-empty")
+        raise ValueError("chronological purge leaves an empty split")
     return ChronologicalSlices(train, validation, test, sealed)
 
 
@@ -585,7 +709,8 @@ def _model_frame(frame: pd.DataFrame) -> pd.DataFrame:
         "time", "symbol", "side", "mechanism", "label_provenance",
         "evidence_provenance", "label_target", "label_identity",
         "target", "terminal_net_pnl",
-        "terminal_return", "mfe", "mae", "tail_loss",
+        "terminal_return", "mfe", "mae", "mfe_return", "mae_return", "tail_loss",
+        "entry_notional_usd", "usd_per_price_unit",
         "harvest_return", "time_to_profit_s", "time_to_failure_s",
         "captured_exit_net_pnl", "captured_exit_return", "captured_exit_reason",
         "captured_exit_action",
@@ -594,9 +719,15 @@ def _model_frame(frame: pd.DataFrame) -> pd.DataFrame:
         "time_to_peak_s",
         "net_pnl", "captured_win_label", "spread_price", "commission_usd",
         "slippage_price", "slippage_bps", "time_to_first_net_green_s",
+        "time_to_first_net_green",
         "assumed_slippage_bps",
     }
-    columns = [column for column in frame.columns if column not in excluded]
+    columns = [
+        column for column in frame.columns
+        if column not in excluded
+        and str(column).lower() not in FUTURE_FEATURE_NAMES
+        and not str(column).lower().startswith(FUTURE_FEATURE_PREFIXES)
+    ]
     result = frame.loc[:, columns].copy()
     result["profit_barrier_first"] = frame["target"].astype(int)
     return result
@@ -694,18 +825,23 @@ def _metrics(prediction: Mapping[str, Any], frame: pd.DataFrame) -> dict[str, An
         captured_net,
     )
     selected_captured = captured[decision]
-    mfe_values = pd.to_numeric(
-        frame.get("mfe", pd.Series(np.nan, index=frame.index)), errors="coerce"
-    ).to_numpy(dtype=float)
-    mid_values = pd.to_numeric(
-        frame.get("mid", pd.Series(1.0, index=frame.index)), errors="coerce"
-    ).to_numpy(dtype=float)
-    mfe_return = np.divide(
-        mfe_values,
-        mid_values,
-        out=np.full(len(frame), np.nan, dtype=float),
-        where=np.isfinite(mid_values) & (np.abs(mid_values) > 1e-12),
-    )
+    if "mfe_return" in frame:
+        mfe_return = pd.to_numeric(frame["mfe_return"], errors="coerce").to_numpy(
+            dtype=float
+        )
+    else:
+        mfe_values = pd.to_numeric(
+            frame.get("mfe", pd.Series(np.nan, index=frame.index)), errors="coerce"
+        ).to_numpy(dtype=float)
+        mid_values = pd.to_numeric(
+            frame.get("mid", pd.Series(1.0, index=frame.index)), errors="coerce"
+        ).to_numpy(dtype=float)
+        mfe_return = np.divide(
+            mfe_values,
+            mid_values,
+            out=np.full(len(frame), np.nan, dtype=float),
+            where=np.isfinite(mid_values) & (np.abs(mid_values) > 1e-12),
+        )
     selected_mfe_return = mfe_return[decision]
     calibration_bins: list[dict[str, Any]] = []
     calibration_ece = 0.0
@@ -931,7 +1067,13 @@ def _select_threshold_for_prediction(
     min_model_agreement: float = 0.6,
     max_uncertainty: float = 1.0,
 ) -> tuple[float, dict[str, Any]]:
-    """Select a scope threshold from validation predictions only."""
+    """Select a scope threshold from validation predictions only.
+
+    Captured-exit thresholds must include the promotion minimum of observed
+    losses.  A threshold that selects only winners is not an executable edge:
+    it cannot estimate profit factor or tail loss and is prone to selection
+    bias, even when its confidence bound is positive.
+    """
     target = str(target_definition).strip().lower()
     if target == "captured_exit_replay":
         mean_key = "mean_captured_exit_return"
@@ -949,7 +1091,13 @@ def _select_threshold_for_prediction(
             max_uncertainty=max_uncertainty,
         )
         metrics = _metrics(prediction, frame)
-        if int(metrics.get("selected") or 0) >= int(min_selected):
+        enough_selected = int(metrics.get("selected") or 0) >= int(min_selected)
+        enough_losses = (
+            target != "captured_exit_replay"
+            or int(metrics.get("captured_exit_loss_count") or 0)
+            >= MIN_CAPTURED_EXIT_LOSSES
+        )
+        if enough_selected and enough_losses:
             candidates.append((float(threshold), metrics))
     if not candidates:
         threshold = 0.5
@@ -982,6 +1130,7 @@ def _execution_status(
     *,
     target_definition: str,
     decision_horizon_s: int,
+    validation_metrics: Mapping[str, Any] | None = None,
     test_metrics: Mapping[str, Any],
     sealed_metrics: Mapping[str, Any],
     sealed_by_horizon: Mapping[str, Mapping[str, Any]],
@@ -1029,6 +1178,18 @@ def _execution_status(
         except (TypeError, ValueError):
             return False
 
+    if not positive(validation_metrics):
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", (
+            "validation_captured_exit_oos_not_positive"
+        )
+    if not positive_lcb(validation_metrics):
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", (
+            "validation_captured_exit_oos_lcb95_not_positive"
+        )
+    if not enough_losses(validation_metrics):
+        return "SHADOW_ONLY_NO_POSITIVE_OOS", (
+            "insufficient_validation_captured_exit_loss_evidence"
+        )
     if not positive(test_metrics) or not positive(sealed_metrics):
         return "SHADOW_ONLY_NO_POSITIVE_OOS", (
             "test_or_sealed_captured_exit_oos_not_positive"
@@ -1159,6 +1320,7 @@ def train_and_publish(
 ) -> dict[str, Any]:
     """Train, evaluate, and publish only a calibrated positive-OOS artifact."""
     slices = chronological_slices(frame)
+    purge_seconds = _chronological_purge_seconds(frame)
     train_frame = _model_frame(slices.train)
     validation_frame = _model_frame(slices.validation)
     configs = [
@@ -1168,6 +1330,13 @@ def train_and_publish(
     ]
     pipeline = MLPipeline(configs=configs, random_seed=42)
     pipeline.train(train_frame, validation_frame)
+    # Keep the estimator and every per-model feature list under the same
+    # point-in-time contract as ``_model_frame``.  This guard catches future
+    # label columns introduced by a later pipeline change before any artifact
+    # files are written.
+    validate_point_in_time_feature_names(pipeline.feature_names)
+    for model in pipeline.models:
+        validate_point_in_time_feature_names(model.feature_names)
 
     def evaluate(
         part: pd.DataFrame,
@@ -1214,7 +1383,13 @@ def train_and_publish(
             ),
             slices.validation,
         )
-        if int(metrics["selected"] or 0) >= min_selected:
+        enough_selected = int(metrics["selected"] or 0) >= min_selected
+        enough_losses = (
+            str(target_definition).strip().lower() != "captured_exit_replay"
+            or int(metrics.get("captured_exit_loss_count") or 0)
+            >= MIN_CAPTURED_EXIT_LOSSES
+        )
+        if enough_selected and enough_losses:
             candidates.append((float(threshold), metrics))
     if candidates:
         threshold, validation_metrics = max(
@@ -1315,6 +1490,7 @@ def train_and_publish(
     execution_status, execution_status_reason = _execution_status(
         target_definition=target_definition,
         decision_horizon_s=selected_decision_horizon,
+        validation_metrics=validation_metrics,
         test_metrics=test_metrics,
         sealed_metrics=sealed_metrics,
         sealed_by_horizon=sealed_by_horizon,
@@ -1420,6 +1596,14 @@ def train_and_publish(
             "decision_horizon_s": int(selected_decision_horizon),
             "decision_horizon_selection": horizon_selection_reason,
             "target_definition": str(target_definition),
+            "oos_split_policy": {
+                "schema": "chronological_forward_horizon_purge.v1",
+                "purge_seconds": purge_seconds,
+                "description": (
+                    "each later split starts after the prior split boundary "
+                    "plus the maximum forward label horizon"
+                ),
+            },
             "mechanisms": sorted(
                 {
                     str(value).strip().lower()
@@ -1457,9 +1641,19 @@ def train_and_publish(
             "symbols": sorted(frame["symbol"].astype(str).str.upper().unique().tolist()),
             "authorized_symbols": authorized_symbols,
             "model_count": len(pipeline.models),
+            "feature_provenance": build_feature_provenance(pipeline.feature_names),
+            "feature_leakage_audit": {
+                "schema": "point_in_time_feature_exclusion.v1",
+                "status": "PASS",
+                "excluded_prefixes": list(FUTURE_FEATURE_PREFIXES),
+                "excluded_names": sorted(FUTURE_FEATURE_NAMES),
+                "feature_count": len(pipeline.feature_names),
+                "future_aliases_found": future_feature_aliases(pipeline.feature_names),
+            },
             "promotion_policy": {
                 "min_captured_exit_losses": MIN_CAPTURED_EXIT_LOSSES,
                 "min_captured_exit_win_lcb95": MIN_CAPTURED_EXIT_WIN_LCB95,
+                "requires_positive_validation_oos": True,
                 "requires_positive_test_and_sealed_lcb95": True,
                 "requires_captured_win_rate_lcb95": True,
             },
@@ -1492,6 +1686,12 @@ def train_and_publish(
                 "DECISION_HORIZON": int(selected_decision_horizon),
                 "OOS_TEST_N": test_metrics.get("n"),
                 "OOS_SEALED_N": sealed_metrics.get("n"),
+                "OOS_VALIDATION_CAPTURED_EXPECTANCY": validation_metrics.get(
+                    "mean_captured_exit_return"
+                ),
+                "OOS_VALIDATION_CAPTURED_EV_LCB95": validation_metrics.get(
+                    "captured_exit_lcb95_return"
+                ),
                 "OOS_PRECISION": sealed_metrics.get("precision"),
                 "OOS_CAPTURED_EXPECTANCY": sealed_metrics.get("mean_captured_exit_return"),
                 "OOS_CAPTURED_PF": sealed_metrics.get("captured_exit_profit_factor"),

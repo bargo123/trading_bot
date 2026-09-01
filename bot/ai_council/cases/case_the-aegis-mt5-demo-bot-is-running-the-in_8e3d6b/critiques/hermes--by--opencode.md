@@ -1,0 +1,1 @@
+This is not a proposal: it provides no hypothesis, methodology, validation criteria, or measurable trading impact. The unsupported-model error must be resolved with an approved, available model and logged failure handling before any Council output can be evaluated.

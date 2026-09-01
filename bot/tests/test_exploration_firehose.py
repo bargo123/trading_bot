@@ -262,6 +262,78 @@ def test_tiny_fixed_risk_sizing_rejects_when_min_lot_exceeds_budget():
     assert tick["allowed"] is False
 
 
+@pytest.mark.parametrize("bad_tick", [-1.0, float("nan"), float("inf")])
+def test_exploration_sizing_never_uses_invalid_tick_value_as_negative_risk(bad_tick):
+    result = risk_lots_for_exploration(
+        max_risk_usd=0.15, entry=1.1000, invalidation=1.0950,
+        pip=0.0001, contract_size=100000.0,
+        tick_value=bad_tick, tick_size=0.00001,
+        volume_min=0.01, volume_step=0.01,
+    )
+    assert result["allowed"] is False
+    assert result["reason"] == "exploration_min_lot_exceeds_risk_budget"
+
+
+def test_firehose_final_sizing_uses_conservative_broker_loss_tick_value():
+    """Preview and final exploration sizing must use the same worst-case tick."""
+    from aegis.intel.firehose_brain import _exploration_sizing_kwargs
+
+    kwargs = _exploration_sizing_kwargs({
+        "trade_contract_size": 100000.0,
+        "trade_tick_size": 0.00001,
+        "trade_tick_value": 0.95,
+        "trade_tick_value_profit": 0.98,
+        "trade_tick_value_loss": -1.02,
+        "volume_min": 0.01,
+        "volume_step": 0.01,
+    })
+    assert kwargs["tick_value"] == pytest.approx(1.02)
+    assert kwargs["tick_size"] == pytest.approx(0.00001)
+    assert kwargs["volume_min"] == pytest.approx(0.01)
+
+
+@pytest.mark.parametrize(
+    ("changes", "reason"),
+    [
+        ({"max_risk_usd": float("nan")}, "exploration_invalid_risk_budget"),
+        ({"max_risk_usd": -0.15}, "exploration_invalid_risk_budget"),
+        ({"entry": float("nan")}, "exploration_invalid_geometry"),
+        ({"pip": float("nan")}, "exploration_invalid_geometry"),
+        ({"volume_min": float("nan")}, "exploration_invalid_volume_spec"),
+        ({"volume_step": 0.0}, "exploration_invalid_volume_spec"),
+    ],
+)
+def test_exploration_sizing_rejects_nonfinite_or_invalid_inputs(changes, reason):
+    inputs = {
+        "max_risk_usd": 0.15,
+        "entry": 1.1000,
+        "invalidation": 1.0999,
+        "pip": 0.0001,
+        "contract_size": 100000.0,
+        "volume_min": 0.01,
+        "volume_step": 0.01,
+    }
+    inputs.update(changes)
+    result = risk_lots_for_exploration(**inputs)
+    assert result["allowed"] is False
+    assert result["reason"] == reason
+    assert result["lots"] == 0.0
+
+
+def test_exploration_sizing_aligns_minimum_lot_to_broker_step():
+    result = risk_lots_for_exploration(
+        max_risk_usd=1.0,
+        entry=1.1000,
+        invalidation=1.0999,
+        pip=0.0001,
+        contract_size=100000.0,
+        volume_min=0.01,
+        volume_step=0.10,
+    )
+    assert result["allowed"] is True
+    assert result["lots"] == pytest.approx(0.10)
+
+
 # ---------------------------------------------------------------------------
 # Brain-level exploration integration
 # ---------------------------------------------------------------------------
@@ -462,6 +534,206 @@ def test_brain_fires_registered_exploration_on_unvalidated_state(tmp_path):
     )
     assert blocked_result is None
     assert blocked_skip == 'exploration_economics_rejected:fast_loser_state_suppressed'
+
+
+def test_book_journal_cache_preserves_exact_candidate_identity(monkeypatch):
+    from aegis.intel import firehose_brain as firehose_brain_module
+
+    brain = object.__new__(firehose_brain_module.IntelligentFirehoseBrain)
+    brain.cfg = {"watcher_runtime_enabled": True}
+    calls = []
+
+    def advisory(**kwargs):
+        calls.append((kwargs["side"], kwargs["mechanism"], kwargs["horizon_s"]))
+        return {"status": "AVAILABLE"}
+
+    def rows(advisory, *, side, **kwargs):
+        return [{"signal_side": str(side).upper()}]
+
+    monkeypatch.setattr(brain, "_watcher_advisory", advisory)
+    monkeypatch.setattr(firehose_brain_module, "book_signal_rows", rows)
+    cache = {}
+    common = {
+        "symbol": "EURUSD",
+        "mechanism": "micro_momentum",
+        "horizon_s": 3,
+        "runtime_state": {},
+        "row": None,
+        "quote_buffer": None,
+        "actual_bid": 1.1,
+        "actual_ask": 1.1001,
+        "now_ts": 1.0,
+        "cache": cache,
+    }
+
+    buy_first = brain._book_journal_for_candidate(side="buy", **common)
+    buy_second = brain._book_journal_for_candidate(side="buy", **common)
+    sell = brain._book_journal_for_candidate(side="sell", **common)
+
+    assert buy_first["book_support_score"] == pytest.approx(1.0)
+    assert buy_second == buy_first
+    assert sell["book_support_score"] == pytest.approx(1.0)
+    assert calls == [("buy", "micro_momentum", 3), ("sell", "micro_momentum", 3)]
+
+
+def test_viable_candidate_carries_bundle_book_support_when_watcher_is_off(tmp_path, monkeypatch):
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    monkeypatch.setattr(
+        IntelligentFirehoseBrain,
+        "execution_bundle_prediction",
+        lambda self, **kwargs: {
+            "probability": 0.80,
+            "decision": True,
+            "abstain": False,
+            "calibration_status": "calibrated",
+            "threshold": 0.55,
+            "expected_net_pnl": 0.02,
+            "expected_net_pnl_lcb95": 0.005,
+            "prediction_fusion": {"book_support_score": 0.90},
+        },
+    )
+    monkeypatch.setattr(
+        IntelligentFirehoseBrain,
+        "_book_journal_for_candidate",
+        lambda self, **kwargs: {},
+    )
+
+    result, skip = _run_forced_demo_brain(
+        tmp_path,
+        monkeypatch,
+        [_forced_candidate()],
+        evidence=_PositiveEvidence(),
+    )
+
+    assert result is not None, skip
+    row = result.journal["viable_candidates"][0]
+    assert row["book_support_score"] == pytest.approx(0.90)
+    assert row["prediction_fusion"]["book_support_score"] == pytest.approx(0.90)
+
+
+def test_each_viable_candidate_carries_its_own_book_support_score(tmp_path, monkeypatch):
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    def book_journal(self, **kwargs):
+        score = 0.80 if int(kwargs["horizon_s"]) == 3 else 0.20
+        return {
+            "watcher_advisory": {"side": str(kwargs["side"]).upper()},
+            "book_signal_rows": [],
+            "book_support_score": score,
+        }
+
+    monkeypatch.setattr(IntelligentFirehoseBrain, "_book_journal_for_candidate", book_journal)
+    monkeypatch.setattr(
+        "aegis.intel.analogue_store.AnalogueStore.query",
+        lambda self, **kwargs: _PositiveEvidence(),
+    )
+    second = _forced_candidate()
+    second.max_hold_s = 10
+    second.variant_id = "forced_test_mechanism:buy:10s"
+    result, skip = _run_forced_demo_brain(
+        tmp_path,
+        monkeypatch,
+        [_forced_candidate(side="buy"), second],
+        evidence=_PositiveEvidence(),
+    )
+
+    assert result is not None, skip
+    rows = {int(row["horizon_s"]): row for row in result.journal["viable_candidates"]}
+    assert rows[3]["book_support_score"] == pytest.approx(0.80)
+    assert rows[10]["book_support_score"] == pytest.approx(0.20)
+
+
+def test_rapid_selector_uses_book_support_for_equal_authoritative_ties(tmp_path, monkeypatch):
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    monkeypatch.setattr(
+        "aegis.intel.analogue_store.AnalogueStore.query",
+        lambda self, **kwargs: _PositiveEvidence(),
+    )
+
+    def book_journal(self, **kwargs):
+        score = 0.90 if int(kwargs["horizon_s"]) == 10 else 0.10
+        return {"book_signal_rows": [], "book_support_score": score}
+
+    monkeypatch.setattr(IntelligentFirehoseBrain, "_book_journal_for_candidate", book_journal)
+    lower_book = _forced_candidate()
+    higher_book = _forced_candidate()
+    higher_book.max_hold_s = 10
+    higher_book.variant_id = "forced_test_mechanism:buy:10s"
+
+    result, skip = _run_forced_demo_brain(
+        tmp_path,
+        monkeypatch,
+        [lower_book, higher_book],
+        evidence=_PositiveEvidence(),
+    )
+
+    assert result is not None, skip
+    assert result.journal["variant_id"] == higher_book.variant_id
+    assert result.journal["book_support_score"] == pytest.approx(0.90)
+
+
+def test_rapid_selector_keeps_better_executable_ev_ahead_of_book_support(
+    tmp_path, monkeypatch,
+):
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    monkeypatch.setattr(
+        "aegis.intel.analogue_store.AnalogueStore.query",
+        lambda self, **kwargs: _PositiveEvidence(),
+    )
+
+    def book_journal(self, **kwargs):
+        score = 0.10 if int(kwargs["horizon_s"]) == 10 else 0.99
+        return {"book_signal_rows": [], "book_support_score": score}
+
+    monkeypatch.setattr(IntelligentFirehoseBrain, "_book_journal_for_candidate", book_journal)
+    lower_ev = _forced_candidate(target_pips=5.0)
+    higher_ev = _forced_candidate(target_pips=10.0)
+    higher_ev.max_hold_s = 10
+    higher_ev.variant_id = "forced_test_mechanism:buy:10s"
+
+    result, skip = _run_forced_demo_brain(
+        tmp_path,
+        monkeypatch,
+        [lower_ev, higher_ev],
+        evidence=_PositiveEvidence(),
+    )
+
+    assert result is not None, skip
+    assert result.journal["variant_id"] == higher_ev.variant_id
+    assert result.journal["book_support_score"] == pytest.approx(0.10)
+
+
+def test_rapid_journal_declares_github_and_books_only_scope(tmp_path, monkeypatch):
+    from aegis.intel.firehose_brain import IntelligentFirehoseBrain
+
+    monkeypatch.setattr(
+        IntelligentFirehoseBrain,
+        "_book_journal_for_candidate",
+        lambda self, **kwargs: {
+            "book_signal_rows": [],
+            "book_support_score": 0.75,
+        },
+    )
+
+    result, skip = _run_forced_demo_brain(
+        tmp_path,
+        monkeypatch,
+        [_forced_candidate()],
+        evidence=_PositiveEvidence(),
+    )
+
+    assert result is not None, skip
+    assert result.journal["prediction_scope"] == "GITHUB_TOOLS_AND_BOOK_ALGORITHMS_ONLY"
+    assert result.journal["council_influence"] is False
+    assert result.journal["research_factory_influence"] is False
+    assert result.journal["book_ranking_role"] == (
+        "secondary_tiebreak_after_capture_confidence_and_ev"
+    )
+    row = result.journal["viable_candidates"][0]
+    assert row["prediction_scope"] == result.journal["prediction_scope"]
 
 
 def _exploration_frame(n=400):
@@ -1628,29 +1900,25 @@ def test_exploration_brain_forwards_runtime_checkpoint_without_changing_decision
     ]
 
 
-def test_mt5_demo_forced_lane_fires_for_evidence_collection(tmp_path, monkeypatch):
-    # forced_demo_lane exists to collect evidence even without probability data.
-    # Fix 3 allows inner loop to proceed to forced_pool instead of hard-continuing.
+def test_mt5_demo_missing_probability_remains_candidate_abstain(tmp_path, monkeypatch):
     result, skip = _run_forced_demo_brain(
         tmp_path, monkeypatch, [_forced_candidate()]
     )
 
-    assert skip is None
-    assert result is not None and result.action == "fire"
-    assert result.journal.get("exploration_authority") == "FORCED_DEMO_EXPLORATION"
-    assert result.journal.get("calibration_status") == "UNCALIBRATED"
+    assert result is None
+    assert skip == "exploration_economics_rejected:no_win_probability_evidence"
 
 
 
 
-def test_forced_demo_lane_accepts_evidence_collection_without_probability(tmp_path, monkeypatch):
+def test_demo_exploration_never_manufactures_authority_without_probability(tmp_path, monkeypatch):
     result, skip = _run_forced_demo_brain(
         tmp_path, monkeypatch, [_forced_candidate()]
     )
 
-    assert skip is None
-    assert result is not None and result.action == "fire"
-    assert result.journal.get("exploration_authority") == "FORCED_DEMO_EXPLORATION"
+    assert result is None
+    assert skip is not None
+    assert "no_win_probability_evidence" in skip
 
 
 

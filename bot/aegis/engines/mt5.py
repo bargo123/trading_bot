@@ -823,6 +823,8 @@ class MT5Engine(BrokerEngine):
             return "refusing mutation outside mode=mt5_demo"
         if "paper_trading_enabled" in self.cfg and not bool(self.cfg.get("paper_trading_enabled")):
             return "refusing mutation when paper_trading_enabled is false"
+        if bool(self.cfg.get("dry_run", False)):
+            return "refusing mutation when dry_run is true"
         info = self._api().account_info()
         if info is None or not bool(getattr(info, "trade_expert", False)):
             return "refusing mutation: account trade_expert is not enabled"

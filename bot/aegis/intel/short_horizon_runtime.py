@@ -8,6 +8,7 @@ confidence.
 from __future__ import annotations
 
 from pathlib import Path
+import math
 from typing import Any, Mapping
 
 import pandas as pd
@@ -19,11 +20,15 @@ from aegis.research.short_horizon import (
     mechanism_features,
     point_in_time_features,
 )
-from aegis.research.short_horizon_artifact import (
+from aegis.intel.short_horizon_policy import (
     MIN_CAPTURED_EXIT_LOSSES,
     MIN_CAPTURED_EXIT_WIN_LCB95,
+    validate_feature_provenance,
 )
-from aegis.research_factory.ml_pipeline import MLPipeline
+from aegis.intel.runtime_ensemble import (
+    RuntimeMLPipeline as MLPipeline,
+    future_feature_aliases,
+)
 
 
 SHORT_HORIZON_ARTIFACT_SCHEMA = "short_horizon_ensemble.v1"
@@ -124,8 +129,16 @@ def execution_candidate_has_current_promotion_policy(metadata: Mapping[str, Any]
 class ShortHorizonPredictor:
     """Runtime-only wrapper around a validated local calibrated ensemble."""
 
-    def __init__(self, artifact_path: Path) -> None:
+    def __init__(
+        self,
+        artifact_path: Path,
+        *,
+        expected_slippage_bps: float | None = None,
+        expected_commission_round_trip_usd: float | None = None,
+    ) -> None:
         self.artifact_path = Path(artifact_path)
+        self.expected_slippage_bps = expected_slippage_bps
+        self.expected_commission_round_trip_usd = expected_commission_round_trip_usd
         self.pipeline: MLPipeline | None = None
         self.metadata: dict[str, Any] = {}
         self.status = "missing_artifact"
@@ -139,7 +152,13 @@ class ShortHorizonPredictor:
             cfg.get("short_horizon_model_path"),
             BOT_ROOT / "intel" / "short_horizon_model",
         )
-        return cls(path)
+        return cls(
+            path,
+            expected_slippage_bps=float(cfg.get("slippage_bps", 0.0) or 0.0),
+            expected_commission_round_trip_usd=float(
+                cfg.get("commission_round_trip_usd", 0.0) or 0.0
+            ),
+        )
 
     def _load(self) -> None:
         metadata_path = self.artifact_path / "metadata.json"
@@ -162,6 +181,45 @@ class ShortHorizonPredictor:
             if missing:
                 self.status, self.reason = "invalid_artifact", "missing:" + ",".join(missing)
                 return
+            configured_costs = (
+                (self.expected_slippage_bps, "assumed_slippage_bps"),
+                (
+                    self.expected_commission_round_trip_usd,
+                    "assumed_commission_round_trip_usd",
+                ),
+            )
+            for expected, metadata_key in configured_costs:
+                if expected is None:
+                    continue
+                try:
+                    expected_value = float(expected)
+                    artifact_value = float(metadata.get(metadata_key, 0.0) or 0.0)
+                except (TypeError, ValueError, OverflowError):
+                    self.status, self.reason = "invalid_artifact", "artifact_cost_assumption_invalid"
+                    return
+                if (
+                    not math.isfinite(expected_value)
+                    or expected_value < 0.0
+                    or not math.isfinite(artifact_value)
+                    or artifact_value < expected_value
+                ):
+                    self.status, self.reason = (
+                        "invalid_artifact",
+                        "artifact_cost_assumption_understated",
+                    )
+                    return
+            feature_names = metadata.get("feature_names")
+            if isinstance(feature_names, list) and future_feature_aliases(feature_names):
+                self.status, self.reason = "invalid_artifact", "future_feature_alias"
+                return
+            if isinstance(feature_names, list):
+                try:
+                    validate_feature_provenance(
+                        metadata.get("feature_provenance"), feature_names
+                    )
+                except ValueError:
+                    self.status, self.reason = "invalid_artifact", "feature_provenance_invalid"
+                    return
             try:
                 artifact_horizons = {int(value) for value in metadata["horizons_s"]}
             except (TypeError, ValueError):
@@ -243,7 +301,13 @@ class ShortHorizonPredictor:
             )
         except Exception as exc:  # fail closed on corrupt/incompatible artifacts
             self.pipeline = None
-            self.status, self.reason = "invalid_artifact", type(exc).__name__
+            self.status = "invalid_artifact"
+            self.reason = (
+                "future_feature_alias"
+                if isinstance(exc, ValueError)
+                and "future outcome alias" in str(exc).lower()
+                else type(exc).__name__
+            )
 
     def snapshot(self) -> dict[str, Any]:
         proof = self.metadata.get("runtime_proof")

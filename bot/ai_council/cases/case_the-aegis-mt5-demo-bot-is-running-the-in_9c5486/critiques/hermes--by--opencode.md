@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal, so it contains no testable hypothesis, metrics, validation plan, or safety controls. Treating it as strategy evidence would be unmeasurable and invalid; resolve model availability through supported configuration before any council evaluation.

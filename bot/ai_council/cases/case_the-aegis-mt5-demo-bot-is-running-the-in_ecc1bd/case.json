@@ -1,0 +1,114 @@
+{
+  "created_utc": "2026-08-28T19:19:58.224992+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ecc1bd\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 15.2,
+          "finished_utc": "2026-08-28T19:22:27.745579+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-28T19:22:12.550211+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T19:22:27.749582+00:00",
+        "text": "This is an API compatibility error, not a research proposal with testable trading logic. It provides no hypothesis, data, validation plan, cost assumptions, or safety controls, so no performance or risk claim can be evaluated."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ecc1bd\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 9.42,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T19:22:37.187081+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-28T19:23:07.406445+00:00",
+    "decision": "no_change",
+    "evidence": {
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 1,
+      "reason": "NO_ROBUST_CANDIDATE"
+    },
+    "rationale": "REAL: none of the proposals is a falsifiable, measurable candidate"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_ecc1bd",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ecc1bd\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 9.44,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T19:20:18.046004+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ecc1bd\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 16.2,
+        "finished_utc": "2026-08-28T19:20:53.416714+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T19:20:37.217290+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T19:20:53.419715+00:00",
+      "text": "Test a stricter validated-state entry filter requiring at least 20 recent, cost-adjusted analogue outcomes before a setup is eligible. Compare it on sealed holdouts against the current gate, requiring higher net expectancy and no increase in maximum drawdown. Reject the candidate unless both criteria hold across all evaluated symbols."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ecc1bd\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 9.25,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T19:22:46.460529+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    }
+  },
+  "status": "decided"
+}

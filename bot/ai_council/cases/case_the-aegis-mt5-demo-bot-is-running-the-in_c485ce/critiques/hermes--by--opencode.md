@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal, so it contains no hypothesis, methodology, metrics, or validation plan to evaluate. It provides no evidence that a model fallback is safe, supported, or reproducible, and any automated retry or substitution must be explicitly validated to avoid silently degrading Council research quality.

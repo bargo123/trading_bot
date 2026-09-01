@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal with testable trading logic. It provides no hypothesis, data, validation plan, cost assumptions, or safety controls, so no performance or risk claim can be evaluated.

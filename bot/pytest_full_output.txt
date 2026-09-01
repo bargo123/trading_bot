@@ -1,0 +1,78 @@
+........................................................................ [  2%]
+........................................................................ [  4%]
+........................................................................ [  7%]
+...F.................................................................... [  9%]
+........................................................................ [ 11%]
+........................................................................ [ 14%]
+........................................................................ [ 16%]
+....................FFF................................................. [ 18%]
+........................................................................ [ 21%]
+........................................................................ [ 23%]
+........................................................................ [ 26%]
+........................................................................ [ 28%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 35%]
+........................................................................ [ 37%]
+........................................................................ [ 40%]
+........................................................................ [ 42%]
+........................................................................ [ 45%]
+........................................................................ [ 47%]
+........................................................................ [ 49%]
+........................................................................ [ 52%]
+........................................................................ [ 54%]
+........................................................................ [ 56%]
+........................................................................ [ 59%]
+........................................................................ [ 61%]
+........................................................................ [ 64%]
+........................................................................ [ 66%]
+........................................................................ [ 68%]
+........................................................................ [ 71%]
+........................................................................ [ 73%]
+........................................................................ [ 75%]
+........................................................................ [ 78%]
+........................................................................ [ 80%]
+........................................................................ [ 83%]
+........................................................................ [ 85%]
+........................................................................ [ 87%]
+........................................................................ [ 90%]
+........................................................................ [ 92%]
+........................................................................ [ 94%]
+........................................................................ [ 97%]
+........................................................................ [ 99%]
+............                                                             [100%]
+================================== FAILURES ===================================
+________ test_brain_fires_registered_exploration_on_unvalidated_state _________
+tests\test_exploration_firehose.py:391: in test_brain_fires_registered_exploration_on_unvalidated_state
+    low_result, low_skip = brain._maybe_explore(
+aegis\intel\firehose_brain.py:2110: in _maybe_explore
+    self.experiments.save()
+aegis\intel\exploration.py:135: in save
+    tmp.replace(self.path)
+..\..\..\AppData\Local\Programs\Python\Python312\Lib\pathlib.py:1376: in replace
+    os.replace(self, target)
+E   PermissionError: [WinError 5] Access is denied: 'C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\exploration_experiments.tmp' -> 'C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\exploration_experiments.json'
+____ test_brain_journals_watcher_advisory_without_granting_order_authority ____
+tests\test_firehose_watcher_integration.py:148: in test_brain_journals_watcher_advisory_without_granting_order_authority
+    monkeypatch.setattr(
+E   AttributeError: <module 'aegis.intel.firehose_brain' from 'C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\aegis\\intel\\firehose_brain.py'> has no attribute 'watcher_advisory_for_firehose'
+________ test_brain_watcher_helper_preserves_final_candidate_identity _________
+tests\test_firehose_watcher_integration.py:206: in test_brain_watcher_helper_preserves_final_candidate_identity
+    monkeypatch.setattr(
+E   AttributeError: <module 'aegis.intel.firehose_brain' from 'C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\aegis\\intel\\firehose_brain.py'> has no attribute 'watcher_advisory_for_firehose'
+_____________ test_brain_watcher_helper_rejects_authority_claims ______________
+tests\test_firehose_watcher_integration.py:237: in test_brain_watcher_helper_rejects_authority_claims
+    monkeypatch.setattr(
+E   AttributeError: <module 'aegis.intel.firehose_brain' from 'C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\aegis\\intel\\firehose_brain.py'> has no attribute 'watcher_advisory_for_firehose'
+============================== warnings summary ===============================
+tests/test_ibkr_order_hygiene.py::test_bracket_sets_explicit_tif_and_atomic_transmit_chain
+  C:\Users\Zaid barghouthi\Desktop\trading_bot\.venv\Lib\site-packages\eventkit\util.py:21: DeprecationWarning: There is no current event loop
+    return asyncio.get_event_loop_policy().get_event_loop()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_exploration_firehose.py::test_brain_fires_registered_exploration_on_unvalidated_state
+FAILED tests/test_firehose_watcher_integration.py::test_brain_journals_watcher_advisory_without_granting_order_authority
+FAILED tests/test_firehose_watcher_integration.py::test_brain_watcher_helper_preserves_final_candidate_identity
+FAILED tests/test_firehose_watcher_integration.py::test_brain_watcher_helper_rejects_authority_claims
+4 failed, 3032 passed, 1 warning in 199.40s (0:03:19)

@@ -12,7 +12,8 @@ and keeps the research loop moving with bounded scope:
   - fast-exit with NO_NEW_EVIDENCE when nothing meaningful changed
 
 It never places orders, never touches live YAML, and never promotes a champion;
-promotion is reserved for the full /aegis-cycle run.
+promotion is reserved for the full /aegis-cycle run. Council review is an
+explicit manual opt-in and is never part of the recurring default loop.
 
 Windows 24/7 hardening:
   - singleton lock (record CYCLE_ALREADY_RUNNING and exit if already running)
@@ -42,6 +43,14 @@ EXIT_RESEARCH_EVERY_N = 6  # ~every 2h
 
 REPORTS = BOT / "reports" / "research"
 CYCLE_STATUS = REPORTS / "aegis_cycle_status.md"
+FAST_EDGE_LEADERBOARD = REPORTS / "fast_edge_leaderboard.json"
+FAST_EDGE_SHADOW_ROWS = REPORTS / "fast_edge_shadow_rows.jsonl"
+EXTERNAL_DAG_MANIFEST = REPORTS / "external_dag_manifest.json"
+SELECTED_STRATEGY_REPLAY = REPORTS / "selected_strategy_replay.json"
+EXTERNAL_DAG_STATUS = REPORTS / "external_dag_status.json"
+EXTERNAL_DAG_ARTIFACTS = BOT / "research" / "external_dag" / "artifacts"
+EXTERNAL_DAG_REGISTRY = BOT / "research" / "experiments.sqlite"
+EXTERNAL_DAG_BUNDLE = BOT / "intel" / "execution_bundle.json"
 BOOK_MEMORY_REPORT = REPORTS / "book_memory.json"
 OUTCOME_REPORT = REPORTS / "outcome_learning.json"
 ML_REPORT = REPORTS / "ml_pipeline.json"
@@ -118,6 +127,63 @@ def _run_script(name: str, *extra: str, timeout_s: int = 900) -> dict[str, Any]:
     except subprocess.TimeoutExpired:
         return {"ok": False, "returncode": -1, "elapsed_s": round(time.time() - started, 1),
                 "timeout": True, "stdout_json": None}
+
+
+def _run_external_dag(tick: int) -> dict[str, Any]:
+    """Refresh the GitHub/book research DAG outside the broker hot path."""
+    disabled = os.environ.get("AEGIS_EXTERNAL_DAG_ENABLED", "1").strip().lower()
+    if disabled in {"0", "false", "no", "off"}:
+        return {"ok": True, "skipped": "disabled"}
+    if not FAST_EDGE_LEADERBOARD.is_file() or not FAST_EDGE_SHADOW_ROWS.is_file():
+        return {"ok": True, "skipped": "source_inputs_missing"}
+    # The generic model leaderboard is not an exact strategy selection.  Do
+    # not let the external DAG run with selected_strategy_count=0; require the
+    # bounded, explicit-selected replay artifact produced by the focused
+    # validation step.
+    if not SELECTED_STRATEGY_REPLAY.is_file():
+        return {
+            "ok": False,
+            "stage": "selected_replay",
+            "reason": "selected_strategy_replay_missing",
+            "path": str(SELECTED_STRATEGY_REPLAY),
+        }
+
+    manifest = _run_script(
+        "build_external_dag_manifest.py",
+        "--report", str(FAST_EDGE_LEADERBOARD),
+        "--rows", str(FAST_EDGE_SHADOW_ROWS),
+        "--output", str(EXTERNAL_DAG_MANIFEST),
+        "--selected-replay", str(SELECTED_STRATEGY_REPLAY),
+        timeout_s=300,
+    )
+    if not manifest.get("ok"):
+        return {"ok": False, "stage": "manifest", "manifest": manifest}
+
+    run_id = (
+        f"github-books-watcher-{int(tick)}-"
+        f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+    )
+    dag = _run_script(
+        "run_external_research_dag.py",
+        "--dataset-manifest", str(EXTERNAL_DAG_MANIFEST),
+        "--run-id", run_id,
+        "--artifact-root", str(EXTERNAL_DAG_ARTIFACTS),
+        "--registry", str(EXTERNAL_DAG_REGISTRY),
+        "--status-path", str(EXTERNAL_DAG_STATUS),
+        "--execution-bundle-path", str(EXTERNAL_DAG_BUNDLE),
+        "--max-workers", "4",
+        "--timeout-s", "60",
+        timeout_s=900,
+    )
+    summary = dag.get("stdout_json") or {}
+    return {
+        "ok": bool(dag.get("ok")),
+        "run_id": str(summary.get("run_id") or run_id),
+        "promotion_status": summary.get("promotion_status"),
+        "promotion_reasons": list(summary.get("promotion_reasons") or ()),
+        "manifest": manifest,
+        "dag": dag,
+    }
 
 
 def _notes_changed() -> bool:
@@ -342,7 +408,8 @@ def write_heartbeat(*, tick: int, watcher_alive: bool, last_cycle: str,
                     last_error: str | None = None, skipped: str | None = None,
                     council: dict[str, Any] | None = None,
                     ingest: dict[str, Any] | None = None,
-                    throughput: dict[str, Any] | None = None) -> Path:
+                    throughput: dict[str, Any] | None = None,
+                    external_dag: dict[str, Any] | None = None) -> Path:
     mt5 = _mt5_status()
     champion = _champion() or {}
     stale = staleness_report()
@@ -364,6 +431,7 @@ def write_heartbeat(*, tick: int, watcher_alive: bool, last_cycle: str,
         "council": council,
         "ingest": ingest,
         "throughput": throughput,
+        "external_dag": external_dag,
         "champion": champion.get("champion") or champion.get("id") or None,
         "skipped": skipped,
         "last_error": last_error,
@@ -384,6 +452,7 @@ def write_status(
     no_new_evidence: bool = False,
     new_outcome_lines: int = 0,
     skipped: str | None = None,
+    external_dag: dict[str, Any] | None = None,
 ) -> Path:
     lines = [
         "# AEGIS cycle status (fast watcher)",
@@ -446,6 +515,18 @@ def write_status(
             f"- ML script: {ml.get('elapsed_s')}s",
             "",
         ]
+    if external_dag is not None:
+        lines += [
+            "## GitHub/book research DAG",
+            "",
+            "- status: " + ("ok" if external_dag.get("ok") else "failed"),
+            "- run: " + str(external_dag.get("run_id") or "?"),
+            "- promotion: " + str(external_dag.get("promotion_status") or "?"),
+            "- reasons: " + ", ".join(
+                str(value) for value in external_dag.get("promotion_reasons") or ()
+            ),
+            "",
+        ]
     CYCLE_STATUS.parent.mkdir(parents=True, exist_ok=True)
     CYCLE_STATUS.write_text("\n".join(lines), encoding="utf-8")
     return CYCLE_STATUS
@@ -484,6 +565,7 @@ def run_cycle(
     *,
     fetch_exit: bool,
     council_every: int = 0,
+    council_enabled: bool = False,
     ingest_enabled: bool = True,
 ) -> dict[str, Any]:
     evidence_changed, new_outcome_lines = _evidence_changed()
@@ -513,17 +595,20 @@ def run_cycle(
     if evidence_changed or notes_changed or fetch_exit:
         autopsy = _run_script("research_fast_trade_autopsy.py", timeout_s=300)
 
-    # P10: autonomous REAL council round on meaningful triggers only.
+    # Council is deliberately disabled for the recurring watcher. The
+    # research libraries and reports remain available for a separately
+    # requested/manual review, but they must not run or add latency here.
     council: dict[str, Any] | None = None
     trigger = None
-    if council_every > 0 and tick > 0 and tick % council_every == 0:
-        trigger = "scheduled_cadence"
-    else:
-        trigger = _evidence_trigger()
-    if trigger and (evidence_changed or notes_changed or trigger != "scheduled_cadence"):
-        council = _run_council_round(trigger=trigger)
-    elif council_every > 0:
-        council = {"skipped": "no_new_evidence"}
+    if council_enabled:
+        if council_every > 0 and tick > 0 and tick % council_every == 0:
+            trigger = "scheduled_cadence"
+        else:
+            trigger = _evidence_trigger()
+        if trigger and (evidence_changed or notes_changed or trigger != "scheduled_cadence"):
+            council = _run_council_round(trigger=trigger)
+        elif council_every > 0:
+            council = {"skipped": "no_new_evidence"}
 
     # Recover a dead/hung runner via the keepalive (deduped by our singleton lock).
     keepalive: dict[str, Any] | None = None
@@ -545,12 +630,14 @@ def run_cycle(
             no_new_evidence=True,
             new_outcome_lines=new_outcome_lines,
             skipped="outcome_learning,book_memory,ml_pipeline",
+            external_dag=None,
         )
         heartbeat = write_heartbeat(
             tick=tick, watcher_alive=True, last_cycle=_now(),
             no_new_evidence=True, new_outcome_lines=new_outcome_lines,
             skipped="outcome_learning,book_memory,ml_pipeline",
             council=council, ingest=ingest, throughput=throughput,
+            external_dag=None,
         )
         return {
             "tick": tick,
@@ -566,6 +653,7 @@ def run_cycle(
             "council": council,
             "ingest": ingest,
             "fast_trade_autopsy": autopsy,
+            "external_dag": None,
         }
 
     outcome = _run_script("research_outcome_learning.py")
@@ -574,6 +662,7 @@ def run_cycle(
         book = _run_script("research_book_memory.py")
     ml_args = ("--fetch",) if fetch_exit else ()
     ml = _run_script("research_ml_pipeline.py", *ml_args, timeout_s=1500)
+    external_dag = _run_external_dag(tick)
     status = write_status(
         tick=tick,
         outcome=outcome,
@@ -581,11 +670,13 @@ def run_cycle(
         ml=ml,
         exit_run=fetch_exit,
         notes_changed=notes_changed,
+        external_dag=external_dag,
     )
     heartbeat = write_heartbeat(
         tick=tick, watcher_alive=True, last_cycle=_now(),
         no_new_evidence=False, new_outcome_lines=new_outcome_lines,
         council=council, ingest=ingest, throughput=throughput,
+        external_dag=external_dag,
     )
     return {
         "tick": tick,
@@ -604,6 +695,7 @@ def run_cycle(
         "council": council,
         "ingest": ingest,
         "fast_trade_autopsy": autopsy,
+        "external_dag": external_dag,
     }
 
 
@@ -1026,10 +1118,12 @@ def main() -> int:
     parser.add_argument("--fetch-exit", action="store_true", help="force M1 fetch for exit research every cycle")
     parser.add_argument(
         "--council-every", type=int,
-        # Re-enabled: autonomous REAL council rounds every 3 ticks (~1h),
-        # still gated by evidence triggers. Env var overrides.
-        default=int(os.environ.get("AEGIS_COUNCIL_EVERY_TICKS", "3") or 3),
-        help="run a REAL council round every N ticks (default 0=off; 72 ~= 24h)",
+        default=int(os.environ.get("AEGIS_COUNCIL_EVERY_TICKS", "0") or 0),
+        help="manual Council cadence when --enable-council is supplied (default 0=off)",
+    )
+    parser.add_argument(
+        "--enable-council", action="store_true",
+        help="explicitly enable the optional manual Council review loop",
     )
     args = parser.parse_args()
 
@@ -1059,7 +1153,12 @@ def main() -> int:
             tick = _tick_count()
             fetch_exit = bool(args.fetch_exit) or (tick % EXIT_RESEARCH_EVERY_N == 0)
             try:
-                result = run_cycle(tick, fetch_exit=fetch_exit, council_every=args.council_every)
+                result = run_cycle(
+                    tick,
+                    fetch_exit=fetch_exit,
+                    council_every=args.council_every,
+                    council_enabled=args.enable_council,
+                )
             except Exception as exc:  # keep the watcher alive across transient failures
                 result = {"tick": tick, "utc": _now(), "error": str(exc)}
                 write_heartbeat(tick=tick, watcher_alive=True, last_cycle=_now(),

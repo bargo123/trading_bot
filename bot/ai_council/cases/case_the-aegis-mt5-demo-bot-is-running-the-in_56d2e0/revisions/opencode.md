@@ -1,0 +1,1 @@
+Test a session-specific spread filter using a supported model configuration. Abstain when current spread exceeds the rolling 20-trade median by 25%, preserving all validated-state gates. Evaluate sealed historical windows with configured spread and slippage costs against the current champion; accept only improved net expectancy, no worse drawdown, and no holdout degradation.

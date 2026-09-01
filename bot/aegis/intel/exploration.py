@@ -21,10 +21,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
+
 
 EXPERIMENT_SCHEMA = "exploration_experiments.v1"
 
@@ -492,28 +494,92 @@ def risk_lots_for_exploration(
     or the trade is REJECTED - rounding UP to volume_min that would exceed the
     budget is a refusal, never an order.
     """
-    desired = abs(float(max_risk_usd))
-    stop_dist = abs(float(entry) - float(invalidation))
-    if stop_dist <= 0 or pip <= 0:
+    try:
+        raw_budget = float(max_risk_usd)
+    except (TypeError, ValueError, OverflowError):
+        raw_budget = float("nan")
+    # Keep diagnostics JSON-safe when the configured budget itself is invalid.
+    desired = abs(raw_budget) if math.isfinite(raw_budget) else 0.0
+    if not math.isfinite(raw_budget) or raw_budget <= 0:
+        return {
+            "allowed": False,
+            "reason": "exploration_invalid_risk_budget",
+            "lots": 0.0,
+            "desired_risk_usd": desired,
+            "actual_min_lot_risk_usd": None,
+        }
+    try:
+        entry_price = float(entry)
+        invalidation_price = float(invalidation)
+        pip_size = float(pip)
+        minimum_lot = float(volume_min)
+        volume_increment = float(volume_step)
+    except (TypeError, ValueError, OverflowError):
+        entry_price = invalidation_price = pip_size = float("nan")
+        minimum_lot = volume_increment = float("nan")
+    if (
+        not all(math.isfinite(value) for value in (
+            entry_price, invalidation_price, pip_size,
+        ))
+        or pip_size <= 0
+        or abs(entry_price - invalidation_price) <= 0
+    ):
         return {"allowed": False, "reason": "exploration_invalid_geometry",
                 "lots": 0.0, "desired_risk_usd": desired,
                 "actual_min_lot_risk_usd": None}
-    if tick_value and tick_size:
-        usd_per_price_unit_per_lot = float(tick_value) / float(tick_size)
+    if (
+        not math.isfinite(minimum_lot)
+        or not math.isfinite(volume_increment)
+        or minimum_lot <= 0
+        or volume_increment <= 0
+    ):
+        return {"allowed": False, "reason": "exploration_invalid_volume_spec",
+                "lots": 0.0, "desired_risk_usd": desired,
+                "actual_min_lot_risk_usd": None}
+    stop_dist = abs(entry_price - invalidation_price)
+    try:
+        resolved_tick_value = abs(float(tick_value)) if tick_value is not None else None
+        resolved_tick_size = float(tick_size) if tick_size is not None else None
+    except (TypeError, ValueError, OverflowError):
+        resolved_tick_value = resolved_tick_size = None
+    if (
+        resolved_tick_value is not None
+        and resolved_tick_size is not None
+        and math.isfinite(resolved_tick_value)
+        and math.isfinite(resolved_tick_size)
+        and resolved_tick_value > 0
+        and resolved_tick_size > 0
+    ):
+        usd_per_price_unit_per_lot = resolved_tick_value / resolved_tick_size
     else:
-        usd_per_price_unit_per_lot = float(contract_size)
+        try:
+            usd_per_price_unit_per_lot = float(contract_size)
+        except (TypeError, ValueError, OverflowError):
+            usd_per_price_unit_per_lot = float("nan")
+        if not math.isfinite(usd_per_price_unit_per_lot) or usd_per_price_unit_per_lot <= 0:
+            return {"allowed": False, "reason": "exploration_contract_value_unavailable",
+                    "lots": 0.0, "desired_risk_usd": desired,
+                    "actual_min_lot_risk_usd": None}
     risk_per_lot = stop_dist * usd_per_price_unit_per_lot
-    min_lot_risk = risk_per_lot * float(volume_min)
-    if min_lot_risk > desired + 1e-12:
+    if not math.isfinite(risk_per_lot) or risk_per_lot <= 0:
+        return {"allowed": False, "reason": "exploration_contract_value_unavailable",
+                "lots": 0.0, "desired_risk_usd": desired,
+                "actual_min_lot_risk_usd": None}
+    # The broker's minimum must itself be aligned to its volume step.  A
+    # nominal min of 0.01 with a 0.1 step cannot be sent as 0.01.
+    minimum_steps = math.ceil(minimum_lot / volume_increment - 1e-12)
+    valid_minimum_lot = minimum_steps * volume_increment
+    min_lot_risk = risk_per_lot * valid_minimum_lot
+    if not math.isfinite(min_lot_risk) or min_lot_risk > desired + 1e-12:
         return {"allowed": False,
                 "reason": "exploration_min_lot_exceeds_risk_budget",
                 "lots": 0.0, "desired_risk_usd": round(desired, 4),
                 "actual_min_lot_risk_usd": round(min_lot_risk, 4)}
-    step = float(volume_step) or float(volume_min) or 0.01
-    lots = int(desired / risk_per_lot / step) * step
-    lots = max(float(volume_min), round(lots, 2))
+    steps = math.floor(desired / risk_per_lot / volume_increment + 1e-12)
+    lots = max(valid_minimum_lot, steps * volume_increment)
+    lots = round(lots, 12)
     actual = risk_per_lot * lots
-    if actual > desired + 1e-9:  # step rounding must never breach budget
+    if not math.isfinite(actual) or actual > desired + 1e-9:  # step rounding must never breach budget
         return {"allowed": False,
                 "reason": "exploration_min_lot_exceeds_risk_budget",
                 "lots": 0.0, "desired_risk_usd": round(desired, 4),

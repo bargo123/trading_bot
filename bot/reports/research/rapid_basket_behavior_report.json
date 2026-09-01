@@ -1,0 +1,50 @@
+{
+  "report": "rapid_basket_behavior",
+  "schema": "aegis.rapid_basket_behavior_report.v1",
+  "captured_at_utc": "2026-08-31T01:58:14.1408970Z",
+  "status": "OFFLINE_BEHAVIOR_VERIFIED; LIVE_MULTI_LEG_PROOF_UNAVAILABLE",
+  "execution_owner": "bot/scripts/run_broker_paper.py",
+  "broker_mutation_in_this_report": false,
+  "implemented_paths": {
+    "global_allocation": "rank and allocate over the complete candidate pool",
+    "basket_ownership": "restart-safe ticket metadata and basket lifecycle cleanup",
+    "rapid_management": "canonical TradeController and runtime checkpoints",
+    "same_thesis_addition": "requires favorable movement, remaining positive EV, fresh evidence and bounded risk; no martingale",
+    "confirmed_close": "broker position absence plus confirmed deal evidence before cleanup",
+    "immediate_rescan": "confirmed-close cleanup releases the slot and records close_to_rescan_ms",
+    "reversal": "pending cancellation, close acknowledgement and reconciliation precede a new basket identity"
+  },
+  "offline_evidence": {
+    "changed_focused": "184 passed in 18.22s",
+    "basket_causality_focused": "315 passed in 5.84s",
+    "full_pytest": "3047 passed, 1 warning in 155.40s",
+    "rapid_benchmark": "256 events at 250ms, 50ms and 10ms; p95 0.0061ms, 0.0049ms and 0.0062ms",
+    "benchmark_scope": "local transport and lifecycle bookkeeping only"
+  },
+  "runtime_snapshot": {
+    "runner_pid": 27232,
+    "status": "running",
+    "feed_status": "HEALTHY",
+    "trading_eligible": true,
+    "causal_events_accepted": 19,
+    "scans": 26,
+    "fires": 0,
+    "fills": 0,
+    "open_positions": 0,
+    "why_no_order": "short_horizon_not_calibrated"
+  },
+  "not_proven": [
+    "four-leg live DEMO burst",
+    "partial live fill and reduction",
+    "pending ladder lifecycle on a live terminal",
+    "live reversal acknowledgement timing",
+    "p95 broker/network latency"
+  ],
+  "safety": {
+    "allow_live": false,
+    "mode": "mt5_demo",
+    "paper_trading_enabled": true,
+    "external_research_can_submit_orders": false,
+    "forced_trade": false
+  }
+}

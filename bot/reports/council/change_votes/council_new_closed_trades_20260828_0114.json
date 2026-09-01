@@ -1,0 +1,69 @@
+{
+  "change_id": "council_new_closed_trades_20260828_0114",
+  "degraded_real_council": true,
+  "final_decision": "DEGRADED_REAL_COUNCIL",
+  "finished_utc": "2026-08-28T01:14:46.539528+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_new_closed_trades_20260828_0114",
+    "current_evidence": "HTTP 401: Model x-preview-f-free is not supported",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: new_closed_trades. Current PF=None, EV=None",
+    "proposed_change": "HTTP 401: Model x-preview-f-free is not supported",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "fewer than two members voted; not a multi-agent decision",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-28T01:14:21.185555+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 1,
+    "reject": 0,
+    "revise_and_resubmit": 1
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "raw": "HTTP 401: Model x-preview-f-free is not supported",
+      "reason": "unparseable vote: ''",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Unsupported model selection blocks the intended workflow.",
+        "No exact files, model identifier, fallback behavior, or error-handling changes are defined.",
+        "Claimed DEMO-only safety impact is not substantiated against execution-path isolation."
+      ],
+      "confidence": 0.97,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal does not describe a concrete code or configuration change; it repeats an unsupported-model HTTP 401 error. Validation cannot begin until the supported model replacement and failure behavior are specified.",
+      "requested_revisions": [
+        "Specify the supported model/provider and exact configuration or code diff.",
+        "Add fail-closed handling so council/research model failures cannot affect broker execution.",
+        "Provide tests for successful invocation, unsupported-model errors, fallback behavior, and confirmation that no MT5 mutation path is reachable.",
+        "Record the experiment and define measurable throughput and OOS acceptance criteria."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "timed out after 90s",
+      "status": "TIMEOUT",
+      "vote": null
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

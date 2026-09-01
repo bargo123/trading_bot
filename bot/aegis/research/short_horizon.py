@@ -150,7 +150,7 @@ def build_short_horizon_labels(
             if last_time < end_time:
                 continue
             future = frame[(frame["_time"] > entry_time) & (frame["_time"] <= end_time)]
-            if future.empty:
+            if future.empty or future["_time"].iloc[-1] < end_time:
                 continue
             for side in normal_sides:
                 entry_price = _entry_price(entry, side)

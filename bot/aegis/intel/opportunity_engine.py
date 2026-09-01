@@ -64,6 +64,23 @@ def _number(row: Mapping[str, Any], *keys: str, default: float = 0.0) -> float:
     return default
 
 
+def _book_rank_score(row: Mapping[str, Any]) -> float:
+    """Read attributable book support without treating it as probability."""
+    direct = _number(row, "book_rank_score", default=float("nan"))
+    if math.isfinite(direct):
+        return direct
+    direct = _number(row, "book_support_score", default=float("nan"))
+    if math.isfinite(direct):
+        return direct
+    fused = row.get("prediction_fusion")
+    if isinstance(fused, Mapping):
+        fused_rank = _number(fused, "book_rank_score", default=float("nan"))
+        if math.isfinite(fused_rank):
+            return fused_rank
+        return _number(fused, "book_support_score", default=float("-inf"))
+    return float("-inf")
+
+
 def rank_and_allocate(
     candidates: Iterable[Mapping[str, Any]],
     *,
@@ -114,6 +131,7 @@ def rank_and_allocate(
             return (
                 2,
                 -_number(row, "selection_score", "comparative_score", default=float("-inf")),
+                -_book_rank_score(row),
                 _number(row, "fast_loser_similarity"),
                 str(row.get("candidate_id") or row.get("thesis_key") or ""),
             )
@@ -127,6 +145,7 @@ def rank_and_allocate(
             ),
             -_number(row, "p_captured_win", default=float("-inf")),
             _number(row, "uncertainty", default=float("inf")),
+            -_book_rank_score(row),
             _number(row, "fast_loser_similarity"),
             _number(row, "tail_loss_probability"),
             -_number(row, "expected_net_ev_lcb95", "expected_net_ev_lcb", default=float("-inf")),

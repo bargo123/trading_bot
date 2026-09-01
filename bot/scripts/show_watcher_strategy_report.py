@@ -10,6 +10,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+try:
+    from aegis.research.watcher_algorithms import ALGORITHM_MODULES
+    from aegis.research.watcher_book_perspectives import strategy_implementation_status
+except ImportError:  # pragma: no cover - direct script execution fallback
+    from watcher_algorithms import ALGORITHM_MODULES
+    from watcher_book_perspectives import strategy_implementation_status
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -48,6 +55,52 @@ def _text(value: Any) -> str:
     return str(value or "").strip()
 
 
+def _historical_algorithm_stats(root: Path) -> dict[str, dict[str, Any]]:
+    """Load the separately generated Watcher replay as descriptive evidence.
+
+    The live Watcher stats file may be empty after a data reset.  The
+    chronological replay is still useful for the per-algorithm report, but
+    it remains explicitly shadow evidence and is never exposed as
+    ``P_CAPTURED_WIN`` or execution authority.
+    """
+    replay = _json(
+        Path(root).parent / "research" / "watcher_algorithm_historical_replay.json",
+        {},
+    )
+    algorithms = replay.get("algorithms") if isinstance(replay, Mapping) else None
+    if not isinstance(algorithms, Mapping):
+        return {}
+    result: dict[str, dict[str, Any]] = {}
+    for key, item in algorithms.items():
+        if not isinstance(item, Mapping):
+            continue
+        perspective_id = _text(key)
+        if not perspective_id:
+            continue
+        result[perspective_id] = {
+            "evaluated_decisions": int(item.get("evaluated") or 0),
+            "applicable_decisions": int(item.get("applicable") or 0),
+            "shadow_sample_size": int(item.get("signal_samples") or 0),
+            "shadow_wins": int(item.get("wins") or 0),
+            "shadow_losses": int(item.get("losses") or 0),
+            "shadow_ambiguous": int(item.get("draws") or 0),
+            "shadow_win_rate": item.get("win_rate"),
+            "shadow_win_rate_percent": (
+                float(item["win_rate"]) * 100.0
+                if item.get("win_rate") is not None
+                else None
+            ),
+            "shadow_net_pnl_usd": item.get("net_pnl"),
+            "shadow_expectancy_usd": item.get("expectancy"),
+            "shadow_p95_loss_usd": item.get("p95_loss"),
+            "shadow_profit_factor": item.get("profit_factor"),
+            "shadow_evidence_source": "historical_quote_replay_net_pnl",
+            "shadow_data_provenance": "chronological_prior_rows_only",
+            "shadow_by_horizon": item.get("by_horizon") if isinstance(item.get("by_horizon"), Mapping) else {},
+        }
+    return result
+
+
 def _empty_strategy(record: Mapping[str, Any]) -> dict[str, Any]:
     raw = record.get("raw_record") if isinstance(record.get("raw_record"), Mapping) else {}
     provenance = record.get("provenance") if isinstance(record.get("provenance"), Mapping) else {}
@@ -59,6 +112,9 @@ def _empty_strategy(record: Mapping[str, Any]) -> dict[str, Any]:
         "source_file": record.get("source_file"),
         "source_line": record.get("source_line"),
         "strategy_family": raw.get("strategy_family") or raw.get("concept"),
+        "algorithm_id": (raw.get("algorithm") or {}).get("algorithm_id") if isinstance(raw.get("algorithm"), Mapping) else record.get("record_id"),
+        "algorithm_status": strategy_implementation_status(record),
+        "algorithm_missing": (raw.get("algorithm") or {}).get("missing_components", []) if isinstance(raw.get("algorithm"), Mapping) else [],
         "side_rule": raw.get("side_rule"),
         "validation_status": record.get("validation_status"),
         "testability": record.get("testability"),
@@ -123,6 +179,52 @@ def build_strategy_report(report_dir: Path) -> dict[str, Any]:
     strategies = {str(row.get("record_id")): _empty_strategy(row) for row in records if row.get("record_id")}
     stats_payload = _json(root / "strategy_stats.json", {})
     per_strategy = stats_payload.get("per_strategy") if isinstance(stats_payload, Mapping) else {}
+    replay_algorithm_perspectives = _historical_algorithm_stats(root)
+    algorithm_perspectives: dict[str, dict[str, Any]] = {
+        name: {
+            "perspective_id": name,
+            "evaluated_decisions": 0,
+            "applicable_decisions": 0,
+            "shadow_sample_size": 0,
+            "shadow_wins": 0,
+            "shadow_losses": 0,
+            "shadow_win_rate": None,
+            "shadow_win_rate_percent": None,
+            "shadow_evidence_source": "UNAVAILABLE",
+            "outcome_metric": "shadow_win_rate",
+            "p_captured_win": None,
+            "p_captured_win_source": "NOT_APPLICABLE_SHADOW_ALGORITHM_METRIC",
+        }
+        for name in ALGORITHM_MODULES
+    }
+    for perspective_id, observation in replay_algorithm_perspectives.items():
+        if perspective_id in algorithm_perspectives:
+            algorithm_perspectives[perspective_id].update(observation)
+    raw_algorithm_perspectives = stats_payload.get("algorithm_perspectives") if isinstance(stats_payload, Mapping) else {}
+    if isinstance(raw_algorithm_perspectives, Mapping):
+        for key, observation in raw_algorithm_perspectives.items():
+            if not isinstance(observation, Mapping):
+                continue
+            perspective_id = _text(observation.get("perspective_id") or key)
+            row = {**algorithm_perspectives.get(perspective_id, {}), **dict(observation)}
+            row["perspective_id"] = perspective_id
+            # A newly reset live stats file contains empty placeholders for
+            # every algorithm.  Keep the independently generated historical
+            # replay in that case; replace it only when live shadow evidence
+            # actually exists for this perspective.
+            if (
+                perspective_id in replay_algorithm_perspectives
+                and int(observation.get("shadow_sample_size") or 0) <= 0
+                and int(replay_algorithm_perspectives[perspective_id].get("shadow_sample_size") or 0) > 0
+            ):
+                replay = replay_algorithm_perspectives[perspective_id]
+                for field, value in replay.items():
+                    if field not in {"perspective_id"}:
+                        row[field] = value
+            row["outcome_metric"] = "shadow_win_rate"
+            row["p_captured_win"] = None
+            row["p_captured_win_source"] = "NOT_APPLICABLE_SHADOW_ALGORITHM_METRIC"
+            algorithm_perspectives[row["perspective_id"]] = row
     if isinstance(per_strategy, Mapping) and per_strategy:
         for key, observation in per_strategy.items():
             row = strategies.get(str(key))
@@ -278,6 +380,12 @@ def build_strategy_report(report_dir: Path) -> dict[str, Any]:
         "unobserved_strategies": sum(row["status"] == "NOT_OBSERVED" for row in ordered),
         "unlinked_confirmed_outcomes": unlinked_confirmed,
         "decision_analysis_aggregates": bool(isinstance(per_strategy, Mapping) and per_strategy),
+        "algorithm_count": len(algorithm_perspectives),
+        "algorithm_outcome_metric": "shadow_win_rate",
+        "algorithm_perspectives": sorted(
+            algorithm_perspectives.values(),
+            key=lambda row: str(row.get("perspective_id")),
+        ),
         "book_inventory": [
             {
                 "book": item.get("file") or item.get("book") or item.get("source_title"),
@@ -295,8 +403,10 @@ def build_strategy_report(report_dir: Path) -> dict[str, Any]:
 
 def render_strategy_report(report: Mapping[str, Any], *, limit: int | None = 25) -> str:
     rows = list(report.get("strategies") or [])
+    algorithm_rows = list(report.get("algorithm_perspectives") or [])
     if limit is not None:
         rows = rows[:max(0, int(limit))]
+        algorithm_rows = algorithm_rows[:max(0, int(limit))]
     lines = [
         "================ WATCHER STRATEGY OUTCOMES ================",
         f"CORPUS_VERSION={report.get('corpus_version')}",
@@ -331,6 +441,22 @@ def render_strategy_report(report: Mapping[str, Any], *, limit: int | None = 25)
             str(row.get("evaluated_decisions", 0)), str(row.get("applicable_decisions", 0)), str(row.get("shadow_closed", 0)),
             str(row.get("confirmed_outcomes", 0)), broker_rate_text, exact_rate_text, proxy_rate_text, str(row.get("wins", 0)), str(row.get("losses", 0)),
             net_text, _text(row.get("record_id")),
+        ]))
+    lines.extend([
+        "ALGORITHM PERSPECTIVE OUTCOMES",
+        f"ALGORITHM_COUNT={report.get('algorithm_count', len(algorithm_rows))} OUTCOME_METRIC={report.get('algorithm_outcome_metric', 'shadow_win_rate')}",
+        "ALGORITHM | EVALUATED | APPLICABLE | SHADOW_SAMPLE | SHADOW_WIN_RATE | EVIDENCE_SOURCE",
+    ])
+    for row in algorithm_rows:
+        rate = row.get("shadow_win_rate_percent")
+        rate_text = "-" if rate is None else f"{float(rate):.2f}%"
+        lines.append(" | ".join([
+            _text(row.get("perspective_id")),
+            str(row.get("evaluated_decisions", 0)),
+            str(row.get("applicable_decisions", 0)),
+            str(row.get("shadow_sample_size", 0)),
+            rate_text,
+            _text(row.get("shadow_evidence_source") or "UNAVAILABLE"),
         ]))
     lines.append("=============================================================")
     return "\n".join(lines)

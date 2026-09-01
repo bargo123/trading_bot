@@ -1,0 +1,16 @@
+{
+  "report": "rapid_multi_position_behavior",
+  "status": "OFFLINE_BEHAVIOR_VERIFIED; LIVE_SMOKE_NOT_RUN",
+  "existing_behavior": {
+    "global_allocation": "rank_and_allocate existing Firehose opportunities",
+    "basket_ownership": "ticket metadata and turnover lifecycle",
+    "rapid_management": "runtime checkpoint and TradeController/FastExit paths",
+    "confirmed_close": "position absence plus broker evidence before release",
+    "immediate_rescan_hook": "runtime checkpoint reports close_to_rescan_ms"
+  },
+  "focused_test_command": "tests/test_integration_contracts.py tests/test_firehose_watcher_integration.py tests/test_run_broker_paper_helpers.py tests/test_firehose_basket.py tests/test_firehose_basket_evidence.py tests/test_firehose_basket_replay.py tests/test_firehose_basket_runtime.py tests/test_firehose_turnover.py tests/test_runtime_checkpoint.py tests/test_execution_audit.py tests/test_execution_circuit.py tests/test_reconcile.py",
+  "focused_result": "224 passed in 8.58s",
+  "runtime_fill_count": null,
+  "runtime_close_count": null,
+  "runtime_latency": null
+}

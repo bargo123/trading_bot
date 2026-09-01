@@ -1,0 +1,1 @@
+This is not a proposal: it contains only an HTTP 401 compatibility error and no strategy, hypothesis, or measurable claim to evaluate. It provides no validation plan, data, risk controls, or execution boundaries, so it cannot be approved for research or deployment.

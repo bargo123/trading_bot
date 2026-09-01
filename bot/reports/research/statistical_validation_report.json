@@ -1,0 +1,51 @@
+{
+  "report": "statistical_validation",
+  "schema": "aegis.statistical_validation_report.v1",
+  "captured_at_utc": "2026-08-31T01:58:14.1408970Z",
+  "status": "SHADOW_ONLY_NO_POSITIVE_OOS",
+  "target": "captured_exit_replay net executable outcome",
+  "artifact": {
+    "path": "bot/intel/short_horizon_model",
+    "model_count": 3,
+    "dataset_hash": "a93970e67897e480558ac48bd56c700d2a04d9a8e715694be8683bc2331e5944",
+    "validation_hash": "13b9c017b63796b5a70b80c4cb7dc8c033c3b7d15acafc97f087967495e45d6f",
+    "decision_horizon_s": 10,
+    "available_horizons_s": [1, 2, 3, 5, 8, 10, 15, 20]
+  },
+  "metrics": {
+    "oos_test_n": 19728,
+    "oos_sealed_n": 19854,
+    "sealed_oos_trades": 94,
+    "sealed_oos_wins": 9,
+    "sealed_oos_losses": 85,
+    "oos_precision": 0.09574468085106383,
+    "oos_captured_expectancy": -0.000036620710959873566,
+    "oos_captured_ev_lcb95": -0.000042196866996582275,
+    "oos_captured_profit_factor": 0.03656162554913646,
+    "calibration_ece": 0.004981473087839068,
+    "p95_loss": -0.00008961509812247313,
+    "p99_loss": -0.00008961897534791316,
+    "never_green_rate": 0.9042553191489362,
+    "probabilistic_sharpe": null,
+    "deflated_sharpe": null,
+    "pbo": null
+  },
+  "promotion": {
+    "execution_authorized": false,
+    "authorized_symbols": [],
+    "reason": "Captured executable expectancy is negative and profit factor is below one; the artifact remains shadow-only."
+  },
+  "runtime_effect": {
+    "prediction_engine_active": true,
+    "unavailable_or_shadow_prediction_abstains": true,
+    "forced_order_fallback": false,
+    "current_why_no_order": "short_horizon_not_calibrated"
+  },
+  "integrity": {
+    "no_lookahead": true,
+    "cost_aware": true,
+    "missing_metrics_are_null": true,
+    "synthetic_or_generic_evidence_cannot_authorize_micro_horizons": true,
+    "no_profitability_claim": true
+  }
+}

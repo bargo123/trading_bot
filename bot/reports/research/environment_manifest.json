@@ -1,0 +1,89 @@
+{
+  "report": "environment_manifest",
+  "captured_at_utc": "2026-08-31T01:58:14.1408970Z",
+  "status": "VERIFIED_DIRTY_WORKTREE_PRESERVED",
+  "repo": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot",
+  "branch": "opencode/exploration-firehose",
+  "source_head": "788533353aaa019c4e62d870edb9d0dd89d17688",
+  "working_tree": {
+    "dirty": true,
+    "status_rows": 305,
+    "preserved": true,
+    "commit_or_push_performed": false
+  },
+  "python": {
+    "executable": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.venv\\Scripts\\python.exe",
+    "version": "Python 3.12.10"
+  },
+  "tools": {
+    "git": "2.55.0.windows.3",
+    "gh": "2.98.0",
+    "uv": "0.12.5",
+    "node": "24.19.0",
+    "npm": "11.17.0",
+    "pnpm": "11.19.0",
+    "ffmpeg": "9.0",
+    "docker": "not required or installed by this plan"
+  },
+  "external_stack": {
+    "repositories": 14,
+    "install_checks": 34,
+    "completed": 32,
+    "completed_bounded_smoke": 1,
+    "blocked": 1,
+    "blocked_check": "mt5-mcp tests: upstream 4 failed, 39 skipped, 10 errors"
+  },
+  "config": {
+    "path": "bot/config_mt5_demo_firehose_hw.yaml",
+    "engine": "mt5",
+    "mode": "mt5_demo",
+    "allow_live": false,
+    "dry_run": false,
+    "paper_trading_enabled": true,
+    "exploration_max_risk_per_trade_usd": 0.15,
+    "max_daily_loss_percent": 0,
+    "max_total_drawdown_percent": 0,
+    "exploration_max_daily_loss_usd": 0
+  },
+  "runtime_snapshot": {
+    "runner_launcher_pid": 20292,
+    "runner_pid": 27232,
+    "logical_execution_owner_count": 1,
+    "runner_status": "running",
+    "feed_status": "HEALTHY",
+    "runtime_phase": "RUNNING_SCAN",
+    "trading_eligible": true,
+    "open_positions": 0,
+    "causal_events_accepted": 19,
+    "causal_events_quarantined": 33,
+    "scans": 26,
+    "search_candidates": 0,
+    "exploration_candidates": 0,
+    "exploration_eligible": 0,
+    "fires": 0,
+    "fills": 0,
+    "forced_demo_exploration_selected": 0,
+    "why_no_order": "short_horizon_not_calibrated",
+    "new_code_loaded": true,
+    "restart_performed": true,
+    "short_horizon_status": "SHADOW_ONLY_NO_POSITIVE_OOS"
+  },
+  "direct_mt5_account_probe": {
+    "version": "500, 6140, 21 Aug 2026",
+    "server": "MetaQuotes-Demo",
+    "connected": true,
+    "terminal_trade_allowed": true,
+    "account_trade_mode": 0,
+    "account_trade_allowed": true,
+    "account_trade_expert": true,
+    "open_positions": 0
+  },
+  "verification": {
+    "changed_focused": "184 passed in 18.22s",
+    "basket_causality_focused": "315 passed in 5.84s",
+    "full_pytest": "3047 passed, 1 warning in 155.40s",
+    "full_pytest_warning": "eventkit DeprecationWarning: no current event loop",
+    "verifier": "exit 0; 38 VERIFIED; machine checks and runtime gates pass",
+    "static_research_broker_mutation_hits": 0
+  }
+}

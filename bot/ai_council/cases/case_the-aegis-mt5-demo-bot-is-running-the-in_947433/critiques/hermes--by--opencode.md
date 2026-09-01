@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal, so it contains no testable hypothesis, validation plan, or safety controls. It does not identify a supported model or demonstrate that any replacement preserves system behavior.

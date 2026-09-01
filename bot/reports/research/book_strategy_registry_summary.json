@@ -1,0 +1,393 @@
+{
+  "schema": "book_strategy_registry.v1",
+  "downloads_dir": "C:\\Users\\Zaid barghouthi\\Downloads",
+  "sources_seen": 42,
+  "sources_unique": 39,
+  "pages_read": 15739,
+  "pages_with_text": 13431,
+  "records": 12614,
+  "records_by_status": {
+    "UNTESTABLE_SOURCE": 8440,
+    "FAMILY_PROXY": 2643,
+    "COMPILE_ERROR": 1189,
+    "CODED_EXACT": 342
+  },
+  "duplicate_count": 3,
+  "duplicate_passage_count": 4131,
+  "unsupported_count": 1,
+  "extraction_failures": 0,
+  "source_hashes": [
+    "09b646b52ad3d67769a4e0184b2561d497dfac08cc43bb177a2987cd51199d6d",
+    "24a10a3999d11fbf49b03aa82223132d64ab155ecb04648ad46919ff0faf7515",
+    "289c40fdb0ba973cf60c00c33fbaa06bf01a6e645d53cbbaac1e46fd5c81cd8c",
+    "2c326f7cb379feef725660b4c2cbdcf95a6f5c80559a05e894360340a4de68fc",
+    "2d36c258ea9b4110b91e90d15e0ffe0e5480a4b6a461808c2d2588500fed9ce3",
+    "380736f086b0b54630215315c35d249accf2df0ccfe71e4c0edb2858fb9a9f74",
+    "3e4401c6f7d323d180c7569a983fd8e4b56838d9ebc8fd6c6c889e64714bc611",
+    "4223a72aef3f409c0b62bfc0db77864b55864b4f9030d870422c5fceeb7ab741",
+    "47128c5d01db803fc7b897768860602df6f4555591eec2dc1bf09d7f3f3ca2d7",
+    "49326624ee09a9a7f7201854c3cb2a49aad9beb297b5a5ee73b8fca9e834a09f",
+    "571a681bb1337a3d0f9c8af932024e525c0bd264862d928bea6505da12428870",
+    "5a93ef385b4216c7859bd8e17401195a3aa70f91583f37984f56121e33e93305",
+    "5aff908bc9e380e7d8f4919259c372e08b47163fa799e7f427ad338c279a2c90",
+    "60740a6fa6cd71a435330e35cef030a3cc7c1cf6bed50362588fa1b47cedc8af",
+    "70429617745e1ffd5e468c7b02dd5d73a75acffb4c76da22adb6497155f8586a",
+    "73ee7bc2ef96763ce272102f546ffd8f8be944e31cf51719f6c873d47bee1d18",
+    "78a4b443a64326a230a1cfe4142d5a2407f07619bba79a687ac6c08255341f51",
+    "85466da2a2d214aec44932922682e05441571fb59ada56466871d8da1057eeef",
+    "8ad3444f513927f9296aec9358ff49329705dde3857e05acc5e86614391f7245",
+    "8ff8adda59cae95139e3c5a60fcb6df0ba3edee042874d28c0945652bc0bc75a",
+    "907e8c89dc0f3e2ad7c8f2eedb1da58fbd5cc9e41a0264c81be393bb65b10953",
+    "9669380e02c8b502ff855f73f7ec3b59aa798bfa78c366b018b2e378e2153aa3",
+    "9f93db0184c8523abcce1aae59ecc19574cb1c14138be8e570b7df6afe79b217",
+    "a7b6df228b68844e7ed5e99279eb0bdd5e0cb3d69a8be40b48feaae79db06100",
+    "a9239928732876feb9f2deb00bfaa89f8fcc9f691359a5ed75552ba27223d9d1",
+    "ac8fafa627741d61a3efd6a04776083a2b149ed703cf80b2fa45c0eed905b6da",
+    "af83c661ad6aed5c3fd8a9cdaee11b85117b5cba5ac19ebb231aea24e696321c",
+    "b5e0226ea298a0708cfb0a5256f0ae8499774aaa0b1d8a7423f4315431406628",
+    "b681b41c6889413becc9ffbdc5143401c476d72b7246ee6b09c536a8feaa8476",
+    "b91c02e0f4ad877201a89e597e67f7c48fc6c93564b2b1774f60c12364aac46d",
+    "be82bf3c23f6886b73bd759aeacd34ff6cb25fe973afe2c41cf2b542def6adab",
+    "ccf1c0548049b9646a5fadd6ceed5be397f98129982b9e32d5d1b9961a02f8b8",
+    "d36753d1248425a1aeceda514dfdf2403c3748f54db322ee0738c316e0d6da56",
+    "da40f3d38254e14223749c5f21393f2cb90c9d8428b8fab971b77db0c311d7c3",
+    "e697e6ed5dbb6f9643ed2b25ae794d13d406da89e53f62a4b1e7fa5a7b4726ec",
+    "edf978aaae7a53bb8d2850d2cb1283adc8eb32c477e01bc6fc505fe2fe8a09bb",
+    "f258aae6e410324705331c132e8bc9ed1ec42254230596f35420359430b14c08",
+    "fa0d635fd144863810e330a1316cf96e7a59984a52d5625524c8a9e8ce8988dc",
+    "ffc95d3d3707c1113e0814bd2401397f92841a204e78f4b680303a3a67f2f158"
+  ],
+  "sources": [
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Chapman & Hall_CRC Financial Mathematics] Raja Velu, Maxence Hardy, Daniel Nehren - Algorithmic Trading and Quantitative Strategies (2020, Chapman and Hall_CRC) - libgen.li.pdf",
+      "file_sha256": "4223a72aef3f409c0b62bfc0db77864b55864b4f9030d870422c5fceeb7ab741",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Chapman & Hall_CRC Financial Mathematics] Raja Velu, Maxence Hardy, Daniel Nehren - Algorithmic Trading and Quantitative Strategies (2020, Chapman and Hall_CRC) - libgen.li.pdf",
+      "pages_read": 451,
+      "pages_with_text": 441,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[New York Institute of Finance] John J. Murphy - Technical Analysis of the Financial Markets_ A Comprehensive Guide to Trading Methods and Applications (New York Institute of F (1999, New York Institute o.pdf",
+      "file_sha256": "2d36c258ea9b4110b91e90d15e0ffe0e5480a4b6a461808c2d2588500fed9ce3",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[New York Institute of Finance] John J. Murphy - Technical Analysis of the Financial Markets_ A Comprehensive Guide to Trading Methods and Applications (New York Institute of F (1999, New York Institute o.pdf",
+      "pages_read": 585,
+      "pages_with_text": 0,
+      "status": "EMPTY_TEXT"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Quantitative Methods for Appli] Frank de Jong, Barbara Rindi - The microstructure of financial markets (2009, Cambridge University Press) - libgen.li.pdf",
+      "file_sha256": "ffc95d3d3707c1113e0814bd2401397f92841a204e78f4b680303a3a67f2f158",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Quantitative Methods for Appli] Frank de Jong, Barbara Rindi - The microstructure of financial markets (2009, Cambridge University Press) - libgen.li.pdf",
+      "pages_read": 207,
+      "pages_with_text": 205,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley finance series] Adam Grimes - The art and science of technical analysis _ market structure, price action, and trading strategies (2012, J. Wiley & Sons ) - libgen.li.pdf",
+      "file_sha256": "b5e0226ea298a0708cfb0a5256f0ae8499774aaa0b1d8a7423f4315431406628",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley finance series] Adam Grimes - The art and science of technical analysis _ market structure, price action, and trading strategies (2012, J. Wiley & Sons ) - libgen.li.pdf",
+      "pages_read": 480,
+      "pages_with_text": 480,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Finance] Andrew Pole - Statistical Arbitrage_ Algorithmic Trading Insights and Techniques (Wiley Finance) (2007, Wiley) - libgen.li.pdf",
+      "file_sha256": "5aff908bc9e380e7d8f4919259c372e08b47163fa799e7f427ad338c279a2c90",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Finance] Andrew Pole - Statistical Arbitrage_ Algorithmic Trading Insights and Techniques (Wiley Finance) (2007, Wiley) - libgen.li.pdf",
+      "pages_read": 257,
+      "pages_with_text": 247,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Finance] Rishi K. Narang - Inside the Black Box_ The Simple Truth About Quantitative Trading (2009, Wiley) - libgen.li.pdf",
+      "file_sha256": "3e4401c6f7d323d180c7569a983fd8e4b56838d9ebc8fd6c6c889e64714bc611",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Finance] Rishi K. Narang - Inside the Black Box_ The Simple Truth About Quantitative Trading (2009, Wiley) - libgen.li.pdf",
+      "pages_read": 228,
+      "pages_with_text": 228,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Finance] Wesley R. Gray, Jack R. Vogel - Quantitative Momentum_ A Practitioner’s Guide to Building a Momentum-Based Stock Selection System (2016, Wiley) - libgen.li.pdf",
+      "file_sha256": "8ad3444f513927f9296aec9358ff49329705dde3857e05acc5e86614391f7245",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Finance] Wesley R. Gray, Jack R. Vogel - Quantitative Momentum_ A Practitioner’s Guide to Building a Momentum-Based Stock Selection System (2016, Wiley) - libgen.li.pdf",
+      "pages_read": 206,
+      "pages_with_text": 204,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading Series] Kevin J. Davey - Building Winning Algorithmic Trading Systems_ A Trader's Journey from Data Mining to Monte Carlo Simulation to Live Trading (2014, Wiley) - libgen.li (1).pdf",
+      "file_sha256": "ccf1c0548049b9646a5fadd6ceed5be397f98129982b9e32d5d1b9961a02f8b8",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading Series] Kevin J. Davey - Building Winning Algorithmic Trading Systems_ A Trader's Journey from Data Mining to Monte Carlo Simulation to Live Trading (2014, Wiley) - libgen.li (1).pdf",
+      "pages_read": 284,
+      "pages_with_text": 253,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading Series] Kevin J. Davey - Building Winning Algorithmic Trading Systems_ A Trader's Journey from Data Mining to Monte Carlo Simulation to Live Trading (2014, Wiley) - libgen.li.pdf",
+      "status": "DUPLICATE",
+      "duplicate_of": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading Series] Kevin J. Davey - Building Winning Algorithmic Trading Systems_ A Trader's Journey from Data Mining to Monte Carlo Simulation to Live Trading (2014, Wiley) - libgen.li (1).pdf",
+      "file_sha256": "ccf1c0548049b9646a5fadd6ceed5be397f98129982b9e32d5d1b9961a02f8b8"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading] Al Brooks - Reading Price Charts Bar by Bar_ The Technical Analysis of Price Action for the Serious Trader (2009, Wiley) - libgen.li.pdf",
+      "file_sha256": "af83c661ad6aed5c3fd8a9cdaee11b85117b5cba5ac19ebb231aea24e696321c",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading] Al Brooks - Reading Price Charts Bar by Bar_ The Technical Analysis of Price Action for the Serious Trader (2009, Wiley) - libgen.li.pdf",
+      "pages_read": 428,
+      "pages_with_text": 417,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading] Alexander Elder - The New Trading for a Living_ Psychology, Discipline, Trading Tools and Systems, Risk Control, Trade Management (2014, Wiley) - libgen.li.pdf",
+      "file_sha256": "78a4b443a64326a230a1cfe4142d5a2407f07619bba79a687ac6c08255341f51",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading] Alexander Elder - The New Trading for a Living_ Psychology, Discipline, Trading Tools and Systems, Risk Control, Trade Management (2014, Wiley) - libgen.li.pdf",
+      "pages_read": 303,
+      "pages_with_text": 293,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley trading] Aronson, David - Evidence-Based Technical Analysis_ Applying the Scientific Method and Statistical Inference to Trading Signals (2011, Wiley) - libgen.li.pdf",
+      "file_sha256": "a9239928732876feb9f2deb00bfaa89f8fcc9f691359a5ed75552ba27223d9d1",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley trading] Aronson, David - Evidence-Based Technical Analysis_ Applying the Scientific Method and Statistical Inference to Trading Signals (2011, Wiley) - libgen.li.pdf",
+      "pages_read": 528,
+      "pages_with_text": 528,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading] Ernie Chan - Quantitative Trading_ How to Build Your Own Algorithmic Trading Business (2008, Wiley) - libgen.li.pdf",
+      "file_sha256": "85466da2a2d214aec44932922682e05441571fb59ada56466871d8da1057eeef",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading] Ernie Chan - Quantitative Trading_ How to Build Your Own Algorithmic Trading Business (2008, Wiley) - libgen.li.pdf",
+      "pages_read": 204,
+      "pages_with_text": 204,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley trading] Irene Aldridge - High-frequency trading_ a practical guide to algorithmic strategies and trading systems (2013, Wiley) - libgen.li.pdf",
+      "file_sha256": "d36753d1248425a1aeceda514dfdf2403c3748f54db322ee0738c316e0d6da56",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley trading] Irene Aldridge - High-frequency trading_ a practical guide to algorithmic strategies and trading systems (2013, Wiley) - libgen.li.pdf",
+      "pages_read": 322,
+      "pages_with_text": 312,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading] James F. Dalton, Robert Bevan Dalton, Eric T. Jones - Markets in profile (2007, Wiley) - libgen.li.pdf",
+      "file_sha256": "70429617745e1ffd5e468c7b02dd5d73a75acffb4c76da22adb6497155f8586a",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\[Wiley Trading] James F. Dalton, Robert Bevan Dalton, Eric T. Jones - Markets in profile (2007, Wiley) - libgen.li.pdf",
+      "pages_read": 225,
+      "pages_with_text": 224,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Abergel, Frédéric (editor)_Bouchaud, Jean-Philippe (editor)_Fouc - Market Microstructure_ Confronting Many Viewpoints (2012, John Wiley & Sons Ltd) [10.1002_9781118673553] - libgen.li.pdf",
+      "file_sha256": "9f93db0184c8523abcce1aae59ecc19574cb1c14138be8e570b7df6afe79b217",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Abergel, Frédéric (editor)_Bouchaud, Jean-Philippe (editor)_Fouc - Market Microstructure_ Confronting Many Viewpoints (2012, John Wiley & Sons Ltd) [10.1002_9781118673553] - libgen.li.pdf",
+      "pages_read": 244,
+      "pages_with_text": 244,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Algorithmic Trading (Winning Strategies and Their Rationale) __ {Chan, Ernest P.}(2013 May 22, John Wiley &amp_ Sons, Inc.)[10.1002_9781118676998]{84756267} libgen.li.pdf",
+      "file_sha256": "2c326f7cb379feef725660b4c2cbdcf95a6f5c80559a05e894360340a4de68fc",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Algorithmic Trading (Winning Strategies and Their Rationale) __ {Chan, Ernest P.}(2013 May 22, John Wiley &amp_ Sons, Inc.)[10.1002_9781118676998]{84756267} libgen.li.pdf",
+      "pages_read": 214,
+      "pages_with_text": 214,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Anna Coulling - A Complete Guide To Volume Price Analysis_ Read the book then read the market (2013, Marinablu International Ltd) - libgen.li.pdf",
+      "file_sha256": "24a10a3999d11fbf49b03aa82223132d64ab155ecb04648ad46919ff0faf7515",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Anna Coulling - A Complete Guide To Volume Price Analysis_ Read the book then read the market (2013, Marinablu International Ltd) - libgen.li.pdf",
+      "pages_read": 273,
+      "pages_with_text": 272,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Barry Johnson - Algorithmic Trading and DMA_ An introduction to direct access trading strategies (2010, 4Myeloma Press) - libgen.li (1).pdf",
+      "file_sha256": "edf978aaae7a53bb8d2850d2cb1283adc8eb32c477e01bc6fc505fe2fe8a09bb",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Barry Johnson - Algorithmic Trading and DMA_ An introduction to direct access trading strategies (2010, 4Myeloma Press) - libgen.li (1).pdf",
+      "pages_read": 595,
+      "pages_with_text": 0,
+      "status": "EMPTY_TEXT"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Barry Johnson - Algorithmic Trading and DMA_ An introduction to direct access trading strategies (2010, 4Myeloma Press) - libgen.li.pdf",
+      "status": "DUPLICATE",
+      "duplicate_of": "C:\\Users\\Zaid barghouthi\\Downloads\\Barry Johnson - Algorithmic Trading and DMA_ An introduction to direct access trading strategies (2010, 4Myeloma Press) - libgen.li (1).pdf",
+      "file_sha256": "edf978aaae7a53bb8d2850d2cb1283adc8eb32c477e01bc6fc505fe2fe8a09bb"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Bob Volman - Forex Price Action Scalping an in-depth look into the field of professional scalping 1 (2011, Light Tower) - libgen.li.pdf",
+      "file_sha256": "907e8c89dc0f3e2ad7c8f2eedb1da58fbd5cc9e41a0264c81be393bb65b10953",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Bob Volman - Forex Price Action Scalping an in-depth look into the field of professional scalping 1 (2011, Light Tower) - libgen.li.pdf",
+      "pages_read": 359,
+      "pages_with_text": 345,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\BULKOWSKI, Thomas N. - Encyclopedia of Chart Patterns (2005, John Wiley & Sons, Inc.) - libgen.li.pdf",
+      "file_sha256": "b681b41c6889413becc9ffbdc5143401c476d72b7246ee6b09c536a8feaa8476",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\BULKOWSKI, Thomas N. - Encyclopedia of Chart Patterns (2005, John Wiley & Sons, Inc.) - libgen.li.pdf",
+      "pages_read": 1035,
+      "pages_with_text": 1034,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\David Aronson - Evidence-based technical analysis (2006, Wiley) - libgen.li (1).djvu",
+      "file_sha256": "a7b6df228b68844e7ed5e99279eb0bdd5e0cb3d69a8be40b48feaae79db06100",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\David Aronson - Evidence-based technical analysis (2006, Wiley) - libgen.li (1).djvu",
+      "pages_read": 0,
+      "pages_with_text": 0,
+      "status": "UNSUPPORTED_FORMAT",
+      "reason": "djvu_decoder_unavailable"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\David Aronson - Evidence-based technical analysis (2006, Wiley) - libgen.li.djvu",
+      "status": "DUPLICATE",
+      "duplicate_of": "C:\\Users\\Zaid barghouthi\\Downloads\\David Aronson - Evidence-based technical analysis (2006, Wiley) - libgen.li (1).djvu",
+      "file_sha256": "a7b6df228b68844e7ed5e99279eb0bdd5e0cb3d69a8be40b48feaae79db06100"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Day Trading and Swing Trading the Currency Market_ Technical and Fundamental Strategies to Profit...{Lien, Kathy}(2008, Wiley){115286408} libgen.li.pdf",
+      "file_sha256": "60740a6fa6cd71a435330e35cef030a3cc7c1cf6bed50362588fa1b47cedc8af",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Day Trading and Swing Trading the Currency Market_ Technical and Fundamental Strategies to Profit...{Lien, Kathy}(2008, Wiley){115286408} libgen.li.pdf",
+      "pages_read": 307,
+      "pages_with_text": 307,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Ernest P. Chan - Machine Trading_ Deploying Computer Algorithms to Conquer the Markets - libgen.li.pdf",
+      "file_sha256": "ac8fafa627741d61a3efd6a04776083a2b149ed703cf80b2fa45c0eed905b6da",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Ernest P. Chan - Machine Trading_ Deploying Computer Algorithms to Conquer the Markets - libgen.li.pdf",
+      "pages_read": 254,
+      "pages_with_text": 254,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\James F. Dalton, Eric T. Jones, Robert Bevan Dalton - Mind over Markets_ Power Trading With Market Generated Information (1999) - libgen.li.pdf",
+      "file_sha256": "73ee7bc2ef96763ce272102f546ffd8f8be944e31cf51719f6c873d47bee1d18",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\James F. Dalton, Eric T. Jones, Robert Bevan Dalton - Mind over Markets_ Power Trading With Market Generated Information (1999) - libgen.li.pdf",
+      "pages_read": 350,
+      "pages_with_text": 239,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Japanese Candlestick Charting Techniques_ A Contemporary Guide to the Ancient Investment Techniqu...{Nison, Steve}(1991, New York Institute of Finance){115291531} libgen.li.pdf",
+      "file_sha256": "f258aae6e410324705331c132e8bc9ed1ec42254230596f35420359430b14c08",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Japanese Candlestick Charting Techniques_ A Contemporary Guide to the Ancient Investment Techniqu...{Nison, Steve}(1991, New York Institute of Finance){115291531} libgen.li.pdf",
+      "pages_read": 330,
+      "pages_with_text": 217,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Jean-Philippe Bouchaud, Julius Bonart, Jonathan Donier, Martin G - Trades, Quotes and Prices_ Financial Markets Under the Microscope (2018, CUP) - libgen.li.pdf",
+      "file_sha256": "289c40fdb0ba973cf60c00c33fbaa06bf01a6e645d53cbbaac1e46fd5c81cd8c",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Jean-Philippe Bouchaud, Julius Bonart, Jonathan Donier, Martin G - Trades, Quotes and Prices_ Financial Markets Under the Microscope (2018, CUP) - libgen.li.pdf",
+      "pages_read": 463,
+      "pages_with_text": 448,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Joel Hasbrouck - Empirical market microstructure (2007, Oxford University Press, USA) - libgen.li.pdf",
+      "file_sha256": "09b646b52ad3d67769a4e0184b2561d497dfac08cc43bb177a2987cd51199d6d",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Joel Hasbrouck - Empirical market microstructure (2007, Oxford University Press, USA) - libgen.li.pdf",
+      "pages_read": 203,
+      "pages_with_text": 203,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\John F Carter - Mastering the Trade, Third Edition_ Proven Techniques for Profiting from Intraday and Swing Trading Setups (2018, McGraw-Hill Education) - libgen.li.pdf",
+      "file_sha256": "da40f3d38254e14223749c5f21393f2cb90c9d8428b8fab971b77db0c311d7c3",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\John F Carter - Mastering the Trade, Third Edition_ Proven Techniques for Profiting from Intraday and Swing Trading Setups (2018, McGraw-Hill Education) - libgen.li.pdf",
+      "pages_read": 495,
+      "pages_with_text": 494,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Marcel Link - High Probability Trading_ Take the Steps to Become a Successful Trader (2003, McGraw-Hill Professional) [10.1036_0071429018] - libgen.li.pdf",
+      "file_sha256": "e697e6ed5dbb6f9643ed2b25ae794d13d406da89e53f62a4b1e7fa5a7b4726ec",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Marcel Link - High Probability Trading_ Take the Steps to Become a Successful Trader (2003, McGraw-Hill Professional) [10.1036_0071429018] - libgen.li.pdf",
+      "pages_read": 415,
+      "pages_with_text": 414,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Marcos Lopez de Prado - Advances in Financial Machine Learning (2018, Wiley) - libgen.li.pdf",
+      "file_sha256": "5a93ef385b4216c7859bd8e17401195a3aa70f91583f37984f56121e33e93305",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Marcos Lopez de Prado - Advances in Financial Machine Learning (2018, Wiley) - libgen.li.pdf",
+      "pages_read": 393,
+      "pages_with_text": 371,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Maureen O'Hara - Market Microstructure Theory (1998, Wiley) - libgen.li.pdf",
+      "file_sha256": "49326624ee09a9a7f7201854c3cb2a49aad9beb297b5a5ee73b8fca9e834a09f",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Maureen O'Hara - Market Microstructure Theory (1998, Wiley) - libgen.li.pdf",
+      "pages_read": 293,
+      "pages_with_text": 0,
+      "status": "EMPTY_TEXT"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Michel M. Dacorogna, Ramazan Gençay, Ulrich A. Müller, Richard B - An Introduction to High-Frequency Finance (2001, Academic Press) - libgen.li.pdf",
+      "file_sha256": "571a681bb1337a3d0f9c8af932024e525c0bd264862d928bea6505da12428870",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Michel M. Dacorogna, Ramazan Gençay, Ulrich A. Müller, Richard B - An Introduction to High-Frequency Finance (2001, Academic Press) - libgen.li.pdf",
+      "pages_read": 407,
+      "pages_with_text": 0,
+      "status": "EMPTY_TEXT"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Python for Finance_ Mastering Data-Driven Finance{Yves Hilpisch}(2018, O&_039_Reilly Media){113647311} libgen.li.pdf",
+      "file_sha256": "9669380e02c8b502ff855f73f7ec3b59aa798bfa78c366b018b2e378e2153aa3",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Python for Finance_ Mastering Data-Driven Finance{Yves Hilpisch}(2018, O&_039_Reilly Media){113647311} libgen.li.pdf",
+      "pages_read": 1055,
+      "pages_with_text": 1053,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Richard Grinold, Ronald Kahn - Active Portfolio Management_ A Quantitative Approach for Producing Superior Returns and Controlling Risk (1999, McGraw-Hill) - libgen.li.pdf",
+      "file_sha256": "b91c02e0f4ad877201a89e597e67f7c48fc6c93564b2b1774f60c12364aac46d",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Richard Grinold, Ronald Kahn - Active Portfolio Management_ A Quantitative Approach for Producing Superior Returns and Controlling Risk (1999, McGraw-Hill) - libgen.li.pdf",
+      "pages_read": 621,
+      "pages_with_text": 613,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Robert Carver - Systematic Trading_ A unique new method for designing trading and investing systems (2015, Harriman House) - libgen.li.pdf",
+      "file_sha256": "380736f086b0b54630215315c35d249accf2df0ccfe71e4c0edb2858fb9a9f74",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Robert Carver - Systematic Trading_ A unique new method for designing trading and investing systems (2015, Harriman House) - libgen.li.pdf",
+      "pages_read": 326,
+      "pages_with_text": 305,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Roy E. Bailey - The Economics of Financial Markets (2005, Cambridge University Press) - libgen.li.pdf",
+      "file_sha256": "47128c5d01db803fc7b897768860602df6f4555591eec2dc1bf09d7f3f3ca2d7",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Roy E. Bailey - The Economics of Financial Markets (2005, Cambridge University Press) - libgen.li.pdf",
+      "pages_read": 550,
+      "pages_with_text": 545,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Stefan Jansen - Machine Learning for Algorithmic Trading_ Predictive models to extract signals from market and alternative data for systematic (2020, Packt Publishing) - libgen.li.pdf",
+      "file_sha256": "be82bf3c23f6886b73bd759aeacd34ff6cb25fe973afe2c41cf2b542def6adab",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Stefan Jansen - Machine Learning for Algorithmic Trading_ Predictive models to extract signals from market and alternative data for systematic (2020, Packt Publishing) - libgen.li.pdf",
+      "pages_read": 821,
+      "pages_with_text": 808,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Steve Bell - Quantitative Finance For Dummies (2016, For Dummies) - libgen.li.pdf",
+      "file_sha256": "8ff8adda59cae95139e3c5a60fcb6df0ba3edee042874d28c0945652bc0bc75a",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Steve Bell - Quantitative Finance For Dummies (2016, For Dummies) - libgen.li.pdf",
+      "pages_read": 411,
+      "pages_with_text": 399,
+      "status": "READ"
+    },
+    {
+      "path": "C:\\Users\\Zaid barghouthi\\Downloads\\Trading Price Action Trading Ranges _ Technical Analysis of -- Al Brooks -- price action trading Al Brooks, 2, 1, 2012 -- Wiley Trading -- isbn13 9781118066676 -- 65087024b6360188e4766b7d84e200a0 -- Anna’.pdf",
+      "file_sha256": "fa0d635fd144863810e330a1316cf96e7a59984a52d5625524c8a9e8ce8988dc",
+      "source_path": "C:\\Users\\Zaid barghouthi\\Downloads\\Trading Price Action Trading Ranges _ Technical Analysis of -- Al Brooks -- price action trading Al Brooks, 2, 1, 2012 -- Wiley Trading -- isbn13 9781118066676 -- 65087024b6360188e4766b7d84e200a0 -- Anna’.pdf",
+      "pages_read": 617,
+      "pages_with_text": 616,
+      "status": "READ"
+    }
+  ]
+}

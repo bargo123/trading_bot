@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+import json
 
 import pandas as pd
 import pytest
@@ -12,6 +13,7 @@ from aegis.intel.quote_buffer import QuoteBuffer
 from aegis.intel.firehose_turnover import FirehoseReentryGuard, TurnoverMetrics
 from aegis.intel.ticket_metadata import TicketMetadataStore, create_ticket_metadata
 from aegis.intel.trade_controller import TradeController
+from aegis.intel.integration_contracts import OrderIntent
 from aegis.sizing import ContractSpec
 from scripts.run_broker_paper import (
     confirmed_position_geometry,
@@ -39,6 +41,7 @@ from scripts.run_broker_paper import (
     remove_confirmed_firehose_basket,
     remove_confirmed_firehose_basket_then_cleanup,
     firehose_decision_snapshot,
+    watcher_funnel_fields,
     frozen_opportunity_from_decision,
     intelligent_refresh_spread_limit,
     meaningful_quote_change,
@@ -50,12 +53,15 @@ from scripts.run_broker_paper import (
     feed_stall_threshold,
     video_style_signal_for_scan,
     pending_order_lifecycle_metadata,
+    market_event_from_quote,
     outcome_features_from_ticket_metadata,
     record_broker_confirmed_outcome_learning,
     finalize_confirmed_firehose_close,
     execute_cooperative_checkpoint,
     FirehoseStopRequested,
     legacy_normal_exit_enabled,
+    append_firehose_contract,
+    reconnect_engine_for_retry,
 )
 from aegis.intel.send_guard import candidate_spread_limit, refresh_verdict
 import scripts.run_broker_paper as broker_runner
@@ -86,6 +92,149 @@ def test_global_lane_selection_telemetry_counts_frozen_choices_and_books():
     }
 
 
+def test_global_selection_preserves_candidate_scoped_book_signals():
+    counts = {}
+    selected = [{
+        "lane": "CALIBRATED_EXPLORATION",
+        "book_signal_rows": [
+            {"signal_id": "book:a", "alignment": "SUPPORTS"},
+            {"signal_id": "book:b", "alignment": "OPPOSES"},
+        ],
+    }]
+
+    record_global_lane_selection(counts, selected)
+
+    assert counts["BOOK_SIGNALS_SELECTED"] == 2
+
+
+def test_watcher_funnel_fields_preserve_read_only_advisory_summary():
+    fields = watcher_funnel_fields({
+        "status": "AVAILABLE",
+        "algorithm_count": 616,
+        "evaluated_count": 616,
+        "applicable_count": 42,
+        "consensus": "BUY",
+        "supporting_algorithm_count": 25,
+        "opposing_algorithm_count": 17,
+        "algorithm_result_sha256": "abc123",
+        "execution_authority": False,
+        "research_only": True,
+        "order_intent": False,
+    })
+
+    assert fields == {
+        "watcher_status": "AVAILABLE",
+        "watcher_algorithm_count": 616,
+        "watcher_evaluated_count": 616,
+        "watcher_applicable_count": 42,
+        "watcher_consensus": "BUY",
+        "watcher_supporting_count": 25,
+        "watcher_opposing_count": 17,
+        "watcher_result_sha256": "abc123",
+        "watcher_execution_authority": False,
+        "watcher_research_only": True,
+        "watcher_order_intent": False,
+    }
+
+
+def test_market_event_from_quote_preserves_broker_time_and_executable_prices():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    quote = SimpleNamespace(
+        time=datetime.fromtimestamp(100.25, timezone.utc),
+        raw_time_msc=100250,
+        bid=1.1000,
+        ask=1.1002,
+    )
+
+    event = market_event_from_quote("eurusd", quote)
+
+    assert event.contract_type == "MarketEvent"
+    assert event.symbol == "EURUSD"
+    assert event.event_ts == pytest.approx(100.25)
+    assert event.payload["bid"] == pytest.approx(1.1000)
+    assert event.payload["ask"] == pytest.approx(1.1002)
+    assert event.payload["raw_time_msc"] == 100250
+    assert event.payload["quote_source"] == "mt5.symbol_info_tick"
+    assert event.correlation_id == "market:EURUSD"
+
+
+def test_market_event_uses_normalized_broker_time_not_future_server_clock():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    quote = SimpleNamespace(
+        time=datetime.fromtimestamp(100.25, timezone.utc),
+        time_msc=100250,
+        raw_time_msc=(100250 + 10_800_000),
+        bid=1.1000,
+        ask=1.1002,
+    )
+
+    event = market_event_from_quote("EURUSD", quote)
+
+    assert event.event_ts == pytest.approx(100.25)
+    assert event.payload["normalized_time_msc"] == 100250
+    assert event.payload["raw_time_msc"] == 10_900_250
+
+
+def test_runner_contract_helper_writes_versioned_order_intent_to_journal(tmp_path):
+    journal = tmp_path / "journal.jsonl"
+
+    event = append_firehose_contract(
+        journal,
+        OrderIntent,
+        event_id="intent-1",
+        correlation_id="scan-1",
+        symbol="EURUSD",
+        event_ts=100.0,
+        source="run_broker_paper",
+        status="READY",
+        reason="fresh_revalidation_pass",
+        payload={"side": "buy", "watcher_execution_authority": False},
+    )
+
+    assert event["contract_type"] == "OrderIntent"
+    rows = [json.loads(line) for line in journal.read_text(encoding="utf-8").splitlines()]
+    assert rows[0]["event"] == "firehose_contract.v1"
+    assert rows[0]["contract"]["schema_version"] == "aegis.order_intent.v1"
+    assert rows[0]["contract"]["payload"]["watcher_execution_authority"] is False
+
+
+def test_decision_snapshot_persists_watcher_advisory_as_research_evidence():
+    decision = SimpleNamespace(
+        side="buy",
+        expected_net_value=0.02,
+        journal={
+            "watcher_advisory": {
+                "status": "AVAILABLE",
+                "algorithm_count": 616,
+                "execution_authority": False,
+                "research_only": True,
+                "order_intent": False,
+            }
+        },
+    )
+
+    snapshot = firehose_decision_snapshot(
+        decision=decision,
+        symbol="EURUSD",
+        scan_id="scan-watcher",
+        bar_time="2026-08-30T00:00:00+00:00",
+        side="buy",
+        qty=0.01,
+        entry=1.1002,
+        stop=1.0998,
+        target=1.1008,
+        spread=0.0002,
+        quote_age=0.1,
+    )
+
+    assert snapshot["watcher_advisory"]["algorithm_count"] == 616
+    assert snapshot["watcher_advisory"]["execution_authority"] is False
+
+
 def test_cooperative_checkpoint_updates_management_heartbeat_and_counters():
     state = RuntimeCheckpointState(interval_s=1.0)
     heartbeats = []
@@ -113,6 +262,30 @@ def test_cooperative_checkpoint_updates_management_heartbeat_and_counters():
     assert result["OPEN_TICKET_RECHECKS"] == 2
     assert result["CONFIRMED_CLOSES_FINALIZED"] == 1
     assert result["SCAN_SYMBOL_INDEX"] == 4
+
+
+def test_reconnect_engine_for_retry_surfaces_authorization_failure():
+    class Engine:
+        def connect(self):
+            raise RuntimeError("mt5.initialize failed (-6) Terminal: Authorization failed")
+
+    connected, reason = reconnect_engine_for_retry(Engine())
+
+    assert connected is False
+    assert reason == (
+        "RuntimeError:mt5.initialize failed (-6) Terminal: Authorization failed"
+    )
+
+
+def test_reconnect_engine_for_retry_reports_success():
+    class Engine:
+        def connect(self):
+            return None
+
+    connected, reason = reconnect_engine_for_retry(Engine())
+
+    assert connected is True
+    assert reason == ""
 
 
 def test_cooperative_checkpoint_honors_operator_stop_before_management():
@@ -206,6 +379,27 @@ def test_heartbeat_atomic_writer_replaces_target_without_temp_file(tmp_path):
     _write_text_atomically(target, '{"status":"running"}')
 
     assert target.read_text(encoding="utf-8") == '{"status":"running"}'
+    assert list(tmp_path.glob(".bot_heartbeat.json.*.tmp")) == []
+
+
+def test_heartbeat_atomic_writer_retries_transient_replace_lock(tmp_path, monkeypatch):
+    target = tmp_path / "bot_heartbeat.json"
+    calls = []
+    real_replace = broker_runner.os.replace
+
+    def flaky_replace(source, destination):
+        calls.append((source, destination))
+        if len(calls) < 3:
+            raise PermissionError(5, "target is temporarily locked")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(broker_runner.os, "replace", flaky_replace)
+    monkeypatch.setattr(broker_runner.time, "sleep", lambda _seconds: None)
+
+    _write_text_atomically(target, '{"status":"running"}')
+
+    assert target.read_text(encoding="utf-8") == '{"status":"running"}'
+    assert len(calls) == 3
     assert list(tmp_path.glob(".bot_heartbeat.json.*.tmp")) == []
 
 
@@ -1180,6 +1374,26 @@ def test_exploration_order_risk_check_rejects_stale_quote_size_breach():
     assert result["max_lots"] == 0.02
 
 
+@pytest.mark.parametrize("bad_tick", [-1.0, float("nan"), float("inf")])
+def test_exploration_order_risk_check_never_accepts_invalid_tick_value(bad_tick):
+    result = exploration_order_risk_check(
+        order_qty=0.01,
+        entry=1.1000,
+        stop=1.0950,
+        pip=0.0001,
+        max_risk_usd=0.15,
+        spec={
+            "trade_contract_size": 100000.0,
+            "trade_tick_value": bad_tick,
+            "trade_tick_size": 0.00001,
+            "volume_min": 0.01,
+            "volume_step": 0.01,
+        },
+    )
+    assert result["allowed"] is False
+    assert result["reason"] == "exploration_min_lot_exceeds_risk_budget"
+
+
 def test_video_style_prediction_signal_uses_shared_direction_only_when_enabled():
     frame = pd.DataFrame({
         "time": pd.date_range("2026-01-01", periods=3, freq="min", tz="UTC"),
@@ -1452,6 +1666,11 @@ def test_confirmed_close_finalizer_releases_every_owner_once(tmp_path):
     assert learning_ids == ["T1"]
     assert metadata_store.get("T1") is None
     assert [event["event"] for event in journal_events].count("firehose_close") == 1
+    assert {
+        event["contract_type"]
+        for event in journal_events
+        if event.get("event") == "firehose_contract.v1"
+    } >= {"ConfirmedClose", "ConfirmedOutcome"}
     assert journal_events[-1]["event"] == "firehose_basket_close"
 
 

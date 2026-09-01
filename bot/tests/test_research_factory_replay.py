@@ -68,6 +68,31 @@ def test_broker_symbol_spec_rejects_missing_or_non_positive_evidence(mapping):
         BrokerSymbolSpec.from_mapping(mapping)
 
 
+def test_broker_symbol_spec_uses_conservative_tick_value_when_broker_splits_sides():
+    spec = BrokerSymbolSpec.from_mapping(
+        {
+            "trade_tick_value": 1.0,
+            "trade_tick_value_loss": 2.0,
+            "trade_tick_value_profit": 3.0,
+            "trade_tick_size": 0.00001,
+            "volume_min": 0.01,
+        }
+    )
+    assert spec.trade_tick_value == 3.0
+
+
+def test_broker_symbol_spec_normalizes_negative_loss_tick_value():
+    spec = BrokerSymbolSpec.from_mapping(
+        {
+            "trade_tick_value": 0.0,
+            "trade_tick_value_loss": -2.0,
+            "trade_tick_size": 0.00001,
+            "volume_min": 0.01,
+        }
+    )
+    assert spec.trade_tick_value == 2.0
+
+
 def test_replay_without_cost_evidence_fails_closed():
     result = replay_hypothesis(pd.DataFrame(), compiled=None, costs=None)
 

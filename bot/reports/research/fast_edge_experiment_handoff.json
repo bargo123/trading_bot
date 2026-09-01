@@ -1,12 +1,140 @@
 {
   "claude_next_experiments": [],
   "execution_authority": "NONE",
-  "exit_recommendations": [],
-  "feature_tests": [],
-  "generated_at": "2026-08-27T11:19:52.971615+00:00",
-  "hypotheses": [],
-  "next_experiments": [],
+  "exit_recommendations": [
+    {
+      "rationale": "Top candidate is fast (1s to green) yet negative under replay; the USDCHF slice (median exit 7s, mfe_protection) is the only positive line. Faster, cost-aware exits may convert the descriptive fast edge into realized edge before mean reversion.",
+      "recommendation": "Replace captured_exit_replay with a fast MFE/tick-target exit for the tight spread-vol gated population, targeting first favorable tick within 1-2s, to lock in the green that the 1.0s time-to-green signature implies.",
+      "validation_required": "Sealed OOS, n>=200, identical gated entry; require mfe/tick PF - replay PF > 0."
+    },
+    {
+      "rationale": "Edge decays with horizon (H3); bounding holding time keeps the trade in the high-separation regime.",
+      "recommendation": "Add a hard time-stop (e.g. exit at 1-3s max) for the fast-clean population to cap the slow-losing tail that the spread-to-vol gate cannot fully exclude."
+    },
+    {
+      "rationale": "Selection bias; would violate the AGENTS.md rule against fabricated/under-evidenced metrics and the NO_POSITIVE_OOS status.",
+      "recommendation": "Do NOT promote the USDCHF mfe_protection slice to a live candidate. It is n=20 and contradicts the sealed-OOS reality."
+    }
+  ],
+  "feature_tests": [
+    {
+      "feature": "spread_to_realized_vol",
+      "test": "Already separates fast-clean from slow-losing (std-diff -1.50 at 1s). Combine with profitability filter; alone it yields PF 0.467.",
+      "verdict": "PROMOTE TO GATE (descriptive separator), DEMOTE AS STANDALONE EDGE"
+    },
+    {
+      "feature": "spread_to_micro_vol",
+      "test": "std-diff -1.42 at 1s, monotone decay with horizon. Pair with spread_to_realized_vol for tighter gating.",
+      "verdict": "PROMOTE TO GATE"
+    },
+    {
+      "feature": "symbol_bucket_13",
+      "test": "Over-represented in fast-clean (0.195 vs 0.029 at 1s, std-diff +0.55). Test interaction with spread-vol gate; reject if bucket_13 stratified PF <= 0.467.",
+      "verdict": "CANDIDATE (cross-sectional)"
+    },
+    {
+      "feature": "win_MAGNITUDE_predictors (NEW)",
+      "test": "The failure mode is small wins (avg_win ~ avg_loss) not low hit rate alone. Build realized-vol-normalized win size, sub-second momentum continuation, micro-vol mean-reversion features to predict captured_exit_return magnitude, not just P_GREEN.",
+      "verdict": "REQUEST NEW FEATURES"
+    },
+    {
+      "feature": "P_TAIL_LOSS (calibrated 0.18 positive rate, ECE 0.011)",
+      "test": "Well-calibrated; use as entry filter (require P_TAIL_LOSS < 0.20) combined with spread-vol gate.",
+      "verdict": "PROMOTE TO RISK GATE"
+    }
+  ],
+  "generated_at": "2026-08-28T20:00:31.616031+00:00",
+  "hypotheses": [
+    {
+      "id": "H1_low_spread_vol_necessary_not_sufficient",
+      "rejection_gate": "Tight gate (spread_to_realized_vol_max<=0.05 AND spread_to_micro_vol_max<=0.5) yields sealed executable captured_exit_pf < 1.0. ALREADY REJECTED: sealed PF 0.467 across ~2700 trades. Sufficiency fails; the feature is a discriminator, not an edge.",
+      "required_features": [
+        "spread_to_realized_vol",
+        "spread_to_micro_vol",
+        "captured_exit_return",
+        "green_within_1s"
+      ],
+      "statement": "Low spread_to_realized_vol and low spread_to_micro_vol are necessary conditions for fast winners but NOT sufficient for profitable execution net of spread."
+    },
+    {
+      "id": "H2_slice_alpha_usdchf_ny_ve_m1rpb_mfe",
+      "rejection_gate": "Reject unless a freshly drawn sealed-OOS slice reaches n>=200 with captured_exit_pf > 1.05 AND captured_exit_expectancy > 0 at the same per-trade spread assumption. Current n=20 is a tiny-sample/selection-bias victim; reject until replicated.",
+      "required_features": [
+        "symbol=USDCHF",
+        "session=new_york",
+        "regime=volatility_expansion",
+        "structure=m1_range_or_pullback",
+        "exit=mfe_protection",
+        "captured_exit_return"
+      ],
+      "statement": "A specific microstructure slice (USDCHF buy, new_york, volatility_expansion, m1_range_or_pullback, mfe_protection exit) carries genuine positive expectancy."
+    },
+    {
+      "id": "H3_edge_decays_with_horizon",
+      "rejection_gate": "Reject if, after re-gating per horizon, the standardized difference for spread_to_realized_vol does NOT fall monotonically 1s->10s, OR if any horizon's gated sealed PF crosses >1.0. Descriptive std-diff already falls -1.50->-0.89; expect no positive PF at any horizon (consistent with observed gated PF 0.46).",
+      "required_features": [
+        "spread_to_realized_vol",
+        "spread_to_micro_vol",
+        "horizon_s",
+        "captured_exit_return"
+      ],
+      "statement": "The fast-winner edge (descriptive separation strength) decays monotonically as the holding horizon lengthens from 1s to 10s+."
+    },
+    {
+      "id": "H4_symbol_bucket_13_cross_section",
+      "rejection_gate": "Reject if stratified PF for bucket_13 under the tight spread-vol gate is <= overall gated PF (0.467) with n_bucket >= 200 in sealed OOS.",
+      "required_features": [
+        "symbol_bucket_13",
+        "spread_to_realized_vol",
+        "captured_exit_return"
+      ],
+      "statement": "symbol_bucket_13 over-representation among fast-clean trades is a real cross-sectional effect, not noise, and improves gated PF."
+    },
+    {
+      "id": "H5_exit_policy_recovers_edge",
+      "rejection_gate": "Reject if, on identical gated entry and n>=200/sealed-OOS slice, (mfe_protection PF - captured_exit_replay PF) <= 0. Positive only hinted by USDCHF n=20; requires validation.",
+      "required_features": [
+        "exit_policy",
+        "median_exit_time_s",
+        "captured_exit_return",
+        "spread_to_realized_vol"
+      ],
+      "statement": "A fast MFE/tick-target exit recovers edge for the tight-spread-vol gated population better than captured_exit_replay."
+    }
+  ],
+  "next_experiments": [
+    {
+      "experiment": "Cost-sensitivity sweep on the tight gated set",
+      "gate": "PF>1.0 at some spread multiplier with n>=200 sealed.",
+      "why": "Edge is sub-spread (PF 0.467 at full spread). Test assumed spread multipliers 1.0x/0.5x/0.25x on the sealed gated set. If PF crosses 1.0 at <0.5x, the strategy is cost-bound and a lower-cost venue/execution would unlock it."
+    },
+    {
+      "experiment": "Per-slice n>=200 gated PF map",
+      "gate": "Report only slices meeting n>=200; flag any PF>1.05.",
+      "why": "Avoid n=20 artifacts. Re-run spread-vol gate sweep at finer thresholds, discarding any slice with sealed n<200 before reporting PF. Produce only adequately-powered slices."
+    },
+    {
+      "experiment": "Expand USDCHF NY volatility_expansion m1_range_or_pullback sealed OOS",
+      "gate": "Reach n>=200 sealed; require PF>1.05 to promote; else reject H2.",
+      "why": "Validate the only positive exit line with adequate sample."
+    },
+    {
+      "experiment": "Combined gate: spread_to_realized_vol<=0.05 AND P_TAIL_LOSS<0.20 AND symbol_bucket_13 interaction",
+      "gate": "Sealed PF>1.0 with n>=200 and calibrated P_TAIL_LOSS filter retained.",
+      "why": "Stack the calibrated risk gate with the discriminant gate and the cross-sectional candidate to isolate any profitable sub-population."
+    },
+    {
+      "experiment": "Win-MAGNITUDE model (ridge on captured_exit_return gated by spread-vol)",
+      "gate": "Gated-subset predicted mean captured_return > 0 with sealed OOS MAE consistent.",
+      "why": "Current ridge predicts negative mean everywhere. Condition on the gated fast-clean population to test whether mean captured return turns positive when spread cost is excluded from the feature space."
+    },
+    {
+      "experiment": "Stricter fast-clean definition re-measure",
+      "gate": "Separation std-diff remains >1.0 under stricter definition.",
+      "why": "Redefine fast_clean = green_within_1s AND closed_within_1-2s AND positive_net; re-measure feature separation to confirm the signal is not diluted by slow exits mislabeled fast."
+    }
+  ],
   "schema": "fast_edge_experiment_handoff.v1",
-  "source_report": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\reports\\research\\fast_edge_generations\\20260827T104845Z\\fast_edge_leaderboard.json",
+  "source_report": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\reports\\research\\fast_edge_generations\\20260828T191845Z\\fast_edge_leaderboard.json",
   "source_schema": "fast_edge_council_review.v1"
 }

@@ -1,0 +1,1 @@
+This is an error message, not a research proposal: it defines no hypothesis, data, methodology, or measurable outcome. It provides no validation plan and cannot support a strategy, model, or safety decision.

@@ -1,0 +1,1 @@
+This is an error message, not a research proposal: it states no hypothesis, methodology, validation plan, or measurable performance claim. It cannot be evaluated for overfitting or trading safety until the unsupported model configuration is corrected and a concrete proposal is supplied.

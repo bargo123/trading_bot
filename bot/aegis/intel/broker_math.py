@@ -28,18 +28,36 @@ class BrokerSymbolSpec:
         if spec is None:
             raise ValueError("broker symbol specification is required")
         try:
-            raw_values = (
-                spec["trade_tick_value"],
-                spec["trade_tick_size"],
-                spec["volume_min"],
-            )
+            raw_values = (spec["trade_tick_size"], spec["volume_min"])
             if any(isinstance(value, bool) for value in raw_values):
                 raise ValueError
-            tick_val, tick_sz, vol_min = (float(value) for value in raw_values)
+            tick_sz, vol_min = (float(value) for value in raw_values)
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("positive tick value, tick size, and volume minimum are required") from exc
-        if not all(math.isfinite(value) and value > 0 for value in (tick_val, tick_sz, vol_min)):
+        tick_values: list[float] = []
+        for key in (
+            "trade_tick_value_loss",
+            "trade_tick_value",
+            "trade_tick_value_profit",
+        ):
+            raw = spec.get(key)
+            if raw is None:
+                continue
+            if isinstance(raw, bool):
+                raise ValueError("positive tick value, tick size, and volume minimum are required")
+            try:
+                value = abs(float(raw))
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if math.isfinite(value) and value > 0:
+                tick_values.append(value)
+        if not tick_values or not all(
+            math.isfinite(value) and value > 0 for value in (*tick_values, tick_sz, vol_min)
+        ):
             raise ValueError("positive tick value, tick size, and volume minimum are required")
+        # A broker can report distinct profit/loss tick values.  Management
+        # conversions must not use the smaller value and understate risk.
+        tick_val = max(tick_values)
 
         contract_raw = spec.get("trade_contract_size")
         try:

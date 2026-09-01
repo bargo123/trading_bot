@@ -793,46 +793,132 @@ def check_entry_economics(candidate: MicroCandidate, *,
                           spread_p90: float | None = None) -> dict[str, Any]:
     """Broker-native pre-entry economics. Uses tick_value/tick_size when
     available for correct JPY/cross pricing; falls back to contract*pip."""
-    rejections = []
-    pip = pip_value(candidate.symbol)
-    stop_dist_price = abs(candidate.entry_price - candidate.invalidation)
-    if tick_value and tick_size and tick_size > 0:
-        usd_per_price_unit_per_lot = float(tick_value) / float(tick_size)
+    rejections: list[str] = []
+
+    def _finite(value: Any) -> float | None:
+        try:
+            number = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return number if math.isfinite(number) else None
+
+    budget = _finite(max_risk_usd)
+    volume = _finite(volume_min)
+    commission = _finite(commission_rt_usd)
+    slippage = _finite(slippage_pips)
+    if budget is None or budget <= 0:
+        rejections.append("INVALID_RISK_BUDGET")
+    if volume is None or volume <= 0:
+        rejections.append("INVALID_VOLUME_SPEC")
+    if commission is None or commission < 0 or slippage is None or slippage < 0:
+        rejections.append("INVALID_COST_INPUTS")
+
+    try:
+        pip = _finite(pip_value(candidate.symbol))
+    except (AttributeError, TypeError, ValueError):
+        pip = None
+    entry = _finite(getattr(candidate, "entry_price", None))
+    invalidation = _finite(getattr(candidate, "invalidation", None))
+    target = _finite(getattr(candidate, "target", None))
+    spread_pips = _finite(getattr(candidate, "spread_pips", None))
+    stop_pips = _finite(getattr(candidate, "stop_pips", None))
+    target_pips = _finite(getattr(candidate, "target_pips", None))
+    if (
+        pip is None or pip <= 0 or entry is None or invalidation is None
+        or target is None or spread_pips is None or stop_pips is None
+        or target_pips is None or abs(entry - invalidation) <= 0
+    ):
+        rejections.append("INVALID_GEOMETRY")
+    if spread_pips is not None and spread_pips < 0:
+        rejections.append("INVALID_COST_INPUTS")
+    for optional_spread in (measured_spread_percentile, spread_p90):
+        if optional_spread is not None:
+            value = _finite(optional_spread)
+            if value is None or value < 0:
+                rejections.append("INVALID_COST_INPUTS")
+
+    if rejections:
+        # Never let a malformed broker/config input reach arithmetic or be
+        # interpreted as a free/zero-cost trade by a caller.
+        return {
+            "allowed": False,
+            "rejections": list(dict.fromkeys(rejections)),
+            "min_lot_risk_usd": None,
+            "risk_budget_usd": budget,
+            "total_cost_pips": None,
+            "net_target_pips": None,
+            "payoff_net": None,
+            "distance_to_eligibility": {"max_gate_distance": float("inf")},
+            "near_eligible": False,
+        }
+
+    assert budget is not None and volume is not None
+    assert commission is not None and slippage is not None
+    assert pip is not None and entry is not None and invalidation is not None
+    assert target_pips is not None and spread_pips is not None and stop_pips is not None
+    stop_dist_price = abs(entry - invalidation)
+    try:
+        resolved_tick_value = abs(float(tick_value)) if tick_value is not None else None
+        resolved_tick_size = float(tick_size) if tick_size is not None else None
+    except (TypeError, ValueError, OverflowError):
+        resolved_tick_value = resolved_tick_size = None
+    if (
+        resolved_tick_value is not None
+        and math.isfinite(resolved_tick_value)
+        and resolved_tick_value > 0
+        and resolved_tick_size is not None
+        and math.isfinite(resolved_tick_size)
+        and resolved_tick_size > 0
+    ):
+        usd_per_price_unit_per_lot = resolved_tick_value / resolved_tick_size
     else:
-        usd_per_price_unit_per_lot = contract_size
-    min_lot_risk = stop_dist_price * usd_per_price_unit_per_lot * volume_min
-    budget = max_risk_usd
+        try:
+            usd_per_price_unit_per_lot = float(contract_size)
+        except (TypeError, ValueError, OverflowError):
+            usd_per_price_unit_per_lot = float("nan")
+        if not math.isfinite(usd_per_price_unit_per_lot) or usd_per_price_unit_per_lot <= 0:
+            return {
+                "allowed": False,
+                "rejections": ["CONTRACT_VALUE_UNAVAILABLE"],
+                "min_lot_risk_usd": None,
+                "risk_budget_usd": budget,
+                "total_cost_pips": None,
+                "net_target_pips": None,
+                "payoff_net": None,
+                "distance_to_eligibility": {"max_gate_distance": float("inf")},
+                "near_eligible": False,
+            }
+    min_lot_risk = stop_dist_price * usd_per_price_unit_per_lot * volume
     if min_lot_risk > budget:
         rejections.append("RISK_GRANULARITY_BLOCKED")
-    total_cost_pips = candidate.spread_pips + slippage_pips + \
-        (commission_rt_usd / (usd_per_price_unit_per_lot * pip * volume_min)
-         if volume_min > 0 else 0)
-    net_target = candidate.target_pips - total_cost_pips
+    total_cost_pips = spread_pips + slippage + \
+        (commission / (usd_per_price_unit_per_lot * pip * volume))
+    net_target = target_pips - total_cost_pips
     if net_target <= 0:
         rejections.append("NEGATIVE_EXPECTED_NET_AFTER_COST")
-    if candidate.spread_pips > candidate.target_pips * 0.5:
+    if spread_pips > target_pips * 0.5:
         rejections.append("SPREAD_FAILURE")
-    if candidate.stop_pips < 0.5:
+    if stop_pips < 0.5:
         rejections.append("INVALID_GEOMETRY")
-    if candidate.stop_pips > 20:
+    if stop_pips > 20:
         rejections.append("TAIL_RISK_FAILURE")
     if measured_spread_percentile is not None and spread_p90 is not None \
-            and candidate.spread_pips > spread_p90:
+            and spread_pips > float(spread_p90):
         rejections.append("SPREAD_ABNORMAL_PERCENTILE")
 
-    spread_limit_pips = candidate.target_pips * 0.5
+    spread_limit_pips = target_pips * 0.5
     distance = {
         # Raw distances keep a 0.1-pip near miss distinct from a structurally
         # impossible candidate. Values are zero when that gate is satisfied.
-        "spread_excess_pips": round(max(0.0, candidate.spread_pips - spread_limit_pips), 4),
+        "spread_excess_pips": round(max(0.0, spread_pips - spread_limit_pips), 4),
         "spread_percentile_excess_pips": round(
-            max(0.0, candidate.spread_pips - float(spread_p90 or 0.0))
+            max(0.0, spread_pips - float(spread_p90 or 0.0))
             if measured_spread_percentile is not None and spread_p90 is not None
             else 0.0,
             4,
         ),
-        "geometry_deficit_pips": round(max(0.0, 0.5 - candidate.stop_pips), 4),
-        "tail_risk_excess_pips": round(max(0.0, candidate.stop_pips - 20.0), 4),
+        "geometry_deficit_pips": round(max(0.0, 0.5 - stop_pips), 4),
+        "tail_risk_excess_pips": round(max(0.0, stop_pips - 20.0), 4),
         "risk_excess_usd": round(max(0.0, min_lot_risk - budget), 4),
         "net_ev_deficit_pips": round(max(0.0, -net_target), 4),
     }

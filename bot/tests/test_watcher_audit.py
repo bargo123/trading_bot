@@ -106,3 +106,118 @@ def test_incremental_ingest_rejects_bad_row_with_symbol_reason():
 
     assert result["status"] == "FAILED"
     assert "mapping" in result["reason"]
+
+
+def test_research_watcher_does_not_run_council_without_explicit_opt_in(monkeypatch):
+    calls = []
+    monkeypatch.setattr(w, "_evidence_changed", lambda: (False, 0))
+    monkeypatch.setattr(w, "_notes_changed", lambda: False)
+    monkeypatch.setattr(w, "staleness_report", lambda: {"alerts": []})
+    monkeypatch.setattr(w, "_evidence_trigger", lambda: "new_closed_trades")
+    monkeypatch.setattr(w, "_run_council_round", lambda **kwargs: calls.append(kwargs) or {"ok": True})
+    monkeypatch.setattr(w, "_run_script", lambda *args, **kwargs: {"ok": True, "stdout_json": {}})
+    monkeypatch.setattr(w, "write_status", lambda **kwargs: "status")
+    monkeypatch.setattr(w, "write_heartbeat", lambda **kwargs: "heartbeat")
+
+    result = w.run_cycle(1, fetch_exit=False)
+
+    assert calls == []
+    assert result["council"] is None
+
+
+def test_external_dag_refresh_builds_manifest_then_runs_github_book_workflow(
+    monkeypatch, tmp_path
+):
+    leaderboard = tmp_path / "leaderboard.json"
+    shadow_rows = tmp_path / "rows.jsonl"
+    selected_replay = tmp_path / "selected_replay.json"
+    leaderboard.write_text("{}", encoding="utf-8")
+    shadow_rows.write_text("{}\n", encoding="utf-8")
+    selected_replay.write_text("{}", encoding="utf-8")
+    manifest = tmp_path / "external_manifest.json"
+    artifacts = tmp_path / "artifacts"
+    status = tmp_path / "status.json"
+    registry = tmp_path / "experiments.sqlite"
+    bundle = tmp_path / "execution_bundle.json"
+    monkeypatch.setattr(w, "FAST_EDGE_LEADERBOARD", leaderboard)
+    monkeypatch.setattr(w, "FAST_EDGE_SHADOW_ROWS", shadow_rows)
+    monkeypatch.setattr(w, "SELECTED_STRATEGY_REPLAY", selected_replay)
+    monkeypatch.setattr(w, "EXTERNAL_DAG_MANIFEST", manifest)
+    monkeypatch.setattr(w, "EXTERNAL_DAG_ARTIFACTS", artifacts)
+    monkeypatch.setattr(w, "EXTERNAL_DAG_STATUS", status)
+    monkeypatch.setattr(w, "EXTERNAL_DAG_REGISTRY", registry)
+    monkeypatch.setattr(w, "EXTERNAL_DAG_BUNDLE", bundle)
+    calls = []
+
+    def fake_run_script(name, *args, **kwargs):
+        calls.append((name, args, kwargs))
+        return {
+            "ok": True,
+            "stdout_json": {"run_id": "fake-run", "promotion_status": "SHADOW_ONLY"},
+        }
+
+    monkeypatch.setattr(w, "_run_script", fake_run_script)
+
+    result = w._run_external_dag(7)
+
+    assert result["ok"] is True
+    assert result["promotion_status"] == "SHADOW_ONLY"
+    assert [call[0] for call in calls] == [
+        "build_external_dag_manifest.py",
+        "run_external_research_dag.py",
+    ]
+    manifest_args = calls[0][1]
+    assert "--selected-replay" in manifest_args
+    assert str(selected_replay) in manifest_args
+    dag_args = calls[1][1]
+    assert "--dataset-manifest" in dag_args
+    assert str(manifest) in dag_args
+    assert "--execution-bundle-path" in dag_args
+    assert str(bundle) in dag_args
+    assert "run_broker_paper.py" not in " ".join(dag_args)
+
+
+def test_external_dag_refresh_skips_without_frozen_source_inputs(monkeypatch, tmp_path):
+    monkeypatch.setattr(w, "FAST_EDGE_LEADERBOARD", tmp_path / "missing-leaderboard.json")
+    monkeypatch.setattr(w, "FAST_EDGE_SHADOW_ROWS", tmp_path / "missing-rows.jsonl")
+    calls = []
+    monkeypatch.setattr(w, "_run_script", lambda *args, **kwargs: calls.append(args))
+
+    result = w._run_external_dag(8)
+
+    assert result == {"ok": True, "skipped": "source_inputs_missing"}
+    assert calls == []
+
+
+def test_external_dag_refresh_fails_closed_without_selected_replay(monkeypatch, tmp_path):
+    leaderboard = tmp_path / "leaderboard.json"
+    shadow_rows = tmp_path / "rows.jsonl"
+    leaderboard.write_text("{}", encoding="utf-8")
+    shadow_rows.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(w, "FAST_EDGE_LEADERBOARD", leaderboard)
+    monkeypatch.setattr(w, "FAST_EDGE_SHADOW_ROWS", shadow_rows)
+    monkeypatch.setattr(w, "SELECTED_STRATEGY_REPLAY", tmp_path / "missing-selected.json")
+
+    result = w._run_external_dag(8)
+
+    assert result["ok"] is False
+    assert result["stage"] == "selected_replay"
+    assert result["reason"] == "selected_strategy_replay_missing"
+
+
+def test_run_cycle_refreshes_external_dag_after_new_evidence(monkeypatch):
+    monkeypatch.setattr(w, "_evidence_changed", lambda: (True, 1))
+    monkeypatch.setattr(w, "_notes_changed", lambda: False)
+    monkeypatch.setattr(w, "staleness_report", lambda: {"alerts": []})
+    monkeypatch.setattr(
+        w,
+        "_run_script",
+        lambda *args, **kwargs: {"ok": True, "stdout_json": {}},
+    )
+    monkeypatch.setattr(w, "_run_external_dag", lambda tick: {"ok": True, "run_id": f"run-{tick}"})
+    monkeypatch.setattr(w, "write_status", lambda **kwargs: "status")
+    monkeypatch.setattr(w, "write_heartbeat", lambda **kwargs: "heartbeat")
+
+    result = w.run_cycle(9, fetch_exit=False, ingest_enabled=False)
+
+    assert result["external_dag"] == {"ok": True, "run_id": "run-9"}
