@@ -1,0 +1,1 @@
+revised: Local deterministic proposal by gemini: treat 'Watch streaming verification question?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes.

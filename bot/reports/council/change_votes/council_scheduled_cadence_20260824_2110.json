@@ -1,0 +1,86 @@
+{
+  "change_id": "council_scheduled_cadence_20260824_2110",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-24T21:11:03.815148+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260824_2110",
+    "current_evidence": "Test a volatility-regime filter that suppresses intelligent-firehose signals when 1-hour ATR is above its rolling 90th percentile. Evaluate it on the sealed holdout against the current validated-state baseline with identical spread and slippage assumptions. Accept only if net expectancy improves by ",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Test a volatility-regime filter that suppresses intelligent-firehose signals when 1-hour ATR is above its rolling 90th percentile. Evaluate it on the sealed holdout against the current validated-state baseline with identical spread and slippage assumptions. Accept only if net expectancy improves by at least 0.05R per trade, maximum drawdown does not increase, and trade count remains at least 70% of baseline.",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/2)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-24T21:10:25.367597+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 2,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "opencode",
+      "concerns": [
+        "The current_evidence field is incomplete.",
+        "Using a sealed holdout requires a pre-registered one-time evaluation protocol to avoid leakage and repeated tuning.",
+        "The stated falsification criterion (negative expectancy) is weaker than the proposed acceptance gates.",
+        "ATR percentile window, ATR calculation, instruments, sample period, baseline version, and cost assumptions are unspecified.",
+        "Affected files include runtime intel paths despite the stated no-champion-impact scope."
+      ],
+      "confidence": 0.91,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal is research-only and appropriately prevents champion impact, but it lacks a complete, reproducible evaluation protocol for a sealed holdout and conflicts on falsification criteria versus acceptance gates.",
+      "requested_revisions": [
+        "Pre-register exact ATR parameters, rolling percentile lookback, instruments, time range, baseline artifact/version, spread, slippage, and execution assumptions.",
+        "Define whether the sealed holdout is evaluated once; use a separate validation split for parameter selection.",
+        "Align falsification criteria with all acceptance gates: net expectancy improvement >=0.05R/trade, no increased maximum drawdown, and trade count >=70% of baseline.",
+        "State that no runtime intel or champion artifact is modified unless governed promotion gates subsequently pass.",
+        "Record the experiment and result, including rejection, in ExperimentRegistry and sealed-holdout records."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Current evidence is truncated and does not state the claimed improvement threshold.",
+        "No explicit requirement to record the experiment in ExperimentRegistry.",
+        "Baseline definition, sealed-holdout period, sample size, and statistical decision method are unspecified.",
+        "ATR calculation and percentile-window timing must explicitly prevent lookahead.",
+        "The proposal should explicitly prohibit live trading, live-account access, live YAML changes, and champion promotion."
+      ],
+      "confidence": 0.96,
+      "model": null,
+      "reason": "The experiment is plausibly safe as research-only, but the evidence statement is incomplete and the protocol lacks required governance and reproducibility details before testing.",
+      "requested_revisions": [
+        "Complete the current_evidence field and state the exact >=0.05R net-expectancy criterion.",
+        "Specify the immutable validated-state baseline, sealed-holdout dataset and period, costs, ATR timeframe/window, and signal-suppression rule.",
+        "Require ExperimentRegistry recording, including failures and full configuration/hash provenance.",
+        "Define minimum sample-size and uncertainty/significance checks alongside drawdown and trade-count gates.",
+        "Explicitly scope implementation to research-only artifacts with no live exposure or champion impact."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "timed out after 90s",
+      "status": "TIMEOUT",
+      "vote": null
+    }
+  ]
+}

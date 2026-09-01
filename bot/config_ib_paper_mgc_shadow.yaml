@@ -1,0 +1,61 @@
+# MGC broker-native capture. Observation only; cannot send orders.
+engine: ibkr
+runner_kind: mgc_firehose
+mode: ib_paper_shadow
+allow_live: false
+ib_host: 127.0.0.1
+ib_port: 4002
+ib_client_id: 7
+ib_dashboard_client_id: 71
+ib_control_client_id: 72
+ib_status_client_id: 79
+ib_account: DUR617128
+ib_futures_exchange: COMEX
+ib_futures_expiry: "202610"
+ib_market_data_type: 3  # delayed; account currently lacks live COMEX top-of-book
+futures_roll_guard_days: 10
+dashboard_host: 127.0.0.1
+dashboard_port: 8787
+
+symbol: MGC
+timeframe: 1s
+order_quantity: 1
+contract_multiplier: 10
+tick_size: 0.1
+capture_poll_seconds: 0.1
+poll_seconds: 2
+max_spread_ticks: 4
+stale_quote_seconds: 2
+
+paper_trading_enabled: false
+dry_run: true
+paper_promoted: false
+
+# Initial non-member cost model, per completed one-contract round trip.
+ib_round_trip_commission_usd: 1.92
+slippage_ticks: 1
+min_expected_net_usd: 1.0
+
+# Selected only after chronological development/validation/holdout replay.
+mgc_lookback_seconds: 10
+mgc_breakout_seconds: 5
+mgc_min_efficiency: 0.50
+mgc_target_ticks: 8
+mgc_stop_ticks: 6
+mgc_max_hold_seconds: 10
+mgc_cooldown_seconds: 1
+mgc_min_book_imbalance: 0.20
+mgc_min_microprice_bias_ticks: 0.10
+mgc_min_trade_flow_imbalance: 0.10
+starting_equity: 250000
+required_live_sessions: 10
+required_usable_records: 250000
+
+max_positions: 1
+max_completed_trades_hour: 100
+max_daily_loss_usd: 250
+max_consecutive_losses: 5
+max_cost_divergence_usd: 100
+pyramid_enabled: false
+kill_switch: false
+test_name: mgc_firehose_shadow

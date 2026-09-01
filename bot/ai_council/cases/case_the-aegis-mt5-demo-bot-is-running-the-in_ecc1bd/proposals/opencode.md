@@ -1,0 +1,1 @@
+Test a stricter validated-state entry filter requiring at least 20 recent, cost-adjusted analogue outcomes before a setup is eligible. Compare it on sealed holdouts against the current gate, requiring higher net expectancy and no increase in maximum drawdown. Reject the candidate unless both criteria hold across all evaluated symbols.

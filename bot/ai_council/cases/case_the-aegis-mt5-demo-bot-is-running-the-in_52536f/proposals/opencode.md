@@ -1,0 +1,1 @@
+Run a sealed holdout study that raises the validated-state confidence threshold by 0.05 and compares net expectancy after modeled spread/slippage against the current threshold. Adopt it only if it improves holdout net expectancy by at least 10% without increasing maximum drawdown or reducing eligible trade count by more than 25%.

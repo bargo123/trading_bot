@@ -1,0 +1,1 @@
+This is an API compatibility error, not a trading or research proposal. It provides no hypothesis, data, validation plan, risk controls, or measurable expected-value claim. Promoting or acting on it would be unsupported and violates the requirement for recorded, reproducible research evidence.

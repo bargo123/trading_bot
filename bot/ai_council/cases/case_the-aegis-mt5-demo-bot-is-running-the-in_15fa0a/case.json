@@ -1,0 +1,202 @@
+{
+  "created_utc": "2026-08-22T17:08:42.262203+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_15fa0a\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 29.28,
+          "finished_utc": "2026-08-22T17:14:54.251029+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T17:14:24.970891+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T17:14:54.251555+00:00",
+        "text": "The 0.10R acceptance threshold carries no significance test or confidence interval, so on a reduced sample (up to 25% fewer trades) it can easily be selection noise\u2014especially given repeated challenger evaluations against the same sealed holdout with no multiple-comparison correction, which is itself a slow leak of the \"sealed\" data. Key terms are unmeasurable: \"validated-state observations\" is undefined (trades vs. bars), and \"worsening maximum drawdown\" has no quantitative tolerance. Validation is incomplete: a single holdout pass without walk-forward re-testing or sensitivity analysis around the arbitrary n=30 cutoff cannot distinguish signal from threshold-fitting, and it's unclear whether per-trade cost assumptions remain valid under the sparser trade distribution. Finally, \"accept it\" is ambiguous governance language\u2014an accepted challenger must still route through every gate in `promote.py`; passing these criteria alone must never be read as promotion authority."
+      }
+    ],
+    "gemini": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_15fa0a\\critiques\\gemini--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 42.9,
+          "finished_utc": "2026-08-22T17:14:12.564495+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T17:13:29.664820+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T17:14:12.566502+00:00",
+        "text": "The 100-trade win-rate criterion is statistically vacuous \u2014 at n\u2248100 the sampling noise alone (~5pp standard error) swamps the claimed 5% effect, win rate ignores payoff asymmetry so the gate can \"pass\" while net expectancy degrades, and no sealed holdout or walk-forward split means the 20% bump and top-decile ATR cutoff are just two more tunable magic numbers inviting overfit with zero multiple-comparison control. The central premise \u2014 that demo slippage invalidates backtest-profitable states \u2014 is asserted, never measured; there is no plan to log actual slippage-vs-ATR distributions against the runner's cost assumptions before building a gate around them. Raising the threshold mechanically suppresses trade count, so the pass/fail test conflates selection effects with improvement, risks never reaching n=100 in any useful window, and cites a trading book as if it were evidence rather than decoration. Finally, implementation must stay confined to `bot/research/` configs and the experiment registry \u2014 any change to the runtime validated-state gate or champion logic without the full promotion gates is a governance violation, and this proposal doesn't say where its changes live."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_15fa0a\\critiques\\gemini--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.39,
+          "finished_utc": "2026-08-22T17:14:24.963665+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T17:14:12.575490+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T17:14:24.963665+00:00",
+        "text": "The top-decile cutoff and 20% threshold increase appear arbitrarily tuned, creating substantial overfitting risk unless preregistered and tested on sealed out-of-sample data across multiple regimes. A 100-trade demo sample is likely underpowered, and \u201c5% higher win rate\u201d lacks confidence intervals, net profitability, drawdown, and spread/slippage controls; win rate alone can improve while expectancy worsens. The proposal also assumes slippage causes validation failures without measuring latency or realized slippage, and it omits ExperimentRegistry recording, lookahead-safe ATR construction, baseline tests, and governed promotion gates."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_15fa0a\\critiques\\opencode--by--gemini.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 16.23,
+          "finished_utc": "2026-08-22T17:13:12.313902+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "Google",
+          "returncode": 0,
+          "started_utc": "2026-08-22T17:12:56.080569+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T17:13:12.313902+00:00",
+        "text": "Relabeling historical losses is a textbook case of hindsight bias that ignores the execution reality of gaps and slippage, rendering your \"synthetic\" profit factor functionally unmeasurable and dangerous. You provide no evidence that a 0.18 cap is achievable during the same liquidity-starved regimes that produced the 1.21 tail event, creating a lethal mismatch between theoretical recomputation and live execution risk. This is not rigorous research; it is an attempt to mask structural exit failures with curve-fitted parameters that violate AEGIS statistical hygiene protocols."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_15fa0a\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 17.32,
+          "finished_utc": "2026-08-22T17:13:29.648162+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T17:13:12.330045+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T17:13:29.654558+00:00",
+        "text": "Relabeling realized losses at a hypothetical cap assumes fills at exactly \u22120.18 and ignores gaps, latency, intrabar path, and added execution costs, so it cannot establish achievable expectancy from exit-level data alone. The cap and thresholds appear selected after inspecting the same 2,518 exits, creating substantial overfitting risk; validation needs preregistered walk-forward and sealed holdout tests, side/regime sample sizes, confidence intervals, and sensitivity analysis across cap values. Passing generic promotion gates does not cure this counterfactual bias, and champion consideration would be unsafe without bar/tick-level stop simulation under adverse slippage."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T17:15:59.383878+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_da0b97",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 5,
+      "n_proposals": 3,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_da0b97 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_15fa0a",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_15fa0a\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 176.16,
+        "finished_utc": "2026-08-22T17:11:48.700258+00:00",
+        "mode": "REAL",
+        "model": "opencode/x-preview-f-free",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T17:08:52.540345+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T17:11:48.701937+00:00",
+      "text": "Proposal: Run a counterfactual tail-loss-cap experiment on the existing reconciled exit dataset (`outcome_learning.json`, n=2,518 exits): relabel every loss larger than 3\u00d7 the average win (~0.18) as exiting at that cap and recompute net expectancy/profit factor under the runner's spread/slippage assumptions. The measured payoff geometry motivates this \u2014 win rate is 0.675 yet expectancy is \u22120.012 with PF 0.77 because avg_win (0.060) is dwarfed by avg_loss (\u22120.177), the 96 SL exits average \u22120.55 each, and one 1.21 tail loss erases ~20 typical wins. Falsifiable prediction: capping losses at ~0.18 flips aggregate expectancy to \u2265 +0.02 and PF to \u2265 1.05 while keeping win rate above 0.60 across both buy and sell sides; if any gate fails, the candidate is rejected and logged in the ExperimentRegistry without touching the champion. This follows the tail-risk discipline theme in *Stock Market Wizards* (tail_loss topic) and stays demo/shadow-only \u2014 validation first via `bot/aegis/research/promote.py` gates before any champion consideration."
+    },
+    {
+      "agent": "gemini",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_15fa0a\\proposals\\gemini.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.06,
+        "finished_utc": "2026-08-22T17:12:08.121395+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "Google",
+        "returncode": 0,
+        "started_utc": "2026-08-22T17:11:55.057371+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T17:12:08.121395+00:00",
+      "text": "I propose a research cycle focused on 'Dynamic Validation Sensitivity' where the validated-state gate's confidence threshold is scaled by the 1-minute ATR to account for execution lag in high-volatility environments. Drawing from the regime-filtering concepts in *Trading Price Action Trends*, this candidate assumes that slippage in the MT5 DEMO environment currently invalidates states that appear profitable in backtests. We will test this by requiring a 20% higher validation score when M1 volatility is in the top decile. This proposal is falsifiable: it will be considered a failure if it does not increase the demo Win Rate by at least 5% over a 100-trade sample compared to the current static gate."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_15fa0a\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.42,
+        "finished_utc": "2026-08-22T17:12:29.369259+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T17:12:16.946468+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T17:12:29.369259+00:00",
+      "text": "Test a research-only challenger that adds a minimum validated-state sample-size gate of 30 historical observations before emitting a signal. On the same sealed holdout and existing spread/slippage assumptions, accept it only if net expectancy improves by at least 0.10R without reducing trade count by more than 25% or worsening maximum drawdown. Record the result in the ExperimentRegistry and leave the champion unchanged regardless of outcome."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_15fa0a\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 15.94,
+        "finished_utc": "2026-08-22T17:15:59.356042+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T17:15:43.420232+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T17:15:59.356042+00:00",
+      "text": "Test a research-only challenger that emits a signal only when its state has at least 30 prior eligible observations, defined as completed, non-overlapping trades available strictly before signal time. Before touching the sealed holdout, run walk-forward tests and sensitivity checks at minimum counts of 20, 30, and 40, recompute spread/slippage for the resulting trade-time distribution, and require a bootstrap 95% confidence interval for the net-expectancy improvement to exclude zero after correction for all challenger comparisons. Evaluate the single preregistered specification once on the sealed holdout, requiring at least a 0.10R net-expectancy improvement, no more than 25% fewer trades, and maximum drawdown no worse than the champion by more than 0.10R or 5%, whichever tolerance is smaller. Record the specification, comparison count, costs, confidence intervals, sensitivity results, and outcome in the ExperimentRegistry; holdout reuse or exploratory follow-ups require a newly sealed dataset. Passing these research criteria only makes the challenger eligible for review through every gate in `promote.py`, and the champion remains unchanged unless that governed promotion process separately succeeds."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_15fa0a\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 38.83,
+        "finished_utc": "2026-08-22T17:15:38.401946+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T17:14:59.573347+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T17:15:38.412986+00:00",
+      "text": "Revised proposal: Run the tail-loss-cap study strictly as a **diagnostic upper bound**, not achievable expectancy \u2014 preregister in the ExperimentRegistry a cap grid (e.g., 1.5\u00d7\u20133\u00d7 average win) *before* any relabeling, then recompute net expectancy/PF per cap under the runner's spread/slippage assumptions plus an adverse-fill stress where exits fill no better than \u2212(cap + estimated gap-through/slippage), reporting bootstrap confidence intervals and per-side/per-regime sample sizes. To control selection bias, no cap is chosen from the full 2,518-exit sample: select the cap only on an initial walk-forward segment, freeze it, and evaluate the frozen rule on subsequent walk-forward folds and the sealed holdout (`bot/research/sealed_holdouts.jsonl`); include a sensitivity table across the whole cap grid so single-point results can't masquerade as robust. Falsifiable out-of-sample prediction, stated ex ante: the frozen cap delivers expectancy \u2265 +0.02 and PF \u2265 1.05 on every holdout fold with win rate \u2265 0.60 and CIs excluding zero under stressed fills, with rejection (logged honestly, champion untouched) if any fold fails, any CI spans zero, or regime samples fall below n\u2248100. Passing `promote.py` gates is treated as necessary but explicitly insufficient: any promotion consideration additionally requires bar-level stop-path simulation demonstrating the realized exit-loss distribution stays \u2264 cap under adverse slippage, and the champion remains untouched throughout \u2014 this experiment informs exit-design research only."
+    }
+  },
+  "status": "decided"
+}

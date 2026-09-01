@@ -1,0 +1,12 @@
+mode,trades,wr,pnl,final,dd,ruined,halt
+unsafe_80pct_fixed,14,57.14,-102.09,-2.09,100.31,True,max_drawdown 100.31%
+brown_recovery_unsafe,33,54.55,507.91,607.91,41.47,False,
+windsor_unsafe,33,54.55,236.48,336.48,28.05,False,
+thomas_unsafe,33,54.55,71.02,171.02,20.17,False,
+brown_dca_unsafe,33,54.55,507.91,607.91,41.47,False,
+traditional_safe_2pct,33,54.55,26.1,126.1,8.12,False,
+fuller_pyramid_solved,5,20.0,-3.36,96.64,4.9,False,max_consecutive_losses (4)
+brown_recovery_solved,33,54.55,42.21,142.21,11.84,False,
+windsor_solved_capped,33,54.55,26.86,126.86,7.63,False,
+thomas_solved,33,54.55,12.62,112.62,4.06,False,
+brown_dca_solved,33,54.55,42.21,142.21,11.84,False,

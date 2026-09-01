@@ -1,0 +1,44 @@
+# Closest to 90% WR on $100 (BTC 5m) — NOT $50/day capable
+# Trade WR ~89.6% | mean day ~$-0.53 | best day ~$0.26 | P(day>=$50)=0%
+symbol: BTC-USD
+timeframe: 5m
+lookback_days: 30
+signal_mode: hw_range
+algo: hw_range
+
+starting_equity: 100.0
+ema_fast: 20
+ema_slow: 50
+atr_period: 14
+bb_period: 20
+bb_std: 2.0
+rsi_period: 14
+adx_period: 14
+adx_trend_threshold: 25
+donchian_period: 20
+
+spread_bps: 2.0
+slippage_bps: 1.0
+min_atr_pct: 0.0
+cost_buffer: 1.0
+
+risk_percent: 5.0
+atr_sl_mult: 8.0
+atr_tp_mult: 0.6
+atr_trail_mult: 2.5
+rsi_oversold: 30
+rsi_overbought: 70
+adx_range_max: 99
+adx_min: 18
+max_hold_bars: 24
+max_trades_per_session: 1
+
+max_daily_loss_percent: 95
+max_total_drawdown_percent: 95
+max_positions: 1
+kill_switch: false
+session_start_utc: 0
+session_end_utc: 24
+
+mode: paper
+poll_seconds: 30

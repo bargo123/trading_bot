@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-21T20:58:10.133759+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e927f9\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 29.56,
+          "finished_utc": "2026-08-21T21:00:53.550218+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-21T21:00:23.988181+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-21T21:00:53.550218+00:00",
+        "text": "The filter's parameters (20-bar window, 20th/80th percentiles, 10% threshold) are asserted a priori with no tuning, sensitivity analysis, or in-sample justification\u2014three free knobs chosen by fiat is textbook garden-of-forking-paths overfitting risk even before touching the holdout. \"Net expectancy increases by at least 10%\" is ambiguous (per-trade vs. aggregate, vs. which baseline run) and a single-pass holdout verdict on noisy metrics like max drawdown and expectancy has no confidence interval, bootstrap, or significance test behind it\u2014one lucky path decides the champion. There's no stated limit on repeated challenges against the same sealed holdout (multiple-testing leakage) and no verification that the proposed accept criteria match or satisfy every gate in `bot/aegis/research/promote.py`; \"accept as improvement candidate\" on self-defined criteria is not a governed promotion. Finally, since a regime filter mechanically deletes trades, the 80% trade-count floor and unchanged-drawdown clause need an explicit definition of comparison windows, or the rejection rule itself becomes unfalsifiable."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e927f9\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.53,
+          "finished_utc": "2026-08-21T21:00:23.968339+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-21T21:00:11.442628+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-21T21:00:23.968339+00:00",
+        "text": "MT5 reject responses do not reliably reveal each symbol\u2019s exact minimum stop distance, so the proposed measurement method is underspecified and may require prohibited order probing rather than read-only access. A seven-day, post-hoc replay on the same failures that generated the hypothesis invites severe overfitting, and widened stops cannot be counterfactually scored from closed-trade outcomes without intratrade price paths, fill/slippage modeling, and explicit flatten-policy interactions. \u201cRejects \u2248 0\u201d is unmeasurable as written, while a bootstrap CI over correlated trades is invalid unless clustered by time/symbol and confirmed on a sealed out-of-sample holdout."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-21T21:01:37.171298+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_63eddc",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_63eddc for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_e927f9",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e927f9\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 57.06,
+        "finished_utc": "2026-08-21T20:59:17.845519+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T20:58:20.781199+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T20:59:17.845519+00:00",
+      "text": "Proposal: The failure audit shows all 470 OMS rejects were `stops` and 1,891 of 2,404 closed trades exited via the \"manual\"/flatten path (`quick_win`/`never_green`/`gave_back`, expectancy \u22120.017, tail_loss_5pct \u22120.49), while the few true TP exits earned +0.09 expectancy \u2014 strongly suggesting hard SLs are never actually working because their placement violates a broker min-stop-distance rule. For the next cycle, I propose a demo-only diagnostic-and-counterfactual experiment (registered in `ExperimentRegistry`): measure each symbol's actual min-stop distance from MT5 reject responses, then replay the last 7-day window comparing realized outcomes against a counterfactual where SLs are placed at max(current, min-distance + buffer), predicting the counterfactual cuts `sl`/tail losses enough to lift portfolio expectancy from \u22120.011 to \u2265 0 while win rate falls no more than ~5 pts. It is falsifiable on two pre-registered metrics: post-fix `oms_reject{stops}` \u2248 0, and counterfactual net > realized net (\u221226.9) with bootstrap CI excluding zero; if either fails, the \"broken stops cause the bleed\" hypothesis is rejected. No champion change, no live YAML touch, and the validated-state gate stays as-is until this passes promotion gates."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e927f9\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 10.96,
+        "finished_utc": "2026-08-21T20:59:47.525713+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-21T20:59:36.564224+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T20:59:47.525713+00:00",
+      "text": "Test a challenger that adds a 20-bar realized-volatility regime filter, allowing existing champion signals only when volatility lies between the rolling 20th and 80th percentiles computed strictly from prior bars. Evaluate it on the next sealed holdout using the existing spread/slippage assumptions and ExperimentRegistry. Accept it as an improvement candidate only if net expectancy increases by at least 10% without worsening maximum drawdown or reducing trade count below 80% of the champion\u2019s; otherwise reject and retain the current champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e927f9\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.09,
+        "finished_utc": "2026-08-21T21:01:37.139414+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-21T21:01:24.051705+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-21T21:01:37.139414+00:00",
+      "text": "Develop the volatility filter exclusively on training data using a preregistered, bounded grid of lookback windows and percentile bands, select parameters by walk-forward net expectancy and drawdown stability, and lock the specification before one-time evaluation on a previously unused sealed holdout. Define improvement as at least a 10% increase in net expectancy per trade versus the frozen champion rerun over identical timestamps under identical spread/slippage assumptions, while retaining at least 80% of the champion\u2019s eligible signals and not worsening maximum drawdown on that same window. Quantify uncertainty with paired block-bootstrap confidence intervals and require the lower bound of the expectancy uplift to exceed zero, while treating drawdown and trade-retention requirements as hard gates. Record the preregistration, tuning results, locked challenger, holdout identifier, and test outcome in ExperimentRegistry, permit only one challenger-family evaluation per sealed holdout, and reject without retesting if any criterion fails. These criteria only nominate a challenger for governed review; promotion occurs solely if every gate in `bot/aegis/research/promote.py` passes through the authorized promotion script, otherwise the current champion remains unchanged."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e927f9\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 30.47,
+        "finished_utc": "2026-08-21T21:01:24.035879+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T21:00:53.566308+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-21T21:01:24.039900+00:00",
+      "text": "Revised proposal: The failure audit shows all 470 OMS rejects were `stops` while true-TP exits earned +0.09 expectancy versus \u22120.017 on the manual/flatten path, motivating a demo-only diagnostic-and-counterfactual experiment (registered in `ExperimentRegistry`) testing whether SL placement violates the broker min-stop distance. Instead of probing reject responses, we will read each symbol's minimum stop level directly from MT5's read-only symbol properties (`SYMBOL_TRADE_STOPS_LEVEL` plus spread buffer) and verify against any documented broker specs \u2014 no order submission of any kind. Because widened stops change intratrade paths, the counterfactual will be replayed bar-by-bar over an extended window using stored M1 price paths with the runner's existing spread/slippage assumptions applied to every simulated fill, and with the flatten policy (`quick_win`/`gave_back`) re-evaluated against the wider stops rather than assumed unchanged. To guard against post-hoc overfitting, the buffer parameter will be tuned only on an in-sample segment, then frozen and evaluated on a pre-registered sealed out-of-sample holdout. Success is falsifiable on two measurable metrics: (1) forward demo-window `oms_reject{reason=stops}` count equal to 0 across at least N\u2265200 placed stops, and (2) holdout counterfactual net exceeding realized net with a cluster bootstrap CI (resampling by day\u00d7symbol clusters) excluding zero; if either fails, the hypothesis is rejected and recorded as such. No champion change, no live YAML touch, and the validated-state gate remains until standard promotion gates pass."
+    }
+  },
+  "status": "decided"
+}

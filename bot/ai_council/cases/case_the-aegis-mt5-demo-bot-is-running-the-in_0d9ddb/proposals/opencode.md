@@ -1,0 +1,1 @@
+Test adding a 60-second maximum quote/bar freshness requirement to the validated-state gate using sealed historical DEMO firehose logs. Accept it only if the holdout shows lower net adverse excursion and no more than a 5% reduction in net expectancy after existing spread/slippage assumptions. Otherwise retain the current gate unchanged.

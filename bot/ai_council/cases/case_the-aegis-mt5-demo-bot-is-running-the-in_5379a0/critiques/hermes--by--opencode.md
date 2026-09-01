@@ -1,0 +1,1 @@
+The proposal contains no strategy, methodology, or measurable objective, so it cannot be evaluated for efficacy or safety. It provides no validation plan, data provenance, failure handling, or evidence that the unsupported model error is resolved.

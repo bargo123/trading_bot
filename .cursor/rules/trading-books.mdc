@@ -1,0 +1,16 @@
+---
+description: Use the full local trading books when designing trading bots
+globs:
+alwaysApply: true
+---
+
+When helping build trading bots in this project:
+
+1. Use the **full cleaned books** in `docs/trading/books/`.
+2. Start from `@docs/trading/BOOKS_FULL.md` or `@docs/trading/INDEX.md` (46 usable extracts).
+3. Attach the specific book file(s) needed (avoid attaching all books at once).
+4. When authors disagree, say so and make bot behavior configurable — then try both sides on **demo**.
+5. Produce concrete Python. Invent **strategy code** freely on demo; do not invent backtest statistics not in the sources.
+6. Educational/systems work only — no profit guarantees. Demo is the sandbox until the user says live.
+7. Do not suggest reinstalling the removed local LLM stack unless the user asks.
+8. Do **not** run `scripts/rebuild_full_books_for_cursor.py` (it deletes extra extracts). Catalog: `python scripts/rebuild_books_catalog.py`.

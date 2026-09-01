@@ -1,0 +1,90 @@
+{
+  "change_id": "council_scheduled_cadence_20260826_1615",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-26T16:16:28.546152+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260826_1615",
+    "current_evidence": "HTTP 401: Model x-preview-f-free is not supported",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "HTTP 401: Model x-preview-f-free is not supported",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/2)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T16:15:54.273752+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 2,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "raw": "HTTP 401: Model x-preview-f-free is not supported",
+      "reason": "unparseable vote: ''",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "No concrete code/config diff or replacement model is specified.",
+        "HTTP 401 may block the proposed validation workflow entirely.",
+        "No evidence that the replacement preserves read-only research boundaries or existing provider compatibility.",
+        "PF and EV are unavailable, so no effectiveness baseline or acceptance threshold is defined."
+      ],
+      "confidence": 0.96,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal is not actionable: its proposed change repeats an HTTP 401 error and does not identify the unsupported model configuration or a bounded remediation.",
+      "requested_revisions": [
+        "Identify the exact configured model/provider and replace it with a supported model using documented credentials and API compatibility.",
+        "Specify affected files, exact configuration changes, fallback behavior, and error handling.",
+        "Add a preflight integration test that verifies model availability without submitting MT5 orders.",
+        "Define costed OOS acceptance metrics and record the experiment in ExperimentRegistry before any promotion consideration."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "timed out after 90s",
+      "status": "TIMEOUT",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Unsupported model configuration remains unresolved",
+        "No concrete files, parameters, or code changes are specified",
+        "Safety impact cannot be confirmed from the incomplete proposal",
+        "Expected throughput improvement is unsubstantiated"
+      ],
+      "confidence": 0.99,
+      "model": null,
+      "reason": "The proposal does not describe an actionable change; both current_evidence and proposed_change contain the same HTTP 401 error. No implementation scope, test results, or validated mechanism is provided.",
+      "requested_revisions": [
+        "Specify the exact proposed code or configuration change",
+        "Replace the unsupported model with a validated supported model or provide a fallback",
+        "Include reproducible exploration-lifecycle and OOS validation results",
+        "Document DEMO-only enforcement and confirm no champion or live-config impact",
+        "Define measurable acceptance thresholds and rollback procedure"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "timed out after 90s",
+      "status": "TIMEOUT",
+      "vote": null
+    }
+  ]
+}

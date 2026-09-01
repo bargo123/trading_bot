@@ -1,0 +1,70 @@
+{
+  "change_id": "council_scheduled_cadence_20260827_0436",
+  "degraded_real_council": true,
+  "final_decision": "DEGRADED_REAL_COUNCIL",
+  "finished_utc": "2026-08-27T04:36:27.223568+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260827_0436",
+    "current_evidence": "HTTP 401: Model x-preview-f-free is not supported",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "HTTP 401: Model x-preview-f-free is not supported",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "fewer than two members voted; not a multi-agent decision",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-27T04:36:06.230215+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 1,
+    "reject": 0,
+    "revise_and_resubmit": 1
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "raw": "HTTP 401: Model x-preview-f-free is not supported",
+      "reason": "unparseable vote: ''",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "No concrete diff or model/provider replacement is specified.",
+        "HTTP 401 may indicate unsupported model selection, credentials, or provider policy; these require diagnosis before testing.",
+        "PF and EV are unavailable, so throughput claims cannot be evaluated.",
+        "Affected files are broad and tests are not defined enough to verify failure handling or OOS safeguards."
+      ],
+      "confidence": 0.98,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal is not an actionable change: its proposed_change repeats an unsupported-model HTTP 401 error and provides no configuration, replacement model, authorization fix, or validation plan.",
+      "requested_revisions": [
+        "Specify the exact configuration/code change, including supported model identifier and provider endpoint.",
+        "Add a fail-closed fallback behavior that records provider errors without altering champion or execution decisions.",
+        "Provide a reproducible test for unsupported-model handling and a successful supported-model request.",
+        "Define exploration metrics, cost assumptions, sample size, OOS gates, and experiment-registry record."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

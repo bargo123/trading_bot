@@ -1,0 +1,1 @@
+Test a symbol/session-specific validated-state threshold calibrated on the training split, instead of one global threshold. On the sealed holdout, this candidate must improve net expectancy and precision without reducing coverage by more than 10%; otherwise reject it. Leave the current champion unchanged and record the result in the experiment registry.

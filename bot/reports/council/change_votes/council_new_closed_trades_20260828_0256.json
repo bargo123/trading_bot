@@ -1,0 +1,70 @@
+{
+  "change_id": "council_new_closed_trades_20260828_0256",
+  "degraded_real_council": true,
+  "final_decision": "DEGRADED_REAL_COUNCIL",
+  "finished_utc": "2026-08-28T02:57:42.980744+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_new_closed_trades_20260828_0256",
+    "current_evidence": "HTTP 401: Model x-preview-f-free is not supported",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: new_closed_trades. Current PF=None, EV=None",
+    "proposed_change": "HTTP 401: Model x-preview-f-free is not supported",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "fewer than two members voted; not a multi-agent decision",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-28T02:56:55.821186+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 1,
+    "reject": 0,
+    "revise_and_resubmit": 1
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "raw": "HTTP 401: Model x-preview-f-free is not supported",
+      "reason": "unparseable vote: ''",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "No implementation details or exact affected files",
+        "Unsupported model selection will prevent exploration throughput",
+        "No evidence that fallback behavior preserves research-only and DEMO execution boundaries",
+        "Tests are named but not specified"
+      ],
+      "confidence": 0.98,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal does not describe an actual change; it repeats an unsupported-model HTTP 401 error. A concrete, validated provider/model configuration and failure handling are required before testing.",
+      "requested_revisions": [
+        "Specify the replacement supported model/provider configuration and exact code/config diff",
+        "Add a fail-closed fallback for model authorization/availability errors that does not trigger trades or promotions",
+        "Provide tests covering 401 handling, fallback behavior, experiment recording, and OOS validation",
+        "Confirm no Council or research component can submit MT5 orders"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "timed out after 90s",
+      "status": "TIMEOUT",
+      "vote": null
+    },
+    {
+      "agent": "cursor",
+      "reason": "timed out after 90s",
+      "status": "TIMEOUT",
+      "vote": null
+    }
+  ]
+}

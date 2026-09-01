@@ -1,0 +1,202 @@
+{
+  "created_utc": "2026-08-28T07:01:34.986407+00:00",
+  "critiques": {
+    "gemini": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5d7b6f\\critiques\\gemini--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 8.03,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T07:11:00.176462+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      },
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5d7b6f\\critiques\\gemini--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 14.38,
+          "finished_utc": "2026-08-28T07:11:14.576683+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-28T07:11:00.193494+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T07:11:14.578683+00:00",
+        "text": "A fixed 15% threshold is an unvalidated, likely overfit parameter, and spread-to-ATR units must be normalized across symbols and quote precision. A 100-trade sample lacks regime, session, and out-of-sample validation; average execution cost is confounded by altered trade selection rather than better execution. The cited book is not empirical support, and testing must not alter protected MT5 DEMO trading configuration or bypass existing spread, EV, OMS, and broker gates."
+      }
+    ],
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5d7b6f\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.13,
+          "finished_utc": "2026-08-28T07:05:16.303350+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-28T07:05:04.173901+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T07:05:16.307352+00:00",
+        "text": "This is not a proposal: it contains only an HTTP 401 compatibility error and no strategy, hypothesis, or measurable claim to evaluate. It provides no validation plan, data, risk controls, or execution boundaries, so it cannot be approved for research or deployment."
+      },
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5d7b6f\\critiques\\hermes--by--gemini.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 27.51,
+          "finished_utc": "2026-08-28T07:05:43.840399+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "Google",
+          "returncode": 0,
+          "started_utc": "2026-08-28T07:05:16.331561+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T07:05:43.842908+00:00",
+        "text": "The proposal relies on an unsupported and likely ephemeral model, creating a critical single point of failure that violates our system's architectural safety protocols. It lacks any measurable logic or validation data, making it impossible to audit for overfitting or performance stability in live execution. Such a brittle, non-functional submission is an unacceptable risk to the AEGIS execution circuit and should be rejected immediately."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5d7b6f\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 8.22,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T07:05:52.071660+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-28T07:16:36.426582+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_a71e91",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 5,
+      "n_proposals": 3,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_a71e91 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_5d7b6f",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5d7b6f\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 8.34,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T07:01:57.074423+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5d7b6f\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 14.15,
+        "finished_utc": "2026-08-28T07:02:25.566823+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T07:02:11.413009+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T07:02:25.568909+00:00",
+      "text": "Test a validated-state cooldown: abstain from new entries for 15 minutes after any invalidation or scratch exit, then compare net expectancy and tail loss against the current policy on sealed holdouts. Promote it only if costs-adjusted expectancy improves and maximum drawdown does not worsen. Reject it if either criterion fails."
+    },
+    {
+      "agent": "gemini",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5d7b6f\\proposals\\gemini.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 32.71,
+        "finished_utc": "2026-08-28T07:04:29.298402+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "Google",
+        "returncode": 0,
+        "started_utc": "2026-08-28T07:03:56.586180+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T07:04:29.302945+00:00",
+      "text": "Introduce a dynamic spread-to-volatility ratio filter within the validated-state gate to automatically suspend firehose entries when the current MT5 spread exceeds 15% of the 20-period ATR. This candidate will be tested against the `config_mt5_demo_firehose_hw.yaml` baseline to verify if it reduces the average trade execution cost by at least 15% over a sample of 100 trades. If the total net profit does not increase by at least 5% or the trade frequency drops by more than 50%, the proposal is falsified. This logic is supported by the liquidity-awareness strategies in \"Volman's Understanding Price Action\" regarding entry timing in variable-cost environments."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5d7b6f\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.7,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T07:11:22.294820+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5d7b6f\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.98,
+        "finished_utc": "2026-08-28T07:11:36.305739+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T07:11:22.325374+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T07:11:36.307739+00:00",
+      "text": "Test a validated-state cooldown using supported, authenticated model infrastructure: abstain from new entries for 15 minutes after any invalidation or scratch exit, then compare costs-adjusted net expectancy and tail loss with the current policy on sealed holdouts. Record any model/API failure, including unsupported-model errors, as an experiment failure without fabricating results. Promote only if expectancy improves and maximum drawdown does not worsen; reject if either criterion fails or evaluation cannot run."
+    }
+  },
+  "status": "decided"
+}

@@ -1,0 +1,1 @@
+Your case question appears to be cut off — the message ends with "Case question:" but no actual question follows. Could you provide the complete case question you'd like me to address?

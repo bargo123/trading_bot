@@ -1,0 +1,1 @@
+The proposal is only an API error message, not a testable trading or research plan. It makes no measurable claim, provides no validation methodology, and cannot support a governed strategy decision.

@@ -1,0 +1,1 @@
+Run a registered challenger that requires two consecutive validated-state confirmations before a DEMO entry. Promote it only if sealed-holdout net expectancy improves by at least 10% with no increase in maximum drawdown and at least 100 eligible signals. Reject it if any threshold fails.

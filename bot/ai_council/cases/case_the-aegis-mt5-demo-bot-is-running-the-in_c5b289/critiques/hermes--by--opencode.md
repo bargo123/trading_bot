@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal; it makes no testable trading claim or specifies no methodology. There is no validation plan, performance metric, safety control, or evidence that substituting a supported model preserves council behavior.

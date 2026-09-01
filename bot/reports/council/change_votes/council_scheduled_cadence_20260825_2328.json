@@ -1,0 +1,107 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_2328",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T23:30:29.641447+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_2328",
+    "current_evidence": "Proposal: Now that split primary OOS economics and sealed multi-outcome metrics are exposed in the research reports, test whether promotion should require positive net-of-spread expected value in each OOS split independently rather than only on the pooled OOS window. Concretely, next cycle should re",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Proposal: Now that split primary OOS economics and sealed multi-outcome metrics are exposed in the research reports, test whether promotion should require positive net-of-spread expected value in each OOS split independently rather than only on the pooled OOS window. Concretely, next cycle should recompute every recently promoted challenger plus the current champion from `bot/research/sealed_holdouts.jsonl` under a strict per-split gate (positive net EV in both splits, no offsetting between regi",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T23:28:42.388053+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 1,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Proposal metadata is internally inconsistent: expected_mechanism ('improve exploration/validation throughput') and falsification_criteria ('negative costed expectancy after exploration trades') describe an exploration-trade experiment, not a promotion-gate study; PF/EV are None so there is no baseline evidence attached",
+        "Split definition is unstated: chronological vs regime-based boundaries must be pre-registered before recomputation or the comparison is gameable via post hoc split selection",
+        "Repeatedly iterating gate designs against the same sealed_holdouts.jsonl erodes the holdout's seal; this should be a one-shot evaluation or paired with an independent split scheme",
+        "Per-split gating lowers statistical power: small-sample splits will generate false rejections of genuinely profitable challengers; minimum-samples-per-split handling is unspecified",
+        "affected_files cites bot/intel/ which contains governed runtime artifacts (intelligent_champion.json); the test itself must not write there"
+      ],
+      "confidence": 0.68,
+      "model": "x-preview-f-free",
+      "reason": "The core test is read-only: recompute already-sealed holdout records under a stricter per-split EV gate and compare against pooled-gate outcomes. It touches no trading YAML, no MT5 path, no champion file, and tightens rather than relaxes validation. Methodologically, requiring positive net-of-spread EV independently in each OOS split is a legitimate hardening against single-regime strategies whose pooled edge masks regional drawdown. Safe to run as an experiment provided its deliverable is a report and any resulting gate change later goes through the governed promote.py path.",
+      "requested_revisions": [
+        "Pre-register the exact split boundaries and rule (e.g., equal-length chronological halves) before any recomputation, recorded in ExperimentRegistry",
+        "Restate expected_mechanism and falsification_criteria to match the actual test, e.g., falsify if per-split gating's rejection set shows no worse forward costed expectancy than pooled gating",
+        "Declare the sealed holdout usage one-shot for this gate design; further iterations require fresh out-of-sample windows",
+        "Define minimum trade count per split below which the split verdict is 'insufficient evidence' rather than pass/fail",
+        "Require both per-split positivity AND pooled positivity (not per-split as a replacement), so the new gate is strictly a tightening",
+        "Deliverable for next cycle must be a research report comparing promoted-challenger fates under both gates; any promote.py gate change is a separate follow-up proposal subject to normal governance"
+      ],
+      "vote": "APPROVE_FOR_TEST"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "No specified minimum sample size, confidence interval, or bootstrap/significance requirement per split; positive EV alone can be noise.",
+        "Recomputing prior promotions from sealed holdouts may risk contaminating governed promotion records unless evaluation is strictly read-only and versioned.",
+        "The claim of improving exploration/validation throughput conflicts with a stricter gate and needs measurable success criteria.",
+        "Affected files omit the governed promotion implementation and experiment registry/report artifacts likely required for this test."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The stricter per-split net-of-spread EV gate is a valid research hypothesis and does not introduce execution safety risk, but the proposal is truncated and lacks a complete, reproducible evaluation protocol.",
+      "requested_revisions": [
+        "Define exact split construction, cost assumptions, minimum observations, uncertainty method, and pass/fail thresholds.",
+        "Run as a registered, read-only retrospective experiment; do not alter `intel/intelligent_champion.json` or retroactively invalidate promotions.",
+        "Specify comparison metrics against the pooled gate, including false-promotion reduction, retained candidate count, and future sealed-holdout performance.",
+        "Provide complete proposed code/config scope and tests for leakage prevention, sealed-holdout immutability, and promotion-gate behavior."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "The proposed change is truncated and does not specify the complete gate.",
+        "Positive EV on tiny OOS splits may be noisy and overfit.",
+        "The claim of no champion impact conflicts with recomputing recently promoted challengers and the current champion unless outputs are strictly report-only.",
+        "No explicit evidence is provided that the required reports and sealed holdout data are complete and reproducible.",
+        "The falsification criterion is vague and does not define the evaluation horizon or decision rule."
+      ],
+      "confidence": 0.92,
+      "model": null,
+      "reason": "The proposal is a reasonable research experiment, but it lacks sufficient implementation detail and evidence to approve testing as written. It must clearly define split boundaries, positive net-EV thresholds, sample-size requirements, missing-data handling, statistical safeguards, registry recording, and confirm that no champion or trading configuration is modified during evaluation.",
+      "requested_revisions": [
+        "Provide the complete proposal and exact affected code paths.",
+        "Define split membership, minimum sample sizes, net spread/slippage cost assumptions, EV thresholds, and treatment of missing or invalid outcomes.",
+        "Run the experiment in report-only mode with no writes to intelligent_champion.json, trading YAML, or broker state.",
+        "Record the experiment and all failures in ExperimentRegistry, including before/after metrics for champion and challengers.",
+        "Add tests proving split isolation, no lookahead, no offsetting between splits, and no champion-promotion side effects.",
+        "Specify a pre-registered falsification rule and rollback procedure before execution."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

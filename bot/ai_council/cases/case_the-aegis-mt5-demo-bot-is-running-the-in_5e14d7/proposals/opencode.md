@@ -1,0 +1,1 @@
+Run a registered holdout experiment adding a validated-state feature that requires two consecutive same-direction signals before entry. Promote it only if net-of-cost expectancy improves by at least 10% versus the current champion with no increase in maximum drawdown; otherwise reject it.

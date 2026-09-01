@@ -1,0 +1,65 @@
+{
+  "schema": "firehose_economics.v1",
+  "label": "research_proxy",
+  "target_daily_usd": 100.0,
+  "current_capital_usd": 92.46,
+  "verified_champion": {
+    "id": null,
+    "status": "none",
+    "expectancy": null,
+    "trades_per_day": null,
+    "expected_net_day": null,
+    "profit_factor": null,
+    "avg_win": null,
+    "avg_loss": null,
+    "max_drawdown_pct": null,
+    "tail_loss": null,
+    "validated_risk_fraction": null,
+    "n_trades": null,
+    "n_losses": null
+  },
+  "observed": {
+    "label": "research_proxy",
+    "not_a_champion": true,
+    "n_trades": 2121,
+    "active_days": 4,
+    "trades_per_day": 530.25,
+    "expectancy": -0.024365865157944366,
+    "expected_net_day": -12.920000000000051,
+    "median_net_day": -6.555000000000078,
+    "win_rate": 0.6694955209806694,
+    "avg_win": 0.03383098591549296,
+    "avg_loss": -0.19250965250965252,
+    "profit_factor": 0.4817488969113518,
+    "max_drawdown_pct": 56.84620376379019,
+    "tail_loss": 3.05,
+    "wins_erased_by_average_loss": 5.69033527401554,
+    "cosmetic_win_rate": true,
+    "daily_pnl_usd": {
+      "2026-08-12": -0.9800000000000004,
+      "2026-08-13": -3.820000000000002,
+      "2026-08-14": -37.59000000000005,
+      "2026-08-17": -9.290000000000154
+    }
+  },
+  "margin_use": null,
+  "capital_utilization": null,
+  "uncertainty": "no_verified_champion_observation_only",
+  "required_capital": {
+    "required_capital_usd": null,
+    "method": "no_verified_champion",
+    "risk_fraction_held_constant": null,
+    "leverage_increase": false,
+    "forbidden": "do_not_lever_current_account_to_force_target"
+  },
+  "gap": {
+    "current_expected_day": -12.920000000000051,
+    "difference_usd": 112.92000000000004,
+    "close_through": [
+      "better_edge",
+      "healthier_payoff"
+    ]
+  },
+  "leverage_increase_recommended": false,
+  "principle": "fast_active_intelligent_positive_ev_scalable"
+}

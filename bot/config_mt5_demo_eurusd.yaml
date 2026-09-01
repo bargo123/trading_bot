@@ -1,0 +1,65 @@
+# MT5 demo — measured hw_range, small size. Demo orders ON.
+# NOT every-bar firehose. NOT 100% WR. NOT all-in. NOT live.
+engine: mt5
+mode: mt5_demo
+allow_live: false
+dry_run: false
+paper_trading_enabled: true
+mt5_path: C:\Program Files\MetaTrader 5\terminal64.exe
+mt5_magic: 260812
+mt5_deviation: 20
+mt5_max_lots: 0.10
+
+symbol: EURUSD
+timeframe: 1h
+lookback_days: 60
+poll_seconds: 60
+# MT5 volume is lots (0.01 = micro). Never pass IB-style 20000 units.
+order_quantity: 0.01
+
+starting_equity: 100
+signal_mode: hw_range
+algo: hw_range
+firehose_every_bar: false
+max_hold_seconds: 0
+
+ema_fast: 50
+ema_slow: 200
+atr_period: 14
+adx_period: 14
+adx_trend_threshold: 99
+adx_range_max: 28
+donchian_period: 55
+bb_period: 30
+bb_std: 1.8
+rsi_period: 14
+rsi_oversold: 40
+rsi_overbought: 70
+atr_sl_mult: 4.0
+atr_tp_mult: 0.4
+atr_trail_mult: 3.0
+min_rr: 0.01
+min_atr_pct: 0.0004
+cost_buffer: 1.0
+# MetaQuotes-Demo often quotes 0 spread on EURUSD; that is not a live-broker cost.
+# Keep a conservative floor until a filled deal shows commission/spread.
+spread_bps: 2.26
+slippage_bps: 0.4
+commission_round_trip_usd: 0.0
+session_start_utc: 0
+session_end_utc: 24
+
+risk_percent: 1
+high_risk_mode: traditional
+high_risk_safe: true
+allow_unsafe_high_risk: false
+hr_risk_max_cap: 2
+hr_equity_floor_frac: 0.5
+hr_max_consecutive_losses: 5
+max_daily_loss_percent: 3.0
+max_total_drawdown_percent: 12.0
+max_positions: 1
+pyramid_enabled: false
+kill_switch: false
+ntz_max_trades_day: 0
+test_name: mt5_demo_eurusd_hw_range

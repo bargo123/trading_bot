@@ -1,0 +1,177 @@
+{
+  "created_utc": "2026-08-20T20:26:37.057172+00:00",
+  "critiques": {
+    "claude": [
+      {
+        "agent": "opencode",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "codex": [
+      {
+        "agent": "opencode",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "claude",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "cursor": [
+      {
+        "agent": "opencode",
+        "submitted_utc": "2026-08-20T20:26:39.708556+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "claude",
+        "submitted_utc": "2026-08-20T20:26:39.709602+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "submitted_utc": "2026-08-20T20:26:39.709602+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "submitted_utc": "2026-08-20T20:26:39.709602+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "gemini": [
+      {
+        "agent": "opencode",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "claude",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "claude",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-20T20:26:39.709602+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "n_critiques": 20,
+      "n_proposals": 5
+    },
+    "rationale": "council round complete; final decision requires measured validation evidence"
+  },
+  "id": "should-the-firehose-stack-entries-during_1e7ca8",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "submitted_utc": "2026-08-20T20:26:37.610494+00:00",
+      "text": "Local deterministic proposal by opencode: treat 'Should the firehose stack entries during Asia session?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "claude",
+      "submitted_utc": "2026-08-20T20:26:38.142522+00:00",
+      "text": "Local deterministic proposal by claude: treat 'Should the firehose stack entries during Asia session?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "gemini",
+      "submitted_utc": "2026-08-20T20:26:38.665471+00:00",
+      "text": "Local deterministic proposal by gemini: treat 'Should the firehose stack entries during Asia session?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "codex",
+      "submitted_utc": "2026-08-20T20:26:39.181716+00:00",
+      "text": "Local deterministic proposal by codex: treat 'Should the firehose stack entries during Asia session?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "cursor",
+      "submitted_utc": "2026-08-20T20:26:39.692897+00:00",
+      "text": "Local deterministic proposal by cursor: treat 'Should the firehose stack entries during Asia session?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    }
+  ],
+  "question": "Should the firehose stack entries during Asia session?",
+  "revisions": {
+    "claude": {
+      "revised_utc": "2026-08-20T20:26:39.709602+00:00",
+      "text": "revised: Local deterministic proposal by claude: treat 'Should the firehose stack entries during Asia session?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    "codex": {
+      "revised_utc": "2026-08-20T20:26:39.709602+00:00",
+      "text": "revised: Local deterministic proposal by codex: treat 'Should the firehose stack entries during Asia session?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    "cursor": {
+      "revised_utc": "2026-08-20T20:26:39.709602+00:00",
+      "text": "revised: Local deterministic proposal by cursor: treat 'Should the firehose stack entries during Asia session?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    "gemini": {
+      "revised_utc": "2026-08-20T20:26:39.709602+00:00",
+      "text": "revised: Local deterministic proposal by gemini: treat 'Should the firehose stack entries during Asia session?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    "opencode": {
+      "revised_utc": "2026-08-20T20:26:39.709602+00:00",
+      "text": "revised: Local deterministic proposal by opencode: treat 'Should the firehose stack entries during Asia session?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    }
+  },
+  "status": "decided"
+}

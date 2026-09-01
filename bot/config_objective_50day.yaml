@@ -1,0 +1,49 @@
+# $50/day ACHIEVABLE config — sized to measured edge (Tharp / Elder / Davey)
+# Engine: breakout_adx BTC-USD 1h | WR~57% | ~0.7 trades/day | +EV
+# Required starting equity ≈ $51,600 at 1% risk/trade
+# Do NOT run this income target on a $100 account.
+
+symbol: BTC-USD
+timeframe: 1h
+lookback_days: 400
+signal_mode: breakout_adx
+algo: breakout_adx
+
+starting_equity: 51600
+objective_daily_usd: 50
+
+ema_fast: 50
+ema_slow: 200
+atr_period: 14
+bb_period: 20
+bb_std: 2.0
+rsi_period: 14
+adx_period: 14
+adx_trend_threshold: 25
+donchian_period: 20
+
+spread_bps: 2.0
+slippage_bps: 1.0
+min_atr_pct: 0.0
+cost_buffer: 1.5
+
+risk_percent: 1.0
+atr_sl_mult: 2.0
+atr_tp_mult: 2.5
+atr_trail_mult: 2.5
+rsi_oversold: 30
+rsi_overbought: 70
+adx_range_max: 25
+adx_min: 20
+max_hold_bars: 0
+max_trades_per_session: 99
+
+max_daily_loss_percent: 6.0
+max_total_drawdown_percent: 20.0
+max_positions: 1
+kill_switch: false
+session_start_utc: 0
+session_end_utc: 24
+
+mode: paper
+poll_seconds: 60

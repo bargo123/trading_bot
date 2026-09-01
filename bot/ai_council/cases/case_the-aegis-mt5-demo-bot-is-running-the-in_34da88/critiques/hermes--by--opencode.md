@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal, so it contains no testable hypothesis, validation plan, or risk controls. It must identify a supported model through documented configuration and verify fallback behavior; blindly substituting an experimental free model risks unreliable or ungoverned runtime behavior.

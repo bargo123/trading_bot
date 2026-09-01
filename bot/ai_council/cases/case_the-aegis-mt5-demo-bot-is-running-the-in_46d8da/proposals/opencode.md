@@ -1,0 +1,1 @@
+Test an adaptive volatility filter that blocks entries when 20-bar ATR exceeds its rolling 90th percentile. Evaluate it on the existing sealed holdout net of current spread/slippage assumptions, requiring a higher profit factor and no increase in maximum drawdown versus the validated champion. Reject the candidate if either condition fails.

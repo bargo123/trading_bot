@@ -1,0 +1,639 @@
+"""FAST_TURNOVER_FIREHOSE_V1 tests (spec phases 3-9, 11-12)."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pandas as pd
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from aegis.intel.fast_firehose import (  # noqa: E402
+    ExitAction,
+    FastExitConfig,
+    FastExitStateMachine,
+    FastMarketContext,
+    MicroCandidate,
+    check_entry_economics,
+    classify_firehose_mode,
+    diagnose_micro_candidates,
+    generate_micro_candidates,
+    generate_micro_search_candidates,
+    generate_runtime_search_candidates,
+    runtime_mechanism_specs,
+    micro_momentum_burst,
+    failed_breakout_fade,
+    fair_value_snapback,
+    pip_value,
+)
+from aegis.intel.profit_harvester import (  # noqa: E402
+    HarvestDecision,
+    HarvestInput,
+    HarvestPolicy,
+    HarvestPolicyEvidence,
+)
+
+
+def _ctx(**overrides) -> FastMarketContext:
+    """Build a test FastMarketContext with reasonable defaults."""
+    base = dict(
+        symbol="EURUSD", timestamp="2026-08-21T12:00:00Z",
+        bid=1.1000, ask=1.10002, spread_pips=0.2,
+        m1_open=1.09998, m1_high=1.10008, m1_low=1.09990,
+        m1_close=1.10000, m1_prev_close=1.09995, m1_atr=0.0015,
+        m1_range=0.00018, m1_body=0.00005, m1_volume=100,
+        m5_compression=0.4,
+        m5_direction="up", m5_structure="none",
+        m5_support=1.0950, m5_resistance=1.1050, m5_atr=0.002,
+        m15_direction="up", m15_structure="none",
+        m15_support=1.0950, m15_resistance=1.1050,
+        m15_range_mid=1.1000, m15_range_half_width=0.0040,
+        return_30s_buy=0.0008, return_30s_sell=-0.0008,
+        return_15s_buy=0.0004, return_15s_sell=-0.0004,
+        return_60s_buy=0.001, return_60s_sell=-0.001,
+        session="london", regime="trend",
+    )
+    base.update(overrides)
+    return FastMarketContext(**base)
+
+
+def test_pip_value_jpy_vs_standard():
+    assert pip_value("EURUSD") == 0.0001
+    assert pip_value("USDJPY") == 0.01
+    assert pip_value("GBPUSD") == 0.0001
+    assert pip_value("XAUUSD") == 0.1
+
+
+def test_micro_momentum_burst_generates_on_compression_release():
+    c = micro_momentum_burst(_ctx(
+        m15_direction="up", m5_direction="up",
+        return_30s_buy=0.0008, return_30s_sell=-0.0008,
+        m1_atr=0.0015,
+        m1_low=1.0998, m1_high=1.1001, spread_pips=0.2))
+    assert c is not None
+    assert c.family == "micro_momentum_burst"
+    assert c.side == "buy"
+    assert c.max_hold_s <= 180
+
+
+def test_micro_momentum_rejects_when_no_impulse():
+    c = micro_momentum_burst(_ctx(
+        m15_direction="up", m5_direction="up",
+        return_30s_buy=0.00001, return_30s_sell=-0.00001,
+        m1_atr=0.0015,
+        m1_low=1.0998, m1_high=1.1001, spread_pips=0.2))
+    assert c is None
+
+
+def test_failed_breakout_fade_generates_on_trap():
+    c = failed_breakout_fade(_ctx(
+        regime="range", session="london",
+        m15_resistance=1.2750, m15_support=1.2700,
+        m1_close=1.2748, m1_prev_close=1.2752,
+        bid=1.2747, ask=1.2749, m1_atr=0.0020,
+        m1_low=1.2740, m1_high=1.2755, spread_pips=0.3))
+    assert c is not None
+    assert c.side == "sell"
+
+
+def test_fair_value_snapback_generates_at_range_edge():
+    c = fair_value_snapback(_ctx(
+        regime="range", session="asia",
+        m15_range_mid=0.6500, m15_range_half_width=0.0030,
+        m1_close=0.6535, m1_atr=0.0015,
+        bid=0.6534, ask=0.6536, spread_pips=0.2))
+    assert c is not None
+    assert c.side == "sell"
+    assert c.required_regime == "range"
+
+
+def test_generate_multiple_independent_candidates():
+    """Multiple families can produce candidates simultaneously."""
+    results = generate_micro_candidates(_ctx(
+        regime="range", session="asia",
+        m15_direction="down", m5_direction="down",
+        m15_resistance=1.1050, m15_support=1.0950,
+        m15_range_mid=1.1000, m15_range_half_width=0.0040,
+        m1_close=1.1042, m1_prev_close=1.1052,
+        m1_low=1.1028, m1_high=1.1053,
+        m1_atr=0.0020, return_30s_sell=-0.0012, return_30s_buy=0.0012,
+        bid=1.1041, ask=1.1043, spread_pips=0.2))
+    families = {c.family for c in results}
+    assert len(families) >= 2, f"expected multiple families, got: {families}"
+
+
+def test_micro_diagnostics_identify_missing_return_without_candidate():
+    candidates, reasons = diagnose_micro_candidates(_ctx(
+        return_30s_buy=None,
+        return_30s_sell=None,
+    ))
+
+    assert candidates == []
+    assert reasons["micro_momentum_burst"] == "missing_return_30s"
+
+
+def test_micro_diagnostics_identify_missing_m15_range():
+    _, reasons = diagnose_micro_candidates(_ctx(
+        m15_range_mid=None,
+        m15_range_half_width=None,
+    ))
+
+    assert reasons["fair_value_snapback"] == "missing_m15_range"
+
+
+@pytest.mark.parametrize(
+    ("overrides", "family", "reason"),
+    [
+        (
+            {"return_30s_buy": 0.00001, "return_30s_sell": -0.00001},
+            "micro_momentum_burst",
+            "insufficient_impulse",
+        ),
+        (
+            {"m5_compression": 0.9},
+            "micro_momentum_burst",
+            "excessive_compression",
+        ),
+        (
+            {"m5_direction": "down"},
+            "micro_momentum_burst",
+            "timeframe_alignment_failure",
+        ),
+        (
+            {"m1_atr": 0.00001, "m1_low": 1.09999, "m1_high": 1.10001},
+            "micro_momentum_burst",
+            "invalid_geometry",
+        ),
+        (
+            {
+                "m15_resistance": 1.1050,
+                "m15_support": 1.0950,
+                "m1_close": 1.1000,
+                "m1_prev_close": 1.1001,
+            },
+            "failed_breakout_fade",
+            "no_failed_break_trigger",
+        ),
+        (
+            {
+                "m15_range_mid": 1.1000,
+                "m15_range_half_width": 0.0040,
+                "m1_close": 1.1000,
+            },
+            "fair_value_snapback",
+            "no_snapback_trigger",
+        ),
+        (
+            {"m15_range_half_width": 0.0},
+            "fair_value_snapback",
+            "invalid_m15_range",
+        ),
+    ],
+)
+def test_micro_diagnostics_report_precise_family_rejection(
+    overrides, family, reason,
+):
+    candidates, reasons = diagnose_micro_candidates(_ctx(**overrides))
+
+    assert candidates == generate_micro_candidates(_ctx(**overrides))
+    assert family not in {candidate.family for candidate in candidates}
+    assert reasons[family] == reason
+
+
+def test_micro_diagnostics_preserve_generator_candidates_for_matching_context():
+    ctx = _ctx(
+        m15_direction="up", m5_direction="up",
+        return_30s_buy=0.0008, return_30s_sell=-0.0008,
+        m15_resistance=1.1050, m15_support=1.0950,
+        m1_close=1.1042, m1_prev_close=1.1052,
+        m1_low=1.1028, m1_high=1.1053,
+        m1_atr=0.0020, bid=1.1041, ask=1.1043,
+        m15_range_mid=1.1000, m15_range_half_width=0.0040,
+    )
+
+    generated = generate_micro_candidates(ctx)
+    diagnosed, _ = diagnose_micro_candidates(ctx)
+
+    assert diagnosed == generated
+
+
+def test_micro_diagnostics_fail_closed_and_preserve_empty_set_for_malformed_context():
+    malformed = _ctx(m1_atr="not-a-number")
+
+    generated = generate_micro_candidates(malformed)
+    diagnosed, reasons = diagnose_micro_candidates(malformed)
+
+    assert diagnosed == generated == []
+    assert reasons["micro_momentum_burst"] == "evaluation_error"
+    assert all(reason != "no_match" for reason in reasons.values())
+
+
+def test_micro_diagnostics_fail_closed_and_preserve_empty_set_for_exception_context():
+    class ExceptionContext:
+        symbol = "EURUSD"
+
+        def __getattribute__(self, name):
+            if name in {"return_30s_buy", "m15_resistance", "m15_range_mid"}:
+                raise RuntimeError("broken market context")
+            return object.__getattribute__(self, name)
+
+    context = ExceptionContext()
+
+    generated = generate_micro_candidates(context)
+    diagnosed, reasons = diagnose_micro_candidates(context)
+
+    assert diagnosed == generated == []
+    assert all(reason == "evaluation_error" for reason in reasons.values())
+
+
+def test_search_candidates_enumerate_both_sides_and_learned_horizons():
+    ctx = _ctx(
+        m15_direction="up", m5_direction="up",
+        return_30s_buy=0.0008, return_30s_sell=-0.0008,
+        m15_resistance=1.1050, m15_support=1.0950,
+        m1_close=1.1042, m1_prev_close=1.1052,
+        m1_low=1.1028, m1_high=1.1053,
+        m1_atr=0.0020, bid=1.1041, ask=1.1043,
+        m15_range_mid=1.1000, m15_range_half_width=0.0040,
+    )
+
+    candidates = generate_micro_search_candidates(ctx, horizons=(3, 8, 15))
+
+    assert candidates
+    assert {candidate.side for candidate in candidates} == {"buy", "sell"}
+    assert {candidate.max_hold_s for candidate in candidates} == {3, 8, 15}
+    assert {candidate.family for candidate in candidates} >= {
+        "micro_momentum_burst", "failed_breakout_fade", "fair_value_snapback",
+    }
+    assert all(candidate.variant_id for candidate in candidates)
+
+
+def test_runtime_search_checkpoints_preserve_complete_candidate_identity():
+    ctx = _ctx()
+    baseline = generate_runtime_search_candidates(ctx, horizons=(3, 10))
+    calls = []
+
+    observed = generate_runtime_search_candidates(
+        ctx,
+        horizons=(3, 10),
+        checkpoint=lambda stage, mechanism, side, horizon: calls.append(
+            (stage, mechanism, side, horizon)
+        ),
+    )
+
+    assert [
+        (candidate.variant_id, candidate.side, candidate.max_hold_s)
+        for candidate in observed
+    ] == [
+        (candidate.variant_id, candidate.side, candidate.max_hold_s)
+        for candidate in baseline
+    ]
+    assert {call[2] for call in calls if call[2]} == {"buy", "sell"}
+    assert {call[3] for call in calls if call[3] is not None} == {3, 10}
+
+
+def test_runtime_registry_exposes_compiled_catalog_mechanisms():
+    ids = {spec.mechanism_id for spec in runtime_mechanism_specs()}
+
+    assert {
+        "micro_momentum_burst", "failed_breakout_fade", "fair_value_snapback",
+        "video_style_breakout", "aegis_range_hw", "donch55", "donch20",
+        "ema_cross", "rsi_pure", "bb_mr", "macd_cross", "stoch_mr",
+        "atr_breakout", "bb_squeeze", "elder_impulse",
+    } <= ids
+
+
+def test_compiled_catalog_candidate_uses_executable_quote_geometry():
+    row = pd.Series({
+        "time": pd.Timestamp("2026-08-21T12:00:00Z"), "close": 1.0990,
+        "atr": 0.0005, "adx": 10.0, "rsi": 20.0,
+        "bb_lower": 1.0995, "bb_upper": 1.1005, "bb_mid": 1.1000,
+        "ema_fast": 1.1000, "ema_slow": 1.1002,
+    })
+    candidates = generate_runtime_search_candidates(
+        _ctx(symbol="EURUSD", bid=1.09898, ask=1.09900, spread_pips=0.2),
+        row=row, previous_row=row, cfg={"session_start_utc": 0, "session_end_utc": 24},
+        horizons=(3,),
+    )
+
+    range_candidates = [c for c in candidates if c.family == "aegis_range_hw"]
+    assert range_candidates
+    candidate = range_candidates[0]
+    assert candidate.entry_price == pytest.approx(1.09900)
+    assert candidate.invalidation < candidate.entry_price < candidate.target
+
+
+def test_entry_economics_reports_near_miss_distances():
+    candidate = MicroCandidate(
+        hypothesis_id="h-distance", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.09980, target=1.10020,
+        max_hold_s=8, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=2.0, target_pips=2.0,
+        risk_usd_min_lot=0.05, lane="SHADOW", mechanism="test",
+    )
+
+    result = check_entry_economics(candidate, max_risk_usd=0.15)
+
+    assert result["allowed"] is False
+    assert result["distance_to_eligibility"]["risk_excess_usd"] > 0
+    assert result["distance_to_eligibility"]["net_ev_deficit_pips"] == 0
+    assert result["near_eligible"] is False
+
+
+def test_entry_economics_blocks_min_lot_risk_exceeding_budget():
+    """Spec P6/audit defect 1: broker min lot risk > budget = BLOCKED."""
+    cand = MicroCandidate(
+        hypothesis_id="h1", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0950, target=1.1050,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=1.0, stop_pips=50, target_pips=50,
+        risk_usd_min_lot=5.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(cand, max_risk_usd=0.15)
+    assert not result["allowed"]
+    assert "RISK_GRANULARITY_BLOCKED" in result["rejections"]
+
+
+def test_entry_economics_blocks_negative_net_target():
+    cand = MicroCandidate(
+        hypothesis_id="h2", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0999, target=1.1001,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=2.0, stop_pips=1, target_pips=1,
+        risk_usd_min_lot=0.05, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(cand, max_risk_usd=0.15)
+    assert "NEGATIVE_EXPECTED_NET_AFTER_COST" in result["rejections"]
+
+
+@pytest.mark.parametrize("bad_tick", [-1.0, float("nan"), float("inf")])
+def test_entry_economics_does_not_use_invalid_tick_value_as_negative_risk(bad_tick):
+    cand = MicroCandidate(
+        hypothesis_id="h-invalid-tick", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0990, target=1.1020,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=10, target_pips=20,
+        risk_usd_min_lot=1.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(
+        cand, max_risk_usd=0.15, contract_size=100000.0,
+        tick_value=bad_tick, tick_size=0.00001,
+    )
+    assert "RISK_GRANULARITY_BLOCKED" in result["rejections"]
+
+
+@pytest.mark.parametrize("bad_budget", [0.0, -0.01, float("nan"), float("inf")])
+def test_entry_economics_rejects_invalid_risk_budget(bad_budget):
+    cand = MicroCandidate(
+        hypothesis_id="h-invalid-budget", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0990, target=1.1020,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=10, target_pips=20,
+        risk_usd_min_lot=1.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(cand, max_risk_usd=bad_budget)
+    assert result["allowed"] is False
+    assert "INVALID_RISK_BUDGET" in result["rejections"]
+
+
+@pytest.mark.parametrize("bad_volume", [0.0, -0.01, float("nan"), float("inf")])
+def test_entry_economics_rejects_invalid_minimum_lot(bad_volume):
+    cand = MicroCandidate(
+        hypothesis_id="h-invalid-volume", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0990, target=1.1020,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=10, target_pips=20,
+        risk_usd_min_lot=1.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(cand, max_risk_usd=0.15, volume_min=bad_volume)
+    assert result["allowed"] is False
+    assert "INVALID_VOLUME_SPEC" in result["rejections"]
+
+
+@pytest.mark.parametrize(
+    ("commission_rt_usd", "slippage_pips"),
+    [(float("nan"), 0.3), (float("inf"), 0.3), (-0.01, 0.3), (0.0, float("nan")), (0.0, -0.1)],
+)
+def test_entry_economics_rejects_invalid_cost_inputs(commission_rt_usd, slippage_pips):
+    cand = MicroCandidate(
+        hypothesis_id="h-invalid-cost", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.0990, target=1.1020,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=10, target_pips=20,
+        risk_usd_min_lot=1.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(
+        cand, max_risk_usd=0.15,
+        commission_rt_usd=commission_rt_usd, slippage_pips=slippage_pips,
+    )
+    assert result["allowed"] is False
+    assert "INVALID_COST_INPUTS" in result["rejections"]
+
+
+def test_entry_economics_rejects_invalid_stop_geometry():
+    cand = MicroCandidate(
+        hypothesis_id="h-invalid-geometry", family="test", symbol="EURUSD", side="buy",
+        entry_price=1.10, invalidation=1.10, target=1.1020,
+        max_hold_s=60, required_regime="trend", required_session="asia",
+        spread_pips=0.2, stop_pips=10, target_pips=20,
+        risk_usd_min_lot=1.0, lane="SHADOW", mechanism="test")
+    result = check_entry_economics(cand, max_risk_usd=0.15)
+    assert result["allowed"] is False
+    assert "INVALID_GEOMETRY" in result["rejections"]
+
+
+# ---------------------------------------------------------------------------
+# Fast exit state machine
+# ---------------------------------------------------------------------------
+
+
+def _sm(**cfg):
+    return FastExitStateMachine(FastExitConfig(**cfg))
+
+
+BASE = dict(side="buy", entry_price=1.1000, stop_loss=1.0990,
+            stop_pips=10, pip=0.0001)
+
+
+def _harvest_policy(*, status="COMPLETE"):
+    return HarvestPolicy(
+        min_net_r=0.50, min_mfe_r=0.60, protected_mfe_fraction=0.60,
+        max_extension_s=30.0, scratch_age_s=20.0, scratch_loss_r=-0.25,
+        stalled_return_r=0.02, accelerating_return_r=0.05,
+        evidence=HarvestPolicyEvidence(
+            policy_id="costed-oos-v1", status=status,
+            completed_lifecycles=12, oos_expectancy_after_cost=0.08,
+        ),
+    )
+
+
+def _harvest_input(**overrides):
+    values = {
+        "ticket": "T1", "side": "buy", "gross_pnl_r": 0.74,
+        "gross_mfe_r": 0.84, "age_s": 10.0,
+        "gross_return_5s_r": 0.05, "gross_return_15s_r": 0.07,
+        "gross_return_30s_r": 0.09, "remaining_ev": 0.04,
+        "remaining_ev_status": "ESTIMATED", "spread_normal": True,
+        "observed_spread_r": 0.02, "observed_slippage_r": 0.01,
+        "observed_commission_r": 0.01,
+    }
+    values.update(overrides)
+    return HarvestInput(**values)
+
+
+def test_fast_exit_take_at_target():
+    sm = _sm()
+    v = sm.evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.10199,
+        stop_loss=1.0990, target=1.1020,
+        opened_ts=1000, now=1030, pnl_pips=19.9,
+        mfe_pips=20, mae_pips=-1,
+        stop_pips=10, pip=0.0001)
+    assert v["action"] == "TAKE"
+
+
+def test_fast_exit_lock_after_mfe_arm():
+    sm = _sm()
+    v = sm.evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.1006,
+        stop_loss=1.0990, target=1.1020, opened_ts=1000, now=1030,
+        pnl_pips=6.0, mfe_pips=7.0, mae_pips=-1.0,
+        stop_pips=10, pip=0.0001)
+    assert v["action"] == "LOCK"
+    assert "cost-plus lock" in v["why"] or "armed" in v["why"]
+
+
+def test_fast_exit_scratch_on_time_decay_without_progress():
+    sm = _sm(time_exit_s=120)
+    v = sm.evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.10001,
+        stop_loss=1.0990, target=1.1020, opened_ts=1000, now=1300,
+        pnl_pips=0.1, mfe_pips=0.3, mae_pips=-0.5,
+        stop_pips=10, pip=0.0001)
+    assert v["action"] == "SCRATCH"
+
+
+def test_fast_exit_abort_on_regime_change_losing():
+    sm = _sm()
+    v = sm.evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.0998,
+        stop_loss=1.0990, target=1.1020, opened_ts=1000, now=1020,
+        pnl_pips=-2.0, mfe_pips=0.5, mae_pips=-3.0,
+        stop_pips=10, pip=0.0001,
+        regime_now="range", regime_at_entry="trend")
+    assert v["action"] == "ABORT"
+    assert "regime" in v["why"]
+
+
+def test_fast_exit_hold_with_positive_ev():
+    sm = _sm()
+    v = sm.evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.1003,
+        stop_loss=1.0990, target=1.1020, opened_ts=1000, now=1020,
+        pnl_pips=3.0, mfe_pips=3.5, mae_pips=-0.5,
+        stop_pips=10, pip=0.0001,
+        remaining_ev=0.03, remaining_ev_status="ESTIMATED")
+    assert v["action"] == "HOLD"
+    assert "positive" in v["why"].lower() or "mfe" in v["why"].lower()
+
+
+def test_fast_exit_legacy_target_take_behavior_is_unchanged():
+    """A structural target must remain higher priority than a harvest hint."""
+    v = _sm().evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.10199,
+        stop_loss=1.0990, target=1.1020,
+        opened_ts=1000, now=1030, pnl_pips=19.9,
+        mfe_pips=20, mae_pips=-1,
+        stop_pips=10, pip=0.0001,
+        harvest_decision=HarvestDecision("MOMENTUM_HOLD", "bounded_favorable_momentum"),
+    )
+
+    assert v["action"] == "TAKE"
+    assert v["reason"] == "target_reached"
+
+
+def test_fast_exit_maps_quick_take_after_existing_protections():
+    """A validated harvest close must replace only the legacy default HOLD."""
+    v = _sm().evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.1003,
+        stop_loss=1.0990, target=1.1020,
+        opened_ts=1000, now=1020, pnl_pips=3.0,
+        mfe_pips=3.0, mae_pips=-0.5,
+        stop_pips=10, pip=0.0001,
+        remaining_ev=0.03, remaining_ev_status="ESTIMATED",
+        harvest_policy=_harvest_policy(),
+        harvest_input=_harvest_input(),
+    )
+
+    assert v["action"] == "QUICK_TAKE"
+    assert v["reason"] == "momentum_stall_profit_harvest"
+
+
+def test_fast_exit_ignores_injected_quick_take_without_evidence_artifact():
+    """Removing policy validation must not let an injected close bypass HOLD."""
+    v = _sm().evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.1003,
+        stop_loss=1.0990, target=1.1020,
+        opened_ts=1000, now=1020, pnl_pips=3.0,
+        mfe_pips=3.0, mae_pips=-0.5,
+        stop_pips=10, pip=0.0001,
+        remaining_ev=0.03, remaining_ev_status="ESTIMATED",
+        harvest_decision=HarvestDecision("QUICK_TAKE", "injected"),
+    )
+
+    assert v["action"] == "HOLD"
+    assert v["reason"] == "fast_hold_justified"
+
+
+def test_fast_exit_uses_harvester_only_with_complete_policy_artifact():
+    """An evaluated, artifact-backed quick take may replace the legacy hold."""
+    v = _sm().evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.1003,
+        stop_loss=1.0990, target=1.1020,
+        opened_ts=1000, now=1020, pnl_pips=3.0,
+        mfe_pips=3.0, mae_pips=-0.5,
+        stop_pips=10, pip=0.0001,
+        remaining_ev=0.03, remaining_ev_status="ESTIMATED",
+        harvest_policy=_harvest_policy(),
+        harvest_input=_harvest_input(),
+    )
+
+    assert v["action"] == "QUICK_TAKE"
+    assert v["reason"] == "momentum_stall_profit_harvest"
+
+
+def test_fast_exit_honors_harvest_floor_breach_before_legacy_lock():
+    """An armed floor breach must close rather than merely adjust the stop."""
+    v = _sm(giveback_frac=0.70).evaluate(
+        side="buy", entry_price=1.1000, current_mark=1.10045,
+        stop_loss=1.0990, target=1.1020,
+        opened_ts=1000, now=1020, pnl_pips=4.5,
+        mfe_pips=10.0, mae_pips=-0.5,
+        stop_pips=10, pip=0.0001,
+        remaining_ev=0.03, remaining_ev_status="ESTIMATED",
+        harvest_policy=_harvest_policy(),
+        harvest_input=_harvest_input(gross_pnl_r=0.49, gross_mfe_r=1.04),
+    )
+
+    assert v["action"] == "QUICK_TAKE"
+    assert v["reason"] == "profit_floor_breach"
+
+
+def test_one_large_loser_cannot_occur_from_old_geometry():
+    """The old 30-pip fallback must never produce a valid exploration order."""
+    from aegis.intel.exploration import risk_lots_for_exploration
+
+    r = risk_lots_for_exploration(
+        max_risk_usd=0.15, entry=1.10, invalidation=1.07,
+        pip=0.0001, contract_size=100000.0,
+        volume_min=0.01, volume_step=0.01)
+    assert r["allowed"] is False
+
+
+# ---------------------------------------------------------------------------
+# Firehose mode classification (Phase 12)
+# ---------------------------------------------------------------------------
+
+
+def test_firehose_mode_classification():
+    assert classify_firehose_mode(broker_round_trips=5, shadow_trades=100) == \
+        "DEMO_FAST_TURNOVER_FIREHOSE"
+    assert classify_firehose_mode(broker_round_trips=0, shadow_trades=500) == \
+        "SHADOW_RESEARCH_FIREHOSE"
+    assert classify_firehose_mode(broker_round_trips=0, shadow_trades=0) == \
+        "RESEARCH_CANDIDATES_ONLY"

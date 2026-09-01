@@ -1,0 +1,1 @@
+Two consecutive scans may merely delay entries and overfit to the chosen scan cadence; test robustness across cadences and market regimes. “False entry” and opportunity loss need pre-registered, executable definitions, including exit horizon and cost model. The sealed holdout must remain untouched until thresholds and comparison methodology are fixed.

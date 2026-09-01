@@ -1,0 +1,110 @@
+# Local trading book library — never commit copyrighted book text
+
+.external/
+
+books/**
+!books/.gitkeep
+extracted/**
+!extracted/.gitkeep
+cleaned/**
+!cleaned/.gitkeep
+docs/trading/books/**
+docs/trading/BOOKS_FULL.md
+docs/trading/extra_hft_pdfs/
+reports/**
+!reports/.gitkeep
+
+.env
+.env.*
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+*.log
+*.gguf
+*.safetensors
+mlx_models/
+adapters/
+models/
+chroma_db/
+datasets/
+
+# Optimizer runtime (templates are un-ignored below)
+bot/optimizer/*
+!bot/optimizer/.gitkeep
+!bot/optimizer/config.yaml
+!bot/optimizer/AGENT_PROMPT.md
+bot/reports/*_journal.jsonl
+bot/reports/bot_heartbeat.json
+bot/reports/*.lock
+bot/reports/risk_state.json
+bot/reports/execution_circuit.json
+bot/reports/paper_runner_stdout.log*
+bot/reports/*.bak
+bot/reports/research/*.log
+# OpenCode 24/7 watcher heartbeat changes every cycle; docs stay tracked
+bot/reports/opencode/heartbeat.json
+
+# Intel research runtime (code + frozen_v1.json stay in git)
+bot/intel/*
+!bot/intel/.gitkeep
+# Deterministic decision artifacts: the runtime brain state MUST be
+# reproducible from a clean clone (audit defects 13/14).
+!bot/intel/validated_opportunities.json
+!bot/intel/validated_states.json
+!bot/intel/cost_profiles.json
+!bot/intel/demo_canary.json
+# Execution journal exceeded GitHub's 100 MB hard limit (blocked pushes).
+# Rotated archives stay local; the runner recreates a fresh journal.
+bot/reports/mt5_demo_firehose_hw_journal*.jsonl
+
+# Research runtime (code stays in bot/aegis/research/)
+bot/research/*
+!bot/research/.gitkeep
+# Permanent book-memory knowledge records stay versioned
+!bot/research/book_memory/
+!bot/research/book_memory/knowledge_records.jsonl
+# Sealed holdout evidence + challenger strategy specs stay versioned
+!bot/research/sealed_holdouts.jsonl
+!bot/research/strategies/
+bot/optimizer/*.lock
+
+# Large/generated AEGIS runtime captures are preserved locally, but are not
+# source artifacts for the GitHub archive (rebuildable from the code/config).
+bot/reports/watcher/
+bot/reports/watcher_archive*/
+bot/reports/watcher_cleared*/
+bot/reports/watcher_legacy*/
+bot/reports/research/fast_edge_generations/
+bot/reports/research/live_github_books*/
+bot/reports/research/fast_edge_shadow_rows*.jsonl
+bot/reports/research/book_strategy_registry.jsonl
+bot/reports/research/*_runs/
+bot/reports/research/short_horizon_candidate*/
+bot/reports/research/short_horizon_clean_probe*/
+bot/reports/research/selected_strategy_replay*.json
+bot/reports/research/book_strategy_historical_replay*.json
+bot/reports/research/book_consensus_historical_replay*.json
+bot/reports/research/external_dag_manifest.json
+bot/reports/research/watcher_algorithm_historical_replay*.json
+bot/reports/research/ml_pipeline.json
+bot/reports/research/fast_trade_autopsy.json
+bot/reports/council/live.jsonl
+bot/reports/FIREHOSE_STOP*
+bot/reports/*.err
+bot/intel/outcome_log.jsonl
+bot/research/fast_edge_shadow_rows*.jsonl
+bot/research/books_index.sqlite
+bot/intel/analogue_index.json
+bot/intel/market_evidence.jsonl
+bot/intel/exploration_experiments.json
+
+
+# tokenade — per-project cache / scaffold flag / dedup refs
+.tokenade/
+
+# tokenade — legacy per-project embedding model cache (now global)
+.fastembed_cache/

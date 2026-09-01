@@ -1,0 +1,81 @@
+{
+  "change_id": "council_scheduled_cadence_20260824_2341",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-24T23:41:31.498699+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260824_2341",
+    "current_evidence": "Test a volatility-regime filter that blocks entries when the 30-minute ATR percentile is below 20% or above 90% of its trailing 60-day distribution. Evaluate it on sealed holdouts with existing spread and slippage assumptions, against the current validated-state baseline. Accept only if net expectan",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Test a volatility-regime filter that blocks entries when the 30-minute ATR percentile is below 20% or above 90% of its trailing 60-day distribution. Evaluate it on sealed holdouts with existing spread and slippage assumptions, against the current validated-state baseline. Accept only if net expectancy improves and maximum drawdown does not worsen; otherwise reject and record the result.",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/2)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-24T23:41:02.912082+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 2,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Acceptance requires sealed-holdout net expectancy improvement with no drawdown worsening, while falsification refers to exploration trades.",
+        "ATR percentile calculation requires an explicit instrument/session-aware 60-day data completeness policy.",
+        "The baseline, minimum sample size, statistical confidence requirement, and spread/slippage source are not defined."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal is research-only and preserves sealed-holdout, costed evaluation, and no-champion-impact constraints, but its acceptance and falsification criteria are inconsistent and insufficiently specified.",
+      "requested_revisions": [
+        "Define the exact sealed-holdout acceptance and rejection criteria; remove exploration-trade falsification language.",
+        "Specify ATR calculation, percentile method, 60-day trading-session handling, missing-data behavior, and all instruments/timeframes.",
+        "Specify the validated-state baseline, minimum trade/sample threshold, significance or robustness checks, and immutable cost assumptions.",
+        "Confirm the implementation remains read-only research and records every outcome through ExperimentRegistry."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Current evidence is truncated.",
+        "No exact baseline, sample period, holdout definition, or minimum trade-count threshold is provided.",
+        "No explicit requirement to register the experiment and preserve sealed holdouts.",
+        "Affected files are broad relative to the stated research change."
+      ],
+      "confidence": 0.96,
+      "model": null,
+      "reason": "The proposal is safety-compatible and appropriately limits scope to an experiment, but the evidence and acceptance criteria are incomplete and the evaluation protocol is underspecified.",
+      "requested_revisions": [
+        "Provide the complete costed expectancy acceptance criteria, including statistical or minimum-sample thresholds.",
+        "Specify baseline, training period, sealed holdout period, ATR calculation, and comparison methodology.",
+        "Confirm ExperimentRegistry usage and that no champion or live configuration is modified.",
+        "List the exact files or modules requiring changes and include lifecycle/OOS validation tests."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

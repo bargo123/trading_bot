@@ -1,0 +1,235 @@
+{
+  "created_utc": "2026-08-25T02:47:30.870095+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\critiques\\codex--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 57.92,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T02:53:17.097365+00:00",
+        "text": "The 1.5\u00d7, 90th-percentile, and all three pass-gate numbers (10%/5%/70%) are unjustified hand-picked constants; if more than one configuration gets evaluated against the sealed holdout, the holdout is burned \u2014 thresholds must be tuned via in-sample walk-forward/CV, the exact spec registered in ExperimentRegistry before any holdout contact, and holdout access treated as strictly one-shot. Both filters risk lookahead as written: the spread median must be trailing-only, and \"realized volatility above its 90th percentile\" is unmeasurable until the percentile window is specified \u2014 a full-sample percentile leaks future information into every entry decision. Comparing expectancy and drawdown on a refiltered trade population is not apples-to-apples, since blocking high-vol regimes mechanically selects calmer trades (regime selection, not demonstrated edge), and a 10% expectancy delta on ~30% fewer trades has wide confidence intervals with no significance test or bootstrap proposed. Finally, key definitions are missing: expectancy per-trade or aggregate and net of which spread/slippage model, and whether \"drawdown does not worsen by more than 5%\" is relative or absolute \u2014 without these the pass condition cannot be adjudicated objectively."
+      },
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.44,
+          "finished_utc": "2026-08-25T02:53:29.551790+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-25T02:53:17.115390+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T02:53:29.556838+00:00",
+        "text": "The 1.5x and 90th-percentile thresholds are arbitrary and invite tuning against the sealed holdout unless fixed using an earlier, strictly time-ordered validation set. \u201c10% expectancy improvement\u201d and \u201c5% drawdown worsening\u201d are undefined as relative versus absolute measures, and no confidence intervals, minimum sample size, or per-instrument/regime robustness test is required. A 30-minute median and realized-volatility percentile must be computed causally with explicit session, missing-data, and spread-cost handling, or the filter can leak future information and manufacture an apparent improvement."
+      }
+    ],
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.02,
+          "finished_utc": "2026-08-25T02:51:09.292147+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-25T02:50:58.276236+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T02:51:09.295420+00:00",
+        "text": "The fixed 25% threshold and tercile split are arbitrary and likely overfit to a small, regime-dependent sample of roughly 200 trades. It does not define spread normalization by instrument, session, volatility, or quote quality, so the observed relationship may merely proxy adverse market conditions rather than executable cost. The proposal also needs a pre-registered minimum effect size, bootstrap method, and leakage-safe sealed-holdout evaluation before treating an exploratory DEMO result as a gate candidate."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\critiques\\hermes--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.42,
+          "finished_utc": "2026-08-25T02:51:21.730176+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-25T02:51:09.310734+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T02:51:21.733737+00:00",
+        "text": "The ~200-trade, tercile-based test is underpowered and invites overfitting/p-hacking: the sample size, tercile cutoffs, and 25% threshold are not pre-registered, and \u201cCI overlaps\u201d is not a valid equivalence or superiority test. Conditioning only on gated-in trades creates selection bias, while signal-time spread may not represent executable/fill spread and may double-count costs already included in net expectancy; validation also lacks fixed out-of-sample periods, regime/asset stratification, and multiple-testing correction. The proposal should explicitly prove the logger is read-only and the single governed runner remains the sole MT5 mutator, with fail-closed behavior if spread data are missing or stale."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 45.8,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T02:52:07.522720+00:00",
+        "text": "1. The filter's free parameters \u2014 the 15-minute timeframe, the 60-bar lookback, the median threshold, and the 10% adoption bar \u2014 are stated without pre-registration or justification, which is exactly how tuning-on-the-holdout happens; and a single sealed-holdout pass with no confidence interval means a 10% expectancy delta on ~100 trades can be pure sampling noise.\n2. \"Post-entry volatility-expansion\" used to reject entries is internally contradictory \u2014 the evaluation point (pre-entry ATR state vs. realized post-entry expansion) is undefined, so the claim isn't measurable as written.\n3. Conditioning on trades that pass an ATR floor silently reweights the sample toward specific sessions and regimes, so the expectancy/drawdown comparison versus the unchanged gate isn't apples-to-apples even at n\u2265100 \u2014 and there's no power analysis behind that floor anyway.\n4. Missing validation: no temporal or regime-stratified resampling, no walk-forward confirmation, no stated seal-integrity check on the holdout or ExperimentRegistry entry, and any adoption must still clear the governed `promote.py` gates rather than this proposal's self-declared criteria."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.62,
+          "finished_utc": "2026-08-25T02:52:19.163954+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-25T02:52:07.544979+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T02:52:19.166965+00:00",
+        "text": "The \u201c15-minute post-entry\u201d ATR filter is causally ambiguous: using information after entry to reject that entry introduces lookahead bias unless the trade is delayed or exited under a pre-specified rule. The 60-bar median and 10% improvement threshold appear arbitrary and invite overfitting, while a 100-trade minimum does not establish statistical significance or robustness across regimes, symbols, and time periods. It also omits confidence intervals, multiple-testing controls, and an explicit fail-closed governance check confirming the experiment cannot alter live or DEMO execution paths."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-25T02:56:04.291346+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_8e7ada",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 6,
+      "n_proposals": 3,
+      "n_revisions": 3,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_8e7ada for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_c8d218",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 91.52,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T02:49:19.895031+00:00",
+      "text": "Proposal: Add a realized-spread-regime check to the validated-state gate as a challenger tested in the next research cycle. Hypothesis: firehose entries admitted when the live DEMO spread at signal time exceeds the trailing 24-hour median by more than ~25% have negative net expectancy after the runner's existing spread/slippage cost model, because the gate currently validates market state but not executable-cost state. Test: log spread-at-decision-time for every gated-in trade over the next ~200 DEMO trades, split into spread terciles, and compare net-expectancy-per-trade across terciles with a bootstrap confidence interval, recorded in the ExperimentRegistry. Falsification criterion: if the high-spread tercile's net-expectancy CI overlaps or beats the low-spread tercile's, reject the hypothesis and keep the gate unchanged. If confirmed, draft a spread-cap precondition in the gate as a challenger strategy and run it through the full promote.py gate set against the sealed holdout \u2014 no champion edits outside the governed path, no risk-parameter increases, demo-only."
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.89,
+        "finished_utc": "2026-08-25T02:49:42.188547+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-25T02:49:30.303007+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T02:49:42.191545+00:00",
+      "text": "Run a sealed-holdout study adding a 15-minute post-entry volatility-expansion filter to the validated-state gate, rejecting entries when ATR is below its 60-bar median. Compare net expectancy, maximum drawdown, and trade count against the unchanged gate using identical DEMO spread and slippage assumptions. Adopt it only if sealed-holdout net expectancy improves by at least 10% without increasing maximum drawdown or reducing sample size below 100 trades."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 14.06,
+        "finished_utc": "2026-08-25T02:50:19.260508+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-25T02:50:05.196722+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T02:50:19.263512+00:00",
+      "text": "Test a research-only regime filter that blocks entries when spread exceeds 1.5\u00d7 its rolling 30-minute median or realized volatility is above its 90th percentile. On the sealed holdout, this candidate passes only if net expectancy improves by at least 10% while maximum drawdown does not worsen by more than 5% and trade count remains above 70% of baseline. Leave the champion and live configuration unchanged during evaluation."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 61.68,
+        "finished_utc": "2026-08-25T02:56:04.247728+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-25T02:55:02.567209+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-25T02:56:04.263281+00:00",
+      "text": "Use a strictly time-ordered in-sample walk-forward/CV set to select and freeze the filter parameters and numerical acceptance gates, then register the complete specification in ExperimentRegistry before opening the sealed holdout, which may be accessed once only. At each decision, calculate the spread median from valid quotes in the preceding 30 minutes and realized-volatility percentiles from trailing 1-minute returns over the preceding 20 trading days for the same instrument and session, with no forward filling, explicit session boundaries, and prespecified handling of missing or stale data. Replay filtered and unfiltered strategies over identical decision timestamps using the same runner spread/slippage model; define expectancy as net P&L per baseline eligible opportunity and drawdown as relative peak-to-trough decline, while counting blocked entries as zero-P&L opportunities in the primary comparison. Accept only if the frozen gates include a block-bootstrap confidence interval and significance test for expectancy improvement, a power-based minimum effective sample size, a bound on relative drawdown deterioration, and consistent results across instruments and predefined regimes; report trade retention and conditional results separately. Leave the champion and live configuration unchanged regardless of the holdout outcome."
+    },
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 80.61,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-25T02:54:50.172099+00:00",
+      "text": "Revised: Pre-register the entire design in the ExperimentRegistry before collection begins \u2014 a sample floor of 400 gated-in DEMO trades or one fixed 8-week window (whichever completes later), chosen so a stated power calculation gives ~80% power at \u03b1=0.05 for the minimum effect size below, one-sided superiority as the primary test, and a stationary block bootstrap (10,000 resamples) to respect return autocorrelation. Redefine exposure as instrument-, session-, and volatility-stratified normalized excess spread \u2014 fill-time effective spread from broker execution records where available, otherwise signal-time quote spread explicitly flagged as a proxy \u2014 divided by that symbol's trailing 24-hour median within its session bucket, so the factor isolates executable cost rather than proxying generic adverse market conditions. To eliminate admission selection bias, log spread passively for every signal reaching the gate, admitted and rejected alike; verify against the runner's cost model that realized spread is not double-counted inside net expectancy; and set a pre-registered minimum effect size of 0.05R/trade for the high-minus-low normalized-spread tercile contrast, with Holm correction across the single primary endpoint and two pre-named secondary stratifications (volatility regime, symbol). Falsification uses formal TOST equivalence bounds instead of informal CI overlap, and any confirmatory spread-cap challenger is drafted only after passing on a sealed, disjoint out-of-sample segment through the full promote.py gate set \u2014 no champion edits outside the governed path, demo-only, no risk-parameter increases. The spread logger is a read-only research component that never calls mt5.order_send() and leaves run_broker_paper.py as the sole MT5 mutator, with fail-closed handling: observations with missing or stale (>60s) spread data are excluded from the analysis set, never imputed or used to justify relaxing the gate."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c8d218\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.36,
+        "finished_utc": "2026-08-25T02:55:02.549113+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-25T02:54:50.190987+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-25T02:55:02.551382+00:00",
+      "text": "Pre-register a causal pre-entry 15-minute ATR filter, with its lookback and threshold selected only from prior training data via a documented power analysis and multiple-testing correction; no post-entry information will determine entry eligibility. Record the experiment in `ExperimentRegistry`, verify sealed-holdout integrity, and compare the filtered and unchanged gates under identical DEMO cost assumptions using paired, temporal walk-forward and regime/session-stratified resampling with confidence intervals for net expectancy, drawdown, and trade-count effects. Analyze and report selection-induced session and regime reweighting, requiring adequate sample size and statistically robust improvement rather than an arbitrary 10% threshold. The study is read-only and fail-closed: it cannot modify live or DEMO execution, and any candidate may be adopted only through all governed `promote.py` gates."
+    }
+  },
+  "status": "decided"
+}

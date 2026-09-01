@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-27T23:46:44.002262+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_20e2f1\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 13.59,
+          "finished_utc": "2026-08-27T23:50:15.084923+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-27T23:50:01.493383+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-27T23:50:15.088922+00:00",
+        "text": "This is an API compatibility error, not a research proposal, so it makes no measurable trading claim or testable hypothesis. It provides no validation plan, data, risk controls, or evidence that the specified model is supported; resolve the provider/model configuration before Council evaluation."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_20e2f1\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 7.84,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-27T23:50:22.944505+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-27T23:50:43.450744+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_1c54a8",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_1c54a8 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_20e2f1",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_20e2f1\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.52,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-27T23:47:00.166650+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_20e2f1\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.21,
+        "finished_utc": "2026-08-27T23:47:27.811111+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-27T23:47:14.599140+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-27T23:47:27.812614+00:00",
+      "text": "Test a stricter validated-state freshness rule: abstain when the latest validated measurement is older than 60 seconds at signal evaluation. Compare it against the current gate on sealed holdouts and a DEMO shadow run, net of existing spread and slippage assumptions. Accept it only if it reduces adverse post-entry excursions by at least 10% without reducing net expectancy or eligible-trade count by more than 5%."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_20e2f1\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 8.2,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-27T23:50:31.150492+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_20e2f1\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.23,
+        "finished_utc": "2026-08-27T23:50:43.404622+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-27T23:50:31.175095+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-27T23:50:43.406634+00:00",
+      "text": "Test a stricter validated-state freshness rule: abstain when the latest validated measurement is older than 60 seconds at signal evaluation. Compare it with the current gate on sealed holdouts and a DEMO shadow run, net of existing spread and slippage assumptions. Use a supported, authenticated model endpoint for any analysis; if unavailable, record the experiment failure without fabricating results. Accept only if adverse post-entry excursions fall at least 10% while net expectancy and eligible-trade count each decline no more than 5%."
+    }
+  },
+  "status": "decided"
+}

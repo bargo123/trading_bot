@@ -1,0 +1,1 @@
+Test a validated-state variant requiring two consecutive spread-normalized favorable quote updates before entry. Evaluate it against the current gate on sealed holdouts with identical DEMO cost assumptions. Adopt only if net expectancy improves without increasing maximum drawdown or reducing eligible trade count by more than 20%.

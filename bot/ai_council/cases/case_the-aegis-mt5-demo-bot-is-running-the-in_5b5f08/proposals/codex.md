@@ -1,0 +1,1 @@
+Test a stricter validated-state gate that requires positive expected value after spread/slippage plus at least two independent analogue matches. The hypothesis is that this reduces false-positive signals without materially reducing net expectancy on a sealed holdout. Promote nothing; accept the candidate only if holdout net expectancy improves and drawdown does not worsen.

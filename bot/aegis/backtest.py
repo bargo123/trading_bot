@@ -1,0 +1,391 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Callable, Optional
+
+import numpy as np
+import pandas as pd
+
+from aegis.exits import giveback_reason, update_mfe, working_stop
+from aegis.risk import RiskEngine
+from aegis.strategy import Signal, prepare, signal_from_row
+from aegis.pyramid import next_pyramid_sl, should_pyramid
+from aegis.high_risk import HighRiskController
+
+PrepareFn = Callable[[pd.DataFrame, dict[str, Any]], pd.DataFrame]
+SignalFn = Callable[[pd.Series, dict[str, Any]], Optional[Signal]]
+
+
+@dataclass
+class BacktestResult:
+    trades: pd.DataFrame
+    equity_curve: pd.Series
+    win_rate: float
+    profit_factor: float
+    max_drawdown_pct: float
+    expectancy_r: float
+    total_trades: int
+    net_pnl: float
+    final_equity: float
+    halt_reason: str = ""
+    ambiguous_exits: int = 0
+    skipped_entries: dict[str, int] = field(default_factory=dict)
+    intel_memory: list[dict[str, Any]] = field(default_factory=list)
+
+
+def run_backtest(
+    df: pd.DataFrame,
+    cfg: dict[str, Any],
+    *,
+    prepare_fn: Optional[PrepareFn] = None,
+    signal_fn: Optional[SignalFn] = None,
+    intel_memory: Optional[list[dict[str, Any]]] = None,
+) -> BacktestResult:
+    prep = prepare_fn or prepare
+    signal = signal_fn or signal_from_row
+    frame = prep(df, cfg)
+    risk = RiskEngine.from_config(cfg)
+    equity = float(cfg.get("starting_equity", 10_000))
+    spread_bps = float(cfg.get("spread_bps", 1.0))
+    slip_bps = float(cfg.get("slippage_bps", 0.5))
+    commission_bps = float(cfg.get("commission_bps", 0.0))
+    cost_bps = spread_bps + slip_bps + commission_bps
+
+    hr = HighRiskController.from_config(cfg, equity)
+    # Fuller pyramid: mode or legacy flag
+    pyramid_on = bool(cfg.get("pyramid_enabled", False)) or hr.fuller_pyramid_enabled()
+    pyramid_max = int(cfg.get("pyramid_max_adds", 2))
+    pyramid_add_r = float(cfg.get("pyramid_add_r", 1.0))
+    pyramid_adx = float(cfg.get("pyramid_adx_min", 25.0))
+    flatten_utc = cfg.get("ntz_flatten_utc")  # optional session flatten (Fabris 17:00)
+
+    trades: list[dict[str, Any]] = []
+    curve = []
+    pos = None
+    halt_reason = ""
+    ambiguous_exits = 0
+    memory: list[dict[str, Any]] = list(intel_memory or [])
+    cfg_run = dict(cfg)
+    cfg_run["_intel_memory"] = memory
+
+    def close_position(exit_time, exit_price: float, outcome: str) -> None:
+        nonlocal equity, pos, halt_reason
+        assert pos is not None
+        side = pos["side"]
+        move = (exit_price - pos["entry"]) if side == "buy" else (pos["entry"] - exit_price)
+        cost = pos["entry"] * (cost_bps / 10000.0) * 2
+        commission_rt = float(cfg.get("commission_round_trip_usd", 0.0) or 0.0)
+        pnl = pos["units"] * (move - cost) - commission_rt
+        initial_risk_money = float(pos["unit0"]) * float(pos["risk_den"])
+        if bool(cfg.get("negative_balance_protection", True)) and equity + pnl <= 0:
+            pnl = -equity
+            outcome = "bankruptcy"
+            halt_reason = "bankruptcy"
+        r = pnl / initial_risk_money if initial_risk_money > 0 else 0.0
+        equity += pnl
+        hr.on_trade_closed(pnl, equity)
+        trades.append(
+            {
+                "entry_time": pos["time"],
+                "exit_time": exit_time,
+                "side": side,
+                "mode": pos["mode"],
+                "reason": pos["reason"],
+                "entry": pos["entry"],
+                "exit": exit_price,
+                "pnl": pnl,
+                "r": r,
+                "outcome": outcome,
+                "adds": int(pos.get("adds", 0)),
+                "risk_pct": pos.get("risk_pct"),
+                "hr_step": pos.get("hr_step"),
+                "mfe": pos.get("mfe"),
+                "mae": pos.get("mae"),
+                "bars_held": pos.get("bars_held"),
+                "symbol": pos.get("symbol") or cfg.get("symbol"),
+                "intel_snap": pos.get("intel_snap"),
+            }
+        )
+        snap = pos.get("intel_snap") if isinstance(pos.get("intel_snap"), dict) else {}
+        memory.append({"features": dict(snap), "win": pnl > 0})
+        pos = None
+
+    for i in range(len(frame) - 1):
+        row = frame.iloc[i]
+        nxt = frame.iloc[i + 1]
+        curve.append(equity)
+        risk.update(equity, now=pd.Timestamp(row["time"]).to_pydatetime())
+
+        if pos is not None:
+            side = pos["side"]
+            high, low = float(nxt["high"]), float(nxt["low"])
+            close_n = float(nxt["close"])
+            pos["bars_held"] = int(pos.get("bars_held", 0)) + 1
+
+            # Fuller: scale into winner without increasing total risk beyond 1R
+            if pyramid_on and int(pos.get("adds", 0)) < pyramid_max:
+                adx_v = float(nxt["adx"]) if not pd.isna(nxt.get("adx")) else 0.0
+                if should_pyramid(
+                    side=side,
+                    entry=float(pos["entry0"]),
+                    price=close_n,
+                    initial_risk=float(pos["initial_risk"]),
+                    adds=int(pos["adds"]),
+                    max_adds=pyramid_max,
+                    add_r=pyramid_add_r,
+                    adx=adx_v,
+                    adx_min=pyramid_adx,
+                    enabled=True,
+                ):
+                    add_px = close_n
+                    new_sl = next_pyramid_sl(side, pos["entries"], add_px)
+                    add_units = float(pos["unit0"])
+                    tot_u = float(pos["units"]) + add_units
+                    avg = (float(pos["entry"]) * float(pos["units"]) + add_px * add_units) / tot_u
+                    pos["entries"].append(add_px)
+                    pos["adds"] = int(pos["adds"]) + 1
+                    pos["units"] = tot_u
+                    pos["entry"] = avg
+                    pos["sl"] = new_sl
+                    if pos.get("tp") is not None and float(pos["initial_risk"]) > 0:
+                        ext = float(pos["initial_risk"])
+                        if side == "buy":
+                            pos["tp"] = float(pos["tp"]) + ext
+                        else:
+                            pos["tp"] = float(pos["tp"]) - ext
+
+            if (not pyramid_on) and pos.get("trail_atr_mult") and not pd.isna(nxt.get("atr")):
+                atr_v = float(nxt["atr"])
+                if side == "buy":
+                    pos["sl"] = max(pos["sl"], close_n - pos["trail_atr_mult"] * atr_v)
+                else:
+                    pos["sl"] = min(pos["sl"], close_n + pos["trail_atr_mult"] * atr_v)
+
+            exit_price = None
+            outcome = None
+            core_sl, tp = pos["sl"], pos.get("tp")
+            sl, sl_name = working_stop(side, float(pos["entry"]), float(core_sl), cfg)
+            if side == "buy":
+                hit_sl = low <= sl
+                hit_tp = tp is not None and high >= tp
+                if hit_sl and hit_tp:
+                    ambiguous_exits += 1
+                    exit_price, outcome = sl, sl_name
+                elif hit_sl:
+                    exit_price, outcome = sl, sl_name
+                elif hit_tp:
+                    exit_price, outcome = tp, "tp"
+            else:
+                hit_sl = high >= sl
+                hit_tp = tp is not None and low <= tp
+                if hit_sl and hit_tp:
+                    ambiguous_exits += 1
+                    exit_price, outcome = sl, sl_name
+                elif hit_sl:
+                    exit_price, outcome = sl, sl_name
+                elif hit_tp:
+                    exit_price, outcome = tp, "tp"
+
+            cost = pos["entry"] * (cost_bps / 10000.0) * 2
+            commission_rt = float(cfg.get("commission_round_trip_usd", 0.0) or 0.0)
+            fav = (float(nxt["high"]) - pos["entry"]) if side == "buy" else (pos["entry"] - float(nxt["low"]))
+            adv = (pos["entry"] - float(nxt["low"])) if side == "buy" else (float(nxt["high"]) - pos["entry"])
+            close_move = (close_n - pos["entry"]) if side == "buy" else (pos["entry"] - close_n)
+            mfe_pnl = float(pos["units"]) * (fav - cost) - commission_rt
+            unreal = float(pos["units"]) * (close_move - cost) - commission_rt
+            pos["mfe"] = update_mfe(pos.get("mfe"), mfe_pnl)
+            pos["mae"] = max(float(pos.get("mae") or 0.0), max(0.0, float(adv)))
+            gb = giveback_reason(float(pos["mfe"]), unreal, cfg)
+            if exit_price is None and gb:
+                exit_price, outcome = close_n, gb
+            flatten_profit = float(cfg.get("flatten_if_profit_usd", 0) or 0)
+            if exit_price is None and flatten_profit > 0 and unreal >= flatten_profit:
+                exit_price, outcome = close_n, "quick_win"
+
+            max_hold = int(cfg.get("max_hold_bars", 0) or 0)
+            if exit_price is None and max_hold > 0 and pos["bars_held"] >= max_hold:
+                exit_price, outcome = close_n, "time"
+            intel_hold = int(cfg.get("intel_max_hold_bars", 0) or 0)
+            if (
+                exit_price is None
+                and bool(cfg.get("intel_enabled", False))
+                and intel_hold > 0
+                and pos["bars_held"] >= intel_hold
+            ):
+                exit_price, outcome = close_n, "intel_time"
+
+            if exit_price is None and flatten_utc is not None:
+                ts = pd.Timestamp(nxt["time"])
+                h = ts.tz_convert("UTC").hour if getattr(ts, "tzinfo", None) else ts.hour
+                if h >= int(flatten_utc):
+                    exit_price, outcome = close_n, "flatten"
+
+            if exit_price is not None:
+                close_position(nxt["time"], float(exit_price), str(outcome))
+                continue
+
+        if pos is not None:
+            continue
+
+        if equity <= 0:
+            halt_reason = "bankruptcy"
+            continue
+
+        entry_now = pd.Timestamp(nxt["time"]).to_pydatetime()
+        ok, why = risk.allow(equity, 0, now=entry_now)
+        if not ok:
+            halt_reason = why
+            continue
+
+        hr_ok, hr_why = hr.allow(equity)
+        if not hr_ok:
+            halt_reason = hr_why
+            continue
+
+        max_day = int(cfg.get("ntz_max_trades_day", 0) or 0)
+        if max_day > 0:
+            day = pd.Timestamp(nxt["time"])
+            if getattr(day, "tzinfo", None) is not None:
+                day = day.tz_convert("UTC").floor("D")
+            else:
+                day = day.floor("D")
+
+            def _entry_day(ts) -> pd.Timestamp:
+                t = pd.Timestamp(ts)
+                if getattr(t, "tzinfo", None) is not None:
+                    return t.tz_convert("UTC").floor("D")
+                return t.floor("D")
+
+            day_n = sum(1 for t in trades if _entry_day(t["entry_time"]) == day)
+            if day_n >= max_day:
+                continue
+
+        sig = signal(row, cfg_run)
+        if sig is None:
+            continue
+
+        entry = float(nxt["open"])
+        if sig.side == "buy":
+            sl_dist = abs(sig.entry - sig.sl)
+            sl = entry - sl_dist
+            tp = entry + abs(sig.tp - sig.entry) if sig.tp is not None else None
+        else:
+            sl_dist = abs(sig.sl - sig.entry)
+            sl = entry + sl_dist
+            tp = entry - abs(sig.entry - sig.tp) if sig.tp is not None else None
+
+        # Always require a stop (solves Brown no-stop DCA / hedge chapters)
+        if abs(entry - sl) <= 0:
+            continue
+
+        risk_pct = hr.effective_risk_percent(equity)
+        min_stop = abs(entry) * float(cfg.get("min_atr_pct", 0.0004))
+        units = risk.size_units(
+            equity,
+            entry,
+            sl,
+            min_stop=min_stop,
+            risk_percent=risk_pct,
+        )
+        fixed_units = float(cfg.get("fixed_units", 0) or 0)
+        if fixed_units > 0:
+            units = fixed_units
+        if units <= 0:
+            continue
+        pos = {
+            "side": sig.side,
+            "mode": sig.mode,
+            "reason": sig.reason,
+            "entry": entry,
+            "entry0": entry,
+            "sl": sl,
+            "entry_sl": sl,
+            "risk_den": max(abs(entry - sl), min_stop),
+            "initial_risk": abs(entry - sl),
+            "tp": tp,
+            "trail_atr_mult": sig.trail_atr_mult,
+            "units": units,
+            "unit0": units,
+            "entries": [entry],
+            "adds": 0,
+            "time": nxt["time"],
+            "bars_held": 0,
+            "risk_pct": risk_pct,
+            "hr_step": hr.step,
+            "mfe": 0.0,
+            "mae": 0.0,
+            "symbol": cfg.get("symbol"),
+            "intel_snap": {k: row.get(k) for k in (
+                "kaufman_er", "rsi", "range_loc", "jansen_score", "adx", "atr",
+                "ema_20", "open", "close", "high", "low", "brooks_in_range",
+                "harris_jump", "volman_doji", "impulse_green", "impulse_red",
+                "brooks_barbwire", "ema_side_streak", "atr_expand",
+                "close_ema_pips", "ret3_pips", "time",
+                "elliott_phase", "elliott_leg", "elliott_up_leg",
+                "gann_cycle_hit", "gann_angle_z", "bb_pct_b", "prado_fdiff",
+                "johnson_spread_ok", "h1_up", "m5_up",
+            ) if k in row.index},
+        }
+
+    if pos is not None and len(frame):
+        last = frame.iloc[-1]
+        close_position(last["time"], float(last["close"]), "eof")
+
+    curve.append(equity)
+    trades_df = pd.DataFrame(trades)
+    eq = pd.Series(curve, name="equity")
+    if hr.halt_reason and not halt_reason:
+        halt_reason = hr.halt_reason
+    if trades_df.empty:
+        return BacktestResult(
+            trades=trades_df,
+            equity_curve=eq,
+            win_rate=0,
+            profit_factor=0,
+            max_drawdown_pct=0,
+            expectancy_r=0,
+            total_trades=0,
+            net_pnl=0,
+            final_equity=equity,
+            halt_reason=halt_reason,
+            ambiguous_exits=ambiguous_exits,
+            intel_memory=memory,
+        )
+
+    wins = trades_df.loc[trades_df["pnl"] > 0, "pnl"]
+    losses = trades_df.loc[trades_df["pnl"] <= 0, "pnl"]
+    gp = float(wins.sum()) if len(wins) else 0.0
+    gl = float((-losses).sum()) if len(losses) else 0.0
+    peak = eq.cummax()
+    dd = (eq - peak) / peak.replace(0, np.nan) * 100
+    return BacktestResult(
+        trades=trades_df,
+        equity_curve=eq,
+        win_rate=float((trades_df["pnl"] > 0).mean() * 100),
+        profit_factor=(gp / gl) if gl > 0 else float("inf"),
+        max_drawdown_pct=max(0.0, float((-dd.min()) if len(dd) else 0)),
+        expectancy_r=float(trades_df["r"].mean()),
+        total_trades=len(trades_df),
+        net_pnl=float(trades_df["pnl"].sum()),
+        final_equity=equity,
+        halt_reason=halt_reason,
+        ambiguous_exits=ambiguous_exits,
+        intel_memory=memory,
+    )
+
+
+def format_report(res: BacktestResult) -> str:
+    pf = "inf" if res.profit_factor == float("inf") else f"{res.profit_factor:.2f}"
+    lines = [
+        "=== Aegis Backtest ===",
+        f"Trades:        {res.total_trades}",
+        f"Win rate:      {res.win_rate:.2f}%",
+        f"Profit factor: {pf}",
+        f"Max drawdown:  {res.max_drawdown_pct:.2f}%",
+        f"Expectancy R:  {res.expectancy_r:.3f}",
+        f"Net PnL:       {res.net_pnl:.2f}",
+        f"Final equity:  {res.final_equity:.2f}",
+    ]
+    if getattr(res, "halt_reason", ""):
+        lines.append(f"Halt:          {res.halt_reason}")
+    return "\n".join(lines)

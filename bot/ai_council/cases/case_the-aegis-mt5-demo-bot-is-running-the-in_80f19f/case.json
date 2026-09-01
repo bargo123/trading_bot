@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T12:24:27.106507+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80f19f\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 10.87,
+          "finished_utc": "2026-08-24T12:25:59.670215+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T12:25:48.798926+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T12:25:59.670215+00:00",
+        "text": "\u201cFalse-state entries\u201d is undefined and invites post-hoc labeling; define it independently before evaluation. Reusing the identical sealed holdout to tune a gate contaminates it, so the candidate needs a separate untouched final holdout or nested validation. Predefine the tolerances, statistical tests, sample-size minimums, and cost model, or the claimed expectancy improvement and promotion decision are unmeasurable and overfit-prone."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80f19f\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.75,
+          "finished_utc": "2026-08-24T12:25:48.788974+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T12:25:37.041244+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T12:25:48.788974+00:00",
+        "text": "The 25% increase and 20% coverage limit are arbitrary and invite threshold overfitting, especially if the sealed holdout is consulted repeatedly until favorable results appear. \u201cNet expectancy remains positive\u201d and \u201cdrawdown decreases\u201d lack confidence intervals, minimum trade counts, statistical tests, and regime/asset-wise validation, so noise could justify retention. Permitting an intelligent signal must also be explicitly routed through the governed promotion gates; otherwise this proposal risks bypassing champion-promotion controls or altering immutable live configuration."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T12:26:30.360561+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_0aaafd",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_0aaafd for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_80f19f",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80f19f\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.66,
+        "finished_utc": "2026-08-24T12:24:48.177121+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T12:24:36.515742+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T12:24:48.179131+00:00",
+      "text": "Run a registered sealed-holdout experiment that raises the validated-state minimum sample threshold by 25% before permitting an intelligent signal. Retain the change only if net expectancy remains positive and holdout drawdown decreases versus the current gate after identical spread/slippage assumptions. Reject it if signal coverage falls by more than 20% or either performance condition fails."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80f19f\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.63,
+        "finished_utc": "2026-08-24T12:25:12.959643+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T12:25:01.331008+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T12:25:12.959643+00:00",
+      "text": "Test a stricter validated-state gate requiring two consecutive validated bars before accepting an intelligent-firehose signal. Re-run the identical sealed holdout with costs included and compare it against the current gate. Promote this candidate only if it reduces false-state entries and improves net expectancy without worsening maximum drawdown or trade coverage beyond predefined tolerances."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80f19f\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 18.84,
+        "finished_utc": "2026-08-24T12:26:30.334524+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T12:26:11.494672+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T12:26:30.350521+00:00",
+      "text": "Define a false-state entry before data access as an accepted signal whose required intelligent-firehose state invalidates within the next two completed bars, regardless of subsequent P&L. Tune the two-consecutive-bar gate using training data and a separate validation set, then evaluate it once against the current gate on an untouched final holdout; do not reuse the existing sealed holdout for tuning. Use the fixed runner spread/slippage cost model, require at least 200 eligible final-holdout signals (including at least 50 per major regime), and assess false-state rates with McNemar\u2019s test and net expectancy with a paired bootstrap 95% confidence interval. Promote only if false-state rate falls significantly at \u03b1=0.05, net expectancy improves with its confidence interval above zero, maximum drawdown worsens by no more than 10% relative, and trade coverage declines by no more than 5%."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_80f19f\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.78,
+        "finished_utc": "2026-08-24T12:26:11.478662+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T12:25:59.695948+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T12:26:11.481398+00:00",
+      "text": "Run one preregistered, registry-recorded sealed-holdout experiment using a threshold range justified from pre-holdout training data, with multiplicity correction and no repeated holdout tuning. Retain a research-only challenger only if it meets preregistered minimum trade counts, has positive net expectancy with a 95% confidence interval above zero, and demonstrates a statistically supported drawdown reduction under identical spread/slippage assumptions across required assets and market regimes. Set the coverage constraint from the baseline coverage confidence interval rather than an arbitrary percentage, and reject the challenger if any preregistered performance, coverage, or regime-stability gate fails. Route any eligible challenger exclusively through `promote.py` and the governed champion-promotion scripts; do not modify immutable live configuration or permit live trading."
+    }
+  },
+  "status": "decided"
+}

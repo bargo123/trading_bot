@@ -1,0 +1,60 @@
+{
+  "id": "CORE_STRATEGY_V1",
+  "metrics": {
+    "win_rate": 95.71428571428572,
+    "profit_factor": 0.2665981333469554,
+    "max_drawdown_pct": 12.54719660000049,
+    "expectancy_r": -0.02695357714286013,
+    "total_trades": 140,
+    "net_pnl": -11.320502400000844,
+    "final_equity": 88.67949759999908,
+    "halt_reason": "",
+    "avg_win": 0.030709729850735244,
+    "avg_loss": -2.572601033333228,
+    "max_consecutive_wins": 43,
+    "max_consecutive_losses": 1,
+    "sharpe": -1.6257926338794528,
+    "sortino": -0.08544432224280003
+  },
+  "oos": {
+    "win_rate": 95.8904109589041,
+    "profit_factor": 0.344959219071693,
+    "max_drawdown_pct": 5.393444986800493,
+    "expectancy_r": -0.01862728401826763,
+    "total_trades": 73,
+    "net_pnl": -4.079375200000464,
+    "final_equity": 95.92062479999947,
+    "halt_reason": "",
+    "avg_win": 0.03068986857141755,
+    "avg_loss": -2.075888666666564,
+    "max_consecutive_wins": 43,
+    "max_consecutive_losses": 1,
+    "sharpe": -0.9246471104067556,
+    "sortino": -0.03977868429615767
+  },
+  "is": {
+    "win_rate": 94.36619718309859,
+    "profit_factor": 0.21125889784182994,
+    "max_drawdown_pct": 7.687969000000408,
+    "expectancy_r": -0.03609375117371203,
+    "total_trades": 71,
+    "net_pnl": -7.6879690000003835,
+    "final_equity": 92.31203099999959,
+    "halt_reason": "",
+    "avg_win": 0.030733877611929274,
+    "avg_loss": -2.436784699999911,
+    "max_consecutive_wins": 26,
+    "max_consecutive_losses": 1,
+    "sharpe": -1.431587939326456,
+    "sortino": -0.06811862007695654
+  },
+  "families": {
+    "loss_stop": 2,
+    "win_quick": 134,
+    "loss_doji": 2,
+    "loss_chop_er": 2
+  },
+  "intel": false,
+  "role": "CHAMPION",
+  "updated_utc": "2026-08-14T17:39:57.555318+00:00"
+}

@@ -1,0 +1,33 @@
+---
+description: Demo account is an R&D sandbox — invent freely until live-ready
+alwaysApply: true
+---
+
+# Demo = invent until live-ready
+
+This project’s **MetaQuotes demo** (`allow_live: false`) is the lab. Until the user
+explicitly says the bot is ready for **real money**, invent aggressively:
+
+- New signals, exits, sizing, filters, sessions, symbols, even **new algos**.
+- Do not stay conservative “because the books / firehose YAML said so.”
+- Books and INDEX are **fuel**, not a veto. When authors disagree, ship a flag
+  and try the wilder side on demo.
+- Measure it: tests, OOS / walk-forward, expectancy **after costs**. Never
+  invent backtest numbers. Never promise profit.
+
+## Hard gates (demo crazy ≠ live)
+
+- Never set `allow_live: true` or point the runner at a real-money account.
+- Never `mt5.shutdown()`.
+- **Open/close on demo is allowed.** The user authorized 0.01-lot probes
+  (including closing tickets) whenever a test needs it. Do not wipe the
+  whole book unless the test is “flat and restart this idea.” See
+  `demo-live-probes.mdc`. On every 20-minute check, actually look at
+  tickets and probe if that answers a hypothesis.
+- Do not start a second `run_broker_paper.py`. Do not cut `max_positions`
+  unless a measured experiment needs it and the user is told.
+- Unattended optimizer stays YAML-only (`allow_code_edit: false`) unless the
+  user opens code edits. **This chat** may ship code inventions to demo.
+
+When the user says go live, switch to conservative live rules. Until then:
+**try it on demo.**

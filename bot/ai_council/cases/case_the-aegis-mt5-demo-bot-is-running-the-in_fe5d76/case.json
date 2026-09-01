@@ -1,0 +1,130 @@
+{
+  "created_utc": "2026-08-27T11:25:43.330629+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fe5d76\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 34.41,
+          "finished_utc": "2026-08-27T11:29:27.485617+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-27T11:28:53.075860+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-27T11:29:27.490630+00:00",
+        "text": "This is an API compatibility error, not a trading proposal, so it contains no hypothesis, metrics, validation plan, or safety controls to review. Resolve the unsupported model configuration before presenting a measurable research or execution change."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fe5d76\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 8.3,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-27T11:29:35.799311+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-27T11:29:55.653853+00:00",
+    "decision": "no_change",
+    "evidence": {
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "DUPLICATE_FAILED_HYPOTHESIS"
+    },
+    "rationale": "REAL: candidate hypothesis overlaps prior record council_the-aegis-mt5-demo-bot-is-running-the-in_555e99 (queued, overlap 0.62); not re-tested"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_fe5d76",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fe5d76\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.3,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-27T11:26:01.198500+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fe5d76\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.04,
+        "finished_utc": "2026-08-27T11:26:51.190244+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-27T11:26:39.150998+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-27T11:26:51.192524+00:00",
+      "text": "Test a volatility-regime filter that abstains from entries when the 15-minute ATR is above the 90th percentile of its trailing 60-day distribution. Evaluate it on sealed historical holdouts against the current validated-state baseline, net of configured spread and slippage. Advance it only if it reduces maximum drawdown by at least 15% without lowering net expectancy or trade count by more than 10%."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fe5d76\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.73,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-27T11:29:43.551788+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fe5d76\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.05,
+        "finished_utc": "2026-08-27T11:29:55.625352+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-27T11:29:43.580350+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-27T11:29:55.627816+00:00",
+      "text": "Test a volatility-regime filter that abstains from entries when 15-minute ATR exceeds the 90th percentile of its trailing 60-day distribution. Evaluate it on sealed historical holdouts against the current validated-state baseline, net of configured spread and slippage. Record the experiment and any infrastructure failure honestly; use only supported, authenticated research-model endpoints if model assistance is required. Advance it only if maximum drawdown falls at least 15% without reducing net expectancy or trade count by more than 10%."
+    }
+  },
+  "status": "decided"
+}

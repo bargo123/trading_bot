@@ -1,0 +1,111 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_2031",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T20:33:36.037089+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_2031",
+    "current_evidence": "Candidate improvement: make the validated-state gate EV-net-of-costs aware instead of confidence-only. Hypothesis: a meaningful fraction of firehose entries pass the current confidence/validation bar but carry non-positive expected value once the runner's realized spread and slippage at entry time a",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate improvement: make the validated-state gate EV-net-of-costs aware instead of confidence-only. Hypothesis: a meaningful fraction of firehose entries pass the current confidence/validation bar but carry non-positive expected value once the runner's realized spread and slippage at entry time are charged. Falsifiable test: replay recent logged signals through the existing sealed-OOS path, stratify trades by net EV computed from quote-time spreads available at decision time, and compare an a",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T20:31:23.389993+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "No quantified baseline: proposal does not show what fraction of currently-passing entries carry non-positive net EV after realized spread/slippage; effect size is pure conjecture",
+        "Falsification text cut off mid-sentence ('compare an a\u2026') \u2014 evaluation arm, EV threshold, sample window, and decision rule are unspecified",
+        "Mechanism mismatch: an EV-aware gate filters entries out; 'improve throughput' is the wrong predicted signature and would make the test unfalsifiable as stated",
+        "bot/intel/ is runtime-consumed by the designated broker-execution owner; unflagged gate-semantics edits risk silently altering live DEMO behavior outside a controlled experiment",
+        "No commitment to ExperimentRegistry recording, which is mandatory for every experiment",
+        "Composition risk with existing remaining-EV/abstention controls: duplicate or conflicting cost models could double-charge spreads or disagree on abstention",
+        "Lookahead guard is asserted (quote-time spreads at decision time) but must be verified in implementation, not assumed"
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "The core idea is sound and safety-clean: gating validated-state on EV net of realized entry-time costs directly serves the repo's 'costs and lookahead matter' rule and strengthens prediction abstention rather than weakening it. Replay-only testing through the sealed-OOS path is read-only, DEMO-scoped, and trivially reversible, so no safety violation exists. However, the trigger evidence is empty (PF=None, EV=None \u2014 no demonstrated baseline that confidence-passing entries are net-negative after costs), the falsification test is truncated mid-specification (comparison arm and threshold undefined), and the stated mechanism ('improve exploration/validation throughput') contradicts what an EV filter does \u2014 it should raise per-trade net expectancy while plausibly reducing validated-entry count. The change also touches bot/intel/, which the governed DEMO execution owner consumes, so runtime gate semantics cannot change without a default-off flag and prior replay evidence.",
+      "requested_revisions": [
+        "Run the read-only baseline replay FIRST and attach numbers: distribution of decision-time net EV across entries passing the current confidence/validation gate, share below zero, over a defined recent window",
+        "Complete the falsification spec: explicit comparison arm (confidence-only vs EV-aware), EV threshold value or calibration rule, evaluation window, primary metric (net costed expectancy per trade), and minimum sample size",
+        "Restate expected mechanism coherently \u2014 e.g. 'reduce negative-EV admissions / increase per-trade net expectancy even if validated count falls' \u2014 and tie success/failure metrics to it",
+        "Scope implementation: replay/sealed-OOS analysis only initially; any runtime gate change lands behind an explicit research-config flag defaulting OFF; PROTECTED_LIVE_YAML and all non-designated trading YAML untouched; no champion-path changes",
+        "Register the experiment in ExperimentRegistry before execution and commit to honest reporting of failures per repo rules",
+        "Specify single-source-of-truth composition with existing EV/spread/abstention controls so costs are charged exactly once"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "The proposed change is truncated and does not define the exact EV formula, cost inputs, thresholds, or abstention behavior.",
+        "Quote-time spread and slippage assumptions must be strictly decision-time available and consistent with the runner's realized-cost model; no label leakage.",
+        "Changing a validated-state gate could reduce exploration throughput, contrary to the stated mechanism, and needs explicit coverage and opportunity-cost metrics.",
+        "Affected runtime paths require confirmation that research-only components cannot submit or modify MT5 DEMO orders.",
+        "PF and EV are currently None, so baseline sample size, trade count, and statistical decision criteria are unspecified."
+      ],
+      "confidence": 0.88,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The hypothesis is testable and aligned with net-of-cost decision quality, but the proposal is incomplete and ambiguously scopes a runtime gate versus an offline sealed-OOS experiment.",
+      "requested_revisions": [
+        "Specify an offline-only sealed-OOS replay first, including signal cohort, sample window, EV formula, spread/slippage source, timestamp alignment, and no-lookahead controls.",
+        "Define preregistered acceptance criteria: net expectancy confidence bounds, trade-count/coverage floor, drawdown/tail-loss limits, and comparison against the unchanged gate.",
+        "State whether this is research-only or a governed runtime change; if runtime, identify the exact execution-owner integration and preserve all existing risk, OMS, quote, spread, and EV gates.",
+        "Record the experiment in ExperimentRegistry and retain results whether accepted or rejected.",
+        "Add tests for cost timestamp availability, EV boundary behavior, abstention behavior, and sealed-OOS isolation."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Proposal and falsification criteria are truncated.",
+        "No precise acceptance thresholds, baseline, sample size, or statistical method are defined.",
+        "No exact files, gate behavior, or confirmation that research processes remain unable to submit orders.",
+        "No explicit ExperimentRegistry recording plan.",
+        "Cost and quote-time spread/slippage methodology is unspecified.",
+        "Rollback and champion-promotion isolation are not demonstrated."
+      ],
+      "confidence": 0.96,
+      "model": null,
+      "reason": "The hypothesis is plausible, but the proposal is incomplete and lacks sufficient experimental and safety detail for approval. The change could affect DEMO execution behavior despite the stated safety impact.",
+      "requested_revisions": [
+        "Provide the complete proposal and exact implementation scope/diff.",
+        "Define baseline metrics, minimum sample size, net-EV calculation, acceptance thresholds, and falsification criteria.",
+        "Demonstrate that the experiment is sealed-OOS, registered in ExperimentRegistry, and cannot modify champion artifacts.",
+        "Explicitly verify that only the designated DEMO execution owner can call mt5.order_send(), with all required DEMO safety gates unchanged.",
+        "Specify rollback steps and report baseline and post-test pytest results."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

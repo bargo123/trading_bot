@@ -1,0 +1,1 @@
+Test a validated-state cooldown: after any invalidated signal, suppress new entries on that symbol for 15 minutes. Promote it only if sealed holdout results improve net expectancy after spread/slippage and reduce invalidation-triggered losses versus the current gate. Reject it if either metric fails to improve.

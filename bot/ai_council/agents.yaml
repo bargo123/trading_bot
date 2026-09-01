@@ -1,0 +1,61 @@
+# AI Council agent registry.
+# Each agent is a generic CLI adapter. `cli` is a command with `{args}` template;
+# `ask_cmd` is the subcommand list. Status is detected at runtime; a UNAVAILABLE
+# agent never blocks the council cycle (no paid fallback, no blocking wait).
+agents:
+  hermes:
+    label: "Hermes Research"
+    provider: "Nous Portal free"
+    adapter: "ai_council.hermes"
+    # Verified through Hermes' real --model/-z interface. These are the only
+    # models the adapter may try; it never falls back to a paid provider.
+    models:
+      - "x-preview-f-free"
+      - "hy3-free"
+      - "laguna-s-2.1-free"
+      - "nemotron-3-ultra-free"
+      - "nemotron-3.5-lightning-free"
+      - "muse-spark-1.2-contributor-free"
+    available_default: true
+    hint: "Research-only Hermes adapter; never an execution authority."
+  opencode:
+    label: "OpenCode"
+    provider: "opencode"
+    cli: "opencode"
+    ask_cmd: ["run"]
+    # Free-model fallbacks when the default model is rate-limited (never paid).
+    models:
+      - "opencode/x-preview-f-free"
+      - "opencode/nemotron-3.5-lightning-free"
+      - "opencode/hy3-free"
+      - "opencode/mimo-v2.5-free"
+    available_default: true
+    hint: "opencode is the orchestrator shell; used for council rounds."
+  claude:
+    label: "Claude Code"
+    provider: "Anthropic"
+    cli: "claude"
+    ask_cmd: ["-p"]
+    available_default: false
+    hint: "Equiti Enterprise subscription; use sparingly, never every 20 min."
+  gemini:
+    label: "Gemini CLI"
+    provider: "Google"
+    cli: "gemini"
+    ask_cmd: ["-p"]
+    available_default: false
+    hint: "Free tier is 429-quota limited; retry later, never auto-paid."
+  codex:
+    label: "Codex CLI"
+    provider: "OpenAI"
+    cli: "codex"
+    ask_cmd: ["exec", "--skip-git-repo-check"]
+    available_default: false
+    hint: "Implementation engineer; manual invocation only, never in recurring Council rounds."
+  cursor:
+    label: "Cursor Agent"
+    provider: "cursor"
+    cli: "agent"
+    ask_cmd: ["--print", "--trust", "--mode", "ask"]
+    available_default: false
+    hint: "cursor-agent CLI; quota limited; never auto-paid."

@@ -1,0 +1,49 @@
+# Volman + Chan basket scalp — aggressive $100 sizing
+# Volman: 20ema + double-doji/micro-range break, tight pip TP/SL, spread-critical
+# Chan 2013: also try Bollinger MR per pair (basket = multi-symbol rotation)
+# Kaufman/Johnson PDFs were image-scans (no text layer) — see report
+symbol: EURUSD=X
+timeframe: 5m
+lookback_days: 14
+starting_equity: 100
+signal_mode: volman_scalp
+algo: volman_scalp
+ema_fast: 20
+ema_slow: 200
+volman_ema: 20
+volman_require_dd: true
+volman_doji_body_frac: 0.35
+volman_pip_size: 0.0001
+volman_tp_pips: 5
+volman_sl_pips: 10
+atr_period: 14
+adx_period: 14
+adx_trend_threshold: 99
+adx_range_max: 99
+bb_period: 20
+bb_std: 2.0
+rsi_period: 14
+rsi_oversold: 30
+rsi_overbought: 70
+min_atr_pct: 0.0
+min_rr: 0.01
+cost_buffer: 0.85
+spread_bps: 0.6
+slippage_bps: 0.3
+session_start_utc: 7
+session_end_utc: 17
+high_risk_mode: traditional
+high_risk_safe: false
+allow_unsafe_high_risk: true
+risk_percent: 20
+hr_risk_max_cap: 100
+hr_max_consecutive_losses: 99
+hr_equity_floor_frac: 0.01
+max_daily_loss_percent: 99
+max_total_drawdown_percent: 99
+max_positions: 1
+ntz_max_trades_day: 200
+pyramid_enabled: false
+mode: paper
+poll_seconds: 30
+test_name: volman_chan_basket

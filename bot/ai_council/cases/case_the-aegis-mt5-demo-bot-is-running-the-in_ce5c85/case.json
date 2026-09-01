@@ -1,0 +1,235 @@
+{
+  "created_utc": "2026-08-25T20:23:16.259448+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\critiques\\codex--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 51.0,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T20:29:44.319426+00:00",
+        "text": "The 15%/5% thresholds are bare round numbers with no derivation, no pre-registered minimum sample size, no confidence intervals, and no multiple-comparison control (e.g., tuning one-vs-three snapshots or the scratch definition until both gates pass), making them easy to satisfy by accident or overfit deliberately. The expectancy comparison is also endogenous: persistence filtering changes which trades become eligible, so any per-signal expectancy delta conflates filter quality with survivorship/selection effects, while \"validated-state,\" snapshot cadence, and scratch classification (which depends on the same exit logic being tested) are left undefined and unreproducible. Validation is missing a sealed OOS holdout, a fixed evaluation window, statistical significance testing, and an ExperimentRegistry record, and \"reject unless both thresholds are met without changing the champion\" is ambiguous about whether the entry gate must touch the designated execution runner's protected YAML \u2014 a change that requires explicit operator authorization, not council approval alone."
+      },
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.12,
+          "finished_utc": "2026-08-25T20:29:56.455134+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-25T20:29:44.334229+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T20:29:56.458655+00:00",
+        "text": "The proposal omits sample-size, confidence-interval, and regime-stratification requirements, so a 15% improvement could be noise or concentrated in a favorable market slice. \u201cInvalidated or scratch trades\u201d and \u201celigible signal\u201d need fixed, pre-registered definitions, and expectancy must be net of spread, slippage, missed fills, and latency introduced by the second snapshot. DEMO shadow results cannot validate execution effects unless timestamps, quotes, and counterfactual fills are recorded against an unchanged control."
+      }
+    ],
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.5,
+          "finished_utc": "2026-08-25T20:27:21.306138+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-25T20:27:08.806167+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T20:27:21.307920+00:00",
+        "text": "\u201cRealized\u201d entry slippage may not be knowable at decision time, so the proposed net-EV feature risks leakage unless it uses only contemporaneous, pre-trade executable quotes and a pre-specified slippage model. A single recent replay and bootstrap interval do not establish robustness across symbols, sessions, regimes, or sparse trade strata, and repeated threshold selection against the sealed holdout would overfit it. The proposal also omits validation that abstention does not concentrate exposure or degrade portfolio-level risk controls."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\critiques\\hermes--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 13.24,
+          "finished_utc": "2026-08-25T20:27:34.574445+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-25T20:27:21.334200+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T20:27:34.574445+00:00",
+        "text": "\u201cRealized\u201d spread/slippage is not available at decision time, so using it risks lookahead and an EV estimate whose calibration, horizon, and cost model are unspecified. \u201cMeaningful fraction\u201d and \u201cuplift\u201d lack predefined effect-size and sample-size thresholds; replaying recent signals may also contaminate the sealed holdout, while ordinary bootstrap intervals ignore temporal dependence and repeated experimentation. The proposal does not specify multiple-testing controls, regime robustness, or safeguards proving the new abstention rule cannot alter governed execution outside the single DEMO owner."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 66.73,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T20:28:41.320702+00:00",
+        "text": "The \"two independent signal families\" gate asserts independence it never tests \u2014 families trained on overlapping windows and features typically share failure modes, so agreement may be redundant correlation dressed as confirmation, and the family list/count must be frozen before evaluation. The acceptance criteria are unmeasurable as written: \"reduces tail loss\" names no statistic (CVaR at what quantile? max drawdown over what window?) and there's no minimum sample size or significance bar, so small-N holdout noise can either pass or veto the challenger arbitrarily. Validation is incomplete: recorded DEMO outcomes were generated under the champion's own entry distribution, so filtering that subset yields a selection-biased estimate of the filter's counterfactual effect, and nothing verifies the modeled spread/slippage matches realized fills before net-EV gating is trusted. Finally, nothing pre-registers the challenger variants or commits to ExperimentRegistry recording \u2014 without freezing the rule set before unsealing the holdout, repeated evaluation against the same sealed data is itself a leak channel and this becomes an overfitting engine rather than an experiment."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.96,
+          "finished_utc": "2026-08-25T20:28:53.301987+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-25T20:28:41.340375+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T20:28:53.306332+00:00",
+        "text": "\u201cIndependent signal families\u201d is undefined and unverified, so the agreement rule can manufacture confidence from correlated features. The proposal gives no sample-size, confidence-interval, regime-stability, or multiple-testing requirements, while \u201cimproves net expectancy,\u201d \u201creduces tail loss,\u201d and \u201c30%\u201d lack operational definitions and could be gamed by noise. Recorded DEMO outcomes are selection- and execution-path-biased, and the proposal omits explicit confirmation that only the governed Firehose owner may execute after all DEMO safety gates pass."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-25T20:31:23.364268+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_0e224f",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 6,
+      "n_proposals": 3,
+      "n_revisions": 3,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_0e224f for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_ce5c85",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 62.66,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T20:24:36.780232+00:00",
+      "text": "Candidate improvement: make the validated-state gate EV-net-of-costs aware instead of confidence-only. Hypothesis: a meaningful fraction of firehose entries pass the current confidence/validation bar but carry non-positive expected value once the runner's realized spread and slippage at entry time are charged. Falsifiable test: replay recent logged signals through the existing sealed-OOS path, stratify trades by net EV computed from quote-time spreads available at decision time, and compare an added abstention rule (\"skip when net EV <= 0\") against the current gate alone on net PnL and Sharpe, accepting the change only if the uplift's bootstrap confidence interval excludes zero out-of-sample. If the uplift fails to replicate in the sealed holdout, record the null honestly in the ExperimentRegistry and leave the champion untouched."
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.0,
+        "finished_utc": "2026-08-25T20:24:59.067077+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-25T20:24:48.070597+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T20:24:59.069079+00:00",
+      "text": "Test a stricter validated-state entry filter requiring both positive net expected value after modeled spread/slippage and agreement from at least two independent signal families before a DEMO trade is eligible. Evaluate it against the current champion on sealed holdouts and recorded DEMO outcomes, using identical cost assumptions and no lookahead. Reject it unless it improves net expectancy and reduces tail loss without reducing trade count by more than 30%."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 15.8,
+        "finished_utc": "2026-08-25T20:25:40.761903+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-25T20:25:24.961190+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T20:25:40.761903+00:00",
+      "text": "Test a two-consecutive-snapshot validated-state entry gate before submitting any MT5 DEMO order. The hypothesis is that persistence filtering reduces invalidated or scratch trades by at least 15% while reducing net expectancy per eligible signal by no more than 5%. Evaluate it in replay and DEMO shadow mode, and reject it unless both thresholds are met without changing the champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 20.13,
+        "finished_utc": "2026-08-25T20:31:23.311943+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-25T20:31:03.177657+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-25T20:31:23.311943+00:00",
+      "text": "Pre-register one fixed two-consecutive-snapshot gate, with snapshot cadence, validated-state criteria, invalidation, and scratch classification defined independently using the existing exit logic; derive the minimum sample size, meaningful reduction, and non-inferiority expectancy margin from the fixed baseline window, variance, cost model, and risk budget before evaluation. Evaluate all baseline signals using intention-to-treat counterfactual outcomes, net of spread, slippage, missed fills, and added latency, with bootstrap confidence intervals, pre-specified significance testing, regime stratification, and a sealed out-of-sample holdout over a fixed window. Record the study in ExperimentRegistry, and apply Holm/Bonferroni correction if any alternative snapshot counts or definitions are examined rather than tuning until success. In DEMO shadow mode, retain an unchanged control and record timestamps, quotes, decisions, and counterfactual fills; do not alter the champion or protected execution YAML unless the designated operator explicitly authorizes it. Reject the gate unless the pre-registered primary endpoint meets its confidence-bound and economic criteria in replay, shadow mode, and the sealed holdout."
+    },
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 54.55,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-25T20:30:51.017138+00:00",
+      "text": "Revised proposal: make the validated-state gate EV-net-of-costs aware using strictly decision-time information \u2014 net EV computed from contemporaneous executable quotes captured at signal time, charged through a slippage model frozen and version-pinned before any evaluation, with the EV horizon and cost model fixed in a written pre-registration before any holdout contact. All rule construction and threshold selection (including any refinement of the \"skip when net EV <= 0\" predicate) occurs only on an earlier development window under predefined effect-size and minimum-sample-per-stratum criteria; the sealed holdout is then evaluated exactly once with block-bootstrap confidence intervals that respect temporal dependence and a multiplicity correction over the small pre-declared variant set, so repeated testing against the holdout is structurally impossible. Acceptance additionally requires the uplift to replicate out-of-sample when stratified by symbol, session, and regime (with sparse strata pooled by prespecified rules) and requires demonstrated non-degradation of exposure concentration and all portfolio-level risk controls. The abstention rule acts purely as an additional entry-suppression predicate inside the existing champion gate \u2014 it adds no order path, touches no broker interface, and cannot alter governed DEMO execution, which remains solely owned by run_broker_paper.py. If the uplift fails to replicate or any robustness check fails, the null result is recorded honestly in the ExperimentRegistry and the champion is left untouched."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ce5c85\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.12,
+        "finished_utc": "2026-08-25T20:31:03.149805+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-25T20:30:51.034749+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-25T20:31:03.149805+00:00",
+      "text": "Pre-register and record each frozen challenger in ExperimentRegistry, including a disjoint feature/window family map verified for correlation and regime overlap before unsealing holdouts. Test only eligible counterfactual opportunities against the champion on sealed holdouts with identical costs, requiring adequate sample size, multiple-testing adjustment, regime-stable bootstrap confidence intervals, higher net expectancy, and lower 95% CVaR and rolling max drawdown, while retaining at least 70% of champion trade count. Calibrate modeled spread/slippage against realized DEMO fills and treat champion-generated DEMO outcomes only as execution-cost validation, not counterfactual entry evidence. Reject all variants failing any gate; only the governed Firehose owner may execute a qualifying trade after every DEMO safety check passes."
+    }
+  },
+  "status": "decided"
+}

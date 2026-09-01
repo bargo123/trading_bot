@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-26T22:30:37.443594+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6e126b\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.02,
+          "finished_utc": "2026-08-26T22:32:03.702170+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-26T22:31:52.679092+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T22:32:03.705684+00:00",
+        "text": "The proposal is not a trading or research strategy, so it provides no hypothesis, data, validation plan, or measurable claim to review. It appears to be an API configuration failure, not evidence supporting a model change or execution action; no trading behavior should be altered until the unsupported model identifier is corrected and the integration is tested."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6e126b\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 7.98,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T22:32:11.701914+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-26T22:32:31.119560+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_39b60c",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_39b60c for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_6e126b",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6e126b\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 8.03,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T22:30:54.178054+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6e126b\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.92,
+        "finished_utc": "2026-08-26T22:31:18.087493+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T22:31:06.170456+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T22:31:18.090002+00:00",
+      "text": "Run a registered holdout experiment adding a volatility-regime calibration check to the validated-state gate, requiring recent realized volatility to fall within the champion\u2019s training-range quantiles before entry. Compare net, cost-adjusted expectancy and maximum drawdown against the current gate over identical MT5 DEMO replay windows. Reject the candidate unless it improves holdout net expectancy without increasing drawdown or reducing qualified-trade count by more than 20%."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6e126b\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.98,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T22:32:19.698307+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6e126b\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.35,
+        "finished_utc": "2026-08-26T22:32:31.074183+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T22:32:19.722383+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T22:32:31.075871+00:00",
+      "text": "Run a registered holdout experiment using a supported, authenticated model configuration before evaluating a volatility-regime calibration check in the validated-state gate. Require recent realized volatility to fall within the champion training-range quantiles before entry, then compare net cost-adjusted expectancy and maximum drawdown against the current gate over identical MT5 DEMO replay windows. Reject the candidate unless it improves holdout net expectancy without increasing drawdown or reducing qualified-trade count by more than 20%."
+    }
+  },
+  "status": "decided"
+}

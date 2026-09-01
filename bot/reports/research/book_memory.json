@@ -1,0 +1,22 @@
+{
+  "schema": "book_memory.v1",
+  "label": "research_proxy",
+  "n_records": 108,
+  "n_sources": 54,
+  "n_with_entry": 49,
+  "n_with_invalidation": 9,
+  "concepts": {
+    "volume_effort_result": 49,
+    "trend_continuation": 20,
+    "range_edge_fade": 11,
+    "support_resistance": 10,
+    "failed_breakout": 6,
+    "momentum": 3,
+    "breakout_continuation": 3,
+    "unclassified": 3,
+    "mean_reversion": 1,
+    "market_profile": 1,
+    "trend_pullback": 1
+  },
+  "built_at": "2026-08-20T23:06:33.473222+00:00"
+}

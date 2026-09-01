@@ -1,0 +1,43 @@
+{
+  "report": "replay_parity",
+  "schema": "aegis.replay_parity_report.v1",
+  "captured_at_utc": "2026-08-31T01:58:14.1408970Z",
+  "status": "NATIVE_EXECUTABLE_REPLAY_VERIFIED; LIVE_PARITY_NOT_ESTABLISHED",
+  "native_replay": {
+    "module": "bot/aegis/research/execution_replay.py",
+    "quote_model": "sequential executable bid/ask",
+    "market_and_pending_lifecycle": true,
+    "pending_replace_cancel_expiry": true,
+    "partial_fill_model": true,
+    "order_rejection_model": true,
+    "four_leg_basket_aggregation": true,
+    "mfe_mae_time_to_green": true,
+    "costs_applied_once": true,
+    "causal_quote_quarantine": true,
+    "outcome_attached_after_evaluation": true,
+    "research_only": true,
+    "execution_authority": false
+  },
+  "comparison": {
+    "runner_vs_replay": null,
+    "external_engine_parity": null,
+    "live_broker_samples_in_this_pass": 0
+  },
+  "offline_tests": {
+    "changed_focused": "184 passed in 18.22s",
+    "basket_causality_focused": "315 passed in 5.84s",
+    "full_pytest": "3047 passed, 1 warning in 155.40s"
+  },
+  "costs": {
+    "spread": "executable entry/liquidation bid/ask",
+    "commission": "applied once when supplied",
+    "slippage": "applied once when supplied",
+    "latency": "stressable in replay but not measured against this live broker session"
+  },
+  "reason": "No legitimate live fill occurred after the verified restart, so runner-versus-replay fill and close parity cannot be claimed.",
+  "safety": {
+    "allow_live": false,
+    "external_adapters_read_only": true,
+    "no_forced_signal": true
+  }
+}

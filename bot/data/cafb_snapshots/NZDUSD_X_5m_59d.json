@@ -1,0 +1,10 @@
+{
+  "symbol": "NZDUSD=X",
+  "requested_interval": "5m",
+  "actual_interval": "5m",
+  "requested_lookback_days": 59,
+  "rows": 16776,
+  "start_utc": "2026-05-18 23:00:00+00:00",
+  "end_utc": "2026-08-07 21:25:00+00:00",
+  "fetched_utc": "2026-08-09 18:43:57.633738+00:00"
+}

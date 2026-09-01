@@ -1,0 +1,1 @@
+Test a validated-state cooldown: abstain from new entries for 15 minutes after any invalidation or scratch exit, then compare net expectancy and tail loss against the current policy on sealed holdouts. Promote it only if costs-adjusted expectancy improves and maximum drawdown does not worsen. Reject it if either criterion fails.

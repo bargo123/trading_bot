@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-21T17:31:44.359067+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-21T17:37:21.240850+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_4a1990",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_4a1990 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_07e089",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_07e089\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 163.68,
+        "finished_utc": "2026-08-21T17:34:40.596325+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T17:31:56.920359+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T17:34:40.603325+00:00",
+      "text": "Proposal: Run a governed exit-research experiment on the firehose's dominant exit path \u2014 the `aegis_flatten` time-stop \u2014 which the latest `outcome_learning.json` shows accounts for 1,926 of 2,514 exits (76.6%) at expectancy \u22120.0136, while TP-resolved exits earn +0.106 (n=446) and SL exits lose \u22120.547 (n=96), producing an aggregate payoff ratio of only 0.34 (avg win 0.06 vs avg loss \u22120.18). Using `bot/aegis/research/exit_research.py`, replay each sealed-holdout entry's realized M1 forward path under the current 45-M1-bar flatten rule (the Grimes/Volman heritage in `intel/runner.py`) versus pre-registered alternatives (e.g., 90-bar time-stop, and a trail-stop arm after +5 pips), all net of the measured per-symbol `cost_pips` in `validated_opportunities.json`. Falsifiable prediction: if the flatten window is the binding constraint, at least one alternative lifts holdout net expectancy above 0 with PF > 1 without increasing `wins_erased_by_tail_loss` (currently ~20); if none does, the current exit is confirmed near-optimal and the negative expectancy must be attacked at entry selection instead. Register the trial in `ExperimentRegistry` before touching any data, consume the holdout once for the family, and promote nothing \u2014 this is evidence-gathering only, consistent with Grimes' *The Art and Science of Technical Analysis* Ch. 8 (\"Trade Management\") on defining exits at entry and letting targets, not arbitrary clocks, resolve trades."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

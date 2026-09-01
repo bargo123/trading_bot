@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T13:30:32.972077+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ba039e\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 10.36,
+          "finished_utc": "2026-08-24T13:32:07.943731+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T13:31:57.581414+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T13:32:07.948942+00:00",
+        "text": "ATR windows add tunable thresholds that can easily overfit the sealed holdout unless all parameters and selection rules are frozen before evaluation. \u201cExpected move\u201d and \u201cstatistical confidence\u201d are unmeasurable without specifying their estimator, confidence test, sample-size/power requirement, and multiple-comparison controls. The proposal also lacks regime, symbol, and out-of-sample stability checks, so a lower drawdown could be a transient artifact rather than a robust improvement."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ba039e\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.9,
+          "finished_utc": "2026-08-24T13:31:57.565595+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T13:31:44.661846+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T13:31:57.565595+00:00",
+        "text": "The 25% increase is arbitrary, and tuning or accepting a threshold based on the sealed holdout leaks holdout information and invites overfitting. Net expectancy and maximum drawdown are undefined without confidence intervals, horizon, regime stratification, and fixed cost assumptions; a single comparison cannot establish robustness. It also lacks an independent validation period and explicit safeguards ensuring the threshold remains research-only and cannot alter live YAML or promote a champion."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T13:32:36.267660+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_5e8aef",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_5e8aef for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_ba039e",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ba039e\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 10.5,
+        "finished_utc": "2026-08-24T13:30:53.149749+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T13:30:42.653689+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T13:30:53.149749+00:00",
+      "text": "Run a sealed-holdout experiment that raises the validated-state minimum sample threshold by 25% and compares net expectancy, drawdown, and trade count against the current gate. Accept it only if holdout net expectancy improves without increasing maximum drawdown or reducing qualified signals by more than 20%; otherwise reject it."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ba039e\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 10.11,
+        "finished_utc": "2026-08-24T13:31:18.168754+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T13:31:08.062716+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T13:31:18.168754+00:00",
+      "text": "Test a research-only challenger that adds a volatility-adjusted time stop to the validated-state gate, exiting when a validated signal fails to reach its expected move within a defined ATR-based window. Evaluate it on a sealed, chronological holdout net of the existing spread/slippage assumptions against the current champion. Promote nothing unless it improves expectancy and drawdown with statistical confidence while passing every existing governance gate; otherwise retain it as rejected evidence."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ba039e\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 17.47,
+        "finished_utc": "2026-08-24T13:32:36.237739+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T13:32:18.766128+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T13:32:36.237739+00:00",
+      "text": "Test a research-only challenger with a volatility-adjusted time stop whose ATR lookback, multiplier, window formula, expected-move estimator, and selection rules are frozen from development data before the sealed chronological holdout is opened; expected move will be the pre-registered median net favorable excursion for validated signals. Compare it with the current champion net of existing spread/slippage assumptions, using net per-trade expectancy as the primary endpoint and maximum drawdown as a co-primary endpoint, with at least 200 independent holdout signals and 80% power to detect a pre-specified 10% expectancy improvement. Require a two-sided 95% paired block-bootstrap confidence interval for expectancy improvement and a pre-specified drawdown test, applying Holm correction to any secondary parameter, regime, or symbol comparisons. Validate stability through rolling walk-forward periods and pre-registered symbol and market-regime slices, requiring consistent improvement without material degradation in any required slice. Promote nothing unless all statistical, stability, cost, and existing governance gates pass; otherwise retain the challenger as rejected evidence."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ba039e\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 10.77,
+        "finished_utc": "2026-08-24T13:32:18.738245+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T13:32:07.969032+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T13:32:18.738245+00:00",
+      "text": "Pre-register several threshold candidates using development data, then evaluate them once on a sealed holdout with fixed spread/slippage assumptions, a defined horizon, regime-stratified reporting, and confidence intervals for net expectancy, maximum drawdown, and trade count. Select no threshold from the sealed results; instead, require the pre-specified candidate to meet its criteria on a subsequent independent validation period. Record the experiment and all rejected candidates, and keep the threshold strictly in research configuration with no edits to live YAML or champion promotion unless all governed promotion gates pass."
+    }
+  },
+  "status": "decided"
+}

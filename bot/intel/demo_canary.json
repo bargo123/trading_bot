@@ -1,0 +1,27 @@
+{
+  "created_utc": "2026-09-01T18:28:05.000706+00:00",
+  "dataset_hash": "ee922ebb2149d80de481a5e772f8977931962447ffaf03591df3f93807dc46a1",
+  "expires_utc": "2026-09-08T18:28:05.000706+00:00",
+  "index_file_sha256": "86925e0e6a10e66d65b0ab469859af86cda66b3fc59fd8836a79f00cc3ec3476",
+  "metrics": {
+    "bootstrap_p05_validate": 8.02362588512279,
+    "expectancy_validate": 15.909523809523797,
+    "n_losses_validate": 7,
+    "n_validate": 21,
+    "profit_factor_validate": 7.818367346938817
+  },
+  "opportunity": {
+    "cost_pips": 1.1,
+    "level": "A",
+    "regime": "trend",
+    "session": "asia",
+    "side": "buy",
+    "strategy_family": "retest",
+    "structure": "retest",
+    "symbol": "GBPNZD"
+  },
+  "risk_fraction": 0.08,
+  "schema": "demo_canary.v1",
+  "strategy_id": "canary_GBPNZD_trend_retest_asia_buy",
+  "validation_hash": "e27b8115a8c85a51"
+}

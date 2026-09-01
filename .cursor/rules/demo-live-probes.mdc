@@ -1,0 +1,29 @@
+---
+description: Demo probes — open/close 0.01 clips on every 20-min check
+alwaysApply: true
+---
+
+# Demo: test by trading (user standing order)
+
+On MetaQuotes demo (`allow_live: false`) this chat **may open and close**
+0.01-lot tickets whenever a measured test needs it. The user asked for this
+until they say the bot is live-ready. That is **not** a profit promise and
+not “the best bot ever” as a claim — it is permission to experiment.
+
+## Every 20-minute `AGENT_LOOP_TICK` (and similar reviews)
+
+1. Read heartbeat, risk halt, open tickets + floating PnL, last journal orders.
+2. Name **one** hypothesis (spread-red, stack-into-loser, stale EMA vs live
+   candle, margin 10019, etc.).
+3. If a 0.01 open or a ticket close would test it, **do that trade** via the
+   existing MT5 engine. Journal `event: probe` with why.
+4. Do **not** flatten the whole book by default. Close extras / one symbol /
+   one ticket when that is the test. Keep one clip if you are testing
+   “stop averaging into red.”
+5. Never `mt5.shutdown()`. Never `allow_live`. Never a second
+   `run_broker_paper.py`. Unattended optimizer stays YAML-only (no orders).
+
+```text
+# ❌ BAD — 20-min tick only reports equity
+# ✅ GOOD — “AUDCHF 4x red stack; close 3 extras, keep 1; enable no_stack_if_red”
+```

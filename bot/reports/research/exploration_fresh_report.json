@@ -1,0 +1,60 @@
+{
+  "schema": "exploration_fresh_report.v2",
+  "generated_utc": "2026-08-22T17:39:59.387525+00:00",
+  "runner_pid": 6604,
+  "runner_status": "running",
+  "mt5_demo": true,
+  "allow_live": false,
+  "funnel": {
+    "scans": 464,
+    "candidates": 64,
+    "shadow": 0,
+    "exploration_eligible": 319,
+    "exploration_fire": 319,
+    "demo_canary_fire": 0,
+    "champion_fire": 0,
+    "skip": 144
+  },
+  "pm_decisions": {
+    "HOLD": 15370,
+    "LOCK": 1,
+    "EXIT": 15,
+    "REDUCE": 0
+  },
+  "pm_tickets": [
+    {
+      "ticket": "10154363345",
+      "thesis": "",
+      "hypothesis": "",
+      "stage": "",
+      "symbol": "EURGBP",
+      "side": "buy",
+      "family": "",
+      "pnl": 0.04,
+      "mfe": 0.04,
+      "mae": 0.0,
+      "locked_profit": 0.0,
+      "entry_ev_at_open": null,
+      "remaining_ev": 0.0,
+      "remaining_ev_status": "ESTIMATED",
+      "exit_state": "open",
+      "age_s": 184.1
+    }
+  ],
+  "exposure": {
+    "gross_long_exposure": 0.03,
+    "gross_short_exposure": 0.0,
+    "net_exposure": 0.03,
+    "hedged_exposure": 0.0,
+    "cost_of_internal_hedge_usd_est": 0.0,
+    "per_symbol_hedged": {}
+  },
+  "experiment_state_distribution": {
+    "ACTIVE": 198,
+    "NEW": 44
+  },
+  "book_backed_experiment_count": 45,
+  "journal_since_fix": {},
+  "last_position_inventory": null,
+  "economic_claim": "No validated profitable champion exists. Historical aggregate remains ~n=2471 WR=67.83% PF=0.769 expectancy=-0.0110 net=-27.17."
+}

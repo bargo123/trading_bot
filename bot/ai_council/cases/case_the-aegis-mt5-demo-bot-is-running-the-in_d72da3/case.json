@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-22T11:28:19.241031+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-22T11:30:45.100318+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_7f8586",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_7f8586 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_d72da3",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_d72da3\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 50.35,
+        "finished_utc": "2026-08-22T11:29:20.875111+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T11:28:30.524335+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T11:29:20.890939+00:00",
+      "text": "Proposal: The measured funnel shows 79% of scanned opportunities (16,261 of 20,573) are discarded for a single reason \u2014 `state_not_in_validated_set` \u2014 while only 2 of 43 shortlisted strategies survive validation, so the validated-state set is the binding constraint on firehose coverage. Next-cycle candidate: run an offline replay of the top-50 skipped (symbol, session, side, regime) states, scored net of the runner's cost profile with the exact promote-gate criteria (bootstrap p05 > 0 on holdout), and admit to the research validated-set only states whose holdout n \u2265 30 and p05 clears the same threshold as the live canary's 0.434 (n=33, PF 3.03). Falsifiable prediction: at least one skipped state passes the identical gate the GBPUSD asia-buy canary passed; if zero of the 50 sampled states clear it, the validated-state gate is correctly calibrated and the candidate is rejected and recorded in the ExperimentRegistry as a null result. Success metric: validated-set expansion raises eligible-fire rate above 21% without dropping canary bootstrap_p05 below its current 0.43 on re-validation. No code changes, no champion edits, demo-only data throughout."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

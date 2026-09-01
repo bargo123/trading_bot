@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-22T01:20:17.589305+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6f9edb\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 33.93,
+          "finished_utc": "2026-08-22T01:23:11.800312+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T01:22:37.875117+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T01:23:11.800312+00:00",
+        "text": "The one-hour window is a free hyperparameter with no stated provenance or sensitivity analysis (why not 30 or 90 minutes?), and reusing the same sealed holdout across successive challengers without a multiple-testing correction converts that holdout into a tuning set \u2014 classic selection overfitting. Key claims are unmeasurable as written: \"high-impact news\" has no calendar source, timezone, or event list, and \"net expectancy improves\" lacks any minimum effect size or significance threshold, so a +0.01 pip noise edge on ~100 trades would pass. Validation is missing entirely: no bootstrap/confidence intervals on expectancy deltas, no check that excluded news windows leave enough treated events to evaluate the change itself, and the invented acceptance gates may not match the governed criteria in `promote.py` \u2014 acceptance must go through those gates, not this ad-hoc triple. No live-trading violation is apparent (read-only, registered, challenger-only), but the demo-trade count criterion is meaningless unless tied to the actual sealed holdout records rather than an unspecified \"eligible\" pool."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6f9edb\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 10.2,
+          "finished_utc": "2026-08-22T01:22:37.859459+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T01:22:27.663058+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T01:22:37.859459+00:00",
+        "text": "The proposal risks overfitting by selecting symbols and exit variants after observing the same losing tail, while \u201cone policy\u201d conflicts with testing multiple variants and provides no sealed holdout, walk-forward period, or multiple-testing correction. Replaying exits from `outcome_log.jsonl` may be invalid without intratrade price paths, precise stop/target collision handling, and verified cost/timestamp data, so the claimed counterfactual may be unmeasurable or look-ahead contaminated. The +0.02 expectancy and PF 1.1 thresholds are arbitrary, and per-symbol bootstrap results need minimum sample sizes, confidence intervals, and aggregate robustness tests. \u201cKeep current behavior\u201d is also unsafe when that behavior has negative expectancy; research results must not imply continued deployment or any runtime change outside governed promotion gates."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T01:24:10.616694+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_c9e1d9",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_c9e1d9 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_6f9edb",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6f9edb\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 68.24,
+        "finished_utc": "2026-08-22T01:21:37.277878+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T01:20:29.041348+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T01:21:37.277878+00:00",
+      "text": "Proposal: The measured evidence points at exit geometry as the dominant drag \u2014 of the 2,517 reconciled demo exits, 76% are `manual` closes (PF 0.64), average winners are cut at +0.06 while the worst tail loss runs \u22121.21 (wins_erased_by_tail_loss \u2248 20), and overall expectancy is \u22120.012 despite a 67.5% win rate. For the next cycle, run an offline counterfactual in `exit_research` that replays the identical entries from `intel/outcome_log.jsonl` under one rules-based exit policy (e.g., symmetric 1R stop / 2R target or an ATR-trailing stop, net of runner costs) instead of manual closes. Acceptance criterion: bootstrap expectancy improves from \u22120.012 to \u2265 +0.02 with PF \u2265 1.1 held out-of-sample per symbol (USDCHF, USDCAD, GBPUSD first); if any variant fails to beat the manual-close baseline after costs, record the rejection in the ExperimentRegistry and keep the current behavior. This is consistent with the corpus's exit-symmetry and tail-loss themes (e.g., *Trade Your Way to Financial Freedom* on R-multiple exits; *Stock Market Wizards* tagged `tail_loss`) and requires no champion change and no gate loosening \u2014 notably, `validated_states.json` currently shows n_survive=0, so fixing attribution first will also give the validated-state gate cleaner inputs."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6f9edb\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 8.83,
+        "finished_utc": "2026-08-22T01:22:04.415715+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T01:21:55.582905+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T01:22:04.417465+00:00",
+      "text": "Test a challenger that adds a one-hour post\u2013high-impact-news exclusion window to the validated-state gate, leaving all other champion logic and cost assumptions unchanged. Register the experiment and compare it on the same sealed holdout against the current champion using net expectancy, maximum drawdown, and trade count. Accept the candidate only if net expectancy improves, maximum drawdown does not worsen, and at least 100 eligible demo trades remain; otherwise reject and retain the current champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6f9edb\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 10.6,
+        "finished_utc": "2026-08-22T01:24:10.536762+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T01:23:59.941113+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T01:24:10.552882+00:00",
+      "text": "Test preregistered 30-, 60-, and 90-minute post-news exclusions, with the durations justified by prior literature or exploratory training data only, using a versioned economic-calendar source, explicit high-impact event list, and UTC-normalized timestamps. Evaluate duration sensitivity through nested or walk-forward validation, then perform one untouched sealed-holdout comparison with multiplicity-adjusted inference to prevent holdout reuse as a tuning process. Report net expectancy and drawdown deltas with bootstrap confidence intervals, excluded-event counts, and trade counts derived directly from sealed-holdout records; require a preregistered economically meaningful expectancy improvement whose adjusted confidence interval excludes zero. Register every result, retain rejected challengers, and permit promotion only through the existing gates in `promote.py`, with all champion logic and cost assumptions otherwise unchanged."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_6f9edb\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 48.09,
+        "finished_utc": "2026-08-22T01:23:59.916040+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T01:23:11.826125+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T01:23:59.916040+00:00",
+      "text": "Proposal: To test whether exit geometry explains the \u22120.012 expectancy among the 2,517 reconciled demo exits (76% manual closes, PF 0.64), I will first audit whether `intel/outcome_log.jsonl` contains verified timestamps, costs, and enough intratrade price-path fidelity for counterfactual replay; if not, this cycle's sole deliverable is building and validating a bar-level path reconstruction with pessimistic collision handling (stop assumed filled whenever stop and target fall inside the same bar) before any variant is scored. Before touching outcome data, I will pre-register in the ExperimentRegistry a fixed family of exactly three exit policies (manual-close baseline, symmetric 1R/2R bracket, ATR-trailing), evaluated via purged walk-forward splits with Bonferroni adjustment across the three variants, requiring \u2265100 exits per symbol-fold, bootstrap confidence intervals rather than point estimates, and a pooled aggregate test across all symbols \u2014 USDCHF, USDCAD, GBPUSD are demoted to exploratory slices, not acceptance targets. Advancement criterion (research-only, not deployment): the single surviving variant's held-out expectancy CI must exclude \u22120.012 with pooled PF CI lower bound \u22651.1 net of runner costs, and it must then be locked and confirmed once against the sealed holdout in `bot/research/sealed_holdouts.jsonl`; failures are recorded as rejections with full metrics. Nothing in this work implies continued operation of the current negative-expectancy behavior \u2014 all findings remain offline, demo-data-only, and any future behavior change flows exclusively through the governed `promote.py` gates, which this proposal does not touch."
+    }
+  },
+  "status": "decided"
+}

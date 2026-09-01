@@ -1,0 +1,18 @@
+{
+  "estimated_cost_usd": 0.0,
+  "cost_status": "unknown",
+  "cost_source": "none",
+  "input_tokens": 23648,
+  "output_tokens": 53,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0,
+  "reasoning_tokens": 16,
+  "total_tokens": 23701,
+  "api_calls": 1,
+  "model": "x-preview-f-free",
+  "provider": "opencode-zen",
+  "session_id": "20260825_130715_81dd9c",
+  "completed": true,
+  "failed": false,
+  "service_tier": null
+}

@@ -1,0 +1,1 @@
+Test an Asia-session sell filter that requires ATR-normalized spread below its rolling median before entry. Evaluate it on sealed holdouts net of configured spread and slippage; accept only if it improves expectancy and does not worsen maximum drawdown versus the current validated champion. Record the experiment and retain the candidate unpromoted unless all promotion gates pass.

@@ -1,0 +1,185 @@
+{
+  "created_utc": "2026-08-24T01:31:04.155451+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_09171b\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 10.76,
+          "finished_utc": "2026-08-24T01:33:16.845449+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T01:33:06.089735+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T01:33:16.845449+00:00",
+        "text": "The 25% threshold is arbitrary unless pre-registered or tuned solely on training folds; otherwise it is a direct overfitting lever. \u201cPredicted edge\u201d and slippage estimates need an explicitly frozen, calibration-tested definition, or the claimed net improvement is unmeasurable. A single sealed-holdout result is insufficient without regime, symbol, and sensitivity analysis around the threshold."
+      }
+    ],
+    "gemini": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_09171b\\critiques\\gemini--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 10.63,
+          "finished_utc": "2026-08-24T01:32:54.175409+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T01:32:43.545333+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T01:32:54.175409+00:00",
+        "text": "A 100-trade replay and a single 4-hour forward-return comparison are too weak to establish regime-specific causality or rule out selection bias, especially after inspecting rejection logs. The proposed 15% threshold is arbitrary, and \u201chigh-volume periods\u201d lacks a pre-registered, measurable definition. Require walk-forward, sealed holdout validation with net costs and drawdown/tail-risk gates before any gate change; DEMO-derived behavior must not be treated as evidence for live deployment."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_09171b\\critiques\\gemini--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.88,
+          "finished_utc": "2026-08-24T01:33:06.073491+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T01:32:54.197181+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T01:33:06.073491+00:00",
+        "text": "Rejected signals are a biased, non-tradable counterfactual, so comparing their 4-hour returns with accepted trades cannot establish that the gate caused missed opportunity, especially without spread/slippage and execution modeling. \u201cHigh-volume,\u201d \u201chigh-probability,\u201d and the arbitrary 15% variance increase are undefined and invite regime cherry-picking, while a 100-trade replay is underpowered and highly vulnerable to overfitting. No untouched out-of-sample, walk-forward, statistical uncertainty, or pre-registered acceptance criteria is specified, and changing a gate based on demo logs risks violating the governed-promotion process unless fully registry-recorded and passed through all research gates."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_09171b\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 10.67,
+          "finished_utc": "2026-08-24T01:32:43.524585+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T01:32:32.849706+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T01:32:43.529602+00:00",
+        "text": "Two consecutive confirmations are an arbitrary, easily overfit rule and may selectively suppress signals without demonstrating better risk-adjusted performance. A 10% sealed-holdout expectancy gain with unchanged maximum drawdown and 100 signals is insufficient without confidence intervals, statistical significance, costs/slippage, regime and temporal robustness, and multiple-testing correction. The proposal also omits explicit enforcement of the existing promotion gates and does not define \u201cvalidated-state,\u201d \u201celigible,\u201d or how drawdown and expectancy are measured."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T01:33:48.448682+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_dfed72",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 4,
+      "n_proposals": 3,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_dfed72 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_09171b",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_09171b\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.21,
+        "finished_utc": "2026-08-24T01:31:24.826190+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T01:31:13.617419+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T01:31:24.826190+00:00",
+      "text": "Run a registered challenger that requires two consecutive validated-state confirmations before a DEMO entry. Promote it only if sealed-holdout net expectancy improves by at least 10% with no increase in maximum drawdown and at least 100 eligible signals. Reject it if any threshold fails."
+    },
+    {
+      "agent": "gemini",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_09171b\\proposals\\gemini.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.77,
+        "finished_utc": "2026-08-24T01:31:42.865387+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "Google",
+        "returncode": 0,
+        "started_utc": "2026-08-24T01:31:31.096674+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T01:31:42.865387+00:00",
+      "text": "Analyze the validated-state gate's rejection logs from the MT5 DEMO environment to determine if high-probability mean-reversion signals are being filtered during peak London-NY overlap sessions. By comparing the 4-hour forward returns of trades rejected by the current gate versus those accepted, the next research cycle will test if the variance threshold is over-optimized for low-volatility regimes. We propose a falsifiable experiment to increase the gate\u2019s allowable variance by 15% specifically during high-volume periods to capture missed volatility. Success will be measured by a 5% improvement in the Sharpe ratio across a 100-trade backtest replay using the intelligent firehose logic."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_09171b\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.27,
+        "finished_utc": "2026-08-24T01:32:02.989470+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T01:31:50.719443+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T01:32:02.989470+00:00",
+      "text": "Test a volatility-normalized cost filter that rejects any signal whose estimated spread plus slippage exceeds 25% of its predicted edge, while leaving the champion unchanged. Record the ablation in `ExperimentRegistry` and evaluate it on the sealed holdout. Promote the candidate for further review only if net expectancy improves by at least 10% with no worse drawdown and the result survives the existing validation gates."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_09171b\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 10.63,
+        "finished_utc": "2026-08-24T01:33:48.423533+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T01:33:37.797813+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T01:33:48.423533+00:00",
+      "text": "Test a volatility-normalized cost filter using a threshold pre-registered at 25% of predicted edge; any alternative threshold must be selected solely on training folds and frozen before evaluation. Define predicted edge and spread/slippage estimates explicitly, freeze their implementations, and verify calibration before measuring net expectancy. Record the ablation in `ExperimentRegistry`, evaluate it once on the sealed holdout with regime- and symbol-level results, and report sensitivity across a pre-specified threshold range. Leave the champion unchanged and advance the candidate only if aggregate net expectancy improves by at least 10%, drawdown is no worse overall and by subgroup, and all existing validation gates pass."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_09171b\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.04,
+        "finished_utc": "2026-08-24T01:33:32.809787+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T01:33:21.773496+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T01:33:32.809787+00:00",
+      "text": "Run a registered challenger with a pre-specified, causally available validated-state definition and evaluate one- versus two-confirmation entry rules without signal-selective tuning. Compute net expectancy and maximum drawdown after the runner\u2019s documented spread and slippage assumptions, defining eligible signals, position lifecycle, and measurement windows before testing. Require all existing promotion gates, sealed temporal and regime-stratified holdouts, confidence intervals and statistically significant risk-adjusted improvement with multiple-testing correction, plus at least 100 eligible signals. Promote only if the two-confirmation rule improves net expectancy by at least 10% without worsening maximum drawdown across required holdouts; otherwise retain the rejected challenger and its results in the registry."
+    }
+  },
+  "status": "decided"
+}

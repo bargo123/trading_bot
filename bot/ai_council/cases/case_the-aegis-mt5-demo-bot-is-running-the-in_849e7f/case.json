@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T23:38:05.455661+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_849e7f\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 10.7,
+          "finished_utc": "2026-08-24T23:40:01.890193+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T23:39:51.186623+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T23:40:01.890193+00:00",
+        "text": "The decile cutoff is an optimization degree of freedom unless it was fixed before inspecting the holdout, so it can still overfit despite the registered ablation. \u201cImproves expectancy and drawdown\u201d lacks predefined statistical confidence, minimum effect sizes, and a drawdown measurement method, making promotion discretionary. The 25% trade-count limit does not validate regime stability or account for adverse selection from filtering entries."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_849e7f\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 20.51,
+          "finished_utc": "2026-08-24T23:39:51.170830+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T23:39:30.655872+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T23:39:51.170830+00:00",
+        "text": "The 20%/90% cutoffs and 60-day lookback are arbitrary hyperparameters that invite overfitting and data-mining, especially without nested walk-forward validation or robustness tests across instruments and periods. \u201cNet expectancy improves\u201d and \u201cmaximum drawdown does not worsen\u201d lack predefined horizons, sample-size requirements, confidence bounds, and significance criteria; the filter may also reduce trade count and distort exposure comparisons. The experiment must explicitly use the ExperimentRegistry and preserve an untouched sealed holdout, with no promotion or runtime execution unless all existing governance gates pass."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T23:41:02.892995+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_bcbd04",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_bcbd04 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_849e7f",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_849e7f\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.71,
+        "finished_utc": "2026-08-24T23:38:29.521996+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T23:38:16.812132+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T23:38:29.522996+00:00",
+      "text": "Test a volatility-regime filter that blocks entries when the 30-minute ATR percentile is below 20% or above 90% of its trailing 60-day distribution. Evaluate it on sealed holdouts with existing spread and slippage assumptions, against the current validated-state baseline. Accept only if net expectancy improves and maximum drawdown does not worsen; otherwise reject and record the result."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_849e7f\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.21,
+        "finished_utc": "2026-08-24T23:38:57.742858+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T23:38:44.528767+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T23:38:57.742858+00:00",
+      "text": "Test a registered ablation that blocks entries during the empirically worst spread-to-range decile, using only pre-entry spread and recent range data. Compare it with the current validated-state gate on a sealed, time-ordered holdout, net of configured spread/slippage costs. Promote no change unless the filter improves expectancy and drawdown without reducing holdout trade count by more than 25%; otherwise reject it."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_849e7f\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 48.74,
+        "finished_utc": "2026-08-24T23:41:02.857557+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T23:40:14.122240+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T23:41:02.859566+00:00",
+      "text": "Run a registered ablation using a spread-to-range decile cutoff fixed from the development sample before opening the sealed holdout; use only pre-entry spread and recent range data. Compare it with the current validated-state gate on the sealed, time-ordered holdout, net of configured spread/slippage costs, using maximum peak-to-trough equity drawdown and a pre-specified block-bootstrap test. Promote only if net expectancy improves by at least 5% and maximum drawdown falls by at least 10%, with two-sided 95% confidence intervals excluding zero, trade count falls by no more than 25%, and effects remain directionally consistent across predefined chronological subwindows and market-regime buckets. Also require that excluded entries do not have higher net risk-adjusted expectancy than retained entries; otherwise reject the filter."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_849e7f\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.2,
+        "finished_utc": "2026-08-24T23:40:14.107372+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T23:40:01.904153+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T23:40:14.109377+00:00",
+      "text": "Test a pre-registered ATR-regime filter grid across instruments and rolling walk-forward periods, selecting parameters only within training windows and retaining an untouched sealed holdout for one final evaluation. Compare matched-horizon net expectancy, drawdown, trade count, and exposure against the validated-state baseline under existing spread and slippage assumptions, with predefined minimum samples and confidence/significance bounds. Accept only robust improvements across periods and instruments without materially worsening maximum drawdown or reducing exposure comparability; otherwise reject. Record every run and failure in `ExperimentRegistry`; do not promote or enable runtime execution unless all existing governance gates pass."
+    }
+  },
+  "status": "decided"
+}

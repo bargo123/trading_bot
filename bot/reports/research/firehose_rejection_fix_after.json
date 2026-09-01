@@ -1,0 +1,61 @@
+{
+  "report": "firehose_rejection_fix_after",
+  "captured_at_utc": "2026-08-31T01:58:14.1408970Z",
+  "measurement_status": "SOURCE_AND_RUNTIME_VERIFIED; NO LEGITIMATE SIGNAL",
+  "source_head": "788533353aaa019c4e62d870edb9d0dd89d17688 plus preserved uncommitted implementation",
+  "after": {
+    "watcher_advisory": {
+      "evaluates_registered_algorithms": true,
+      "journals_selected_candidate_evidence": true,
+      "preserves_exact_selected_candidate_identity": true,
+      "execution_authority": false,
+      "research_only": true,
+      "order_intent": false
+    },
+    "causal_market_event_ledger": {
+      "normalized_broker_time_preferred_over_raw_server_clock": true,
+      "accepted_quotes_enter_quote_buffer": true,
+      "runtime_accepted": 19,
+      "runtime_quarantined": 33
+    },
+    "runner_contracts": [
+      "MarketEvent",
+      "OrderIntent",
+      "PreflightResult",
+      "OrderAcknowledgement",
+      "ExecutionReport",
+      "FillEvent",
+      "PositionEvent",
+      "CloseIntent",
+      "ConfirmedClose",
+      "ConfirmedOutcome",
+      "ReconciliationEvent"
+    ],
+    "order_lifecycle_requires_ack_before_fill": true,
+    "historical_optional_cost_import_fail_closed": true,
+    "uncalibrated_forced_order_lane_removed": true,
+    "broker_sender_changed": false,
+    "live_money_enabled": false
+  },
+  "verification": {
+    "changed_focused": "184 passed in 18.22s",
+    "basket_causality_focused": "315 passed in 5.84s",
+    "full_pytest": "3047 passed, 1 warning in 155.40s",
+    "verifier": "exit 0; 38 VERIFIED; machine checks and runtime gates pass"
+  },
+  "runtime_proof": {
+    "status": "RUNNING_VERIFIED_SOURCE",
+    "runner_pid": 27232,
+    "feed_status": "HEALTHY",
+    "trading_eligible": true,
+    "scans": 26,
+    "fires": 0,
+    "fills": 0,
+    "open_positions": 0,
+    "forced_demo_exploration_selected": 0,
+    "why_no_order": "short_horizon_not_calibrated",
+    "account_server": "MetaQuotes-Demo",
+    "allow_live": false,
+    "restart_performed": true
+  }
+}

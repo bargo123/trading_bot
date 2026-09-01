@@ -1,0 +1,1 @@
+Test a stricter validated-state rule requiring two consecutive confirming snapshots before entry. Evaluate it on sealed MT5 DEMO outcome logs against the current gate, net of existing spread and slippage assumptions. Advance it only if it improves out-of-sample expectancy without increasing maximum drawdown or reducing trade count by more than 25%.

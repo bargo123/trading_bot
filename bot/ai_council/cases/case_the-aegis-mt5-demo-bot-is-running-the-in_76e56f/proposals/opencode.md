@@ -1,0 +1,1 @@
+Run a registered, sealed-holdout experiment that adds a minimum expected-value margin above estimated spread and slippage before a validated-state signal is eligible. Compare net expectancy, maximum drawdown, and trade count against the current gate; retain the change only if holdout net expectancy improves by at least 10% without increasing maximum drawdown.

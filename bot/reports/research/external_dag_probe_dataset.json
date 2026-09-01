@@ -1,0 +1,47 @@
+{
+  "schema": "aegis.frozen_dataset_manifest.v1",
+  "purpose": "bounded_external_stack_integration_probe",
+  "point_in_time_state": {
+    "decision_ts": "2026-08-31T00:00:00Z",
+    "symbol": "EURUSD",
+    "side": "BUY",
+    "horizon_s": 3,
+    "bid": 1.1,
+    "ask": 1.1001,
+    "spread_pips": 1.0
+  },
+  "validation_evidence": {
+    "target_definition": "captured_exit_replay",
+    "dataset_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "validation_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "model_artifact_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "created_at": 1700000000.0,
+    "expires_at": 4100000000.0,
+    "authorized_symbols": [],
+    "authorized_horizons_s": [],
+    "book_algorithm_count": 616,
+    "book_registry_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "chronological_test": {
+      "expectancy": -0.01,
+      "profit_factor": 0.9,
+      "n_trades": 0,
+      "n_losses": 0
+    },
+    "sealed_oos": {
+      "expectancy": -0.01,
+      "profit_factor": 0.9,
+      "n_trades": 0,
+      "n_losses": 0
+    },
+    "calibration_ece": null,
+    "p95_loss": null,
+    "p99_loss": null,
+    "abstain_rate": 1.0,
+    "perturbation_status": "UNTESTED",
+    "replay_parity_status": "UNTESTED",
+    "models": {},
+    "book_context": {
+      "status": "RESEARCH_ONLY"
+    }
+  }
+}

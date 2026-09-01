@@ -1,0 +1,70 @@
+{
+  "change_id": "council_new_closed_trades_20260826_2348",
+  "degraded_real_council": true,
+  "final_decision": "DEGRADED_REAL_COUNCIL",
+  "finished_utc": "2026-08-26T23:49:02.739549+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_new_closed_trades_20260826_2348",
+    "current_evidence": "HTTP 401: Model x-preview-f-free is not supported",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: new_closed_trades. Current PF=None, EV=None",
+    "proposed_change": "HTTP 401: Model x-preview-f-free is not supported",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "fewer than two members voted; not a multi-agent decision",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T23:48:42.536328+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 1,
+    "reject": 0,
+    "revise_and_resubmit": 1
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "raw": "HTTP 401: Model x-preview-f-free is not supported",
+      "reason": "unparseable vote: ''",
+      "status": "ERROR",
+      "vote": null
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Proposed change is identical to the failure message.",
+        "No concrete affected code paths or configuration values are identified.",
+        "No evidence that a replacement preserves research-only and DEMO execution boundaries.",
+        "Exploration throughput cannot be evaluated without defined success metrics and costed OOS criteria."
+      ],
+      "confidence": 0.98,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal contains an unsupported-model HTTP 401 error rather than an implementable, testable change. No replacement model, configuration change, or validation evidence is specified.",
+      "requested_revisions": [
+        "Specify the exact supported model/provider and configuration changes.",
+        "Document fallback behavior for model failures without enabling trade execution or bypassing gates.",
+        "Add deterministic tests for unsupported-model handling and successful fallback.",
+        "Define measurable OOS, costed expectancy, and experiment-registry acceptance criteria."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

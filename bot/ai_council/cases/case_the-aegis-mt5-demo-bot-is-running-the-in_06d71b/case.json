@@ -1,0 +1,235 @@
+{
+  "created_utc": "2026-08-25T00:22:57.408143+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\critiques\\codex--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 39.03,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T00:27:03.985922+00:00",
+        "text": "The challenger's defining parameters\u2014the spread threshold and the three-consecutive-observation window\u2014are unspecified and appear hand-picked, so unless they were frozen ex ante from training data via purged cross-validation, this is textbook overfitting that burns the sealed holdout as a tuning set. The acceptance criterion is unmeasurable as written: \"improves out-of-sample expectancy and drawdown\" sets no minimum trade count, significance threshold, effect size, or multiple-testing correction despite the council repeatedly challenging the same champion. It also leaves the lookahead risk unaddressed\u2014all three spread observations must strictly precede the signal timestamp, and broker-quote-dependent spread data makes generalization to the runner's execution assumptions an open question\u2014while omitting mandatory ExperimentRegistry logging and deferring promotion to subjective judgment instead of the explicit numeric gates in bot/aegis/research/promote.py."
+      },
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.43,
+          "finished_utc": "2026-08-25T00:27:16.435344+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-25T00:27:04.005850+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T00:27:16.435344+00:00",
+        "text": "\u201cThree consecutive observations\u201d is undefined without sampling cadence, quote source, and handling of stale/tick-bursty data, making the result non-reproducible and potentially latency-biased. The proposal omits a pre-registered threshold and robustness checks across regimes, so tuning persistence length or spread cutoffs on the holdout risks overfitting. \u201cTrade quality\u201d and \u201cimproves expectancy\u201d require explicit net-cost definitions, confidence intervals, minimum sample size, and statistical significance before any promotion claim is measurable."
+      }
+    ],
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.34,
+          "finished_utc": "2026-08-25T00:25:08.518013+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-25T00:24:57.175925+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T00:25:08.518013+00:00",
+        "text": "The threshold is internally inconsistent: the hypothesis is rejected unless at least one third fail, but the proposed gate is adopted if even one fails, enabling a post-hoc policy change. Scaling each strategy's own historical costs may preserve optimistic or stale cost estimates rather than test realistic execution conditions; no out-of-sample or market-regime validation is specified. Re-evaluating already-promoted strategies also risks retrospective churn without a governed demotion policy or confirmation that `promote.py` can safely enforce the new criterion."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\critiques\\hermes--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 13.38,
+          "finished_utc": "2026-08-25T00:25:21.915372+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-25T00:25:08.535001+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T00:25:21.919721+00:00",
+        "text": "The decision rule is internally inconsistent: \u201cfewer than one third\u201d rejects the hypothesis, yet \u201ceven one\u201d affected strategy triggers a new gate, with no sample-size, confidence, or multiple-testing control. Reusing sealed holdouts and rescoring only previously promoted, selection-biased strategies risks holdout overfitting, while multiplying each strategy\u2019s own historically measured costs may reproduce flawed or endogenous assumptions rather than model realistic execution costs. The unchanged backtest may not faithfully reconstruct historical cost inputs, and max drawdown is logged but has no defined acceptance criterion."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 49.47,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T00:26:11.387327+00:00",
+        "text": "The 1.25\u00d7 threshold and 60-minute window are unexamined free parameters with no sensitivity analysis, and any re-tuning after seeing the sealed holdout result is holdout erosion by stealth \u2014 the protocol must be single-shot, pre-registered (thresholds frozen and logged in ExperimentRegistry before first seal contact), or it's fitting the holdout. The acceptance metrics are under-specified and gameable: \"10% net expectancy improvement\" never states relative vs absolute, a minimum trade count, or a significance test, and a filter that rejects many signals will almost mechanically lower max drawdown and inflate per-trade expectancy while destroying total PnL \u2014 so both gates are biased toward passing noise unless you add bootstrap CIs on the expectancy delta plus an explicit total-PnL/opportunity-cost non-degradation condition. Validation is also incomplete: there's no out-of-time or regime check that the sealed window's spread distribution (session/news-dependent, and undefined as to tick- vs bar-sampled median) resembles live conditions, and no interaction test confirming the filter composes cleanly with the existing quote/economics gates rather than only beating the baseline in isolation. Governance-wise nothing violates the read-only rules and retaining the baseline on failure is right, but \"accept\" must mean routing the challenger through research_promote_champion.py and every promote.py gate \u2014 the proposal's private pass/fail criterion cannot substitute for the governed promotion path."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 13.51,
+          "finished_utc": "2026-08-25T00:26:24.926164+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-25T00:26:11.412067+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-25T00:26:24.929162+00:00",
+        "text": "The 1.25 threshold and 60-minute window appear arbitrary and invite overfitting unless pre-registered and tested across symbols, regimes, and untouched time periods; the rolling median must explicitly exclude the current observation and handle sparse or stale quotes. \u201cNet expectancy improves by 10%\u201d is unmeasurable without a minimum trade count, confidence intervals, statistical test, and precise expectancy definition, while \u201cno increase in maximum drawdown\u201d needs a tolerance for sampling noise. The proposal also omits mandatory ExperimentRegistry recording and governed promotion gates, and does not establish that spread/slippage assumptions are conservative or independently validated."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-25T00:29:16.223531+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_00aa4f",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 6,
+      "n_proposals": 3,
+      "n_revisions": 3,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_00aa4f for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_06d71b",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 54.33,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T00:23:52.361504+00:00",
+      "text": "Candidate improvement: add a cost-stress revalidation step to the validated-state gate for the next research cycle. Hypothesis: the current gate can promote challengers whose net edge after the runner's assumed spread/slippage is small enough that realistic cost variation flips them negative, meaning some promotions are cost-noise artifacts rather than durable edges. Test: using only existing records (sealed holdouts in bot/research/sealed_holdouts.jsonl, the sitting champion spec, and logged outcomes), rescore every previously promoted strategy through the unchanged backtest at 1.0x, 1.25x, and 1.5x of its own measured historical spread/slippage assumptions, logging net expectancy and max drawdown per multiplier in ExperimentRegistry \u2014 no code, config, or champion changes during measurement. Falsifiable decision rule: if fewer than one third of promoted strategies show non-positive net expectancy at 1.25x costs, reject the hypothesis and leave the gate unchanged; if even one does, adopt \"positive net expectancy at 1.25x costs\" as an additional promote.py gate condition and re-evaluate the affected strategies on record. This is fully read-only research on already-recorded data, keeps all execution authority untouched, and directly serves the standing rule that outcomes must be robust to the runner's cost assumptions."
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.87,
+        "finished_utc": "2026-08-25T00:24:05.894087+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-25T00:23:53.027370+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T00:24:05.904981+00:00",
+      "text": "Test a spread-normalized entry filter that rejects signals when current spread exceeds 1.25 times the symbol\u2019s rolling 60-minute median. Evaluate it only on sealed historical holdouts under existing spread and slippage assumptions, versus the unchanged validated-state baseline. Accept it only if net expectancy improves by at least 10% with no increase in maximum drawdown; otherwise retain the baseline."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.86,
+        "finished_utc": "2026-08-25T00:24:24.957228+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-25T00:24:12.095416+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-25T00:24:24.966842+00:00",
+      "text": "Test whether adding a spread-persistence filter\u2014rejecting signals unless the quoted spread remains below the configured threshold for three consecutive observations\u2014improves net expectancy after spread/slippage costs. Run it as a sealed-holdout challenger against the current validated-state champion, with identical symbols, dates, and risk limits. Promote only if it improves out-of-sample expectancy and drawdown without reducing trade-quality gates beyond their current thresholds."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 51.43,
+        "finished_utc": "2026-08-25T00:29:15.469217+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-25T00:28:24.037738+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-25T00:29:15.473222+00:00",
+      "text": "Pre-register the exact spread threshold from the runner configuration and a three-sample persistence rule using one-second broker-quote observations, with stale or tick-bursty samples rejected and all three distinct samples strictly preceding the signal timestamp; select no parameters from the sealed holdout, using only training data and purged cross-validation. Register the hypothesis, data version, quote source, cadence, cost model, parameter freeze, and regime partitions in ExperimentRegistry before testing, and define net expectancy as realized P&L after the runner\u2019s configured spread and slippage costs. Require at least 100 closed trades, a minimum 10% improvement in net expectancy with a one-sided 95% confidence interval excluding zero, at least a 5% reduction in maximum drawdown, unchanged trade-quality gates, and consistent results across the pre-registered regimes and runner-cost sensitivity checks, with Holm\u2013Bonferroni correction across all registered champion challenges. Promote only through the explicit numeric gates in `bot/aegis/research/promote.py`; otherwise retain the challenger and sealed-holdout results without promotion."
+    },
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 54.12,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-25T00:28:10.585792+00:00",
+      "text": "Revised proposal: add a cost-stress revalidation study to the next research cycle, run read-only over existing records (sealed holdouts, the sitting champion spec, logged outcomes, and also the non-promoted challenger specs already kept in bot/research/strategies/, so inference is not restricted to promoted survivors). First establish faithfulness: rescore each record through the unchanged backtest at 1.0x and require it to reproduce the recorded net expectancy within a pre-registered tolerance, excluding and honestly logging any record that cannot be reconstructed before any multiplier analysis. Then rescore surviving records at 1.25x and 1.5x using the runner's current configured spread/slippage assumptions applied uniformly \u2014 not each strategy's own historical estimates \u2014 recording net expectancy and max drawdown per multiplier in ExperimentRegistry as a single pre-registered test (no other gate criteria ride on this cycle). Decision rule made internally consistent: reject the hypothesis if zero reconstructed records show non-positive net expectancy even at 1.5x; if any do, compute the exact binomial lower confidence bound on the failure rate and adopt \"positive net expectancy at 1.25x\" as a promote.py gate condition only if that bound exceeds 10% at 95% confidence, with drawdown acceptance defined simultaneously as max drawdown at 1.25x not exceeding 1.5x the strategy's recorded value. Any consequence for already-promoted strategies flows exclusively through the governed promoter path (research_promote_champion.py) in the normal cycle \u2014 flagged champions are marked cost-fragile on record and re-challenged, never directly demoted \u2014 and the new gate ships only after a passing promote.py regression test demonstrates it can enforce the criterion without breaking existing promotions."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_06d71b\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.42,
+        "finished_utc": "2026-08-25T00:28:24.020852+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-25T00:28:10.603424+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-25T00:28:24.020852+00:00",
+      "text": "Pre-register and log in `ExperimentRegistry` a single-shot challenger using a 1.25x threshold and trailing 60-minute tick-sampled median spread excluding the current quote, with explicit stale/sparse-quote handling; freeze all parameters before first sealed-holdout access. Evaluate versus the unchanged validated-state baseline across sealed out-of-time holdouts and predefined symbol/session/news regimes, confirming spread-distribution relevance and composition with existing quote and economics gates under conservative, independently validated spread/slippage assumptions. Define net expectancy as net PnL per executed trade, require a minimum pre-registered trade count, a bootstrap 95% confidence interval for the expectancy delta above zero, at least 10% relative improvement, non-degraded total net PnL, and maximum-drawdown change within a pre-registered sampling-noise tolerance. Any failure retains the baseline with results recorded; a passing challenger proceeds only through `research_promote_champion.py` and every `promote.py` gate, with no post-holdout retuning."
+    }
+  },
+  "status": "decided"
+}

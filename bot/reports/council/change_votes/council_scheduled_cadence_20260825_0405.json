@@ -1,0 +1,108 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_0405",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T04:07:38.804184+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_0405",
+    "current_evidence": "Candidate improvement: add a live-spread/session-liquidity entry filter to the firehose intake path. Rationale from measured evidence: the fast-trade autopsy stream shows losses clustering in entries filled during low-liquidity/rollover windows where realized fill spread exceeded the runner's backte",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate improvement: add a live-spread/session-liquidity entry filter to the firehose intake path. Rationale from measured evidence: the fast-trade autopsy stream shows losses clustering in entries filled during low-liquidity/rollover windows where realized fill spread exceeded the runner's backtest spread assumption, turning otherwise neutral-direction trades into guaranteed-negative expectancy outcomes. Hypothesis: suppressing entries whenever the live quote spread exceeds the 75th percentil",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T04:05:42.133352+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Truncated current_evidence and proposed_change fields leave the exact filter threshold undefined (75th percentile of which distribution: rolling intraday, same-session historical, global?) \u2014 an ambiguous gate could suppress most entries or behave inconsistently across sessions.",
+        "Mechanism mismatch: an entry filter reduces fill count, which conflicts with 'improve exploration/validation throughput'; expected effect on trade frequency is unstated.",
+        "Evidence is observational and unquantified: no N, no aggregate spread-cost PnL, no counterfactual PF/EV delta, no control comparing rollover vs non-rollover entry cohorts.",
+        "Runtime dependency on live quote spread needs explicit staleness/no-quote behavior (fail-open vs fail-closed) and a defined source consistent with the runner's OMS quote path.",
+        "A global spread percentile may disproportionately gate Asian-session or wide-spread symbols, biasing exploration coverage unless percentiles are session/symbol-conditioned.",
+        "Affected paths (bot/intel/) must keep all research-side components read-only; only the designated broker-paper runner's intake path may consume the gate."
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "The underlying idea is sound and well-motivated by market microstructure (rollover-window spread blowouts converting neutral-direction trades into guaranteed-negative expectancy), it is exposure-reducing rather than risk-increasing, and it stays inside the governed DEMO execution path with no live-YAML or champion impact \u2014 so no safety objection. However, both the evidence and hypothesis fields are truncated mid-sentence, leaving the operative rule undefined ('live quote spread exceeds the 75th percentile' of what reference distribution, over what lookback, sampled at what moment pre-order?). With PF=None/EV=None and only a qualitative clustering claim, the causal attribution to low-liquidity fills is not yet numerically established or controlled for confounders (session, time-of-day, symbol). Additionally the stated expected_mechanism ('improve exploration/validation throughput') contradicts the actual effect of an entry-suppression filter, which mechanically reduces trade count; if the real goal is higher precision per exploration trade, that should be stated so the falsification criteria can be designed around it.",
+      "requested_revisions": [
+        "Resubmit with the complete, non-truncated hypothesis specifying: spread metric, reference distribution and lookback (prefer session- and symbol-conditioned percentiles), comparison operator, and the exact evaluation point in the intake path relative to order_send.",
+        "Attach quantified counterfactual evidence from the fast-trade autopsy stream: number of affected fills, realized-vs-assumed spread cost in pips and currency, resulting PF/EV delta net of costs, and a matched control cohort outside rollover windows.",
+        "Correct expected_mechanism to describe the true effect (entry suppression during adverse microstructure) and state the acceptable trade-frequency reduction and how cross-session exploration coverage is preserved.",
+        "Define stale-quote / missing-quote behavior explicitly (fail-closed recommended) and confirm the gate reads only from the governed execution path's existing quote feed.",
+        "Confirm ExperimentRegistry entry, OOS validation split, and a minimum sample size for the 'negative costed expectancy' falsification verdict so the decision cannot trigger on noise.",
+        "Reconfirm no live config edits, no champion-file writes, and that rollback restores the intake path exactly (feature-flagged preferred)."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "The 75th-percentile threshold is unspecified: source window, symbol/session normalization, update cadence, and fallback behavior are missing.",
+        "A live intake filter can alter execution behavior despite DEMO-only status; it must preserve existing governed risk, DEMO-account checks, and single execution-owner boundaries.",
+        "No baseline sample size, net costed metrics, or OOS split is provided to substantiate the claimed clustering.",
+        "Session/rollover definitions, quote-staleness handling, and treatment of spread units are unspecified.",
+        "Affected-file scope is broad and should identify the exact research-only versus execution-path components."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal identifies a plausible cost-control hypothesis, but it is truncated and lacks a precise, testable filter definition and evidence sufficient to alter the intake path.",
+      "requested_revisions": [
+        "Provide the complete deterministic rule, including spread units, percentile estimation dataset/window, per-symbol/session treatment, and missing/stale quote behavior.",
+        "Attach baseline and OOS evidence with sample counts, net expectancy/PF, realized-versus-assumed spread distributions, and confidence intervals.",
+        "Implement first as an experiment behind a research-safe feature flag with ExperimentRegistry recording; do not modify immutable live YAML or promote a champion.",
+        "Specify acceptance/falsification gates, monitoring duration, rollback trigger, and confirmation that only the governed DEMO execution owner may submit orders."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "The proposal is truncated and does not specify the exact spread/session-liquidity threshold or data source.",
+        "Affected files suggest possible runtime changes without identifying the governed execution boundary.",
+        "No sample-size, baseline, cost model, or statistical acceptance criteria are provided.",
+        "No explicit ExperimentRegistry record, lookahead-safety check, or sealed OOS protocol is specified.",
+        "The claim of no safety impact is unsupported while changing firehose intake behavior."
+      ],
+      "confidence": 0.97,
+      "model": null,
+      "reason": "The hypothesis is plausible, but the proposal lacks sufficient implementation and validation detail for approval. It must demonstrate that the filter remains within the governed DEMO execution path and does not allow research or council processes to submit orders.",
+      "requested_revisions": [
+        "Provide the complete proposal with exact threshold calculation, session definitions, fallback behavior, and affected functions/files.",
+        "Confirm that only bot/scripts/run_broker_paper.py may execute MT5 DEMO orders and that research/council components remain read-only.",
+        "Define costed metrics, minimum trade/sample counts, baseline comparison, and explicit OOS/holdout validation gates.",
+        "Record the experiment in ExperimentRegistry and state that no champion promotion or live YAML changes are permitted.",
+        "Specify rollback criteria and verify the baseline pytest suite remains green."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

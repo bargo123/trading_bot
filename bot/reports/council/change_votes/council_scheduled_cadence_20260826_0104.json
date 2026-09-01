@@ -1,0 +1,118 @@
+{
+  "change_id": "council_scheduled_cadence_20260826_0104",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-26T01:08:03.776567+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260826_0104",
+    "current_evidence": "Proposal: In the next research cycle, run an offline exit-research replay over the 2,802 reconciled demo exits testing a tightened loss cap (~$0.10/trade, roughly half the current average loss of \u2212$0.187, versus \u2212$0.374 average on STOP_LOSS exits and a $1.21 tail loss) layered on the existing rapid-",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Proposal: In the next research cycle, run an offline exit-research replay over the 2,802 reconciled demo exits testing a tightened loss cap (~$0.10/trade, roughly half the current average loss of \u2212$0.187, versus \u2212$0.374 average on STOP_LOSS exits and a $1.21 tail loss) layered on the existing rapid-scratch logic, hypothesizing this alone flips profit factor above 1.0 at unchanged win rate. The measured evidence motivates exactly this: win rate is 64.3% yet expectancy is \u2212$0.017 and PF 0.72 purel",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/4)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T01:04:47.838011+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 2,
+    "counted": 4,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Unchanged-win-rate assumption is the load-bearing claim and is likely wrong; success must be judged on measured costed OOS expectancy, not on the hypothesis narrative.",
+        "Stop-fill realism: a $0.10 cap is inside typical spread/slippage noise for many sessions; the replay must model pessimistic fills (cap breached by slippage, gap-throughs like the observed $1.21 tail) or results will be fantasy.",
+        "Path/lookahead risk: intrabar high/low ordering ambiguity can silently favor tight stops; requires conservative worst-path assumptions and entry-time-only information sets.",
+        "Single-point selection of ~$0.10 chosen after inspecting average losses invites overfitting; needs a cap sweep, not one value.",
+        "affected_files lists bot/intel/: a research process writing to runtime intel state risks contaminating live-facing artifacts; research output belongs in bot/research/ and bot/reports/research/ with an ExperimentRegistry entry.",
+        "Falsification criterion references 'negative costed expectancy after exploration trades' but this phase is an offline replay with no exploration trades; criterion and expected_mechanism ('improve exploration/validation throughput') are mismatched boilerplate.",
+        "Sample of 2,802 exits may be regime-specific; representativeness and reconciliation quality should be stated."
+      ],
+      "confidence": 0.7,
+      "model": "x-preview-f-free",
+      "reason": "This is a legitimate, low-risk offline exit-research replay over already-reconciled demo exits: no MT5 mutation, no config change, no champion write, trivial rollback. It fits sanctioned research-cycle work and the evidence (WR 64.3% vs expectancy -$0.017, PF 0.72, STOP_LOSS exits averaging -$0.374 with a $1.21 tail) makes loss-cap tightening a reasonable first hypothesis to test. Approval is for the replay as an experiment, NOT for the headline claim: 'flips PF above 1.0 at unchanged win rate' is almost certainly false because tightening stops converts would-be recoveries into losers (avg winner is only ~$0.077, so many winners likely dipped below -$0.10 intratrade); the replay's job is to measure that degradation honestly under realistic fill and cost assumptions.",
+      "requested_revisions": [
+        "Run a loss-cap grid (e.g. $0.06-$0.15) and report the full PF/expectancy/win-rate curve with confidence intervals instead of point-testing ~$0.10.",
+        "Model stop fills pessimistically: slippage beyond the cap, gap-through at tail events, all net of runner spread/commission assumptions per repo rule 6.",
+        "Pre-register the primary metric as costed OOS expectancy (with the existing split-primary/OOS machinery) and a significance threshold; treat unchanged win rate as a measurement outcome, not an assumption.",
+        "Use strictly entry-time information; document the intrabar path assumption used for stop evaluation.",
+        "Confine all writes to bot/research/, bot/reports/research/, and experiments.sqlite; make no writes to bot/intel/ runtime state, and route any subsequent live-config cap change exclusively through research_promote_champion.py gates.",
+        "Fix the falsification criterion for the offline phase (e.g. negative or non-significant costed OOS expectancy) and record the experiment in ExperimentRegistry before running."
+      ],
+      "vote": "APPROVE_FOR_TEST"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "The evidence text and proposal are truncated.",
+        "A fixed $0.10 cap may be infeasible under observed spread, slippage, quote cadence, and broker-close latency.",
+        "The claim that unchanged win rate plus a lower loss cap flips PF above 1.0 is not demonstrated and may rely on retrospective optimization.",
+        "Exit changes require assessment of foregone winners, partial fills, stop execution gaps, and regime/symbol stratification.",
+        "No champion or execution configuration may be changed based on the replay alone."
+      ],
+      "confidence": 0.91,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "Offline replay is permissible and does not alter execution, but the proposed loss-cap hypothesis is unsupported without a fully specified, costed, time-ordered OOS methodology.",
+      "requested_revisions": [
+        "Specify the replay implementation, data fields, all-in cost model, and whether the cap is executable at observed quote resolution.",
+        "Pre-register candidate caps and use a chronological sealed holdout with no parameter selection on the holdout.",
+        "Report net expectancy, PF, tail loss, drawdown, win rate, trade count, confidence intervals, and results by regime/symbol.",
+        "Record the experiment in ExperimentRegistry and retain the rejected result if all gates do not pass.",
+        "Keep the work research-only; require governed promotion gates before any runtime or DEMO execution change."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "concerns": [
+        "Tightened stops may be more susceptible to slippage and spread in live execution compared to replay results.",
+        "Potential for increased scratch rate which could impact net profit after commissions/fees."
+      ],
+      "confidence": 0.95,
+      "model": null,
+      "reason": "The proposal is a data-driven hypothesis aimed at correcting negative expectancy in a high-win-rate system by tightening loss caps. Using an offline replay over 2,802 reconciled exits is a safe and statistically significant method for validation before any live exposure.",
+      "requested_revisions": [],
+      "vote": "APPROVE_FOR_TEST"
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Incomplete current evidence and unclear cost/slippage assumptions",
+        "No defined train/validation/holdout split or out-of-sample procedure",
+        "Loss-cap implementation and execution-timing assumptions are unspecified",
+        "Falsification criteria are too vague",
+        "Experiment registry and champion-promotion exclusion are not explicitly stated",
+        "Affected-file scope could permit unintended runtime changes"
+      ],
+      "confidence": 0.93,
+      "model": null,
+      "reason": "The proposal is research-only and does not present a safety violation, but the replay protocol is underspecified and the claim that a tightened loss cap will flip profit factor above 1.0 is unvalidated. It should not proceed without preregistered methodology and explicit safeguards against overfitting or unintended promotion.",
+      "requested_revisions": [
+        "Specify the exact replay algorithm, loss-cap levels, timing, spread, slippage, and other costs",
+        "Use a preregistered split with untouched sealed holdout data and report confidence intervals",
+        "Define quantitative pass/fail criteria before execution, including expectancy, profit factor, drawdown, and trade-count thresholds",
+        "Record the experiment and all failures in ExperimentRegistry",
+        "Guarantee no mt5.order_send calls, no live-config changes, and no champion promotion",
+        "Limit changes to research artifacts and provide a reproducible test command"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "timed out after 90s",
+      "status": "TIMEOUT",
+      "vote": null
+    }
+  ]
+}

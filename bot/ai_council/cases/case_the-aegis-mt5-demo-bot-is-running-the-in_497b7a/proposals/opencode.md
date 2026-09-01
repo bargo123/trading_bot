@@ -1,0 +1,1 @@
+Test session-specific validated-state confidence thresholds using sealed MT5 DEMO outcomes, with spread and slippage costs applied. Promote the change only if its sealed-holdout net expectancy exceeds the current gate while reducing invalidated entries by at least 10% without increasing maximum drawdown. Otherwise retain the existing validated-state gate unchanged.

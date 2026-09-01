@@ -1,0 +1,1205 @@
+{
+  "index": {
+    "path": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\analogue_index.json",
+    "provenance": "mt5_m1",
+    "outcome_unit": "pips",
+    "n": 9569
+  },
+  "overall": {
+    "n": 9569,
+    "n_wins": 4505,
+    "n_losses": 5017,
+    "win_rate": 0.4707910962483018,
+    "avg_win": 6.7222197558268375,
+    "avg_loss": -7.103308750249153,
+    "expectancy": -0.5594837496081193,
+    "profit_factor": 0.8497725697513534,
+    "net_pnl": -5353.7000000000935,
+    "payoff_ratio": 0.9463504955477335,
+    "breakeven_wr": 0.5137820769113758,
+    "wins_erased_by_average_loss": 1.0566909455901061,
+    "wins_erased_by_tail_loss": 13.284302394695532,
+    "tail_loss": 89.30000000000007,
+    "cosmetic_win_rate": false
+  },
+  "states": {
+    "states_with_min_sample": 41,
+    "runtime_eligible_states": 2,
+    "positive_expectancy_states": 14,
+    "best": [
+      {
+        "state": {
+          "regime": "range",
+          "structure": "retest",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 39,
+        "n_losses": 16,
+        "win_rate": 0.5897435897435898,
+        "expectancy_pips": 2.710256410256321,
+        "profit_factor": 1.9119930974977852,
+        "payoff_ratio": 1.330082154781068,
+        "avg_win": 9.634782608695655,
+        "avg_loss": -7.243750000000221,
+        "tail_loss": 33.09999999999924,
+        "mean_lower_95": -0.8218990719974073,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "retest",
+          "session": "newyork",
+          "side": "buy"
+        },
+        "n": 72,
+        "n_losses": 27,
+        "win_rate": 0.6111111111111112,
+        "expectancy_pips": 1.920833333333147,
+        "profit_factor": 1.893410852713059,
+        "payoff_ratio": 1.161865750528468,
+        "avg_win": 6.661363636363459,
+        "avg_loss": -5.733333333333542,
+        "tail_loss": 23.400000000000087,
+        "mean_lower_95": -0.3439800960655168,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "noise",
+          "structure": "none",
+          "session": "london",
+          "side": "buy"
+        },
+        "n": 37,
+        "n_losses": 14,
+        "win_rate": 0.6216216216216216,
+        "expectancy_pips": 1.699999999999916,
+        "profit_factor": 1.984350547730762,
+        "payoff_ratio": 1.2078655507926377,
+        "avg_win": 5.513043478260788,
+        "avg_loss": -4.564285714285802,
+        "tail_loss": 19.700000000000273,
+        "mean_lower_95": -0.400657252881514,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "retest",
+          "session": "asia",
+          "side": "sell"
+        },
+        "n": 50,
+        "n_losses": 25,
+        "win_rate": 0.48,
+        "expectancy_pips": 1.3920000000000243,
+        "profit_factor": 2.3058161350845086,
+        "payoff_ratio": 2.4018918073796964,
+        "avg_win": 5.120833333333286,
+        "avg_loss": -2.1319999999999055,
+        "tail_loss": 5.299999999999727,
+        "mean_lower_95": -0.049855079941085734,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "none",
+          "session": "asia",
+          "side": "sell"
+        },
+        "n": 759,
+        "n_losses": 344,
+        "win_rate": 0.5401844532279315,
+        "expectancy_pips": 1.3889328063241628,
+        "profit_factor": 1.591615691116252,
+        "payoff_ratio": 1.3354043847414407,
+        "avg_win": 6.9173170731707865,
+        "avg_loss": -5.179941860465067,
+        "tail_loss": 32.29999999999844,
+        "mean_lower_95": 0.7976918784585401,
+        "runtime_eligible": true
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "none",
+          "session": "asia",
+          "side": "sell"
+        },
+        "n": 674,
+        "n_losses": 308,
+        "win_rate": 0.5400593471810089,
+        "expectancy_pips": 0.85816023738875,
+        "profit_factor": 1.352919641222786,
+        "payoff_ratio": 1.144778157957742,
+        "avg_win": 6.091483516483514,
+        "avg_loss": -5.321103896103836,
+        "tail_loss": 46.10000000000003,
+        "mean_lower_95": 0.22758067729952702,
+        "runtime_eligible": true
+      },
+      {
+        "state": {
+          "regime": "noise",
+          "structure": "none",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 25,
+        "n_losses": 13,
+        "win_rate": 0.48,
+        "expectancy_pips": 0.7759999999999198,
+        "profit_factor": 1.217732884399526,
+        "payoff_ratio": 1.3192106247661533,
+        "avg_win": 9.041666666666584,
+        "avg_loss": -6.8538461538462325,
+        "tail_loss": 21.200000000001218,
+        "mean_lower_95": -3.4828779339090286,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "retest",
+          "session": "asia",
+          "side": "sell"
+        },
+        "n": 61,
+        "n_losses": 30,
+        "win_rate": 0.5081967213114754,
+        "expectancy_pips": 0.5950819672131658,
+        "profit_factor": 1.4265569917744312,
+        "payoff_ratio": 1.3805390242978368,
+        "avg_win": 3.916129032258089,
+        "avg_loss": -2.8366666666665883,
+        "tail_loss": 10.300000000000864,
+        "mean_lower_95": -0.4932529456588277,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "none",
+          "session": "london",
+          "side": "buy"
+        },
+        "n": 510,
+        "n_losses": 231,
+        "win_rate": 0.5411764705882353,
+        "expectancy_pips": 0.4049019607843699,
+        "profit_factor": 1.1255777183167295,
+        "payoff_ratio": 0.9420596120694367,
+        "avg_win": 6.706159420289921,
+        "avg_loss": -7.118614718614673,
+        "tail_loss": 36.70000000000062,
+        "mean_lower_95": -0.3597150688087126,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "noise",
+          "structure": "none",
+          "session": "london",
+          "side": "sell"
+        },
+        "n": 25,
+        "n_losses": 14,
+        "win_rate": 0.44,
+        "expectancy_pips": 0.24799999999992295,
+        "profit_factor": 1.0752427184465794,
+        "payoff_ratio": 1.3684907325683737,
+        "avg_win": 8.0545454545452,
+        "avg_loss": -5.885714285714224,
+        "tail_loss": 11.999999999999789,
+        "mean_lower_95": -3.287746475038097,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "none",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 576,
+        "n_losses": 294,
+        "win_rate": 0.484375,
+        "expectancy_pips": 0.1420138888888724,
+        "profit_factor": 1.0309590492771141,
+        "payoff_ratio": 1.0863869551522276,
+        "avg_win": 9.76344086021501,
+        "avg_loss": -8.987074829931963,
+        "tail_loss": 54.199999999999804,
+        "mean_lower_95": -1.0540115456519041,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "retest",
+          "session": "london",
+          "side": "buy"
+        },
+        "n": 81,
+        "n_losses": 37,
+        "win_rate": 0.5432098765432098,
+        "expectancy_pips": 0.09629629629619359,
+        "profit_factor": 1.0595419847327572,
+        "payoff_ratio": 0.8909784871616369,
+        "avg_win": 3.1545454545454423,
+        "avg_loss": -3.540540540540751,
+        "tail_loss": 14.900000000000091,
+        "mean_lower_95": -0.923843851120484,
+        "runtime_eligible": false
+      }
+    ],
+    "worst": [
+      {
+        "state": {
+          "regime": "range",
+          "structure": "breakout",
+          "session": "asia",
+          "side": "buy"
+        },
+        "n": 29,
+        "n_losses": 28,
+        "win_rate": 0.034482758620689655,
+        "expectancy_pips": -3.993103448275736,
+        "profit_factor": 0.01446808510638372,
+        "payoff_ratio": 0.4051063829787442,
+        "avg_win": 1.7000000000000348,
+        "avg_loss": -4.196428571428442,
+        "tail_loss": 16.700000000000603,
+        "mean_lower_95": -5.658439957796437,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "breakout",
+          "session": "asia",
+          "side": "sell"
+        },
+        "n": 29,
+        "n_losses": 26,
+        "win_rate": 0.10344827586206896,
+        "expectancy_pips": -6.772413793103455,
+        "profit_factor": 0.035363457760329065,
+        "payoff_ratio": 0.3064833005895185,
+        "avg_win": 2.400000000001038,
+        "avg_loss": -7.830769230769359,
+        "tail_loss": 23.900000000001143,
+        "mean_lower_95": -9.21336891402091,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "breakout",
+          "session": "newyork",
+          "side": "buy"
+        },
+        "n": 71,
+        "n_losses": 59,
+        "win_rate": 0.15492957746478872,
+        "expectancy_pips": -7.074647887324003,
+        "profit_factor": 0.10892318609188843,
+        "payoff_ratio": 0.5842243617655835,
+        "avg_win": 5.581818181817975,
+        "avg_loss": -9.554237288135626,
+        "tail_loss": 53.399999999999004,
+        "mean_lower_95": -9.998053794791854,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "breakout",
+          "session": "london",
+          "side": "buy"
+        },
+        "n": 101,
+        "n_losses": 101,
+        "win_rate": 0.0,
+        "expectancy_pips": -7.2465346534652,
+        "profit_factor": 0.0,
+        "payoff_ratio": null,
+        "avg_win": null,
+        "avg_loss": -7.2465346534652,
+        "tail_loss": 21.999999999999797,
+        "mean_lower_95": -8.204659865958215,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "breakout",
+          "session": "london",
+          "side": "sell"
+        },
+        "n": 32,
+        "n_losses": 29,
+        "win_rate": 0.09375,
+        "expectancy_pips": -7.943750000000002,
+        "profit_factor": 0.04507888805408992,
+        "payoff_ratio": 0.43576258452286915,
+        "avg_win": 3.9999999999995595,
+        "avg_loss": -9.179310344827543,
+        "tail_loss": 23.599999999999177,
+        "mean_lower_95": -10.445569774793285,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "breakout",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 38,
+        "n_losses": 34,
+        "win_rate": 0.10526315789473684,
+        "expectancy_pips": -8.92368421052638,
+        "profit_factor": 0.015960533952409917,
+        "payoff_ratio": 0.13566453859548427,
+        "avg_win": 1.3750000000001261,
+        "avg_loss": -10.135294117647147,
+        "tail_loss": 58.700000000000415,
+        "mean_lower_95": -13.054468406402197,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "breakout",
+          "session": "newyork",
+          "side": "buy"
+        },
+        "n": 83,
+        "n_losses": 80,
+        "win_rate": 0.03614457831325301,
+        "expectancy_pips": -11.756626506024054,
+        "profit_factor": 0.003370442242875527,
+        "payoff_ratio": 0.08987845981001406,
+        "avg_win": 1.099999999999805,
+        "avg_loss": -12.238749999999948,
+        "tail_loss": 60.40000000000045,
+        "mean_lower_95": -14.574208760738653,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "breakout",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 47,
+        "n_losses": 46,
+        "win_rate": 0.02127659574468085,
+        "expectancy_pips": -18.36170212765985,
+        "profit_factor": 0.02935552806208484,
+        "payoff_ratio": 1.3503542908559025,
+        "avg_win": 26.100000000000012,
+        "avg_loss": -19.3282608695655,
+        "tail_loss": 82.30000000000071,
+        "mean_lower_95": -24.11650071499635,
+        "runtime_eligible": false
+      }
+    ],
+    "all": [
+      {
+        "state": {
+          "regime": "range",
+          "structure": "retest",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 39,
+        "n_losses": 16,
+        "win_rate": 0.5897435897435898,
+        "expectancy_pips": 2.710256410256321,
+        "profit_factor": 1.9119930974977852,
+        "payoff_ratio": 1.330082154781068,
+        "avg_win": 9.634782608695655,
+        "avg_loss": -7.243750000000221,
+        "tail_loss": 33.09999999999924,
+        "mean_lower_95": -0.8218990719974073,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "retest",
+          "session": "newyork",
+          "side": "buy"
+        },
+        "n": 72,
+        "n_losses": 27,
+        "win_rate": 0.6111111111111112,
+        "expectancy_pips": 1.920833333333147,
+        "profit_factor": 1.893410852713059,
+        "payoff_ratio": 1.161865750528468,
+        "avg_win": 6.661363636363459,
+        "avg_loss": -5.733333333333542,
+        "tail_loss": 23.400000000000087,
+        "mean_lower_95": -0.3439800960655168,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "noise",
+          "structure": "none",
+          "session": "london",
+          "side": "buy"
+        },
+        "n": 37,
+        "n_losses": 14,
+        "win_rate": 0.6216216216216216,
+        "expectancy_pips": 1.699999999999916,
+        "profit_factor": 1.984350547730762,
+        "payoff_ratio": 1.2078655507926377,
+        "avg_win": 5.513043478260788,
+        "avg_loss": -4.564285714285802,
+        "tail_loss": 19.700000000000273,
+        "mean_lower_95": -0.400657252881514,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "retest",
+          "session": "asia",
+          "side": "sell"
+        },
+        "n": 50,
+        "n_losses": 25,
+        "win_rate": 0.48,
+        "expectancy_pips": 1.3920000000000243,
+        "profit_factor": 2.3058161350845086,
+        "payoff_ratio": 2.4018918073796964,
+        "avg_win": 5.120833333333286,
+        "avg_loss": -2.1319999999999055,
+        "tail_loss": 5.299999999999727,
+        "mean_lower_95": -0.049855079941085734,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "none",
+          "session": "asia",
+          "side": "sell"
+        },
+        "n": 759,
+        "n_losses": 344,
+        "win_rate": 0.5401844532279315,
+        "expectancy_pips": 1.3889328063241628,
+        "profit_factor": 1.591615691116252,
+        "payoff_ratio": 1.3354043847414407,
+        "avg_win": 6.9173170731707865,
+        "avg_loss": -5.179941860465067,
+        "tail_loss": 32.29999999999844,
+        "mean_lower_95": 0.7976918784585401,
+        "runtime_eligible": true
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "none",
+          "session": "asia",
+          "side": "sell"
+        },
+        "n": 674,
+        "n_losses": 308,
+        "win_rate": 0.5400593471810089,
+        "expectancy_pips": 0.85816023738875,
+        "profit_factor": 1.352919641222786,
+        "payoff_ratio": 1.144778157957742,
+        "avg_win": 6.091483516483514,
+        "avg_loss": -5.321103896103836,
+        "tail_loss": 46.10000000000003,
+        "mean_lower_95": 0.22758067729952702,
+        "runtime_eligible": true
+      },
+      {
+        "state": {
+          "regime": "noise",
+          "structure": "none",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 25,
+        "n_losses": 13,
+        "win_rate": 0.48,
+        "expectancy_pips": 0.7759999999999198,
+        "profit_factor": 1.217732884399526,
+        "payoff_ratio": 1.3192106247661533,
+        "avg_win": 9.041666666666584,
+        "avg_loss": -6.8538461538462325,
+        "tail_loss": 21.200000000001218,
+        "mean_lower_95": -3.4828779339090286,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "retest",
+          "session": "asia",
+          "side": "sell"
+        },
+        "n": 61,
+        "n_losses": 30,
+        "win_rate": 0.5081967213114754,
+        "expectancy_pips": 0.5950819672131658,
+        "profit_factor": 1.4265569917744312,
+        "payoff_ratio": 1.3805390242978368,
+        "avg_win": 3.916129032258089,
+        "avg_loss": -2.8366666666665883,
+        "tail_loss": 10.300000000000864,
+        "mean_lower_95": -0.4932529456588277,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "none",
+          "session": "london",
+          "side": "buy"
+        },
+        "n": 510,
+        "n_losses": 231,
+        "win_rate": 0.5411764705882353,
+        "expectancy_pips": 0.4049019607843699,
+        "profit_factor": 1.1255777183167295,
+        "payoff_ratio": 0.9420596120694367,
+        "avg_win": 6.706159420289921,
+        "avg_loss": -7.118614718614673,
+        "tail_loss": 36.70000000000062,
+        "mean_lower_95": -0.3597150688087126,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "noise",
+          "structure": "none",
+          "session": "london",
+          "side": "sell"
+        },
+        "n": 25,
+        "n_losses": 14,
+        "win_rate": 0.44,
+        "expectancy_pips": 0.24799999999992295,
+        "profit_factor": 1.0752427184465794,
+        "payoff_ratio": 1.3684907325683737,
+        "avg_win": 8.0545454545452,
+        "avg_loss": -5.885714285714224,
+        "tail_loss": 11.999999999999789,
+        "mean_lower_95": -3.287746475038097,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "none",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 576,
+        "n_losses": 294,
+        "win_rate": 0.484375,
+        "expectancy_pips": 0.1420138888888724,
+        "profit_factor": 1.0309590492771141,
+        "payoff_ratio": 1.0863869551522276,
+        "avg_win": 9.76344086021501,
+        "avg_loss": -8.987074829931963,
+        "tail_loss": 54.199999999999804,
+        "mean_lower_95": -1.0540115456519041,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "retest",
+          "session": "london",
+          "side": "buy"
+        },
+        "n": 81,
+        "n_losses": 37,
+        "win_rate": 0.5432098765432098,
+        "expectancy_pips": 0.09629629629619359,
+        "profit_factor": 1.0595419847327572,
+        "payoff_ratio": 0.8909784871616369,
+        "avg_win": 3.1545454545454423,
+        "avg_loss": -3.540540540540751,
+        "tail_loss": 14.900000000000091,
+        "mean_lower_95": -0.923843851120484,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "none",
+          "session": "asia",
+          "side": "buy"
+        },
+        "n": 859,
+        "n_losses": 430,
+        "win_rate": 0.49243306169965073,
+        "expectancy_pips": 0.015366705471412816,
+        "profit_factor": 1.0049847060156125,
+        "payoff_ratio": 1.0216156585974312,
+        "avg_win": 6.291489361702081,
+        "avg_loss": -6.158372093023341,
+        "tail_loss": 50.69999999999908,
+        "mean_lower_95": -0.6064379907642761,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "noise",
+          "structure": "none",
+          "session": "asia",
+          "side": "buy"
+        },
+        "n": 115,
+        "n_losses": 48,
+        "win_rate": 0.5739130434782609,
+        "expectancy_pips": 0.012173913043472703,
+        "profit_factor": 1.0044416243654801,
+        "payoff_ratio": 0.7305029995385312,
+        "avg_win": 4.796969696969751,
+        "avg_loss": -6.5666666666667535,
+        "tail_loss": 45.999999999999375,
+        "mean_lower_95": -1.526171884640919,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "none",
+          "session": "asia",
+          "side": "buy"
+        },
+        "n": 911,
+        "n_losses": 459,
+        "win_rate": 0.48957189901207465,
+        "expectancy_pips": -0.22579582875963228,
+        "profit_factor": 0.9258070333633809,
+        "payoff_ratio": 0.9527924401654525,
+        "avg_win": 5.7551569506725535,
+        "avg_loss": -6.040305010893212,
+        "tail_loss": 39.400000000000546,
+        "mean_lower_95": -0.792922552210654,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "none",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 670,
+        "n_losses": 325,
+        "win_rate": 0.5119402985074627,
+        "expectancy_pips": -0.24134328358208806,
+        "profit_factor": 0.9467005076142133,
+        "payoff_ratio": 0.8970194314128845,
+        "avg_win": 8.373469387755097,
+        "avg_loss": -9.334769230769222,
+        "tail_loss": 50.69999999999908,
+        "mean_lower_95": -1.2317440944011293,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "retest",
+          "session": "london",
+          "side": "buy"
+        },
+        "n": 88,
+        "n_losses": 49,
+        "win_rate": 0.4431818181818182,
+        "expectancy_pips": -0.34659090909096074,
+        "profit_factor": 0.7556089743589307,
+        "payoff_ratio": 0.949354865220195,
+        "avg_win": 2.4179487179485064,
+        "avg_loss": -2.5469387755101285,
+        "tail_loss": 7.699999999999374,
+        "mean_lower_95": -1.0152028152673898,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "none",
+          "session": "newyork",
+          "side": "buy"
+        },
+        "n": 753,
+        "n_losses": 372,
+        "win_rate": 0.5033200531208499,
+        "expectancy_pips": -0.39667994687911434,
+        "profit_factor": 0.9119710008251872,
+        "payoff_ratio": 0.8951272092532181,
+        "avg_win": 8.16490765171506,
+        "avg_loss": -9.121505376344034,
+        "tail_loss": 81.3999999999993,
+        "mean_lower_95": -1.3464577780963358,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "noise",
+          "structure": "none",
+          "session": "asia",
+          "side": "sell"
+        },
+        "n": 65,
+        "n_losses": 34,
+        "win_rate": 0.47692307692307695,
+        "expectancy_pips": -0.45384615384608745,
+        "profit_factor": 0.8117421825143826,
+        "payoff_ratio": 0.8902978775964195,
+        "avg_win": 4.103225806451654,
+        "avg_loss": -4.6088235294116755,
+        "tail_loss": 12.400000000001299,
+        "mean_lower_95": -2.0875785159673743,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "none",
+          "session": "london",
+          "side": "sell"
+        },
+        "n": 426,
+        "n_losses": 236,
+        "win_rate": 0.4413145539906103,
+        "expectancy_pips": -0.47981220657283014,
+        "profit_factor": 0.8627358807333135,
+        "payoff_ratio": 1.0830088715588402,
+        "avg_win": 6.833510638297841,
+        "avg_loss": -6.309745762711948,
+        "tail_loss": 23.700000000004273,
+        "mean_lower_95": -1.2709846517439325,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "none",
+          "session": "london",
+          "side": "buy"
+        },
+        "n": 489,
+        "n_losses": 237,
+        "win_rate": 0.5071574642126789,
+        "expectancy_pips": -0.5854805725971645,
+        "profit_factor": 0.8117933210623111,
+        "payoff_ratio": 0.7757863592409988,
+        "avg_win": 4.979435483870933,
+        "avg_loss": -6.418565400843902,
+        "tail_loss": 30.29999999999866,
+        "mean_lower_95": -1.2473242645800915,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "retest",
+          "session": "london",
+          "side": "sell"
+        },
+        "n": 59,
+        "n_losses": 34,
+        "win_rate": 0.4067796610169492,
+        "expectancy_pips": -0.6796610169493041,
+        "profit_factor": 0.723066298342482,
+        "payoff_ratio": 1.0243439226518496,
+        "avg_win": 4.362499999999681,
+        "avg_loss": -4.258823529411803,
+        "tail_loss": 20.0999999999965,
+        "mean_lower_95": -2.095609757830819,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "retest",
+          "session": "newyork",
+          "side": "buy"
+        },
+        "n": 78,
+        "n_losses": 45,
+        "win_rate": 0.4230769230769231,
+        "expectancy_pips": -0.7012820512822062,
+        "profit_factor": 0.7524886877827657,
+        "payoff_ratio": 1.0261209378855896,
+        "avg_win": 5.039393939393979,
+        "avg_loss": -4.911111111111409,
+        "tail_loss": 25.100000000000477,
+        "mean_lower_95": -2.663830242689879,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "retest",
+          "session": "london",
+          "side": "sell"
+        },
+        "n": 71,
+        "n_losses": 41,
+        "win_rate": 0.4225352112676056,
+        "expectancy_pips": -0.7084507042252003,
+        "profit_factor": 0.531657355679759,
+        "payoff_ratio": 0.7265983860956706,
+        "avg_win": 1.9033333333333606,
+        "avg_loss": -2.6195121951217084,
+        "tail_loss": 16.199999999999548,
+        "mean_lower_95": -1.4603153309197812,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "noise",
+          "structure": "none",
+          "session": "newyork",
+          "side": "buy"
+        },
+        "n": 29,
+        "n_losses": 16,
+        "win_rate": 0.4482758620689655,
+        "expectancy_pips": -0.7482758620689292,
+        "profit_factor": 0.8289992119779431,
+        "payoff_ratio": 1.0203067224343914,
+        "avg_win": 8.092307692307736,
+        "avg_loss": -7.93124999999997,
+        "tail_loss": 32.399999999999096,
+        "mean_lower_95": -4.733600390473519,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "none",
+          "session": "london",
+          "side": "sell"
+        },
+        "n": 434,
+        "n_losses": 246,
+        "win_rate": 0.42857142857142855,
+        "expectancy_pips": -0.8647465437788684,
+        "profit_factor": 0.772338489535927,
+        "payoff_ratio": 1.0214799377733226,
+        "avg_win": 6.84516129032253,
+        "avg_loss": -6.701219512195201,
+        "tail_loss": 25.800000000004708,
+        "mean_lower_95": -1.6759681635169295,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "retest",
+          "session": "asia",
+          "side": "buy"
+        },
+        "n": 69,
+        "n_losses": 41,
+        "win_rate": 0.4057971014492754,
+        "expectancy_pips": -0.9101449275364096,
+        "profit_factor": 0.5776731674511872,
+        "payoff_ratio": 0.8458785666249529,
+        "avg_win": 3.067857142857027,
+        "avg_loss": -3.626829268292903,
+        "tail_loss": 15.100000000005664,
+        "mean_lower_95": -2.0440604071314517,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "retest",
+          "session": "asia",
+          "side": "buy"
+        },
+        "n": 101,
+        "n_losses": 58,
+        "win_rate": 0.42574257425742573,
+        "expectancy_pips": -0.9574257425744167,
+        "profit_factor": 0.569456812110358,
+        "payoff_ratio": 0.7681045372651342,
+        "avg_win": 2.974418604650924,
+        "avg_loss": -3.8724137931035485,
+        "tail_loss": 11.399999999999011,
+        "mean_lower_95": -1.8433461308234445,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "retest",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 55,
+        "n_losses": 30,
+        "win_rate": 0.45454545454545453,
+        "expectancy_pips": -1.2927272727272587,
+        "profit_factor": 0.510667584308339,
+        "payoff_ratio": 0.612801101170007,
+        "avg_win": 2.9680000000001048,
+        "avg_loss": -4.843333333333395,
+        "tail_loss": 22.20000000000084,
+        "mean_lower_95": -2.8178708336639304,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "none",
+          "session": "newyork",
+          "side": "buy"
+        },
+        "n": 723,
+        "n_losses": 368,
+        "win_rate": 0.4854771784232365,
+        "expectancy_pips": -1.4497925311203308,
+        "profit_factor": 0.7321373811714195,
+        "payoff_ratio": 0.7675970264133402,
+        "avg_win": 8.162393162393144,
+        "avg_loss": -10.633695652173893,
+        "tail_loss": 89.30000000000007,
+        "mean_lower_95": -2.4795032253501508,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "breakout",
+          "session": "london",
+          "side": "sell"
+        },
+        "n": 45,
+        "n_losses": 34,
+        "win_rate": 0.24444444444444444,
+        "expectancy_pips": -1.6666666666667425,
+        "profit_factor": 0.5530393325387263,
+        "payoff_ratio": 1.709394300574245,
+        "avg_win": 8.436363636363668,
+        "avg_loss": -4.935294117647169,
+        "tail_loss": 20.399999999999306,
+        "mean_lower_95": -4.136293552665804,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "breakout",
+          "session": "asia",
+          "side": "buy"
+        },
+        "n": 32,
+        "n_losses": 30,
+        "win_rate": 0.0625,
+        "expectancy_pips": -3.446875000000001,
+        "profit_factor": 0.035839160839165635,
+        "payoff_ratio": 0.5375874125874845,
+        "avg_win": 2.050000000000285,
+        "avg_loss": -3.813333333333353,
+        "tail_loss": 27.200000000000557,
+        "mean_lower_95": -5.091228971590923,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "breakout",
+          "session": "london",
+          "side": "buy"
+        },
+        "n": 76,
+        "n_losses": 68,
+        "win_rate": 0.10526315789473684,
+        "expectancy_pips": -3.834210526315666,
+        "profit_factor": 0.1482022800350776,
+        "payoff_ratio": 1.2597193802981594,
+        "avg_win": 6.337499999999801,
+        "avg_loss": -5.030882352941015,
+        "tail_loss": 17.399999999999636,
+        "mean_lower_95": -5.205621666166319,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "breakout",
+          "session": "asia",
+          "side": "buy"
+        },
+        "n": 29,
+        "n_losses": 28,
+        "win_rate": 0.034482758620689655,
+        "expectancy_pips": -3.993103448275736,
+        "profit_factor": 0.01446808510638372,
+        "payoff_ratio": 0.4051063829787442,
+        "avg_win": 1.7000000000000348,
+        "avg_loss": -4.196428571428442,
+        "tail_loss": 16.700000000000603,
+        "mean_lower_95": -5.658439957796437,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "breakout",
+          "session": "asia",
+          "side": "sell"
+        },
+        "n": 29,
+        "n_losses": 26,
+        "win_rate": 0.10344827586206896,
+        "expectancy_pips": -6.772413793103455,
+        "profit_factor": 0.035363457760329065,
+        "payoff_ratio": 0.3064833005895185,
+        "avg_win": 2.400000000001038,
+        "avg_loss": -7.830769230769359,
+        "tail_loss": 23.900000000001143,
+        "mean_lower_95": -9.21336891402091,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "breakout",
+          "session": "newyork",
+          "side": "buy"
+        },
+        "n": 71,
+        "n_losses": 59,
+        "win_rate": 0.15492957746478872,
+        "expectancy_pips": -7.074647887324003,
+        "profit_factor": 0.10892318609188843,
+        "payoff_ratio": 0.5842243617655835,
+        "avg_win": 5.581818181817975,
+        "avg_loss": -9.554237288135626,
+        "tail_loss": 53.399999999999004,
+        "mean_lower_95": -9.998053794791854,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "breakout",
+          "session": "london",
+          "side": "buy"
+        },
+        "n": 101,
+        "n_losses": 101,
+        "win_rate": 0.0,
+        "expectancy_pips": -7.2465346534652,
+        "profit_factor": 0.0,
+        "payoff_ratio": null,
+        "avg_win": null,
+        "avg_loss": -7.2465346534652,
+        "tail_loss": 21.999999999999797,
+        "mean_lower_95": -8.204659865958215,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "breakout",
+          "session": "london",
+          "side": "sell"
+        },
+        "n": 32,
+        "n_losses": 29,
+        "win_rate": 0.09375,
+        "expectancy_pips": -7.943750000000002,
+        "profit_factor": 0.04507888805408992,
+        "payoff_ratio": 0.43576258452286915,
+        "avg_win": 3.9999999999995595,
+        "avg_loss": -9.179310344827543,
+        "tail_loss": 23.599999999999177,
+        "mean_lower_95": -10.445569774793285,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "range",
+          "structure": "breakout",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 38,
+        "n_losses": 34,
+        "win_rate": 0.10526315789473684,
+        "expectancy_pips": -8.92368421052638,
+        "profit_factor": 0.015960533952409917,
+        "payoff_ratio": 0.13566453859548427,
+        "avg_win": 1.3750000000001261,
+        "avg_loss": -10.135294117647147,
+        "tail_loss": 58.700000000000415,
+        "mean_lower_95": -13.054468406402197,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "breakout",
+          "session": "newyork",
+          "side": "buy"
+        },
+        "n": 83,
+        "n_losses": 80,
+        "win_rate": 0.03614457831325301,
+        "expectancy_pips": -11.756626506024054,
+        "profit_factor": 0.003370442242875527,
+        "payoff_ratio": 0.08987845981001406,
+        "avg_win": 1.099999999999805,
+        "avg_loss": -12.238749999999948,
+        "tail_loss": 60.40000000000045,
+        "mean_lower_95": -14.574208760738653,
+        "runtime_eligible": false
+      },
+      {
+        "state": {
+          "regime": "trend",
+          "structure": "breakout",
+          "session": "newyork",
+          "side": "sell"
+        },
+        "n": 47,
+        "n_losses": 46,
+        "win_rate": 0.02127659574468085,
+        "expectancy_pips": -18.36170212765985,
+        "profit_factor": 0.02935552806208484,
+        "payoff_ratio": 1.3503542908559025,
+        "avg_win": 26.100000000000012,
+        "avg_loss": -19.3282608695655,
+        "tail_loss": 82.30000000000071,
+        "mean_lower_95": -24.11650071499635,
+        "runtime_eligible": false
+      }
+    ]
+  },
+  "gap_to_100_per_day": {
+    "measured_expectancy_pips_per_trade": -0.5594837496081193,
+    "measured_profit_factor": 0.8497725697513534,
+    "measured_win_rate": 0.4707910962483018,
+    "measured_payoff_ratio": 0.9463504955477335,
+    "expectancy_usd_per_trade_at_0.01_lots": -0.05594837496081193,
+    "runtime_eligible_states": 2,
+    "note": "Measured expectancy is not positive, so there is no capital level or lot size at which this strategy family yields $100/day. Leverage multiplies a negative number. The gap is an EDGE gap, not a capital gap.",
+    "required_capital_for_100_per_day": "unavailable"
+  }
+}

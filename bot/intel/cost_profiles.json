@@ -1,0 +1,1204 @@
+{
+  "built_at": "2026-08-20T23:53:42.067812+00:00",
+  "min_observations": 30,
+  "rule": "validation_cost_pips = spread_p75 + slippage + commission; fallback = 2x config-bps spread + slippage + commission (conservative by design)",
+  "schema": "cost_profiles.v1",
+  "symbols": {
+    "AUDCAD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 28210,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 11912,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 0.6,
+          "spread_p90": 0.7,
+          "validation_cost_pips": 0.7
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 10408,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 0.6,
+          "spread_p90": 0.6,
+          "validation_cost_pips": 0.7
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 5890,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 0.6,
+          "spread_p90": 0.6,
+          "validation_cost_pips": 0.7
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.5,
+      "spread_p75": 0.6,
+      "spread_p90": 0.6,
+      "validation_cost_pips": 0.7
+    },
+    "AUDCHF": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 9715,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 5749,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.5,
+          "spread_p90": 3.5,
+          "validation_cost_pips": 0.6
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 2123,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 0.4,
+          "validation_cost_pips": 0.5
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 1843,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 0.4,
+          "validation_cost_pips": 0.5
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.4,
+      "spread_p75": 0.4,
+      "spread_p90": 1.1,
+      "validation_cost_pips": 0.5
+    },
+    "AUDJPY": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 16723,
+      "pip_size": 0.01,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 9408,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 0.7,
+          "spread_p90": 5.7,
+          "validation_cost_pips": 0.8
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 4518,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.5,
+          "spread_p90": 0.5,
+          "validation_cost_pips": 0.6
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 2797,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.5,
+          "spread_p90": 0.5,
+          "validation_cost_pips": 0.6
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.5,
+      "spread_p75": 0.6,
+      "spread_p90": 0.8,
+      "validation_cost_pips": 0.7
+    },
+    "AUDNZD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 12298,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 6467,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 0.8,
+          "spread_p90": 12.1,
+          "validation_cost_pips": 0.9
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 3421,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 0.4,
+          "validation_cost_pips": 0.5
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 2410,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 0.4,
+          "validation_cost_pips": 0.5
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.4,
+      "spread_p75": 0.5,
+      "spread_p90": 1.4,
+      "validation_cost_pips": 0.6
+    },
+    "AUDSGD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 33698,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 13689,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.7,
+          "spread_p75": 1.1,
+          "spread_p90": 1.6,
+          "validation_cost_pips": 1.2
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 13130,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.8,
+          "spread_p75": 0.9,
+          "spread_p90": 1.0,
+          "validation_cost_pips": 1.0
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 6879,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.8,
+          "spread_p75": 1.0,
+          "spread_p90": 1.1,
+          "validation_cost_pips": 1.1
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.7,
+      "spread_p75": 0.9,
+      "spread_p90": 1.2,
+      "validation_cost_pips": 1.0
+    },
+    "AUDUSD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 1682,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 1211,
+          "slippage_pips": 0.1,
+          "spread_p50": 1.6,
+          "spread_p75": 2.7,
+          "spread_p90": 4.0,
+          "validation_cost_pips": 2.8
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 162,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.1,
+          "spread_p75": 0.2,
+          "spread_p90": 0.2,
+          "validation_cost_pips": 0.3
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 309,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.1,
+          "spread_p75": 0.1,
+          "spread_p90": 0.2,
+          "validation_cost_pips": 0.2
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 1.0,
+      "spread_p75": 1.9,
+      "spread_p90": 3.6,
+      "validation_cost_pips": 2.0
+    },
+    "CADCHF": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 33235,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 13523,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.9,
+          "spread_p75": 1.0,
+          "spread_p90": 1.1,
+          "validation_cost_pips": 1.1
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 13084,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.8,
+          "spread_p75": 0.9,
+          "spread_p90": 0.9,
+          "validation_cost_pips": 1.0
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 6628,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.8,
+          "spread_p75": 0.9,
+          "spread_p90": 0.9,
+          "validation_cost_pips": 1.0
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.9,
+      "spread_p75": 0.9,
+      "spread_p90": 1.0,
+      "validation_cost_pips": 1.0
+    },
+    "CADJPY": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 33928,
+      "pip_size": 0.01,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 14172,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.7,
+          "spread_p75": 0.7,
+          "spread_p90": 1.0,
+          "validation_cost_pips": 0.8
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 12954,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.7,
+          "spread_p75": 0.7,
+          "spread_p90": 0.7,
+          "validation_cost_pips": 0.8
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 6802,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.7,
+          "spread_p75": 0.7,
+          "spread_p90": 0.7,
+          "validation_cost_pips": 0.8
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.7,
+      "spread_p75": 0.7,
+      "spread_p90": 0.8,
+      "validation_cost_pips": 0.8
+    },
+    "EURAUD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 15481,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 10934,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.6,
+          "spread_p75": 0.7,
+          "spread_p90": 1.4,
+          "validation_cost_pips": 0.8
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 2634,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 0.6,
+          "validation_cost_pips": 0.5
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 1913,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.5,
+          "spread_p90": 0.6,
+          "validation_cost_pips": 0.6
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.5,
+      "spread_p75": 0.6,
+      "spread_p90": 0.9,
+      "validation_cost_pips": 0.7
+    },
+    "EURCAD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 13335,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 9980,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 0.5,
+          "spread_p90": 0.9,
+          "validation_cost_pips": 0.6
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 2002,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 0.5,
+          "validation_cost_pips": 0.5
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 1353,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 0.5,
+          "validation_cost_pips": 0.5
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.5,
+      "spread_p75": 0.5,
+      "spread_p90": 0.6,
+      "validation_cost_pips": 0.6
+    },
+    "EURCHF": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 1744,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 1421,
+          "slippage_pips": 0.1,
+          "spread_p50": 6.3,
+          "spread_p75": 7.3,
+          "spread_p90": 7.8,
+          "validation_cost_pips": 7.4
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 155,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 0.4,
+          "validation_cost_pips": 0.5
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 168,
+          "slippage_pips": 0.1,
+          "spread_p50": 1.1,
+          "spread_p75": 1.4,
+          "spread_p90": 1.6,
+          "validation_cost_pips": 1.5
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 2.8,
+      "spread_p75": 7.1,
+      "spread_p90": 7.7,
+      "validation_cost_pips": 7.2
+    },
+    "EURGBP": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 2052,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 1784,
+          "slippage_pips": 0.1,
+          "spread_p50": 1.1,
+          "spread_p75": 2.2,
+          "spread_p90": 3.0,
+          "validation_cost_pips": 2.3
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 61,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.2,
+          "spread_p75": 0.3,
+          "spread_p90": 0.4,
+          "validation_cost_pips": 0.4
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 207,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.2,
+          "spread_p75": 0.9,
+          "spread_p90": 0.9,
+          "validation_cost_pips": 1.0
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.9,
+      "spread_p75": 2.0,
+      "spread_p90": 2.9,
+      "validation_cost_pips": 2.1
+    },
+    "EURJPY": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 11924,
+      "pip_size": 0.01,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 10644,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 1.1,
+          "validation_cost_pips": 0.5
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 799,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 0.5,
+          "validation_cost_pips": 0.5
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 481,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.5,
+          "spread_p90": 1.6,
+          "validation_cost_pips": 0.6
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.4,
+      "spread_p75": 0.4,
+      "spread_p90": 0.9,
+      "validation_cost_pips": 0.5
+    },
+    "EURNZD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 33306,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 14077,
+          "slippage_pips": 0.1,
+          "spread_p50": 1.0,
+          "spread_p75": 1.1,
+          "spread_p90": 2.2,
+          "validation_cost_pips": 1.2
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 12600,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.8,
+          "spread_p75": 0.9,
+          "spread_p90": 0.9,
+          "validation_cost_pips": 1.0
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 6629,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.8,
+          "spread_p75": 0.9,
+          "spread_p90": 0.9,
+          "validation_cost_pips": 1.0
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.9,
+      "spread_p75": 1.0,
+      "spread_p90": 1.1,
+      "validation_cost_pips": 1.1
+    },
+    "EURUSD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 1144,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 702,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 0.7,
+          "spread_p90": 1.0,
+          "validation_cost_pips": 0.8
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 197,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.0,
+          "spread_p75": 0.1,
+          "spread_p90": 0.1,
+          "validation_cost_pips": 0.2
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 245,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.0,
+          "spread_p75": 0.1,
+          "spread_p90": 0.1,
+          "validation_cost_pips": 0.2
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.1,
+      "spread_p75": 0.6,
+      "spread_p90": 0.7,
+      "validation_cost_pips": 0.7
+    },
+    "GBPAUD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 32876,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 13939,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.9,
+          "spread_p75": 1.0,
+          "spread_p90": 1.2,
+          "validation_cost_pips": 1.1
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 12072,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.8,
+          "spread_p75": 0.9,
+          "spread_p90": 0.9,
+          "validation_cost_pips": 1.0
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 6865,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.8,
+          "spread_p75": 0.9,
+          "spread_p90": 0.9,
+          "validation_cost_pips": 1.0
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.8,
+      "spread_p75": 0.9,
+      "spread_p90": 1.1,
+      "validation_cost_pips": 1.0
+    },
+    "GBPCAD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 31102,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 13742,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.6,
+          "spread_p75": 0.7,
+          "spread_p90": 1.1,
+          "validation_cost_pips": 0.8
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 11089,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.6,
+          "spread_p75": 0.6,
+          "spread_p90": 0.7,
+          "validation_cost_pips": 0.7
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 6271,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.6,
+          "spread_p75": 0.7,
+          "spread_p90": 0.7,
+          "validation_cost_pips": 0.8
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.6,
+      "spread_p75": 0.7,
+      "spread_p90": 0.7,
+      "validation_cost_pips": 0.8
+    },
+    "GBPCHF": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 15196,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 10859,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 0.5,
+          "spread_p90": 1.2,
+          "validation_cost_pips": 0.6
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 2411,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 0.5,
+          "validation_cost_pips": 0.5
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 1926,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.4,
+          "spread_p90": 0.5,
+          "validation_cost_pips": 0.5
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.5,
+      "spread_p75": 0.5,
+      "spread_p90": 0.8,
+      "validation_cost_pips": 0.6
+    },
+    "GBPJPY": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 33575,
+      "pip_size": 0.01,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 14365,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.8,
+          "spread_p75": 1.0,
+          "spread_p90": 1.6,
+          "validation_cost_pips": 1.1
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 12305,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.7,
+          "spread_p75": 0.8,
+          "spread_p90": 1.0,
+          "validation_cost_pips": 0.9
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 6905,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.7,
+          "spread_p75": 0.8,
+          "spread_p90": 0.9,
+          "validation_cost_pips": 0.9
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.8,
+      "spread_p75": 0.9,
+      "spread_p90": 1.1,
+      "validation_cost_pips": 1.0
+    },
+    "GBPNZD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 32530,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 13966,
+          "slippage_pips": 0.1,
+          "spread_p50": 1.0,
+          "spread_p75": 1.2,
+          "spread_p90": 2.8,
+          "validation_cost_pips": 1.3
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 12004,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.8,
+          "spread_p75": 0.9,
+          "spread_p90": 0.9,
+          "validation_cost_pips": 1.0
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 6560,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.8,
+          "spread_p75": 0.9,
+          "spread_p90": 0.9,
+          "validation_cost_pips": 1.0
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.9,
+      "spread_p75": 1.0,
+      "spread_p90": 1.3,
+      "validation_cost_pips": 1.1
+    },
+    "GBPUSD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 1421,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 1040,
+          "slippage_pips": 0.1,
+          "spread_p50": 1.1,
+          "spread_p75": 1.1,
+          "spread_p90": 1.1,
+          "validation_cost_pips": 1.2
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 179,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.0,
+          "spread_p75": 0.1,
+          "spread_p90": 0.1,
+          "validation_cost_pips": 0.2
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 202,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.0,
+          "spread_p75": 0.1,
+          "spread_p90": 0.1,
+          "validation_cost_pips": 0.2
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.8,
+      "spread_p75": 1.1,
+      "spread_p90": 1.1,
+      "validation_cost_pips": 1.2
+    },
+    "NZDJPY": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 28916,
+      "pip_size": 0.01,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 12463,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 0.6,
+          "spread_p90": 1.2,
+          "validation_cost_pips": 0.7
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 10727,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 0.5,
+          "spread_p90": 0.5,
+          "validation_cost_pips": 0.6
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 5726,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 0.5,
+          "spread_p90": 0.5,
+          "validation_cost_pips": 0.6
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.5,
+      "spread_p75": 0.5,
+      "spread_p90": 0.7,
+      "validation_cost_pips": 0.6
+    },
+    "NZDUSD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 1360,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 1086,
+          "slippage_pips": 0.1,
+          "spread_p50": 1.2,
+          "spread_p75": 1.2,
+          "spread_p90": 1.2,
+          "validation_cost_pips": 1.3
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 130,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.1,
+          "spread_p75": 0.1,
+          "spread_p90": 0.1,
+          "validation_cost_pips": 0.2
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 144,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.1,
+          "spread_p75": 0.1,
+          "spread_p90": 0.1,
+          "validation_cost_pips": 0.2
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 1.1,
+      "spread_p75": 1.2,
+      "spread_p90": 1.2,
+      "validation_cost_pips": 1.3
+    },
+    "USDCAD": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 1502,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 1018,
+          "slippage_pips": 0.1,
+          "spread_p50": 1.2,
+          "spread_p75": 1.2,
+          "spread_p90": 1.2,
+          "validation_cost_pips": 1.3
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 169,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.1,
+          "spread_p75": 0.1,
+          "spread_p90": 0.1,
+          "validation_cost_pips": 0.2
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 315,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.1,
+          "spread_p75": 0.1,
+          "spread_p90": 0.1,
+          "validation_cost_pips": 0.2
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 1.2,
+      "spread_p75": 1.2,
+      "spread_p90": 1.2,
+      "validation_cost_pips": 1.3
+    },
+    "USDCHF": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 1693,
+      "pip_size": 0.0001,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 1208,
+          "slippage_pips": 0.1,
+          "spread_p50": 1.2,
+          "spread_p75": 1.2,
+          "spread_p90": 1.2,
+          "validation_cost_pips": 1.3
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 263,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.1,
+          "spread_p75": 0.2,
+          "spread_p90": 0.2,
+          "validation_cost_pips": 0.3
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 222,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.1,
+          "spread_p75": 0.1,
+          "spread_p90": 0.2,
+          "validation_cost_pips": 0.2
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.6,
+      "spread_p75": 1.2,
+      "spread_p90": 1.2,
+      "validation_cost_pips": 1.3
+    },
+    "USDJPY": {
+      "commission_pips": 0.0,
+      "cost_source": "measured_p75",
+      "observations": 2428,
+      "pip_size": 0.01,
+      "sessions": {
+        "asia": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 2059,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.5,
+          "spread_p75": 1.5,
+          "spread_p90": 1.5,
+          "validation_cost_pips": 1.6
+        },
+        "london": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 120,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.2,
+          "spread_p75": 0.3,
+          "spread_p90": 0.3,
+          "validation_cost_pips": 0.4
+        },
+        "newyork": {
+          "commission_pips": 0.0,
+          "evidence_sufficient": true,
+          "fallback": null,
+          "observations": 249,
+          "slippage_pips": 0.1,
+          "spread_p50": 0.4,
+          "spread_p75": 0.5,
+          "spread_p90": 0.5,
+          "validation_cost_pips": 0.6
+        }
+      },
+      "slippage_pips": 0.1,
+      "spread_p50": 0.5,
+      "spread_p75": 1.5,
+      "spread_p90": 1.5,
+      "validation_cost_pips": 1.6
+    }
+  }
+}

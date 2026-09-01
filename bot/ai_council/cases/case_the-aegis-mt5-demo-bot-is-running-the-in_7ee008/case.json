@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T07:48:46.343292+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7ee008\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 31.55,
+          "finished_utc": "2026-08-23T07:57:57.673113+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T07:57:26.119760+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T07:57:57.673113+00:00",
+        "text": "The fixed abstention margin is a free parameter, and neither its value nor the tolerances defining \"comparable coverage\" or \"worsening drawdown\" are pre-registered, making the falsification clause unfalsifiable in practice and the whole comparison a garden of forking paths. Evaluating on sealed holdouts \"in the next walk-forward cycle\" is ambiguous between repeated peeking (which destroys their sealed status) and a single underpowered draw with no stated bootstrap CI, significance test, or minimum trade count for expectancy deltas that are noise-dominated after costs. Nothing specifies how the spread/slippage buffer is estimated\u2014static runner assumptions versus realized, session-dependent costs\u2014so the gate may simply memorize one cost regime and fail out-of-sample. It also omits the mandatory ExperimentRegistry entry and the governed promotion path (`promote.py` gates via `research_promote_champion.py`), leaving undefined what happens if the challenger \"passes.\""
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7ee008\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.68,
+          "finished_utc": "2026-08-23T07:57:26.102026+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T07:57:13.420036+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T07:57:26.102026+00:00",
+        "text": "The proposal risks severe selection and look-ahead bias: replaying skipped states through the champion\u2019s exit policy on demo bars, then selecting clusters that pass a bootstrap p05 threshold, reuses the champion and searches many clusters without an untouched holdout or multiple-testing correction. \u201cValidated states retain their edge\u201d and \u201cpositive bootstrap-p05\u201d are underspecified without a fixed time split, minimum trade independence, confidence procedure, and exact cost/slippage model; 500 shadow exits can still be highly correlated and nonrepresentative. It also treats the observed skip label as proof the narrow gate is correct, while the reported expectancy and 0.3-pip assumption are not independently validated against realistic fills, regime drift, or adverse selection."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T07:59:03.724541+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_d701ff",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_d701ff for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_7ee008",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7ee008\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 177.98,
+        "finished_utc": "2026-08-23T07:51:54.176732+00:00",
+        "mode": "REAL",
+        "model": "opencode/x-preview-f-free",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T07:48:56.196608+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T07:51:54.178741+00:00",
+      "text": "Measured evidence shows the validated-state gate is the system's dominant filter \u2014 16,261 of 20,573 scanned opportunities (79%) were skipped, with `state_not_in_validated_set` accounting for 100% of skips and only 2 of 43 shortlisted strategies surviving validation \u2014 yet admitted and exploration fires still realize negative expectancy (\u22120.012/trade, PF 0.77, avg loss \u22120.177 vs avg win 0.060, tail loss erasing ~20\u00d7 average win). Proposal: next cycle, build a research-only counterfactual shadow ledger that replays every `state_not_in_validated_set` skip through the champion's exit policy on demo bars and records its would-be net-of-cost outcome (at the runner's 0.3-pip cost assumption) in the ExperimentRegistry. Falsifiable prediction: if no skipped state-cluster (symbol \u00d7 session \u00d7 side) achieves positive bootstrap-p05 net expectancy over \u2265500 shadow exits while the two validated states retain their edge, the narrow gate is confirmed correct and coverage stays unchanged; if any cluster clears that bar, it enters as a challenger through the full `bot/aegis/research/promote.py` gate stack, never by editing the gate directly. Decision rule: adopt only if gate-plus-admissions beats gate-only portfolio expectancy by \u22650.01 per trade net of costs; otherwise record the rejection honestly in the registry and sealed-holdout log. This requires no live orders, no `allow_live` change, and no champion edit."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7ee008\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 10.23,
+        "finished_utc": "2026-08-23T07:56:47.698896+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T07:56:37.470810+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T07:56:47.698896+00:00",
+      "text": "Test a stricter, cost-aware validated-state gate that abstains unless the model\u2019s expected edge exceeds the measured spread/slippage buffer by a fixed margin. Evaluate it in the next walk-forward cycle against the current gate on sealed holdouts, recording net expectancy, drawdown, coverage, and calibration. The candidate is falsified if it does not improve net expectancy at comparable coverage without worsening drawdown."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7ee008\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 20.26,
+        "finished_utc": "2026-08-23T07:59:03.692469+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T07:58:43.434042+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T07:59:03.692469+00:00",
+      "text": "Before evaluation, register a single challenger specification with the ExperimentRegistry: abstain unless expected edge exceeds the all-in cost buffer by 0.25\u00d7 that buffer, with comparable coverage defined as within \u00b15 percentage points and worsening drawdown defined as more than 10% relative or 0.5R absolute. Estimate the buffer from realized, session- and volatility-stratified spread/slippage data in the training window, conservatively bounded by runner assumptions, then freeze it before the holdout. Run one pre-registered evaluation on the sealed holdout\u2014no interim peeking\u2014with a minimum of 200 eligible trades, paired bootstrap 95% confidence intervals for net-expectancy and drawdown deltas, and report coverage and calibration. The challenger is falsified unless the lower confidence bound for net-expectancy improvement is positive while both coverage and drawdown remain within those tolerances. If it passes, retain all records and submit it only through `research_promote_champion.py` and the `promote.py` gates; otherwise, keep it as a rejected challenger without promotion."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7ee008\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 45.71,
+        "finished_utc": "2026-08-23T07:58:43.412618+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T07:57:57.705121+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T07:58:43.412618+00:00",
+      "text": "Revised proposal: Build a research-only counterfactual shadow ledger that replays every `state_not_in_validated_set` skip strictly point-in-time (features computed only from bars available at each decision timestamp) through a champion whose parameters and validated-state set are frozen as-of a pre-declared cut date, with all cluster discovery done in-sample and the post-cut window sealed as an untouched holdout in `bot/research/sealed_holdouts.jsonl`. To control the ~dozens of simultaneous cluster tests (symbol \u00d7 session \u00d7 side), require in-sample stationary-block-bootstrap p05 net expectancy > 0 with Benjamini\u2013Hochberg FDR \u2264 0.10 across clusters, a minimum of 500 shadow exits per cluster after enforcing \u2265 one-session spacing between entries (reporting effective sample size, since raw counts overstate independence), and replication on the sealed holdout where the cluster's point estimate must exceed 0 with a 90% bootstrap interval excluding zero. Costs use the runner's 0.3-pip assumption only as a floor: fills are additionally priced from empirical demo spread distributions at the original skip timestamps (capturing session-dependent widening and adverse-selection timing) and stressed at 2\u00d7 and 3\u00d7, with adoption requiring positive expectancy under the median stress case. \"Validated states retain their edge\" is operationalized as their in-sample net expectancy falling within the 90% bootstrap interval of their trailing-window realized expectancy; if the validated states themselves degrade, the experiment is recorded as voided rather than read as evidence either way. The skip label itself is treated as a hypothesis, not proof of gate correctness: both outcomes \u2014 narrow-gate confirmation or a challenger cluster \u2014 are pre-registered in the ExperimentRegistry before any replay runs, any surviving challenger proceeds through the full `bot/aegis/research/promote.py` gate stack (never direct gate edits), and rejections are logged honestly with full metrics. This requires no live orders, no `allow_live` change, and no champion edit."
+    }
+  },
+  "status": "decided"
+}

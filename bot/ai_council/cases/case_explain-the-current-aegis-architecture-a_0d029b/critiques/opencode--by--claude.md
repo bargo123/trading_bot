@@ -1,0 +1,3 @@
+No proposal text came through — the message ends at the instructions, so there's nothing for me to attack. I checked `bot/reports/council/latest.md`: the last round (`analyze-the-current-mt5-demo-champion-us_1442e4`) is already `decided: defer_validation` with 5 proposals and 20 critiques recorded, and the summary file stores only counts, not bodies.
+
+Paste the proposal, or tell me which record in `bot/reports/council/live.jsonl` to pull, and I'll do the hostile pass on it.

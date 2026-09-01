@@ -1,0 +1,130 @@
+{
+  "created_utc": "2026-08-26T20:28:39.043648+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_984f33\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.76,
+          "finished_utc": "2026-08-26T20:32:40.963595+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-26T20:32:28.201834+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T20:32:40.967593+00:00",
+        "text": "This is an API compatibility error, not a research proposal, so it makes no measurable trading claim to evaluate. It lacks a reproducible request, provider documentation reference, fallback behavior, and validation that any replacement model preserves required safety and reliability constraints."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_984f33\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 9.31,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T20:32:50.288749+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-26T20:33:12.155990+00:00",
+    "decision": "no_change",
+    "evidence": {
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "DUPLICATE_FAILED_HYPOTHESIS"
+    },
+    "rationale": "REAL: candidate hypothesis overlaps prior record council_the-aegis-mt5-demo-bot-is-running-the-in_e0c7ed (queued, overlap 0.59); not re-tested"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_984f33",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_984f33\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.66,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T20:28:55.900882+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_984f33\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 14.72,
+        "finished_utc": "2026-08-26T20:29:23.160498+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T20:29:08.437110+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T20:29:23.162497+00:00",
+      "text": "Run a sealed-holdout study that raises the validated-state minimum sample threshold from its current value by 25% and compares net expectancy, drawdown, and trade count after identical spread/slippage costs. Accept the change only if holdout net expectancy improves by at least 10% without increasing maximum drawdown or reducing eligible trades by more than 30%. Otherwise retain the current gate unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_984f33\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 8.64,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T20:32:58.940139+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_984f33\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.14,
+        "finished_utc": "2026-08-26T20:33:12.107279+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T20:32:58.962751+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T20:33:12.109792+00:00",
+      "text": "Run the sealed-holdout study locally using a supported configured model or no external model dependency. Raise the validated-state minimum sample threshold by 25% and compare net expectancy, drawdown, and trade count under identical spread/slippage costs. Accept only if holdout net expectancy improves by at least 10%, maximum drawdown does not increase, and eligible trades decline by no more than 30%; otherwise retain the current gate."
+    }
+  },
+  "status": "decided"
+}

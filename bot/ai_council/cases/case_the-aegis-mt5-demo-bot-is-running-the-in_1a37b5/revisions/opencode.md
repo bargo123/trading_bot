@@ -1,0 +1,1 @@
+Test the stricter 60-second validated-state freshness rule using only supported, authenticated model endpoints. Compare sealed DEMO outcomes net of spread and slippage, requiring a lower adverse-exit rate with no reduction in net expectancy. Promote nothing unless results are statistically reproducible across two non-overlapping holdouts.

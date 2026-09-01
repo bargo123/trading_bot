@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T13:25:28.663592+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e1b934\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 33.04,
+          "finished_utc": "2026-08-23T13:30:27.288472+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T13:29:54.252619+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T13:30:27.288472+00:00",
+        "text": "The persistence filter as described smuggles lookahead risk: \"accepting a signal only when the state remains valid on the next bar\" must translate to a one-bar-delayed entry executed at t+1 prices with costs recomputed, yet the proposal never specifies this, so a naive implementation consumes future information to inflate expectancy. The success criteria are half-unmeasurable \u2014 \"\u226510% net expectancy improvement\" carries no significance test or minimum trade count (indistinguishable from fold noise), and \"without materially increasing drawdown\" defines no numeric bound, inviting post-hoc judgment calls dressed as pre-registration. Validation gaps: no fold count/walk-forward seeding specified, no multiple-comparison discipline if the threshold or filter parameters get revisited, and no commitment that the sealed holdout is touched exactly once \u2014 iterative re-checking burns the seal. Finally, \"candidate successful\" must not imply promotion: any pass must still traverse every gate in `promote.py`, an omission the proposal quietly leaves open."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e1b934\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 15.89,
+          "finished_utc": "2026-08-23T13:29:54.236924+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T13:29:38.349504+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T13:29:54.240483+00:00",
+        "text": "The six X/N combinations invite multiple-testing and data-mined selection, while \u201cheld-out trades\u201d is undefined and lacks a fixed temporal split, embargo, regime breakdown, or selection protocol. Logged close-level counterfactual profits cannot establish whether a trade reached 25%/50% of target within N minutes without complete intratrade paths, and may omit spread, slippage, overlap, and cancellation effects, making the replay unmeasurable or biased. \u201cBootstrap p05 > 0\u201d is underspecified and should account for clustered trades and multiplicity; the trading-book aggregate and *Mental Game* citation do not prove causality, though the stated promotion path avoids an immediate live-safety violation."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T13:31:20.824904+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_11a33e",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_11a33e for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_e1b934",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e1b934\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 187.96,
+        "finished_utc": "2026-08-23T13:28:46.397583+00:00",
+        "mode": "REAL",
+        "model": "opencode/x-preview-f-free",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T13:25:38.435784+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T13:28:46.403135+00:00",
+      "text": "**Proposal \u2014 time-based \"never-green\" exit study:** Measured evidence shows the dominant loss driver is payoff geometry, not entry selection: avg_win +0.060 vs avg_loss \u22120.177 (payoff ratio 0.34), SL closes at expectancy \u22120.55 each, manual closes (n=1928, PF 0.64) dragging the book to net E \u22120.012 / PF 0.77, while TP exits are strongly positive (+0.107), with 1,288 `never_green` flattens recorded. I propose one registered experiment (`ExperimentRegistry`) using the counterfactual policy profits already logged per close: replay the 2,518 exited rows walk-forward and test whether flattening any trade that has not reached X% of target (X \u2208 {25%, 50%}) within N minutes (N \u2208 {15, 30, 60}) beats the current exit policy net of costs on held-out trades only. Falsifiable success gate: challenger must raise out-of-sample aggregate expectancy above 0 and PF above 1.05 with bootstrap p05 > 0, then pass all `bot/aegis/research/promote.py` gates before any champion change; failure is recorded honestly and the idea is sealed. This mechanical cut-loss discipline is consistent with the corpus's *The Mental Game of Trading* (rule-based exits remove hope-driven holding), and touches no live YAML or code until promoted through the governed path."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e1b934\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.28,
+        "finished_utc": "2026-08-23T13:29:12.088760+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T13:28:58.804799+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T13:29:12.088760+00:00",
+      "text": "Test a research-only one-bar persistence filter after the validated-state gate, accepting a signal only when the state remains valid on the next bar. Register a walk-forward experiment using the existing spread/slippage assumptions and sealed holdout, with the candidate successful only if net expectancy improves by at least 10% without materially increasing drawdown. Reject it and leave the champion unchanged if that criterion fails."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e1b934\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 15.64,
+        "finished_utc": "2026-08-23T13:31:20.792764+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T13:31:05.156983+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T13:31:20.792764+00:00",
+      "text": "Test one pre-registered research-only one-bar persistence filter after the validated-state gate, with entry delayed to t+1 and execution at t+1 prices, recomputing spread/slippage costs and all outcomes without lookahead. Use five fixed, seeded walk-forward folds, require at least 200 aggregate trades, and declare success only if net expectancy improves by \u226510% with a paired block-bootstrap 95% confidence interval excluding zero and maximum drawdown increases by no more than 5% relative to the champion. The sealed holdout must remain untouched during development and be evaluated exactly once after the filter and criteria are frozen; any additional variants require separate registration and multiplicity correction. A passing result is only a challenger record and cannot change the champion unless every gate in `promote.py` passes."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_e1b934\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 37.84,
+        "finished_utc": "2026-08-23T13:31:05.141090+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T13:30:27.304313+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T13:31:05.141090+00:00",
+      "text": "**Revised Proposal \u2014 time-based \"never-green\" exit study:** Before replay, I will run a registered data-availability audit (`ExperimentRegistry`) confirming every exited trade has a complete intratrade price path with bid/ask quotes, so the 25%/50%-of-target-within-N-minutes condition is measurable from bars rather than inferred from close-level counterfactuals, with spread/slippage applied at each simulated flatten and overlapping positions handled explicitly; rows lacking full paths are dropped identically from both arms and exclusion counts reported. Evaluation uses a fixed temporal split \u2014 earliest 70% of trades by open time for development, latest 30% held out with a 7-day embargo \u2014 with results additionally broken down by regime buckets (trending vs. ranging, high vs. low volatility) instead of book-wide aggregates only. To control multiplicity, I pre-register one primary variant (flatten if MFE <50% of target within 30 minutes); the other five X/N cells are pre-declared sensitivity analyses evaluated under Holm correction, and the success gate applies to the primary cell alone: on held-out trades, day-clustered block bootstrap (\u22651,000 resamples) must show expectancy > 0 and PF > 1.05 with p05 > 0 after adjustment, followed by all `bot/aegis/research/promote.py` gates before any champion change. Failure is recorded honestly and the idea sealed. The *Mental Game* citation is retained purely as motivation, not as evidence of causality."
+    }
+  },
+  "status": "decided"
+}

@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-21T08:20:45.807387+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-21T08:25:13.593701+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_80a12c",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_80a12c for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_24711c",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_24711c\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 96.07,
+        "finished_utc": "2026-08-21T08:22:22.551948+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T08:20:46.484655+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T08:22:22.556955+00:00",
+      "text": "Run one pre-registered exit-research experiment (via `bot/aegis/research/exit_research.py` + ExperimentRegistry, no champion/code changes) testing whether capping per-trade tail loss at 0.5R and enforcing a minimum 2R reward-to-risk geometry flips the firehose's demo expectancy positive. Motivating evidence from today's measurements: `outcome_learning.json` shows a 67.8% win rate yet expectancy -0.0117 and PF 0.75, because avg_win (0.052) is only 0.33x avg_loss (-0.159), the 81 SL closes average -0.513 each, and a single 1.1 tail loss erases ~21 wins \u2014 precisely the high-hit-rate/negative-payoff trap *Trade Your Way to Financial Freedom* (Van K Tharp) dissects via R-multiple expectancy, and matching *The Ultimate Forex Trading System* (2021)'s rule that RR must be \u22651:2 to absorb inevitable stop-outs. Falsification test: replay the 2,461 reconciled demo exits through the capped-exit policy net of the runner's spread/slippage assumptions; the hypothesis is rejected if sealed-holdout expectancy remains \u2264 0 or PF \u2264 1.0 at n \u2265 500 exits, and any surviving challenger goes through every `promote.py` gate before ever being considered for champion status."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

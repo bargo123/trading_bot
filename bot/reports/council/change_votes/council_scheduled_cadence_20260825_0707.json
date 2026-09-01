@@ -1,0 +1,109 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_0707",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T07:12:44.750590+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_0707",
+    "current_evidence": "Proposal: Run an execution-fidelity audit of the validated-state gate using the existing journal plus outcome logs \u2014 join every closed trade to its firing-decision record and label it by (regime, structure, session, side), then compute costed expectancy separately for trades matching the two validat",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Proposal: Run an execution-fidelity audit of the validated-state gate using the existing journal plus outcome logs \u2014 join every closed trade to its firing-decision record and label it by (regime, structure, session, side), then compute costed expectancy separately for trades matching the two validated states (range/trend \u00d7 asia \u00d7 sell) versus all others. The measured evidence motivates exactly this: the failure audit shows the validated set contains only two asia-sell states (validate expectancy",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T07:07:56.564333+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Truncated problem/evidence fields (PF=None, EV=None, sentence cut at 'validate expectancy') leave the motivating claim unverifiable",
+        "Falsification criterion mismatches the mechanism: a read-only audit cannot be falsified by future exploration-trade PnL",
+        "affected_files includes bot/intel/, home of governed runtime artifacts; write scope must exclude intelligent_champion.json and any lifecycle/runtime files",
+        "No stated minimum sample size or uncertainty treatment; small-n buckets (validated vs non-validated) will produce noisy expectancy splits that could be over-read",
+        "Join fidelity unspecified: matching key between closed trades and firing-decision records, and how runner spread/slippage assumptions are applied, determine whether results are meaningful",
+        "No mention of ExperimentRegistry logging, which AGENTS.md requires for every experiment"
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "The core proposal is sound and safely scoped: a retrospective execution-fidelity audit joining the existing trade journal to firing-decision records, labeled by (regime, structure, session, side), with costed expectancy split between validated asia-sell states and all others. It is read-only analytics on already-recorded outcomes, touches no broker path, no live YAML, and no champion artifact. However, the submission has material defects: the 'current_evidence' field is truncated mid-sentence so the claimed motivating finding cannot be verified, the falsification criterion ('negative costed expectancy after exploration trades') describes a forward trading experiment rather than this retrospective audit and therefore does not actually falsify it, and 'affected_files: bot/intel/' is dangerously vague because bot/intel/ contains the governed intelligent_champion.json and runtime state that research processes must never write.",
+      "requested_revisions": [
+        "Restate the full evidence basis untruncated, including the actual counts and expectancy figures behind the claim that the validated set contains only two asia-sell states",
+        "Rewrite falsification criteria for the audit itself, e.g.: if validated-matching trades show costed expectancy statistically indistinguishable from non-matching trades (bootstrap CI overlapping zero), the validated-state gate provides no execution edge and the gate design is falsified",
+        "Restrict outputs to bot/reports/research/ plus an ExperimentRegistry entry; declare bot/intel/ strictly read-only for this experiment",
+        "Specify the exact join key (trade id / decision timestamp + symbol), dedup rules, and cost model source, confirming costs come from the runner's configured spread/slippage assumptions",
+        "Add per-bucket sample sizes and bootstrap confidence intervals; require a minimum n per bucket before any conclusion is drawn",
+        "Confirm explicitly the audit performs no mt5.order_send() call and no writes outside the declared report paths"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Proposal text and evidence are incomplete.",
+        "Decision-to-closed-trade linkage may be ambiguous or incomplete.",
+        "Tiny state-specific samples can create misleading expectancy estimates.",
+        "Cost/slippage assumptions and OOS split are unspecified.",
+        "Affected runtime intel/council paths create unnecessary risk for a research-only audit."
+      ],
+      "confidence": 0.86,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "A read-only execution-fidelity audit is appropriate, but the proposal is truncated and lacks a precise data-join definition, sample-size requirements, cost model, and safeguards against using audit findings to alter execution or champion state.",
+      "requested_revisions": [
+        "Provide the complete proposal and exact source schemas/keys used to join decisions and outcomes.",
+        "Make the audit read-only and write results only to governed research reports/experiment registry.",
+        "Specify minimum sample sizes, confidence intervals, cost assumptions, handling of unmatched records, and an OOS validation protocol.",
+        "Confirm no execution configuration, champion artifact, or broker position can be modified by the audit."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "No exact implementation files, data-join rules, sample sizes, or cost/slippage methodology are specified.",
+        "\"Exploration trades\" could imply broker execution by research or AI Council components, which is prohibited.",
+        "No explicit ExperimentRegistry requirement or baseline pass-count requirement is included.",
+        "The two validated states and acceptance thresholds are not precisely defined.",
+        "No leakage, missing-record, duplicate-join, or out-of-sample handling is specified."
+      ],
+      "confidence": 0.97,
+      "model": null,
+      "reason": "The audit is research-appropriate in principle, but the proposal lacks sufficient operational detail and leaves execution boundaries ambiguous. It must demonstrate read-only research behavior, governed DEMO-only execution if exploration trades are involved, and complete experiment recording before testing.",
+      "requested_revisions": [
+        "Specify exact files and implement the audit as read-only; prohibit mt5.order_send() in bot/intel and bot/ai_council.",
+        "If trades are executed, require the existing broker-paper runner only, with all DEMO and fail-closed gates verified and exactly one execution owner.",
+        "Define the validated states, join keys, inclusion/exclusion rules, sample-size requirements, and net spread/slippage assumptions.",
+        "Register the experiment in ExperimentRegistry and preserve rejected results without champion promotion or live-config changes.",
+        "Add leakage, missing-journal, duplicate-join, and OOS validation tests, and report pytest baseline and post-change pass counts.",
+        "Define quantitative pass/fail and falsification thresholds for costed expectancy and a clear rollback procedure."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Test a stricter validated-state entry rule requiring two consecutive consistent state classifications before an order is eligible. Compare it with the current rule on sealed historical sessions, net of configured spread and slippage, and reject it unless it improves out-of-sample expectancy while preserving or reducing maximum drawdown.

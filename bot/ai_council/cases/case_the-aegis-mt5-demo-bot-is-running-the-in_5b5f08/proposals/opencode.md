@@ -1,0 +1,1 @@
+Test whether a time-based exit at 12 completed M5 bars improves net expectancy versus the current exit logic on the sealed holdout. Require identical entries, validated-state gating, and configured spread/slippage; accept only if net expectancy improves with no increase in maximum drawdown or losing-streak length. Record the experiment and retain the incumbent if any gate fails.

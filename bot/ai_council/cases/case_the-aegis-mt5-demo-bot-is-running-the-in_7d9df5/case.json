@@ -1,0 +1,116 @@
+{
+  "created_utc": "2026-08-23T14:32:08.542715+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7d9df5\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 35.72,
+          "finished_utc": "2026-08-23T14:38:35.462468+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T14:37:59.742489+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T14:38:35.462468+00:00",
+        "text": "The 15% ATR cost-abstention threshold is asserted, never derived\u2014no pre-registration or sensitivity analysis, so it reads like a knob tuned on data overlapping the evaluation splits, and any post-hoc adjustment after seeing walk-forward results is leakage. Comparing expectancy between a strategy that abstains and one that doesn't is apples-to-oranges: fewer trades means higher-variance expectancy that can clear a 20% bar by luck, yet there's no minimum-trade-count floor, no significance test, no multiple-testing control, and \"no worse max drawdown\" with zero tolerance is a brittle knife-edge criterion. Nothing specifies the sealed holdout is one-shot; repeated challengers knocking on the same holdout guarantee eventual promotion of noise via selection bias. Finally, the proposal omits whether the challenger runs through every gate in `promote.py` and gets an `ExperimentRegistry` entry regardless of verdict\u2014without those, the \"record it\" promise is unverifiable."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7d9df5\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 15.19,
+          "finished_utc": "2026-08-23T14:37:59.724348+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T14:37:44.536532+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T14:37:59.725974+00:00",
+        "text": "The proposed 2\u20133\u00d7 cap is tuned directly from the observed average win and tail-loss outcomes, creating substantial overfitting and potential label leakage; replaying the same exit window is not independent validation. The experiment is not reproducible without specifying the time-stop rule, intratrade price path, fill model, and treatment of existing manual/SL/TP exits\u2014exit timestamps alone cannot establish whether the new stops would have triggered. A single PF \u22651.0 and win-rate threshold also ignores regime stability, uncertainty, drawdown, sample-size effects, and multiple-testing risk; citing trading books is not validation."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T14:39:15.309029+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_c44fe2",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 1,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_c44fe2 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_7d9df5",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7d9df5\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 257.55,
+        "finished_utc": "2026-08-23T14:36:38.232639+00:00",
+        "mode": "REAL",
+        "model": "opencode/x-preview-f-free",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T14:32:20.686370+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T14:36:38.234642+00:00",
+      "text": "Proposal: The dominant measured failure is exit geometry, not entry selection \u2014 across 2,518 reconciled demo exits the bot wins 67.5% of trades yet runs PF 0.77 with expectancy -0.012 because average loss (-0.177) is ~2.9x average win (+0.060), SL closes cost -0.55 each, and manual flattens (76% of exits) bleed -0.013/trade while TP closes earn +0.107. I propose one exit_research experiment: add a hard per-trade invalidation stop capped at ~2-3x current average win (plus a time-stop replacing open-ended manual holds), replayed over the same reconciled-exit window net of the runner's spread/slippage assumptions, logged in ExperimentRegistry as a challenger to the existing exit policy. Falsifiable prediction: loss-capped exits raise portfolio profit factor from 0.77 to >=1.0 without dropping win rate below 55%, driven mainly by cutting the tail_loss bucket (currently 1.21 max, erasing ~20 average wins). If PF stays below 1.0 on the sealed holdout after costs, the challenger is rejected and recorded, and no promotion occurs. This follows the stop-discipline emphasis in \"Systematic Trading\" and the range-trade loss-control passages in \"Trading Price Action Ranges\"; it changes nothing in the champion or validated-state gate until every promote gate passes."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7d9df5\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 18.09,
+        "finished_utc": "2026-08-23T14:37:21.338217+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T14:37:03.247469+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T14:37:21.340216+00:00",
+      "text": "Test a research-only challenger that abstains when live spread plus modeled slippage exceeds 15% of the signal\u2019s ATR, even when the validated-state gate passes. Compare it with the current champion using identical walk-forward splits and a sealed holdout, net of runner costs. Accept the candidate only if holdout net expectancy improves by at least 20% with no worse maximum drawdown; otherwise reject and record it."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7d9df5\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 26.19,
+        "finished_utc": "2026-08-23T14:39:01.689171+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T14:38:35.495628+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T14:39:01.698594+00:00",
+      "text": "Revised proposal: The dominant measured failure is exit geometry \u2014 across 2,518 reconciled demo exits the bot wins 67.5% of trades yet runs PF 0.77 because average loss (-0.177) is ~2.9x average win (+0.060). I propose an exit_research challenger that adds a hard invalidation stop and a fixed time-stop (exit after N bars if neither stop nor target is hit, N specified in the registered spec), evaluated by replaying intrabar high/low price paths so trigger timing is deterministic; existing manual/SL/TP closes are replaced by the new policy, fills are modeled conservatively at stop level plus the runner's spread/slippage, and all cap/time-stop parameters are selected only on a training split strictly preceding the evaluation window. Rather than a single tuned cap, I run a pre-registered grid (e.g., 1.5x\u20134x average win \u00d7 several horizons) on the training split, then apply the entire grid frozen to a disjoint sealed holdout, promoting at most one challenger only if the improvement holds across neighboring parameter values (robustness plateau) rather than a single point. Falsifiable prediction: holdout PF >= 1.0 with win rate >= 55%, with uncertainty quantified by bootstrap CIs (lower CI bound of PF delta > 0), no material drawdown worsening, and sufficient holdout sample (pre-registered minimum n), reported per regime bucket to check stability. If any gate fails, the challenger is recorded as rejected in ExperimentRegistry with full results, counting this as one entry against a tracked multiple-testing budget across exit experiments, and no promotion occurs until every promote.py gate passes."
+    }
+  },
+  "status": "decided"
+}

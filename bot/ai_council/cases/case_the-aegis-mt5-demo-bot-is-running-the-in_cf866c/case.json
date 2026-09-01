@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T05:51:09.374491+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_cf866c\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.58,
+          "finished_utc": "2026-08-24T05:52:41.470921+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T05:52:29.894008+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T05:52:41.486632+00:00",
+        "text": "Volatility-normalized costs and regime-stability thresholds invite parameter mining unless fixed from prior, disjoint data and tied to executable spread/slippage observations. A single time-split holdout is insufficient to substantiate a 10% improvement claim; require multiple walk-forward folds, confidence intervals, and a significance test. The proposal omits sample-size, turnover, and state-transition safety checks, so coverage and drawdown limits could mask fragile behavior or validation leakage."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_cf866c\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.2,
+          "finished_utc": "2026-08-24T05:52:29.885541+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T05:52:18.688196+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T05:52:29.885541+00:00",
+        "text": "Using the sealed holdout to choose or accept the 0.65 threshold leaks evaluation data and risks overfitting; the threshold must be fixed before a fresh holdout test. \u201cModel confidence\u201d needs a defined, calibrated measurement, and \u201cnet expectancy improves\u201d must include uncertainty/significance and a predeclared horizon, not just a point estimate. The proposal also omits mandatory experiment-registry recording and does not specify how trade-count, spread/slippage, and every promotion gate will be independently audited without touching live configuration."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T05:53:12.131869+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_3000b3",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_3000b3 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_cf866c",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_cf866c\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 9.86,
+        "finished_utc": "2026-08-24T05:51:28.643771+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T05:51:18.780236+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T05:51:28.643771+00:00",
+      "text": "Test a stricter entry-confidence threshold: require model confidence of at least 0.65 before a DEMO signal is eligible for evaluation. Compare it with the current threshold on the same sealed holdout, net of the configured spread and slippage. Accept it only if net expectancy improves while trade count remains at least 70% of baseline and no promotion gate regresses; otherwise retain the current rule."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_cf866c\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.68,
+        "finished_utc": "2026-08-24T05:51:53.796326+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T05:51:41.113785+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T05:51:53.796326+00:00",
+      "text": "Test a research-only challenger that adds a volatility-normalized spread/slippage and regime-stability filter to the validated-state gate. Keep the champion unchanged and evaluate it on a time-split sealed holdout, net of existing costs. Reject it unless it improves net expectancy by at least 10% without worsening maximum drawdown or trade coverage by more than 5%; otherwise retain the current champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_cf866c\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.14,
+        "finished_utc": "2026-08-24T05:53:12.099928+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T05:53:00.959292+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T05:53:12.099928+00:00",
+      "text": "Test a research-only challenger with volatility-normalized spread/slippage and regime-stability thresholds fixed from prior, disjoint data and calibrated only to executable spread/slippage observations; leave the current champion unchanged. Evaluate it net of existing costs across multiple time-ordered walk-forward folds and a sealed holdout, reporting fold-level confidence intervals and a prespecified significance test for net expectancy. Require adequate minimum sample size per fold and regime, turnover bounds, no validation leakage, and state-transition safety checks. Reject the challenger unless it delivers a statistically supported net-expectancy improvement of at least 10% while maximum drawdown and trade coverage worsen by no more than 5% and all safety gates pass; otherwise retain the champion."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_cf866c\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 19.45,
+        "finished_utc": "2026-08-24T05:53:00.951524+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T05:52:41.502365+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T05:53:00.953532+00:00",
+      "text": "Pre-register a calibrated confidence threshold of 0.65, confidence definition, and evaluation horizon; select it using training and validation data only, then test it once on a fresh sealed holdout. Record the experiment and all parameters in `ExperimentRegistry`, with net expectancy evaluated after the existing configured spread and slippage assumptions and accompanied by a predeclared uncertainty/significance assessment. Independently audit baseline-relative trade count (minimum 70%), cost application, and every promotion gate using research-only configuration and artifacts, without modifying live YAML. Accept only if all predeclared criteria pass; otherwise retain the current rule and record the rejected challenger."
+    }
+  },
+  "status": "decided"
+}

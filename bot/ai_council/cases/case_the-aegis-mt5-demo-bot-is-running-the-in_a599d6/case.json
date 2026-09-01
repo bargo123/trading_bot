@@ -1,0 +1,235 @@
+{
+  "created_utc": "2026-08-22T09:12:34.559049+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 45.77,
+          "finished_utc": "2026-08-22T09:18:32.136901+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T09:17:46.365514+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T09:18:32.138651+00:00",
+        "text": "This proposal burns the sealed holdout as a selection criterion: making the accept/reject call directly against it contaminates it for future challengers, and with no stated sample-size floor, confidence intervals, or multiple-comparison control, a 5% profit-factor edge could be noise from a handful of trades. Key terms are unmeasurable as written \u2014 \"raises the threshold by 10%\" (relative to what baseline; per-strategy or global?) and \"increasing maximum drawdown\" (which drawdown definition, and with zero tolerance?) \u2014 leaving acceptance undecidable. Validation is missing: no walk-forward/in-sample gate before touching the holdout, no re-measurement of champion baselines under identical conditions rather than reusing stale metrics, and no sensitivity check on why 10% is the right shift versus a swept parameter. Finally, the bespoke acceptance rule bypasses governance: promotion must run every gate in `bot/aegis/research/promote.py` via `research_promote_champion.py`, not a council member's improvised criteria."
+      },
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\critiques\\codex--by--gemini.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 9.59,
+          "finished_utc": "2026-08-22T09:18:41.750810+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "Google",
+          "returncode": 0,
+          "started_utc": "2026-08-22T09:18:32.158463+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T09:18:41.750810+00:00",
+        "text": "The proposal risks overfitting by burning a sealed holdout on a trivial 10% parameter nudge, effectively treating validation data as a training signal for a greedy local search. It lacks any sensitivity analysis or regime-specific justification, leaving the trade-off between a 20% volume reduction and profit factor gains statistically unvalidated against tail-risk variance. Furthermore, the arbitrary threshold increase fails to address the underlying quality of the \"validated states,\" potentially masking deteriorating execution edge with simple result filtering."
+      }
+    ],
+    "gemini": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\critiques\\gemini--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 42.85,
+          "finished_utc": "2026-08-22T09:17:34.499406+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T09:16:51.651170+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T09:17:34.510681+00:00",
+        "text": "The \"3.0\u00d7\" multiplier is a magic number with no stated provenance \u2014 no sensitivity analysis, no walk-forward estimate of the threshold itself, so it will be tuned until one state crosses p05 > 0, which is textbook multiple-comparison leakage into `validated_states.json`. The falsifiability criterion is nearly vacuous: demanding *at least one* validated state from a firehose generating dozens of candidate configurations guarantees a lucky survivor under null conditions, and \"zero validated states\" may simply mean there is no edge after costs \u2014 the proposal presumes the opposite without evidence. It never specifies the evaluation protocol (data window, out-of-sample holdout, whether the spread is measured at simulated decision time or looked ahead, stop-loss symmetry \u2014 a 3\u00d7-spread target with tight stops still bleeds on stop-outs) and cites Ed Ponsi instead of any measurement from this system. Finally, it omits the non-negotiable governance steps: no ExperimentRegistry entry, no run through every `promote.py` gate before anything touches champion artifacts \u2014 as written, this proposal is not executable under council rules."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\critiques\\gemini--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.83,
+          "finished_utc": "2026-08-22T09:17:46.349799+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T09:17:34.515085+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T09:17:46.349799+00:00",
+        "text": "The 3\u00d7 spread threshold is an arbitrary, likely overfit cutoff with no out-of-sample, walk-forward, or sensitivity analysis across regimes and brokers. Requiring one validated state next cycle invites multiple-testing and selection bias; it does not demonstrate durable portfolio-level improvement and omits slippage, commissions, fill probability, sample-size requirements, and sealed-holdout validation. Invoking Ponsi does not empirically justify the multiplier, and any implementation must remain research-only, be registered, and avoid modifying protected live configuration or enabling trades."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\critiques\\opencode--by--gemini.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 9.78,
+          "finished_utc": "2026-08-22T09:16:38.464762+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "Google",
+          "returncode": 0,
+          "started_utc": "2026-08-22T09:16:28.682809+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T09:16:38.464762+00:00",
+        "text": "The grid-search for k-multipliers across the same IS/OOS split is a textbook case of p-hacking historical noise that will inevitably fail to generalize. Demanding a win rate above 85% while simultaneously slashing average loss by over 70% is mathematically delusional, as the current performance profile suggests the win rate is entirely dependent on allowing trades to drift deep into negative territory. Furthermore, the proposal ignores how hard-stop execution in tail events suffers from non-linear slippage and spread expansion, making the \"net-of-costs\" expectancy calculation a purely theoretical exercise that lacks real-world validation."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 13.14,
+          "finished_utc": "2026-08-22T09:16:51.635105+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T09:16:38.493933+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T09:16:51.635105+00:00",
+        "text": "Selecting \\(k\\) on the sealed holdout contaminates it; choose the stop using IS only, validate once on OOS, and reserve the sealed holdout for a single untouched final evaluation with multiple-testing correction. The break-even loss target assumes the 95.7% hit rate and win distribution remain unchanged after truncating losses, while the 85% win-rate floor is arbitrary and may favor the same cosmetic metric being criticized. One tail event is too little evidence to establish a stable tail-loss mechanism, so confidence intervals, trade counts, regime sensitivity, and drawdown/tail-risk gates are missing despite the otherwise compliant research-only safeguards."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T09:19:52.146489+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_14f4b9",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 6,
+      "n_proposals": 3,
+      "n_revisions": 3,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_14f4b9 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_a599d6",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 128.98,
+        "finished_utc": "2026-08-22T09:14:58.885450+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T09:12:49.910407+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T09:14:58.885450+00:00",
+      "text": "Proposal: Test a hard tail-loss cap as a challenger exit for CORE_STRATEGY_V1 in the next cycle: grid-search a maximum-loss stop at k \u00d7 the current TP distance (k \u2208 {5, 10, 15, 20}) plus an ATR-scaled variant, replayed through `exit_research` on the same IS/OOS split and then the sealed holdout, net of runner spread/slippage. The measured case for it is unambiguous \u2014 the champion's 95.7% win rate is cosmetic because avg_win is 0.031R while avg_loss is \u22122.57R (PF 0.27, expectancy \u22120.027R), and the reconciled demo exits show one tail loss erases ~20 average wins (`outcome_learning`, cosmetic_win_rate=False); break-even requires cutting avg_loss to \u2264 ~0.7R at the current hit rate. Falsification criterion: if no k in the grid lifts holdout net-of-costs expectancy above 0 R and PF above 1.0 without dropping win rate below 85%, the tail-stop hypothesis is rejected and recorded via ExperimentRegistry, with the challenger kept on record and never promoted unless all `promote.py` gates pass. This is consistent with the corpus's expectancy/R-multiple framing (\"Trade Your Way to Financial Freedom\") and its tail-risk emphasis (\"Stock Market Wizards\"). No live trading, config, or champion changes involved \u2014 research-only."
+    },
+    {
+      "agent": "gemini",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\proposals\\gemini.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 33.41,
+        "finished_utc": "2026-08-22T09:15:38.197967+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "Google",
+        "returncode": 0,
+        "started_utc": "2026-08-22T09:15:04.787075+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T09:15:38.197967+00:00",
+      "text": "The current MT5 DEMO intelligent firehose suffers from a \"cost mirage\" where signal expectancy is subsumed by the 2.6-pip SupremeFX spread, resulting in zero validated states. I propose implementing a dynamic entry filter that requires a minimum projected profit target of 3.0 times the current measured bid/ask spread to ensure alpha clears execution costs. This improvement is falsifiable: the next research cycle must produce at least one entry in `validated_states.json` with a cost-adjusted bootstrap p05 greater than zero. This aligns with Ed Ponsi\u2019s requirement in *Forex Patterns & Probabilities* that price targets must be large enough to cover the spread to maintain a viable edge."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 15.38,
+        "finished_utc": "2026-08-22T09:16:02.834608+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T09:15:47.453729+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T09:16:02.846512+00:00",
+      "text": "Test a challenger that raises the validated-state minimum expected-value threshold by 10% while leaving all other logic unchanged. Register the experiment and evaluate it on the sealed holdout with identical spread/slippage assumptions. Accept the candidate only if net profit factor improves by at least 5% without reducing trade count by more than 20% or increasing maximum drawdown; otherwise reject it and retain the champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 14.67,
+        "finished_utc": "2026-08-22T09:19:52.122268+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T09:19:37.452503+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T09:19:52.122268+00:00",
+      "text": "Register a pre-specified experiment that compares the current global validated-state minimum expected-value threshold with a sensitivity grid of relative shifts, including +10%, using training and walk-forward validation only, with identical spread/slippage assumptions and freshly re-measured champion metrics. Advance one locked challenger only if it has a regime-justified rationale, meets a predeclared minimum trade count, shows uncertainty-adjusted improvement after multiple-comparison correction, and does not materially worsen a precisely defined peak-to-trough equity maximum drawdown or tail-risk metrics. Evaluate that single frozen challenger once on the sealed holdout as a confirmation gate, recording the result without using the holdout to tune or select another threshold. Any promotion must run through `bot/scripts/research_promote_champion.py` and pass every gate in `bot/aegis/research/promote.py`; otherwise record the rejection and leave the champion unchanged."
+    },
+    "gemini": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\revisions\\gemini.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 16.66,
+        "finished_utc": "2026-08-22T09:19:37.436608+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "Google",
+        "returncode": 0,
+        "started_utc": "2026-08-22T09:19:20.774060+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T09:19:37.436608+00:00",
+      "text": "To resolve the \"magic number\" critique, I propose a sensitivity grid search (1.5x to 5.0x spread) to empirically determine the reward-to-cost threshold that maximizes expectancy for the MT5 DEMO firehose. This investigation will utilize a walk-forward protocol with a 40% sealed-holdout window to mitigate selection bias and prevent multiple-comparison leakage into `validated_states.json`. Success is redefined as identifying at least three configuration clusters that maintain a cost-adjusted bootstrap p05 > 0 on OOS data while accounting for spread, simulated slippage, and exit symmetry. The experiment will be formally logged in the `ExperimentRegistry` and remains research-only, requiring a full pass through all `promote.py` gates before any champion artifacts are updated. This rigorous approach treats the current \"zero validated states\" as a valid null hypothesis, ensuring that any surviving configuration represents durable alpha rather than a lucky survivor of random-walk fluctuations."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_a599d6\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 39.0,
+        "finished_utc": "2026-08-22T09:19:20.758252+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T09:18:41.754831+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T09:19:20.774060+00:00",
+      "text": "Proposal (revised): Test a hard tail-loss cap as a challenger exit for CORE_STRATEGY_V1 by selecting k \u2208 {5, 10, 15, 20} and an ATR-scaled variant strictly on IS data via `exit_research`, validating only the single winning k once on OOS, and touching the sealed holdout exactly once at the end under a multiple-testing correction across the candidate set. Because truncating losses changes the exit distribution, recompute the post-truncation hit rate and break-even loss from replayed IS trades rather than assuming the current 95.7% persists, and gate on net-of-costs expectancy, PF, and drawdown/tail metrics (max DD, CVaR) instead of any win-rate floor. To make costs non-theoretical, replay all stop fills under a stressed friction model (e.g., 2\u20133\u00d7 runner spread/slippage, reflecting tail-event expansion) and require the challenger to stay expectancy-positive under that stress. Report bootstrap CIs on expectancy/PF, enforce minimum per-cell trade counts, and include per-regime sensitivity, treating the single observed tail loss as motivation rather than statistical evidence. Falsification: if no candidate clears all of these gates, reject and log via ExperimentRegistry, keeping the challenger on record and never promoting unless every `promote.py` gate passes. Research-only; no live trading, config, or champion changes."
+    }
+  },
+  "status": "decided"
+}

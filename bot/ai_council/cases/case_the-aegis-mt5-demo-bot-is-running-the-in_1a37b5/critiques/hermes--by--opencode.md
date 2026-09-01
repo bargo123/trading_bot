@@ -1,0 +1,1 @@
+This is an error message, not a research proposal, so it provides no hypothesis, methodology, risk controls, or measurable outcome. It cannot be validated and should not influence trading or model-selection decisions until the unsupported model identifier is corrected and a reproducible evaluation is supplied.

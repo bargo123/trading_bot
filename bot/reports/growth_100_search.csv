@@ -1,0 +1,13 @@
+label,trades,wr,pnl,final,peak,dd,ruined,hit_1k,halt
+thomas10r_BTC-USD_15m_rr10_p0,48,27.1,-2.45,97.55,112.04,14.8,False,False,
+thomas10r_BTC-USD_15m_rr10_p1,48,25.0,-10.99,89.01,107.15,16.9,False,False,
+thomas10r_BTC-USD_15m_rr5_p1,48,25.0,-15.6,84.4,100.66,16.2,False,False,
+hw100wr_thomas_growth,10,80.0,-0.21,99.79,100.19,0.5,False,False,
+thomas10r_EURUSD=X_1h_rr10_p0,49,22.4,-18.72,81.28,100.0,20.3,False,False,
+thomas10r_EURUSD=X_1h_rr10_p1,49,16.3,-29.14,70.86,100.0,29.1,False,False,
+thomas10r_EURUSD=X_1h_rr5_p1,49,16.3,-29.14,70.86,100.0,29.1,False,False,
+thomas10r_EURUSD=X_1h_rr2_p1,49,16.3,-28.59,71.41,100.0,28.6,False,False,
+thomas10r_BTC-USD_15m_rr2_p1,48,27.1,-19.29,80.71,100.0,20.9,False,False,
+bookopt_btc15_rr2_p1,78,20.5,-31.98,68.02,100.0,34.5,False,False,
+bookopt_btc15_rr5_p1,77,18.2,-31.17,68.83,100.0,38.5,False,False,
+bookopt_btc15_rr10_p0,70,28.6,-9.78,90.22,100.0,14.6,False,False,

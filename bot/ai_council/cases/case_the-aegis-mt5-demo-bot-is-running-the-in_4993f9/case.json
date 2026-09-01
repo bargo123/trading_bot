@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-27T20:36:37.257011+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4993f9\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 14.33,
+          "finished_utc": "2026-08-27T20:39:27.715209+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-27T20:39:13.382844+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-27T20:39:27.739250+00:00",
+        "text": "This is not a trading proposal but an unsupported-model error, so it provides no hypothesis, methodology, metrics, or validation evidence to review. Resolve the model configuration before claiming any research or execution capability."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4993f9\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 18.22,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-27T20:39:45.974151+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-27T20:40:10.697885+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_650415",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_650415 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_4993f9",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4993f9\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 9.56,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-27T20:37:07.839749+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4993f9\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.88,
+        "finished_utc": "2026-08-27T20:37:36.613479+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-27T20:37:22.729793+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-27T20:37:36.617480+00:00",
+      "text": "Test whether requiring a minimum 20% improvement in expected value after spread and slippage before validated-state entry reduces net-negative MT5 DEMO trades. Evaluate on sealed holdouts and the next 100 eligible signals, comparing net expectancy, drawdown, and abstention rate against the current gate. Adopt only if net expectancy improves with no increase in maximum drawdown; otherwise reject the candidate."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4993f9\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 10.52,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-27T20:39:56.502928+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4993f9\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 14.14,
+        "finished_utc": "2026-08-27T20:40:10.665725+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-27T20:39:56.525052+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-27T20:40:10.668719+00:00",
+      "text": "Test whether a supported Council model can evaluate a minimum 20% post-cost expected-value improvement gate before validated-state entry. Evaluate the gate on sealed holdouts and the next 100 eligible MT5 DEMO signals, comparing net expectancy, drawdown, and abstention rate against the current gate. Adopt only if net expectancy improves with no increase in maximum drawdown; otherwise reject and record the unsupported-model failure."
+    }
+  },
+  "status": "decided"
+}

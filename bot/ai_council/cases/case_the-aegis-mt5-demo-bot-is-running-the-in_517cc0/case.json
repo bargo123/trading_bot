@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T04:47:58.596058+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_517cc0\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 10.88,
+          "finished_utc": "2026-08-24T04:49:43.698548+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T04:49:32.813881+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T04:49:43.698548+00:00",
+        "text": "ATR-derived holding time can overfit volatility regimes unless its mapping, bounds, and parameters are fixed before inspecting holdout results. \u201cValidated-state signals\u201d and the ATR calculation window are undefined, making identical-entry and leakage-free evaluation unverifiable. The 10% expectancy threshold lacks confidence intervals, sample-size requirements, and multiple-testing controls, so apparent improvement may be noise."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_517cc0\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.64,
+          "finished_utc": "2026-08-24T04:49:32.797868+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T04:49:20.155683+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T04:49:32.797868+00:00",
+        "text": "The rolling 75th-percentile threshold is underspecified: window length, minimum sample size, session definition, and whether the current spread is included could introduce leakage or unstable, overfit cutoffs. \u201cImproves holdout expectancy\u201d and \u201cwithout increasing maximum drawdown\u201d lack uncertainty bounds, economic significance thresholds, and multiple-testing controls, so a noisy improvement could pass. The proposal also does not explicitly prohibit live-path/config changes or require verifying that spread costs are not double-counted against the existing net-cost assumptions."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T04:50:13.557049+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_13f76a",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_13f76a for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_517cc0",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_517cc0\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 10.1,
+        "finished_utc": "2026-08-24T04:48:18.149219+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T04:48:08.046875+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T04:48:18.151230+00:00",
+      "text": "Test a research-only adaptive spread filter: reject entries when the current spread exceeds the rolling 75th percentile for that symbol and session. Evaluate it through the registered sealed-holdout pipeline against the current champion, net of existing spread and slippage assumptions. Accept it only if it passes every promotion gate and improves holdout expectancy without increasing maximum drawdown."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_517cc0\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 14.06,
+        "finished_utc": "2026-08-24T04:48:55.259768+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T04:48:41.197338+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T04:48:55.259768+00:00",
+      "text": "Test a volatility-normalized time-stop exit for validated-state signals, with maximum holding time set from current ATR rather than a fixed bar count. Evaluate it against the incumbent using identical entries, spread/slippage costs, and sealed holdouts. Accept it only if out-of-sample net expectancy improves by at least 10% without worsening maximum drawdown by more than 5%; otherwise reject and retain the current champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_517cc0\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 18.29,
+        "finished_utc": "2026-08-24T04:50:13.525833+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T04:49:55.239295+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T04:50:13.525833+00:00",
+      "text": "Pre-register a volatility-normalized time-stop for validated-state signals, defined as signals passing the incumbent\u2019s existing validation gate, using ATR(14) from completed bars only. Fix the mapping and bounds before any holdout inspection\u2014for example, \\(H=\\mathrm{clip}(\\mathrm{round}(H_{\\mathrm{ref}}\\times ATR_{\\mathrm{ref}}/ATR_{14}),3,24)\\), with \\(H_{\\mathrm{ref}}\\) and \\(ATR_{\\mathrm{ref}}\\) estimated only from the development set\u2014and evaluate it against identical entries, costs, and sealed holdouts. Require at least 200 independent out-of-sample trades and a paired 95% confidence interval whose lower bound for net-expectancy improvement is at least 10% of the incumbent, while maximum drawdown worsens by no more than 5%. Test only this pre-registered specification, or apply family-wise error control to any pre-declared alternatives; otherwise reject it and retain the current champion."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_517cc0\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.49,
+        "finished_utc": "2026-08-24T04:49:55.211443+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T04:49:43.726145+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T04:49:55.225247+00:00",
+      "text": "Test a research-only adaptive spread filter using the prior 500 observed spreads per symbol and UTC trading session, requiring 100 samples and excluding the current bar to prevent leakage. Evaluate one pre-registered 75th-percentile specification through the ExperimentRegistry and sealed-holdout pipeline, with no live-path or live-config changes, and verify the filter does not double-count the runner's existing spread and slippage costs. Compare against the current champion using bootstrap confidence intervals, requiring a positive lower 95% bound for net expectancy improvement, at least 0.05R per trade economic improvement, and no statistically material maximum-drawdown increase. Accept promotion only if all existing gates pass; otherwise retain the rejected challenger and its recorded results."
+    }
+  },
+  "status": "decided"
+}

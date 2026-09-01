@@ -1,0 +1,1 @@
+This is an API error, not a research proposal: it contains no hypothesis, methodology, metrics, or validation plan. It makes no measurable claim and provides no evidence that the unsupported model can be used safely or reliably.

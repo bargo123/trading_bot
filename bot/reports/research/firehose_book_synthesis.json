@@ -1,0 +1,1803 @@
+{
+  "schema": "firehose_book_synthesis.v1",
+  "generated_utc": "2026-08-21T19:57:36.797319+00:00",
+  "corpus_version": "cc243170a00ab5d0d354338b6fd4d24109646dcee8a408d291e9311182044ce7",
+  "sources_total": 54,
+  "relevant_yes": 31,
+  "relevant_partial": 22,
+  "relevant_no": 1,
+  "executable_firehose_hypotheses": 1616,
+  "sources": [
+    {
+      "source": "books\\a-complete-guide-to-volume-price-analysis-coulling",
+      "file": "books\\a-complete-guide-to-volume-price-analysis-coulling.md",
+      "file_hash": "ce93f7a83c6e0608ca2988df048c022dd7bc59efa7e8bbee74f99173d94ebffd",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "scalping",
+        "microstructure",
+        "spread",
+        "momentum",
+        "mean_reversion",
+        "breakout",
+        "failed_breakout",
+        "noise",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 6,
+        "exit": 30,
+        "strategy": 30,
+        "risk": 6,
+        "execution": 134,
+        "total": 375
+      },
+      "passage_hashes": [
+        "d1a367a72c8f1e0f07d7065934a2937d7dbfdc87d67b8b31a37106b6413c85ab",
+        "3effcc957904460af167a61316114c9eac522827c546f819eec0894e372cb973",
+        "860e0ceabf2db1e98c2a551294b81eefdcf15d896b7c7bc31214f2cfe312dded",
+        "b4c20f82c27de6b7af8c3f3efa7e889809da1451cf106edba08da4b0eddae514",
+        "91565b8f8143fb4ec379b164a707270000964504ae6d47fe338187d456525dc6",
+        "d5f6a30081c1c738a03035de8a31a655300177cc50d104079a91df5e324baff5",
+        "83997d6989d1ee06a98f504770b34579f2d28e2057f235159bbac4054118a057",
+        "009fbf1b49f79c94d1a0f723bb8b7e37bca17ca906b7493c23311163cb786270",
+        "8d2b7b6667b66c641b8a289622df7ab8411defae6fc84848b3bf91de5b5a0242",
+        "3183c952ab80ce628442bebd2c28d1b3af40fe2aec08a62f78cf09e62476686d"
+      ]
+    },
+    {
+      "source": "books\\advances-in-financial-machine-learning-prado-2018",
+      "file": "books\\advances-in-financial-machine-learning-prado-2018.md",
+      "file_hash": "50a0c4b8538f7ff7567d632e9ab95021781f30cb09f35060c9eb504eadb1f2fd",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "microstructure",
+        "spread",
+        "slippage",
+        "adverse_selection",
+        "momentum",
+        "failed_breakout",
+        "time_stop",
+        "noise",
+        "volatility_state",
+        "overtrading",
+        "validation"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 22,
+        "strategy": 4,
+        "risk": 30,
+        "execution": 82,
+        "total": 601
+      },
+      "passage_hashes": [
+        "c7d111d66930f79e218f68a60043d263a63e87a8059ae42cadaaf01f64ef20d2",
+        "bd96730b7c31323c7a278623a050822c56952a8f955662f369adb086e1c126f9",
+        "1f3600fc556c939b40536e4efff51b72dab8b19777ac0e0a06a26f5490f7d6bb",
+        "521083b986ab669a4a226ad78470174881d59f6f18408becc1faeb0cd2130077",
+        "60f3e10296535b69e8cf628f2c6ee247e59ce03f260ffddbdb2622e017bc3ab5",
+        "9df449e65779e107e2aaeb475ad119972aee349e5953f225b02fddfaa513a6d1",
+        "e260aaeef621bc822c0dd5a22b6247c5ce764414d5eeae44e94c73d65935748d",
+        "8214f8b8c840087c7a00f9091527845b6466c57278530897e3b3e7c2f2627370",
+        "a366fe8ffe475f8fa0264cafb4ed902c1ed448eb9f2c9fea55cf19c7fbda2416",
+        "5e98061dd9893480ec95f95afbd6b7c624e27eea5e658f97cc4160f3716a7f13"
+      ]
+    },
+    {
+      "source": "books\\algorithmic-trading-and-dma-johnson-2010",
+      "file": "books\\algorithmic-trading-and-dma-johnson-2010.md",
+      "file_hash": "825945a238fa9a03287cab27f9b682a42979bd84473e993ae7e4404e5b42f344",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "microstructure",
+        "spread",
+        "slippage",
+        "adverse_selection",
+        "momentum",
+        "mean_reversion",
+        "noise",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 2,
+        "exit": 26,
+        "strategy": 2,
+        "risk": 0,
+        "execution": 748,
+        "total": 975
+      },
+      "passage_hashes": [
+        "fe94434c2be2cef3f68e4ed5a2622bf1998050d55bf10bd7ca1d9145f8c843d8",
+        "f26781c2cbd1007f19bc48db84c08372f85a59edc7b32187cd7ea34a822f7829",
+        "0a2fbb7355cbdbf433c0824303c06b2ad204ab52c7992fe3a4011118a9153cbb",
+        "e505a384a76e7a87d0730fa01707d9befa8ed2f6ca6edbc13b2a226a00784706",
+        "d3d8ccd6c92abb40b13787a5dceddfd8b95eedfabe3061cb5be7b23834d44913",
+        "57a1916d4c519ccea85af88c088786295ed24778040eca6a82c8d35d72a5ab2b",
+        "b3825a9c987e7ec945532c44dfc1d63d2b7551f2ae65d68d0f2473471b5a7548",
+        "1eb8e52bf767f65ec18982de30ba51b035a17455641cb3663fbb2dd522350169",
+        "01d3fbf4f9d15590637135db122cab41d83c4351a518dd0029da7dc691fba34f",
+        "3c10e21fdabe7ac12e42d5969b3f3f4b4057a05f02ce221363bbe3542f8bcce5"
+      ]
+    },
+    {
+      "source": "books\\algorithmic-trading-winning-strategies-chan-2013",
+      "file": "books\\algorithmic-trading-winning-strategies-chan-2013.md",
+      "file_hash": "a8f5666e0530bb6a770fa37b02751b6802aa66c3fbe729961ed54789dbb382af",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "microstructure",
+        "spread",
+        "adverse_selection",
+        "momentum",
+        "mean_reversion",
+        "failed_breakout",
+        "time_stop",
+        "noise",
+        "volatility_state",
+        "validation",
+        "tail_loss"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 6,
+        "strategy": 20,
+        "risk": 36,
+        "execution": 62,
+        "total": 360
+      },
+      "passage_hashes": [
+        "746336d1acb13e1da1e693c1909ab0c8ac053d539ef85d8b8f1366af7dbee8d6",
+        "3be3252b8a74e273d2592dbaea341774ce54b193327cd89c481d6423d93fe80b",
+        "c711dd63cfa020aee7b08a0aaa367ee2a440f214b1c1baf57f66844acfe8e06f",
+        "429d2495a62273f25383848f92b86891ababe0f59bf0c95c0f97513c13143eee",
+        "b03aa8916e0201338c871cc96e44d2afbed0d44956cc56cf9b0fcda48847f34b",
+        "3fcb863709f22abe08452fa9ff65c817fe90bb869842f44202c8368ca12f706f",
+        "f5c8be3c35457ac826c96e76289d45efea8f6e6dc315c978e308e76917cf95e7",
+        "d5cd8e82264924cd6add3269b0d1de238852c58cf524d50585a4841136f563bc",
+        "75e513eac64e55fa739ad3bfd743acfc9d1fa143b0acfee2388a81c776bf658f",
+        "e3d4eec0185611f21294a0e0b0a6fab52bed6b32c960ab5d0ee425aeb8506077"
+      ]
+    },
+    {
+      "source": "books\\beat-the-forex-dealer-an-insider-s-look-into-trading-today-s-foreign-exchange-ma",
+      "file": "books\\beat-the-forex-dealer-an-insider-s-look-into-trading-today-s-foreign-exchange-ma.md",
+      "file_hash": "016c4251763f56ee6c0283e8522904c1e8c61dab700852ec509054fb3e1c8218",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "momentum",
+        "noise",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 10,
+        "risk": 2,
+        "execution": 34,
+        "total": 48
+      },
+      "passage_hashes": [
+        "8c6fd1194be6ec45e2d7d8f0ddfb50c56fbe330cd3ad59e38f957bdadcd181c1",
+        "f68d6f71663b0db1f48a2dca1ce7f0fcd9e8aec7dbb16a0f7c30e00c17367796",
+        "df48f1baf61db8e858a26b053d8665084225ca65bacbcb6b12b471a6422c3211",
+        "2a458f48453889b42d6499e6d5123dd86e811b73b1eea8b19d05e72f0ffb610a",
+        "8610d2229173b84eab03aa1c0bbf1b4d341584bc2c2aa6a6db7a945855b0d702",
+        "36bc7926bcd76584330a1bc9a344c43cd640b11295380817f0475904f3b2abc9",
+        "92ed20eb9723a97ca5a45eb13b41da17dcf6b7d5b2c4763d88313a22cac84b76",
+        "8380f2db7822de4e4fc43f5a6812a0131777731c44184d68f55954fa43969afa",
+        "b52ca12364325f3725c9db67f9bb7b4fcc1763fe1174a1953ace990dbeca9633",
+        "4ec4bd1f30f6de3ff38011572537cb5d4b7eab472c75704f203813ad34e3e090"
+      ]
+    },
+    {
+      "source": "books\\beyond-candlesticks-new-japanese-charting-techniques-revealed-wiley-finance-1994",
+      "file": "books\\beyond-candlesticks-new-japanese-charting-techniques-revealed-wiley-finance-1994.md",
+      "file_hash": "858ed9f64a3bcb20d362801992e79873503a87af3bdcbf14ff7de554429decbb",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "spread",
+        "momentum"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 48,
+        "risk": 0,
+        "execution": 4,
+        "total": 55
+      },
+      "passage_hashes": [
+        "2bd2e07103420ee4424e9a1a451c40a221822bcc1d6432dcf5eb98944cf9653d",
+        "bfc6dc92b69bdc92ea68dc24e1e3a8a5fb9232702700eb07f6e55cdaebd41534",
+        "88d0f4e72f33c639825c4a7c9caea166daa7d0923c251a5b41e0d49828455225",
+        "7db357489e7012533339683133313e350cdea18734e9dd7daf226c684395bea6",
+        "bae656e160a1b87123bc45f890ad61e0497fe9c6ef22519c6bf1e4d57ad0c8ac",
+        "e38d032e0305a2b156b9eed4e680575f323e8acf8984137235a5465cba0632f8",
+        "ad8e7c8f43afdfbd87fff54c8fa73bebe04832bae7b56c64c16bfce12c12f90c",
+        "635da84ca2fd6251992c31db9aa0757bc3ee798e7a519f0a16cd43e36776d00f",
+        "1564009d566ffa9da3688821e38cf073536aa06e41556ae2e3d8d4a803d62f82",
+        "86b0d6915defb57f78019a9a7248700c9191eb69cae93087e9bae12531689746"
+      ]
+    },
+    {
+      "source": "books\\building-winning-algorithmic-trading-systems-website-a-trader-s-journey-from-dat",
+      "file": "books\\building-winning-algorithmic-trading-systems-website-a-trader-s-journey-from-dat.md",
+      "file_hash": "c45210cb20249cd0ead427b9c14f22866a65764d80af705711e53f8277c06412",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "breakout",
+        "noise",
+        "volatility_state",
+        "validation",
+        "tail_loss"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 4,
+        "risk": 18,
+        "execution": 12,
+        "total": 50
+      },
+      "passage_hashes": [
+        "041a53d7dabca17c4822387f35f4d30583bd22bb48fbae918b1530dd9814ae20",
+        "77b8a30eba611e6b4e66674fa667fd9d7ab04416def43b24e27a8e6b1260245a",
+        "ce18a6814271d843f67f12420603b365aa98165bd0b1e0bbec67f480c8defea7",
+        "00f40ebd7ed92be8c2ef202b0b3f3d1899218b5bb56f862a66ba9e0fd0c40d9f",
+        "5f0e14223028c9204797a2620c6e1db178b8861b9472bff69c37474b82995513",
+        "0d0c81dbadca6fa139e44a5889b36dee6e1417c5e7ea973500370ea582c91bb2",
+        "43bf6024917cab967fcee3febb7a1cf9c50c1586c59d69439a9766f692e6b3b7",
+        "7f6e69d8c207b83625bcf275c2a2dee93252336cff44ec2b6ef6e0685474a4bb",
+        "c00576b60d1ec98ae267b00ffae27be3ad2a93183e5b227e21558cca95663a3f",
+        "a5c36ca049f0e225e6b3fb431897bb725d9953b91e71094303fc4d12e586e741"
+      ]
+    },
+    {
+      "source": "books\\developing-high-frequency-trading-systems",
+      "file": "books\\developing-high-frequency-trading-systems.md",
+      "file_hash": "1139155ebf6c396c45a9aabd0d6aa3571d43b3c3b21eb1af4d07c545f3a69aa3",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "scalping",
+        "microstructure",
+        "spread",
+        "momentum",
+        "time_stop",
+        "noise"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 28,
+        "strategy": 2,
+        "risk": 0,
+        "execution": 316,
+        "total": 491
+      },
+      "passage_hashes": [
+        "3d9ae07a1111f39e9e64b0e4f503e6f0a7c14c5298e03c38e1ec90f52b1ee6c8",
+        "57c9e8a247fb1c101a4e59b11f2f8f14e38556684738b60ec6d7301daf76bf09",
+        "5e69a67088f6522d61c8ad52d0ab3325be8ac6fd75c77498a1c3d1d2e69aa074",
+        "195f8fac129482e57a4ebbbc8721c433bc7f3fe5344e48651fee21254f20c75f",
+        "25bf3c2b5fe6ae0e4575148d2f03a74bf7e83a59a8d912ec74df83be4d75542d",
+        "4d79a84c2e2ea17a7288211f8e857991f961f06e5a8e920fc68e143334790f4b",
+        "fc528e5d3d56c83e2f765d8c23843fb3d5f2a815534347217fec8bd095be58b3",
+        "a754a588440730dacba31aeffbbecc38a362ce3bf63235b0a70477132dc4f7cc",
+        "d9797d99783cfd0feb8fcd1ed8fc5b88a43c492977d8507f5122dfa4cf13407c",
+        "54436708f759c11c8b5dbf4cb3f9b3bf26a8d81f9b82a1499ef2c3b7f753e1b3"
+      ]
+    },
+    {
+      "source": "books\\elliott-wave-principle-frost-prechter-2005",
+      "file": "books\\elliott-wave-principle-frost-prechter-2005.md",
+      "file_hash": "072a7d8995c501fad4ff593530611bb4409d1e150dfa4d71653e914a19215e60",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "momentum",
+        "breakout",
+        "failed_breakout",
+        "time_stop",
+        "noise",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 18,
+        "exit": 16,
+        "strategy": 12,
+        "risk": 0,
+        "execution": 38,
+        "total": 265
+      },
+      "passage_hashes": [
+        "7becd41dc1077ad098fce0ca924db8a179ca29024caf46e11088fc9c7b1e1a3c",
+        "0c5b62d32ebbb870ac0031e4ae5f37a382cd675c76f4efa0e4318b035bc2bd10",
+        "a207db4eda30700673592857e55de90e9a7cf11de002f0dbc3d4ca75f03764ea",
+        "7a0c6a33177aefe2e292f1feab75ba39717ca837b9ed03ba40de32819ba18ab5",
+        "2bb3e0f42a06decf0d0a873e6f909ead29438820c6e11554497adf260efab06f",
+        "9f8ed0915f85eedb1ace44442486893fc7ebcb275facd518e7cfc6d94a561a3d",
+        "4eab07bf4c961b48746e121d1021e32224a701b531c4ea905317e020f77a8ff1",
+        "75ebf580e07b8908e70093d69b240f4f8a15fada0bba30ef9194b6fa57bc0ebe",
+        "fa0027cf7e297f9fd0827bbc5d36e066a28669be2f145630bcb4037bb0b820b5",
+        "290fe58f3621e2f4dadf2fab1fb87bde867dace3d0dd39ed33a64649827bef2a"
+      ]
+    },
+    {
+      "source": "books\\encyclopedia-of-chart-patterns-2005-john-wiley-sons-inc---libgen-li",
+      "file": "books\\encyclopedia-of-chart-patterns-2005-john-wiley-sons-inc---libgen-li.md",
+      "file_hash": "d10b043b296c92c097efe360b876dcb123288aac4e1f0bad812dc84a2e755a26",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "momentum",
+        "mean_reversion",
+        "breakout",
+        "failed_breakout",
+        "noise"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 72,
+        "risk": 40,
+        "execution": 48,
+        "total": 207
+      },
+      "passage_hashes": [
+        "15465cb0f7949683739ee194c7231deec912170909b7a5d171b7beb1e864277d",
+        "d916634972433354973b55b1bf3ede43cfd5d50b0ec28632a38faf52a0776afd",
+        "0e65032a3eb118178b065d76a3e0d8b3637211ecd784956b3a23768efb168f33",
+        "09a7770f9ed60ada9a46ad562e9d033fd71ae69b22ac311f48944d276029b477",
+        "6a7ee534371f6b265a7081962628b709a0bfcc996e5e8b202f8899ae477d7b20",
+        "64a5cf7eb4051a54a7cfc661d76348a8ce2a7e2f966e9158198b720d6c75c055",
+        "3f5cbf62bbfb8e6eeb6caef121717fc0e2a3891a73d1aefaad452a7f44a6e9dc",
+        "4ff1cc639bd6b8ff2ef864049e1023343f4aad3b37748a6797dcfa3d04d4edbe",
+        "de8858555b13d76f623c89f7d5dc9b0b38ff270631eeea06302a83ea09506293",
+        "e9e14424d2193f61ea862c7735338d2b45e13718672a35f09e20f1fb8f814e57"
+      ]
+    },
+    {
+      "source": "books\\evidence-based-technical-analysis-applying-the-scientific-method-and-statistical",
+      "file": "books\\evidence-based-technical-analysis-applying-the-scientific-method-and-statistical.md",
+      "file_hash": "da63d05d614209475e45a592702b17c50faa3b2fb39560172da774b6c5fa9ced",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "momentum",
+        "failed_breakout",
+        "noise",
+        "volatility_state",
+        "validation"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 4,
+        "strategy": 26,
+        "risk": 4,
+        "execution": 22,
+        "total": 107
+      },
+      "passage_hashes": [
+        "c750bcb25652eacd8bec638a4f0ff41d3b52e14a577f382fc75c8720d3bc1fbe",
+        "966d32047fe7075e8e6ac1da3c06ab294cc63759bb4034d4dd68f9e5fe8c47f8",
+        "61f7ae9f818f9173c76d7f13fb2fd383eb338fc6773d8b86645152f71814706b",
+        "26f9b37f88fe11ff0fcc7374b7e6468d7c2cae66276fcb72395d189bcc5721ab",
+        "9f55b829239bbcf1611981eba5a7faa1f22d3585c28e747fe50caf5147d1dbd0",
+        "684c66a3ec3952c3bb0a2e40b59372091b9eae1688b5d9e910bd4fd85085698e",
+        "1ae754dc00ce7d5b1a5b3be376bbc199ce42139eb2c8dd6e0c43f2b7a361cb50",
+        "76f0131f7b8384a4f6b912e8c09bb080c4a56bda76474be85b4f133557e10f95",
+        "d55592fc3e9f4e4a92066bf57515d89ce03940d5ff903d8e1c7242b5fffc5d71",
+        "443a8d11754e420037f611484268aef41af7b7a7df53372ec7fc2271d1550c57"
+      ]
+    },
+    {
+      "source": "books\\following-the-trend-diversified-managed-futures-trading-wiley-trading-2023-wiley",
+      "file": "books\\following-the-trend-diversified-managed-futures-trading-wiley-trading-2023-wiley.md",
+      "file_hash": "b6f41d0e32b64e06585ad15bfa0f124482f21e465f3e4f2bb3c065651647dc91",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 6,
+        "risk": 24,
+        "execution": 24,
+        "total": 68
+      },
+      "passage_hashes": [
+        "bd1a5936a090eddf32bc4bdfffc22b5d23fd100eb90c8f338cbbcb87d68c4e2b",
+        "1c0d88dd0390beac7a51d1b3feb584362f7d1aa4ede5283208be210462628588",
+        "e1aee9bcf8125f09b3cd51a182f46da3c3ba3d3f4b1692535dc86ccdb39be4c4",
+        "b9937172dfc8a06b37d16b8d6923b0d93b062d95bf744249307d059f16ad8b10",
+        "286a9e1b6905b21d9970ef8ba0c0db7f277f3b2dea5f0ac871a2752b2a841a0d",
+        "da7a96fe2e5d2cbe59364081d35a02da1fe23863f5239fdb8e28d90b85e08a43",
+        "6a69287a3a120713f27fe088d34dd0f93fe0084ceab74b22b2d4c1622a4386f1",
+        "f04abd2fc1c307270999ea5a39d4f133d1697d0067b859f34a6fe9d99b897412",
+        "88ebeea00ce45f1b6f7390de83cdcbb4e9bd0b11f5311392b3c01a4d559ed91e",
+        "563d783856dd367a305e82a9c264470f6df5320ae4efba2fd6ba7d07056d32fd"
+      ]
+    },
+    {
+      "source": "books\\forex-patterns-probabilities-trading-strategies-for-trending-range-bound-markets",
+      "file": "books\\forex-patterns-probabilities-trading-strategies-for-trending-range-bound-markets.md",
+      "file_hash": "5886c6379221be90cb758cdb1bfcf68412cca94a6d5f0b45dfcfbf3a5a97061d",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "momentum",
+        "breakout",
+        "failed_breakout",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 4,
+        "strategy": 36,
+        "risk": 2,
+        "execution": 12,
+        "total": 56
+      },
+      "passage_hashes": [
+        "4dac3bb3dfe85520f22b2266b09f984c85fe703d9ef8031f738b0734c4b0f091",
+        "ca6b9aab2d54225eef55ad348d34b4f5e80b2ead9ba5160fcb838df6ab5d6d3e",
+        "f02ef51d0d5b1a89905f53561d2229a4f00503fa40b1b1313d90fbcf5b1cdc89",
+        "273515e9a771c15b164022d3199a0fa40b3c562f217707e57db8bd6334e6c6d0",
+        "cf6bd3fb3a7f42f00bfb58a514d93eb7256b27157b49e16cf368f555c3c5232a",
+        "a00f45cd4770b6de26df5204a13eb30e07b99f3472c6e27c1e32577fcdf85d6e",
+        "8ff18c1a4e118c364ff75642fb40d89855b9148f1b7479ef24cf758c098a4462",
+        "2ed5281caab507180d25b76ffbd7c7d894e25efc9eb33956544121f8076ce37e",
+        "15bffd97cdf465a310a8b7e77aa029c813ec0e8556dd6dd34c386b9893bb94ee",
+        "51dd0095ca0bdf409a96bc7df56480d78c78f26127e096af4115af2d35a354a7"
+      ]
+    },
+    {
+      "source": "books\\forex-strategy-the-price-in-time---libgen-li",
+      "file": "books\\forex-strategy-the-price-in-time---libgen-li.md",
+      "file_hash": "818d3602266c1575051f2169d082ee0cc71c92a7ad6651ffcf1a955d9da823c3",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 4,
+        "strategy": 8,
+        "risk": 10,
+        "execution": 2,
+        "total": 31
+      },
+      "passage_hashes": [
+        "62306f43444fe1558cc5c74b07f6d9589290b8d835c2f5084717f22201e93250",
+        "2076fc835045b318a5a9ea00e97ace0a6950331102a7546365bb8d189f3e6977",
+        "4bae2e70de06423a06256a9aa1e62c423fdfa7180f6cdf102625efb2cd4cd789",
+        "a7b00e6d1cb852eddf563670fae751e18eb17a4ec71007b06e4e39c591117ada",
+        "aa662ecd267d12a25b5f76b367aa31f87796c60910ae6073222367519350a3d8",
+        "da8fe9c1ece095f5376f29989eb433d634deb93a16bbc95ac5640f0d4f3992a5",
+        "7e5e407f700fbb31e85ea293b968f4fcd97ec217227661cb37aeeba4843aa235",
+        "3d6dfbd5d0df6eddc28f4b102be8a15216118930a858448b263be2c405e589d3",
+        "47794f4b16dc0112070761ae76de2dc715d16b5a84d49148b6c8ca39bb02a9e0",
+        "addc36e427fc9e0c2da8467516c5465d256d67e79f9867e46cda1ac090a6291c"
+      ]
+    },
+    {
+      "source": "books\\getting-started-in-technical-analysis-1999-wiley---libgen-li",
+      "file": "books\\getting-started-in-technical-analysis-1999-wiley---libgen-li.md",
+      "file_hash": "5d396afeacf6211ff2f77293cda7657e589f52625cb5a3b9c3283e64d9b29115",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "momentum",
+        "breakout",
+        "failed_breakout",
+        "noise"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 32,
+        "risk": 0,
+        "execution": 34,
+        "total": 69
+      },
+      "passage_hashes": [
+        "dbf0a8b6200027c474d5c4298c9845ea662cc17a377f9f142109e288df295299",
+        "d3484c211d630128dd7c00fec43e2c2a119f574fa0ee40b3ac0b88c1d11c1649",
+        "9d1e9f95ac943099ac9105db07ddae4a698630b375161a02ee7ea4f3512ef9f4",
+        "0365ae726d576f9bb385f2e5d702e6b7d5a32e757553813aec67cdbff7740061",
+        "e4a5a6e3ffd5899a2889904c992cf787e3ffd6be1c2d1432f161638986ddb7fc",
+        "1bb2e3e1316be85f7f4b9d95d1c09d05af1282366e3f4e54c1d6e3c43202bef7",
+        "9549d94068e11345bf5a4526162f7398b973b6709995a97a88cd59bbc4cbafcd",
+        "e7b626d7a564987b61ab60d2398766ffef8a5f4568591c403878a5fa235ea12f",
+        "5de291ef68d707a577729b4796181fa1e1e5ef0705a3761acfdc023e7990afb0",
+        "9a2817e7cf3a1da50e2677a28742d1d9726d58998ca0bf536a18963dadff83e7"
+      ]
+    },
+    {
+      "source": "books\\hands-on-machine-learning-for-algorithmic-trading-jansen",
+      "file": "books\\hands-on-machine-learning-for-algorithmic-trading-jansen.md",
+      "file_hash": "ef518f214f407e70f51ec2f46b2cf23743168a19ea7f9aac03eec0f37c72b3f2",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "microstructure",
+        "spread",
+        "slippage",
+        "momentum",
+        "mean_reversion",
+        "failed_breakout",
+        "time_stop",
+        "noise",
+        "volatility_state",
+        "validation"
+      ],
+      "record_counts": {
+        "entry": 2,
+        "exit": 50,
+        "strategy": 6,
+        "risk": 10,
+        "execution": 70,
+        "total": 684
+      },
+      "passage_hashes": [
+        "e0c9466cfc9ed5df0ef5125ccac10c912b05fd49b2c92799bfce704889bb0d14",
+        "a0dbbcd0d940dad6752d60ead964eb9ac11ce08076816944c28e436c08b5e5d5",
+        "e10748dfc6a3ca2fce165a7a5c28a84e829d9da98092ff2e7079924519f9b18b",
+        "d7fa3188d5828c929737128440f4f2576cef64759f6ae6c1e9f53dfdce60eaf3",
+        "ce342420e5237ad0c0a78caa223bf5f95e1d59704746fd7b481d9aebcd990ed6",
+        "c0caef8030f2af54e13cd403902a407056c2cde755573dca6feb15c057d07025",
+        "a6563dd166ad4802279c8e383c4748b405b4f1a7bb7485b9866c22c50a4daa29",
+        "d62caeedbc8017dc8d246ad4b33778fa73d4689d0bd1546e9b69c7a8ba57b3ad",
+        "85ff276bd1179895e921ae5accab1423e5dd8c0b0653c9ceddda194e5664e566",
+        "ffb7fe225146e2cc98828771fdcf8125363b06e97479409e606785cc4c3be21f"
+      ]
+    },
+    {
+      "source": "books\\high-frequency-trading-a-practical-guide-aldridge",
+      "file": "books\\high-frequency-trading-a-practical-guide-aldridge.md",
+      "file_hash": "06363123bad9391ef80516e7497d0a9f7faa171ff009e1087a6eaac093633e5a",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "scalping",
+        "microstructure",
+        "spread",
+        "slippage",
+        "adverse_selection",
+        "momentum",
+        "mean_reversion",
+        "failed_breakout",
+        "time_stop",
+        "noise",
+        "validation",
+        "tail_loss"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 22,
+        "strategy": 4,
+        "risk": 32,
+        "execution": 316,
+        "total": 506
+      },
+      "passage_hashes": [
+        "2594896ba70ec8ce1c4ffa46c1d5f5828e4f891bfef863458663a1f118bcc11e",
+        "1f6eda834cde017fad1749beee1fd28b7334df6cd47c9b43c3d27406a7739c83",
+        "a9edb1d62c866d8d9e4f4081a72fec4b16dc0c8f7845fcdc1c9d93c004f8ee44",
+        "51c9c575e3b64e3dbf4667b26ad8140ba685802a52520eb7164c36661e02790e",
+        "cf8d79cc7aca9a12a57ebb3d459b26ef1ddd2664b9b847ee6d90b32bb36d5694",
+        "4c39308fb7b3e704e22d40e33103cdc1c7e7ba64f24872f44252a8b258b09da8",
+        "452d2d1cfa1447280bf321b078fdfd09e7ce0386999b83f1e51a99f63be2b5a2",
+        "9d064f450e3146ace0e4b4fb80b8d133cfdaf1a55c7eb9790990fe1105dcc597",
+        "4939111f395804900ddaf8325b20dadb4b556efbec4b8fcc43a19e237f094744",
+        "5f858d98ee5ddd210ee17f542f975a15dee4356ad96b1d8cbc2fd4e7ebd82f3b"
+      ]
+    },
+    {
+      "source": "books\\how-to-day-trade-for-a-living-a-beginner-s-guide-to-trading-tools-and-tactics-mo",
+      "file": "books\\how-to-day-trade-for-a-living-a-beginner-s-guide-to-trading-tools-and-tactics-mo.md",
+      "file_hash": "67faa7ac4cb3265868056e45758dc8d71fea5f65ae11312a62a80adde7041b5c",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "scalping",
+        "spread",
+        "momentum",
+        "breakout",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 4,
+        "strategy": 34,
+        "risk": 6,
+        "execution": 16,
+        "total": 64
+      },
+      "passage_hashes": [
+        "26e5d5cdbcc6e2a84b6529915f6d8a33cda1f925772c48cd4ed3907d3d044a11",
+        "671d6e0325b006f84ae159a141b44b138d9e424435db9775a1528650ddb17629",
+        "ddbdba68e2a29048a421a02c1724acaf8f23b070241b54f958ce9bb181becd87",
+        "648cc1eab16c6fd7bbec8e287c30a9bb3743ce7334e7fbaf141dc31b9c056c29",
+        "dc4935ef3cc7099891c7e82d7e682f9b79a5d2bf8e9e6e7b012b8e8058743313",
+        "fe802ba33f3469e71a1c7bf858a6613b66dbb7ef2ae7edc3eca37be69055e5e2",
+        "5e4b1083acf139087ce92f79e8e0b4964cd88d183a883be4ca65aa3b57a70dbe",
+        "69142dd9c5a12607ffcdd991875e5014f805afb3108e6bcaf2b5095ffeed5170",
+        "14dd905f586cfabfc0111a1c1e95cff1410ed6e579477ae6c61eb48b4a44ca1b",
+        "70b023ed65eea294c5eff208788f471deb8a8b57427e26fa11f894fe59246343"
+      ]
+    },
+    {
+      "source": "books\\how-to-make-profits-in-commodities-gann-1976",
+      "file": "books\\how-to-make-profits-in-commodities-gann-1976.md",
+      "file_hash": "6133739f0c67f403cb15cb8cb15cb1e0e8e113704b7bed26c8fb0c6ca33a7e56",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "scalping",
+        "spread",
+        "failed_breakout",
+        "volatility_state",
+        "tail_loss"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 144,
+        "risk": 8,
+        "execution": 32,
+        "total": 297
+      },
+      "passage_hashes": [
+        "89a15a9e39d0495daeb62a5318c8fa88328f28b718681a94a758972c682bff88",
+        "0a82bbf03b0ad521c9bb1e5a271d4cd651c2120072a1f5ebaaf5c156f368af47",
+        "0e81ea76f8a64a061d1ff6e96d39d55cdf3721ae6b6a661576146fb04e8f61f2",
+        "14c13449a97ddb6ca0bcd3a79148448c16cb19919d6f94a6c007252bcf597cf4",
+        "eeba9b15952231272a2333229fd4b40d8c76fe00dbcdb0563fcf2f5531364556",
+        "960bb30f73abfa1d84dc0a7596f2da11a8ad60939dd44620a7c7baf4acdacee1",
+        "b855806f09156e88c2aff735018f41f2da5915e6e2b4332f8c37ced84684dd78",
+        "1217e5702a30ef776e3bb44dfd1111a70124a344a4114a62e042da660fa168ee",
+        "a8eb8731eb315d31abba86d66215b2bc350dce9fe642096e15be0427a3b14475",
+        "21c57e7013cd79e1781e30276307771ce9745efe01d2281ab075cb3450230622"
+      ]
+    },
+    {
+      "source": "books\\inside-the-black-box-narang",
+      "file": "books\\inside-the-black-box-narang.md",
+      "file_hash": "f2e59bf84e8b5ca99742545cd3c54452fbceb71471bb395e08d4175f077a973f",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "microstructure",
+        "spread",
+        "slippage",
+        "adverse_selection",
+        "momentum",
+        "mean_reversion",
+        "breakout",
+        "time_stop",
+        "noise",
+        "volatility_state",
+        "validation"
+      ],
+      "record_counts": {
+        "entry": 2,
+        "exit": 10,
+        "strategy": 6,
+        "risk": 34,
+        "execution": 222,
+        "total": 463
+      },
+      "passage_hashes": [
+        "00f323ce2d635048311d72b44a2e2ef1d1455a8c8c33cf24f80b2c5888ded415",
+        "2efc3b58a9252efdc1555d29a0b1593891a5fd066dceb5e5e165767bad4ceedb",
+        "f97bec5260ec05fb2e74ce8d249992a3dea919620da0e3aa1dbd3d845ecd6456",
+        "44240e0ca064ae0e58077d3bd404f067cc4bb6b11a153ac00e0925df6a97aea0",
+        "de50abe169c4f890cfbf781dcc81834a454fc09f3da792490b9851543e6b97ca",
+        "690539452c0728b3d09b28c8630b917b8b10c613b6803778e50105f9426d7484",
+        "f9a312301e555709fd8d99f492d3aea4645e407500bf53f60cb6ed9878ce27ed",
+        "712cf04c1d8d13d911f242d584e99307ae80412c483f91e1bab7fc4ca3c83aba",
+        "07ba4cba2522cb4a1778dbb77d847c8e714dc677941d12064164c754c6d087ac",
+        "e823d4e90973932670f7a3a80a3b29cfedeae7fe6011eb1bfa4904652076146e"
+      ]
+    },
+    {
+      "source": "books\\market-structure",
+      "file": "books\\market-structure.md",
+      "file_hash": "6287ef3c50888d7ede78f4c6f4a6f1f5f55f343638303eabbea709aba6753e96",
+      "status": "PARTIALLY_INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "slippage",
+        "momentum",
+        "noise"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 0,
+        "risk": 2,
+        "execution": 2,
+        "total": 5
+      },
+      "passage_hashes": [
+        "4194ccca22bf1beeac6f634dcf585e01f26cf4873b7076e1cece0fc38e56b8ef",
+        "67cc600449764bcb8929e743515deaa1e3a446b6a5b3e46f73373e42b959bcbd",
+        "edb076162d8b3c62a69f69b5cfe238bf0670e26ce5897706eaffcc4258285cf5",
+        "4194ccca22bf1beeac6f634dcf585e01f26cf4873b7076e1cece0fc38e56b8ef",
+        "edb076162d8b3c62a69f69b5cfe238bf0670e26ce5897706eaffcc4258285cf5"
+      ]
+    },
+    {
+      "source": "books\\modelling-asset-prices-for-algorithmic-and-high-frequency-trading-cartea-jaimungal",
+      "file": "books\\modelling-asset-prices-for-algorithmic-and-high-frequency-trading-cartea-jaimungal.md",
+      "file_hash": "9a21edb83192e11ebec3c5230dd1f8813af300f0255e14184c9dac78545e2f58",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "adverse_selection",
+        "momentum",
+        "failed_breakout",
+        "noise",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 4,
+        "strategy": 0,
+        "risk": 0,
+        "execution": 32,
+        "total": 57
+      },
+      "passage_hashes": [
+        "e3ae852de985e1b9ba0026bb2963dc2e7871e4b5c15b38c080721a269313ff15",
+        "48080b6a697e3f14861a25aaaf51bc72d7de6caddeec5c3dbb2f2ce89850d873",
+        "a44e65699c2288ec564118eb82e832227dc9baa278bd7399c940fbf1b3276232",
+        "1fe7889e0d47e4068b803e88f4e7ce8393fc8a2c86de10942ea660a3335867b9",
+        "7896be65f6057eec8d99eff5fc2e61217664cc43a1348fe0663ad206aad09e2b",
+        "f97e87b3786699c0b967e47a3d242ee16de12f4c3042c5399f108d657f739def",
+        "3700ac958d1290630ebffbe394b07385864999efafdc872b28e39610a1727a11",
+        "b90c587ea5902d357a7a2c3e7bf952cb9b86d8dc1ebf87f75d145410ffeffe59",
+        "34f46ceb90a4cc3fb5a288679767ea21be3a89b54f6105d82c9742772bd86e9c",
+        "563ed0a6847d0ddd72df48e9bb23aae8161ad90feee7bd15b477e00ae499a980"
+      ]
+    },
+    {
+      "source": "books\\price-action-breakdown-damir-2016",
+      "file": "books\\price-action-breakdown-damir-2016.md",
+      "file_hash": "e1fdb522bb0cfbe3f5f039406c0a39efb18a1d240d658d772f998d2881de6a3a",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "mean_reversion",
+        "breakout"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 12,
+        "strategy": 24,
+        "risk": 0,
+        "execution": 0,
+        "total": 82
+      },
+      "passage_hashes": [
+        "f26f51b204add4fb830b344e57c0f76d2831103498e92d48eb17079d0f3c1957",
+        "020bdeadbce54af34ad7a1c9accc984a9def1a9981e70097e2f0c13ce65a6339",
+        "dd02ccb4fe448064c0b473f06923a6e5bf9ebeca8f8ed79a1c10d385b730ffaf",
+        "49cc072dc7a7dab3daf56c1169b4e2b8aeda5be8d7427f433a9e6439b0976a1a",
+        "51b79dd4f03e4ed082dacb9e5bbb34609f1aaf7949d8e38ffdad16cbe955ae7c",
+        "c294c561f08135514a11f65e24c9fe37feca19f7539fb86aee7644638b30b184",
+        "9754e0298d28fd471e2c853c42feaf76ca7ffc4792ff1c890eea2ce588b9ba60",
+        "ec84b67a61cae1a499b7902c38cbdbbc59b4776fcdaed8aa3cf6b459caba7908",
+        "c1f85f1a5e8f322472e8b8e7799d689fa4796023468fa22733ec6487cd0d1f1e",
+        "d4e7feb94e4f019e4243fde8271d9b43b80d95ff0fdd0889848abcb7711389b2"
+      ]
+    },
+    {
+      "source": "books\\profitable-forex-trading-using-high-and-low-risk-strategies-2024---annas-arch-37",
+      "file": "books\\profitable-forex-trading-using-high-and-low-risk-strategies-2024---annas-arch-37.md",
+      "file_hash": "e367d66220a77421e2015c458a153701240e95a601d09119063b1e052cc9ea21",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 8,
+        "risk": 8,
+        "execution": 10,
+        "total": 28
+      },
+      "passage_hashes": [
+        "fb3aad27a488d826b59e38ff02f4bc1383144cbb789eec8b60df343fb16e8330",
+        "517505b0adfd0feaaf96fc683ce95bb91a65be0513c1c5d5ccf6a3898952ee34",
+        "b676555d1fa1f76d6d3148d27d83bc64de6b9016ce17054bdb3e3170ff8a1456",
+        "92acf856511c56858e9c4393032ba2ce02615d7ba862e5c88246f5a2e403ec33",
+        "492d6b2285b45241489bf1a12af29df6212e6c2383ea6aff766c0daf1ee43df7",
+        "92d74c468f49ff40ca6283a367c1b77a70c1cecdee70229443b6a9b4f1414bbf",
+        "d8f2dfa285dad51b298697d98c90ebc86b5fc4e584cedf096fa50508ef775f3b",
+        "35fdc913f2051ecc2ef6e67dd6ebd5c155f5b24a771a142bd4a33c0562109499",
+        "5ea65c441f9645401d5d4bca4cc1cb62029dc0ca4107bb0008e8de6820937e9f",
+        "2c7d5f860dd4bb73e680c0313049b3450303c1aae10c0cf0c048cbf52dbc404e"
+      ]
+    },
+    {
+      "source": "books\\pyramiding-full-text-extracted",
+      "file": "books\\pyramiding-full-text-extracted.md",
+      "file_hash": "4027a6115c1215108419902f4d3808333e63de9937a19683ec8b0e080e55833a",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "NO",
+      "topics_matched": [],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 2,
+        "risk": 0,
+        "execution": 0,
+        "total": 2
+      },
+      "passage_hashes": [
+        "85cbe1ed3b89a74b63e8289f6cd92c9e82250b9c497138523f4539e9fca1fd12",
+        "85cbe1ed3b89a74b63e8289f6cd92c9e82250b9c497138523f4539e9fca1fd12"
+      ]
+    },
+    {
+      "source": "books\\quantitative-trading-how-to-build-your-own-algorithmic-trading-business-2008-wil",
+      "file": "books\\quantitative-trading-how-to-build-your-own-algorithmic-trading-business-2008-wil.md",
+      "file_hash": "e7bcd249e180bbb65f18ef1d46f46861116d8a4be872fd610b5c0ab831416208",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 0,
+        "risk": 12,
+        "execution": 12,
+        "total": 43
+      },
+      "passage_hashes": [
+        "4a51774b2eb11b01a055f075fdb45fbc8e6994ac2c72508aac0d757fe641c3d9",
+        "408ba251e3c1e6867b331aa76896083e20b5d9c13cd3c4f480d5bfab12955eac",
+        "82d417ac247038a94ae2c13eed2dd691dd019428976e02522b1d1297bc1e2f1a",
+        "416cdf15dcd7f4de37972e35ca5bcddad15e9d1bf7ee8588c3ad137a52f32598",
+        "93f047b0c12319a5466728cc3a5911fd5c26ae95adb24fd5789a7f4758e01dfa",
+        "f9228dde39dc16009e71928ff26cfee8b4aeaa713f4cbd0b3175ccc9606892d4",
+        "2ded14c1c6e18a66678bb635191fae35196e85e99d41f6e0214631111e739719",
+        "7d18c3babf34defdbf9091deefbbf1dd1ed672c4ea6ecc678f75674bba4e1682",
+        "004b31971e95c6aa31595dc10bb42ce2fea0206fdcc2501561ebebc6dc772870",
+        "f7a620055f92609423d3e3205e783368c5234e58f4e4adc677aceb5498a3c080"
+      ]
+    },
+    {
+      "source": "books\\quantum-finance-van-der-post",
+      "file": "books\\quantum-finance-van-der-post.md",
+      "file_hash": "b40c872a1ef1f11a95aec551257c110c62ea725b701321e97ab84123c439979a",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "microstructure",
+        "spread",
+        "adverse_selection",
+        "momentum",
+        "mean_reversion",
+        "failed_breakout",
+        "noise",
+        "volatility_state",
+        "tail_loss"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 58,
+        "strategy": 4,
+        "risk": 0,
+        "execution": 58,
+        "total": 231
+      },
+      "passage_hashes": [
+        "d75b125356f5149758b1261817f36e24cac5fe59ab02d96426c2890432be8c56",
+        "dfb365224dead222c0f98f79e3a4ce5dbd88de177ff4ac2b9748517e09e638b2",
+        "5780dc985bd9c22892a377c19b83cefbe429e446ed81acbbc3b46009ba083467",
+        "db7ded50ae94431c9f9b544dd0a519a5deafbad47362a46bcfed912fc8edc494",
+        "dc7beea25ff9ef97fd4a778a15846bfdab3ae075d454cc0a1f8e154e31e0df9e",
+        "e3792797aa21c88e987761703a2017df97f2d6252f49f646f8ae750824b7dbc2",
+        "6d9ca86abfe00ad2b3bc443f7cccc0971937bec75c1f2669603ef581fa0b3193",
+        "cbb8103d2cc7e6997b958b1fe8fbbb2b5f270d73c159e65034dfb323cb4401d0",
+        "3dc60f6c82fac82e758c3416e4c0c1e6ba4534daf84bce7ca0d619bef9edb4ba",
+        "b4ebd50f7ad77fc1f0a99395d0a32a6e433eeed2cff2cce833c2e9a0475c4eac"
+      ]
+    },
+    {
+      "source": "books\\quantum-trading-using-principles-of-modern-physics-oreste",
+      "file": "books\\quantum-trading-using-principles-of-modern-physics-oreste.md",
+      "file_hash": "be8546ff9093bcfe30da5227ba9ade05ca9291fe35e49f6d0a148de26683eb8f",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "momentum",
+        "mean_reversion",
+        "failed_breakout",
+        "noise",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 4,
+        "exit": 10,
+        "strategy": 16,
+        "risk": 46,
+        "execution": 26,
+        "total": 280
+      },
+      "passage_hashes": [
+        "5ad0d5dc32ffa0cb40758b7992e782dfe272dcc56b1df1e8134965a56e56a363",
+        "d3500ab69fd51a6d6482c1d6aed5372e2ac1e5fe2802a935fb2c18533befe393",
+        "c7d28be9ead4233965947620e8600d6ea09bf8a3f3b4786c60e045ea901308c3",
+        "f382ce17ccbdb142ba474269d0fdc0da3defea305c6c006e8ee2482e46184e2a",
+        "50fec13a7a922cfbb89ed9f679496c7aaa237de9eaa3fb0475802d3e806bd454",
+        "906d744f54f4c192c5f46031b2907a8096df64a83d2b114060c15c2b20fd3088",
+        "2137bb31097ded6a1a7723b49ed141774e484f44cfcba32389c8091e156a6535",
+        "62e538b24fd7555b518627b989f65e2460ba19315d097795a32993da54a136e7",
+        "7beb66fb311079ad664fce90a9e2a16e8636ea3828efdedeb48f9019db753c2b",
+        "525f3891e2922a75073ee4960726c8928111dce046fdc6aaacf9355d9dc01bd9"
+      ]
+    },
+    {
+      "source": "books\\reminiscences-of-a-stock-operator-2012-john-wiley-sons---libgen-li",
+      "file": "books\\reminiscences-of-a-stock-operator-2012-john-wiley-sons---libgen-li.md",
+      "file_hash": "216cbcd60c343b0c46aeebf9ad7c24df2500dbfd9e5b391c064ae3b88542ff9d",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "spread",
+        "momentum"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 12,
+        "risk": 4,
+        "execution": 36,
+        "total": 56
+      },
+      "passage_hashes": [
+        "8f05cea01ae9469078bbd5b8d0945b0296a74a8fecb0c008f5bbdb0ca03c04d8",
+        "e577582ed2b09eee8a35f487871e03c7f680b7ba4a95d43032f97a923d764905",
+        "55217602b6852954eb726b0a552485f36b9071f0929390cd7c0eccb1c03ee8f8",
+        "44717845126590c08c23ff4dbf2f059f2a273af444304a6cd7bde8e80c08f7ab",
+        "6d76a9c2059ecf105ee485da359501700743cfbfccc02877b9b1a7a6ebacae67",
+        "3b98641be2e22f716b42ed66084fb498d4a8b07ffdc35b2188cc6cedf3b9ace1",
+        "bcf667f16f66cfdf99b7e1c8f548338c3aca42dfb42925d81b3cfd230c046b81",
+        "85f1146e01b11de0c4b54ccbbf31f4fb4b9597e9f6d6686b75fb398089f999ea",
+        "85b518eb657f80b59d8aee793db40be74e2162673c0acac329d528ae5621ebdb",
+        "5ef6d7ffb79738bd31947b04043617c371df170f4896776a0699a5c9a81b6478"
+      ]
+    },
+    {
+      "source": "books\\sample-author",
+      "file": "books\\sample-author.md",
+      "file_hash": "0cc0902e70baf89a2a6f37946d190c73ffed063ddaafe68203d3d7c4221a7e5c",
+      "status": "PARTIALLY_INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "mean_reversion",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 0,
+        "risk": 4,
+        "execution": 0,
+        "total": 6
+      },
+      "passage_hashes": [
+        "562f2fa661f0980aadb50bf197300368d2922c2bf03d38186fc8cad76ceb137c",
+        "5886ca184918a931da5e7b12110079777adb2526e52ac2a7e59707baaabb29dc",
+        "e4204bb02144f233ecf40ad3e59ae93e1d925149b89f957738394a0b9408902e",
+        "562f2fa661f0980aadb50bf197300368d2922c2bf03d38186fc8cad76ceb137c",
+        "5886ca184918a931da5e7b12110079777adb2526e52ac2a7e59707baaabb29dc",
+        "e4204bb02144f233ecf40ad3e59ae93e1d925149b89f957738394a0b9408902e"
+      ]
+    },
+    {
+      "source": "books\\steidlmayer-on-markets-trading-with-market-profile-2003-john-wiley-sons---libgen",
+      "file": "books\\steidlmayer-on-markets-trading-with-market-profile-2003-john-wiley-sons---libgen.md",
+      "file_hash": "fae15b642382a9aa2ff32bb4d605c47588945552fb1d0a061d30bf89ee1857dc",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum",
+        "mean_reversion",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 4,
+        "risk": 0,
+        "execution": 38,
+        "total": 48
+      },
+      "passage_hashes": [
+        "7cd25ce1a30c997a82d3897ae78a59a9e854bc4dd1c7a33e81d89faf8dcfdb51",
+        "15577a665113b53dbba8f111c4d6cf6da56427ed64a0d17dcb434351ed4a3cc7",
+        "36f9d022466efda411397d678825eb8f7acb06964a2fdf4b73cf14d892d608ec",
+        "4979c0556af03ebf85c8b6ae5774dc97a71af080ed444bfabb528663aa2d22c2",
+        "be732d629a6a1fde2ce732827a222d511e602e0d42a1ff6406cc3f86171f4bc8",
+        "f1318c6d9d6e2e2ca408f0925b27b8fe187ea4100c7f8d8dc9a47aea03aeabd2",
+        "fcc1434b41688c62fdf966c48aacf7b252d7782b461047001f928c2780db0b7b",
+        "f9210e7dc363baff0669fb1d86acd3727a88308413f2b06a507beacd32da2753",
+        "d494d09d638333d9e87f598593c48eb6127458ff122a67bc0a077c54c963f1bd",
+        "7c3bf4a595d12585cca3ead0a2752faac78e703334e858544c4dc6a80fa6c330"
+      ]
+    },
+    {
+      "source": "books\\stock-market-wizards-interviews-with-america-s-top-stock-traders-2001-harperbusi",
+      "file": "books\\stock-market-wizards-interviews-with-america-s-top-stock-traders-2001-harperbusi.md",
+      "file_hash": "040a37df581f4e92d84c13e81c7017aeefc26695045a288368edd9d55de7ca07",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum",
+        "tail_loss"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 2,
+        "strategy": 4,
+        "risk": 8,
+        "execution": 22,
+        "total": 37
+      },
+      "passage_hashes": [
+        "9c81027021d856695067a161e779184f40350b4cd67b96be96aa319978fbcf89",
+        "848dfc016be15004d1176410807b0ce78892af32174256c8be2603c6090a977c",
+        "50182dc8d979d22b646696d400b973dd90858e99bcde1e41fc4c4b66a2aa4d0b",
+        "aa2b7452f11d57c8ec23c2d45ef1c7b24ccd01dffe6da3d54eef6de365c16abb",
+        "937a27e458253e342e657d2bfb9ec3f9afdb5892f451661ca46ea52b65dc1424",
+        "ae556c53a3cbe1a748c940fe6f78ce3f01c4c63658335be9e780e74ddb48d29e",
+        "ede39410b208bad5637fac3e8c27b504d742c8500377c61cb262cb35a4f2c9eb",
+        "ba252d904503bc2a5c104bda68a7fbfbc735ede9cfe43d9959be8b507720f95d",
+        "703003a52ff18fd1f1538712d0845fee02a23a1987f83df9bf83b1f618b6857f",
+        "3949884275913c891506f1d988abaaeb65326aea9da7d93b8b1c981606622150"
+      ]
+    },
+    {
+      "source": "books\\stock-trading-investing-using-volume-price-analysis-coulling",
+      "file": "books\\stock-trading-investing-using-volume-price-analysis-coulling.md",
+      "file_hash": "7a169f637ed0e7769324d2e46817359291ce8b7f665f3797cf41e53ebc9f7291",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "momentum",
+        "mean_reversion",
+        "breakout",
+        "failed_breakout",
+        "noise",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 40,
+        "strategy": 22,
+        "risk": 2,
+        "execution": 260,
+        "total": 583
+      },
+      "passage_hashes": [
+        "20b294bf60aab57c6b4fe36c245949cea25c78e08b096a3eaa1b4be50b675272",
+        "a1fcbf416155a4cab4c8641845a73f8ff98f37a1a32a235948313561601418e4",
+        "a3c0b2a93b1c7b39ba2a3126327edff64518638f89e34c0469fc88e344850637",
+        "bbf015a105dd1f0afc543b2d92620c3ecaaa8776d2a7d826b39b5b2c055f683c",
+        "c9258323d9a0897f998b0a61afb5631f8b7af614fdf8ae5dcc9d6fe0d24c10c6",
+        "cc6ce936f0796f9c6d3d0278c4415b99f7a760ceeb1831737ba132e9b12ff05a",
+        "0f0a48a8d7ba133f0c75c35249f289c5955b953c714b2ff6c57cf0d7b3092d1f",
+        "7abb262c0d07cdafb542228de1cbf66eca296e0a2a8d696d76646adde7496469",
+        "88b8bb51386a2db4e40f7743b1aa65d016365be100460aab0e6e5f98cdf649ae",
+        "58df9ff56fd973f85903c41208964485e89476201aeae607f2d0acb4551cb956"
+      ]
+    },
+    {
+      "source": "books\\systematic-trading-a-unique-new-method-for-designing-trading-and-investing-syste",
+      "file": "books\\systematic-trading-a-unique-new-method-for-designing-trading-and-investing-syste.md",
+      "file_hash": "6860eb6bbb63aa38399e9bc07c7199391ca91fa9223cbfbd0270be2d19a6f487",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "momentum",
+        "mean_reversion",
+        "breakout",
+        "failed_breakout"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 2,
+        "strategy": 18,
+        "risk": 20,
+        "execution": 22,
+        "total": 66
+      },
+      "passage_hashes": [
+        "a2b76461b157d5c26ed63e26c4c9e203ffbccd63493c0d49eb201d176c4e0696",
+        "8c4154010851a5729acae4866b162cba5d288ba996448b561f15ba817bba9fd9",
+        "3cf1d54fd1f8c39fcb45eaaef46205151eb4d7cc37681b30e1ff95fd7e56e59b",
+        "2bd0d61d02f19a60399b1796b3dabb321ce109b4cf7d9fba6f310a680dc234e0",
+        "ecd9cd8f3ce5178c522cff23009553e8e5494f88f696a409e68d2c5d6ad10dce",
+        "ed8ee0c1373e182a0471aca15f958d3a4d4c8529efc6c8e325ea6acb4edfb581",
+        "b2098acb006023eb6c713d1a8df33327c18e255498b2e2e2acf84b5f42b06ecd",
+        "022dec1568e33209a963d8defed4093fa3b73f3717aecbb7f48d8c11d6252c50",
+        "e508a861e1c188fab52a7a40110509c74ee55109fc6eee181c06662936632945",
+        "ac4c231aaba17e2fc14b878011dcb60905676c906efa9b2de39a7c387575d01b"
+      ]
+    },
+    {
+      "source": "books\\technical-analysis-of-stock-trends-eleventh-edition-2018-crc-press---libgen-li",
+      "file": "books\\technical-analysis-of-stock-trends-eleventh-edition-2018-crc-press---libgen-li.md",
+      "file_hash": "e2502bfd59813c7d5f4e301c1a729f4483a2b15921377dfb64645f8d0d4256c6",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "momentum",
+        "mean_reversion",
+        "breakout"
+      ],
+      "record_counts": {
+        "entry": 2,
+        "exit": 4,
+        "strategy": 38,
+        "risk": 26,
+        "execution": 66,
+        "total": 139
+      },
+      "passage_hashes": [
+        "d7833e3673690447b128a5f8ac7b23d47466ab219d08d4afaaee5b68e6e75ba5",
+        "07a481e1554ebb4c5cdaf8e689ec0f699246b5c8a5785d12f7d66c59c39da1a5",
+        "7a7092733c468608bc30edfebc5e8b767c030e0ffcf5e893086ccd422939bdb5",
+        "8c5871e121eded5366e4d2ba61696be039f80a40e29591d6c6d3dc7df132669e",
+        "3899483ce4aab0b7fd3ea99aa88d0a6ce8cbe2c95bf8261c6fa65e09ff9f4a79",
+        "ff754b5fefb08a659ac7ba3ad7cabf83944fde0e419490fdb200d230dfaaed22",
+        "77b587f7f71b5f31c68fd639c2ecc2cd6d9d8b617f19d18d5a7874f8faae3916",
+        "9aa9ead5105b898c067f9f0f6197f23a5667b09eb5b3a7b95bd1130a1672f727",
+        "904e15800eda38c32e155e6624c0628f4d2e815bf10a2c9155c740ceccd86dbb",
+        "be10e6611805b2cc264b3626ff855450837dfc9c76daab56f607238da2ce24cb"
+      ]
+    },
+    {
+      "source": "books\\the-1-hour-trade-anderson",
+      "file": "books\\the-1-hour-trade-anderson.md",
+      "file_hash": "ccf4dcf9dd305787848d96f7c1510346bed6ef654b84e96194814f125fd5c454",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum",
+        "breakout"
+      ],
+      "record_counts": {
+        "entry": 14,
+        "exit": 32,
+        "strategy": 12,
+        "risk": 26,
+        "execution": 14,
+        "total": 141
+      },
+      "passage_hashes": [
+        "ea9b490d95b5d9ae99c20b400cff345861013321b2d095893af26b08ae71be8c",
+        "0ba1c110c3926aa5570b5c172be4a04290a8e3212f57a0bcc65e067d23a6f529",
+        "b0e2beb5c2481eef11d1cd22dc01b0135bbb37ff07d2feeb8eeb458380cb3dab",
+        "91b291efab62ff34b89da52658bda6a428be5ccd3149f1190c5aa5601fc61e31",
+        "8f99e5df4dc6bbba3c869d8cfa08e9d546a9e2ba83f1ae75b21b62ef36bec6f0",
+        "f1ade278becf40d683cad61cc8ff71934968e735204e7177805d5bee95e02eb2",
+        "8e7c111ba18a515db5f4bcf63bc778f98b803ab5f25a743f5f3e6d00d02cbec6",
+        "c7a1a97e1f90d6e560d89b61e86969e5db10e37dda857cc1b4bd4005bae01968",
+        "abc9041aa2574fc09c70001b5b4c7919b2ac8330ca5e58cea564c5e68e841484",
+        "174c9cec92b78c9dcecb1efb163b63255ab7e48d4c4b6f275d499a5de731cef2"
+      ]
+    },
+    {
+      "source": "books\\the-10xroi-trading-system----thomas-lr-thomas-lr----2014----109595d6293932cffaa6",
+      "file": "books\\the-10xroi-trading-system----thomas-lr-thomas-lr----2014----109595d6293932cffaa6.md",
+      "file_hash": "022e992728b54ffbafa4bf8be046015556722491b93b02c6e8dc2bf56d5117db",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "momentum",
+        "breakout",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 2,
+        "exit": 4,
+        "strategy": 8,
+        "risk": 4,
+        "execution": 0,
+        "total": 19
+      },
+      "passage_hashes": [
+        "ba357f2e9de638600e00a95606a3bc0be6ba0cb97da2f407480915acfa828770",
+        "384f3b5b33c6b2372422036c3bfe31cc492410b3cadee90070988a03f0fb5c8d",
+        "67c9aab0050f2ef96aca67a96679739e0968e7d4adf4f82e2a77f2e41b651741",
+        "2ceb2e91e3fbca09713962cadcca0593374a3433309fb1483c283e87bb909c1f",
+        "5b73cf8ed2c8b07187e5e9e15f9bb8bd954ce09e0e5e60c9438c1fddd34e9b76",
+        "4b92941e18a11afe6a63349dfdf40b8043fa31b753713a7f161dba1a09b0489f",
+        "41f3ce741d86f30a2bae9409b93b5de9068257921ea8a45c58526b3aea040943",
+        "daa3e76e2a0a778a01dc4d8f22c787a5fb675d8923bbe16f6ee7fc5f782c998f",
+        "b5a1e5d14c467a05e1047309bfdfbc8acf19e1dcd88bb2e85b9ee61a69e7d2ef",
+        "c7d18c81b567beb5eaeb98cbb411685d85a8347dcbed0f2f2eb4f878bac719af"
+      ]
+    },
+    {
+      "source": "books\\the-art-and-science-of-technical-analysis-market-structure-price-action-and-trad",
+      "file": "books\\the-art-and-science-of-technical-analysis-market-structure-price-action-and-trad.md",
+      "file_hash": "aa11fd1f1a94914c73e3d25c6ab3f235a8260281658608ed5dfaad82b332af0a",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "slippage",
+        "momentum",
+        "mean_reversion",
+        "breakout",
+        "failed_breakout",
+        "noise",
+        "tail_loss"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 36,
+        "risk": 20,
+        "execution": 32,
+        "total": 97
+      },
+      "passage_hashes": [
+        "c49b4580bda420ed2a35946897a6e4c2a938513c37c7c932ca081e3051000b0b",
+        "8f7d39dc584da538322ffdb95cacb76ee1ee7af18bafb11feeb24e971557c9a6",
+        "cb58177c9e9f727a7c30706adff5789e197030c2ce195abadc09c441d6f638b9",
+        "51d555dcd2d0e8d4cfb5310f778ad650b430a29fa7279c857809e00b0272f623",
+        "a03f9932a626dcb30a59ed97bff01e5fc064392b7dfa0ec16873881ba50f2e03",
+        "7857512a0b8935df7f5145dc1a58f5d938252b6b60459555d4e19a1bb1855107",
+        "3d1b82902be4fb866d07de6ebe447669663be791ebd3ee305cbc137bd77e9bd2",
+        "1d86822c89859bc65a6e542bee72fddd95669dff71998925650d11fcb91ad383",
+        "b04bccd971eabde6a63105cbe8610486ef1b7bf329abe67c589f2bf8936a85a6",
+        "d0bc1b45cb1efe5088b4b9d2f41a89b615943df07b569e8adda5dd93aa578721"
+      ]
+    },
+    {
+      "source": "books\\the-definitive-guide-to-point-and-figure-2005---libgen-li",
+      "file": "books\\the-definitive-guide-to-point-and-figure-2005---libgen-li.md",
+      "file_hash": "61dc709b6c344b6807da9272aa2037709e07c3522bf2b55e4d42d9cafc6c8dc1",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum",
+        "breakout",
+        "failed_breakout"
+      ],
+      "record_counts": {
+        "entry": 2,
+        "exit": 2,
+        "strategy": 80,
+        "risk": 2,
+        "execution": 12,
+        "total": 105
+      },
+      "passage_hashes": [
+        "328887e3f12f27fc40b849182cae7955d9e44d65198475a53021059d3b0dcafc",
+        "9871298ab5c79b435eaa0f343ff0471b4dd99ebcced83ba08a19c55628c37790",
+        "70de80b08ef5f03ab5e9df7f1a62dbf1ff3e39f490319ae7398c94037f67a067",
+        "cf07d2276631125d39c686d9286beb54cf439044ca1fa6b0909b7cd94a6812ba",
+        "3dab66cde57f59eee1bf7517e2ef65f4cb9318f3f3a0d118011a17890ecd4fec",
+        "4828d2f1723d92a2527b9c0796f2040a200a5a4bb4026613f35163783a6b97e6",
+        "a611ffe1c79cc0f140ce74b9e4021753bda3ec396634a06bf034df2c7a035fc5",
+        "3bd4367b56541e9e1c17ed5b74ae897e09b6eb9e767f316e67fbf898ef362bf9",
+        "41c501b9260fb8f5b75b9e13302cb7bf75ade075ce9724d555818623ad1711e4",
+        "467406e480606270d0d7f8325a43ea2f59a0650aa47817aa4a022092ded5e3a8"
+      ]
+    },
+    {
+      "source": "books\\the-disciplined-trader-developing-winning-attitudes-1990-prentice-hall-press---l",
+      "file": "books\\the-disciplined-trader-developing-winning-attitudes-1990-prentice-hall-press---l.md",
+      "file_hash": "7464707fce419e0865962fdc5938cea77867dfe01eb331ccc5bb6d6fe6e10655",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 2,
+        "strategy": 8,
+        "risk": 6,
+        "execution": 20,
+        "total": 38
+      },
+      "passage_hashes": [
+        "f372d8d4e19bf29482391e8254d0f246cf3c5c7ad36d13b8837b8d3d6aa426cb",
+        "9c6a880f5eee00b02ab80a6ae61c08dd666b96a49e4db2c8cb5430792986bc2b",
+        "4f1ad7d027e87c8673fb9452b75475d12b901d2daeb83c8a9ab43223e0d1f34e",
+        "2891acc0c1a432747422e9f851eaa0dbdfed6ad5da6f3e507f86215b0169ff2a",
+        "196987d5aaa9ee5539b0b93eef3b72c79f22e4733d75d882b7d633e5226c2121",
+        "d17bb52a882bd2e5bef6d0e0b67ae8d94581b0cd8ab6a90bf38c02638db83463",
+        "cd8443948b4cc424363551273d66f6de1015a973b90b9aee3fa1d7892e3e334a",
+        "9e9c7ad6c515509ddb10cfd1d0c651e6eb04c03ead18d94f6f01977411c0fe4a",
+        "db90cee0ab0120218248b5aba8b4b83955a424da0a560291691270aa0a62dbd4",
+        "15465d0e0388606a3e9b27078a4263cdd2ef90bbba3bf42e528316fce8b56757"
+      ]
+    },
+    {
+      "source": "books\\the-holy-grail-forex-trading-system-foreign-exchange-day-trading-was-this-the-ul",
+      "file": "books\\the-holy-grail-forex-trading-system-foreign-exchange-day-trading-was-this-the-ul.md",
+      "file_hash": "eb61914a27b5ad0bb7586db31f810497590f049e81ba30a8c6c28dcb9ae65d11",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "spread",
+        "noise"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 2,
+        "risk": 32,
+        "execution": 10,
+        "total": 62
+      },
+      "passage_hashes": [
+        "bf211ee4181747e82d41c90e24849ccacb77ef3050a122ac06cc070f2216de93",
+        "47e6a444d25b74388113e9c9526f4c08df563960ca47d70fc9b4e9dc444dc22b",
+        "fe6b248360cb1eaf06bb50efff6c6813f71329d6e8f28a00292d4e2e6a4f1157",
+        "59965507d5f5783722d54cd1f6d56b67a0baac1e701aee64d3330b7acfb7f730",
+        "249f417ced0862f38c46332e37240eebc53aa5d13491b85ed48961f1711b4615",
+        "48274333318e35c502a6e21a2fdc0758cf9b3a33c427184b4c8f41f632e1da08",
+        "bf13eaa23bd9312b7014666d50f50462403ccd83986b173e6ada6276994a9325",
+        "dda48005dd27ba3fe3bb5dff0ccfa27b1e7e33d83dd5ee377c49ee97285fe418",
+        "e6888d4f697805743561063ea2b243f958683cfd036d24ff63b1b57581d13f16",
+        "d53e1f88f0451c52e9432608e78398cf0346c6667d03ab85c89db5b6aa197e8e"
+      ]
+    },
+    {
+      "source": "books\\the-man-who-solved-the-market-zuckerman-2019",
+      "file": "books\\the-man-who-solved-the-market-zuckerman-2019.md",
+      "file_hash": "6ad79c197bdb4d3c1924331a268a73647e089b099055290ed349200d087b27b5",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "slippage",
+        "momentum",
+        "mean_reversion",
+        "breakout",
+        "noise",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 18,
+        "strategy": 4,
+        "risk": 18,
+        "execution": 62,
+        "total": 353
+      },
+      "passage_hashes": [
+        "2b1c3ae1ba7b4e77a10292c81d66ddd3aa0156c1f744e930592fb2a12f234981",
+        "330e2a4ff53403457fccdea9186fd91fdc6fc44f883fbc585db05dcd6ec28c26",
+        "47f080e6bb316cf4375a1c328ff4dc1b946e51ba85935632e38bf20f4b7ba404",
+        "c5ea5ee59928021d99dde93117a5ebdc9b7a38e5d24608ac790abbda4eca7da9",
+        "16cb09f5bf0c7bb018bb2ad506a348a29bf50cd8e34c80f343b8af76cb5f6e75",
+        "d0d48fb2c7ab2eefd191f5d8622ba3e41df3e9febc3c380843bbe1304843e92e",
+        "3b8c552132cf0343bf766d957bb82e48df85a497232a6a0d6770c172d82aff0f",
+        "3154da27deb133a4522ea6c62eb9c45d4ad5bcf63f08d08a8b7e93c6928d14af",
+        "ebb1361596b88427ec42df2210918ddacb3a05be8c610584edea1d0ccd93a109",
+        "5e7cdcc2751e290824c452b35d3582534b88025a92eb2c57ac135884022f2f95"
+      ]
+    },
+    {
+      "source": "books\\the-mental-game-of-trading-a-system-for-solving-problems-with-greed-fear-anger-c-5dfe4c06",
+      "file": "books\\the-mental-game-of-trading-a-system-for-solving-problems-with-greed-fear-anger-c-5dfe4c06.md",
+      "file_hash": "6a9b2e5da0c8cdb63214526df0ae9cd148667c051b3a89b35e787282e0898547",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum",
+        "noise",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 2,
+        "strategy": 14,
+        "risk": 32,
+        "execution": 4,
+        "total": 59
+      },
+      "passage_hashes": [
+        "e7d8d72e3b69d7391ed57bcc615572727806d767dc913143f338191e35101709",
+        "f44d98d3b0249fb4739c55c9e4f700045ca736310fd64c800908ed41fed63004",
+        "94b37faa719a003d8f715f366435250f663793417267bfbbf196a9ac0a3483c6",
+        "6b607e84b5c5633cbafd282f2bbe16e3e7d65a044f030a3552033741595198bb",
+        "8ee5027ce6a7060cf01c82602a4ca1655565e875050d805e65ab3050cc27af0e",
+        "9c64ae7ccd7c83fa4deb51cc0c620b8262ddb4d8e76f8700cf5f74248d263407",
+        "d056a72183def89b7f10d1920c2aadc4799f0c66e3f114965280c8b2170b5048",
+        "4dec1357faf140cf022c688c48b9ce0a14290d2ece5e17ddd8c89b638704cf27",
+        "fa684c8f1741085241d0e0ba620449e06f3b39ada9e92e83b8fbd3e3c20ef36f",
+        "6c052097c6ed6eefa489b0b5cd7fae2ed853fcdbe555b552070ab9a4ab763504"
+      ]
+    },
+    {
+      "source": "books\\the-mental-game-of-trading-a-system-for-solving-problems-with-greed-fear-anger-c",
+      "file": "books\\the-mental-game-of-trading-a-system-for-solving-problems-with-greed-fear-anger-c.md",
+      "file_hash": "657c90c7c7bdbfc69541292ce7132586def0d6e7ef1e51ef80231fd207249d50",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum",
+        "noise",
+        "volatility_state"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 2,
+        "strategy": 14,
+        "risk": 32,
+        "execution": 4,
+        "total": 59
+      },
+      "passage_hashes": [
+        "f1f8bca9fd949ae55c05ac92eceec6607cb1c135a65a5f8d2c4102b785258fa0",
+        "f44d98d3b0249fb4739c55c9e4f700045ca736310fd64c800908ed41fed63004",
+        "94b37faa719a003d8f715f366435250f663793417267bfbbf196a9ac0a3483c6",
+        "6b607e84b5c5633cbafd282f2bbe16e3e7d65a044f030a3552033741595198bb",
+        "8ee5027ce6a7060cf01c82602a4ca1655565e875050d805e65ab3050cc27af0e",
+        "9c64ae7ccd7c83fa4deb51cc0c620b8262ddb4d8e76f8700cf5f74248d263407",
+        "d056a72183def89b7f10d1920c2aadc4799f0c66e3f114965280c8b2170b5048",
+        "4dec1357faf140cf022c688c48b9ce0a14290d2ece5e17ddd8c89b638704cf27",
+        "fa684c8f1741085241d0e0ba620449e06f3b39ada9e92e83b8fbd3e3c20ef36f",
+        "6c052097c6ed6eefa489b0b5cd7fae2ed853fcdbe555b552070ab9a4ab763504"
+      ]
+    },
+    {
+      "source": "books\\the-new-market-wizards-conversations-with-america-s-top-traders",
+      "file": "books\\the-new-market-wizards-conversations-with-america-s-top-traders.md",
+      "file_hash": "ef7298f82b3ed56d19b1d87089ef1357e20cc50610c3d1254c2ee2125b8b4d47",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "momentum",
+        "mean_reversion",
+        "breakout",
+        "noise"
+      ],
+      "record_counts": {
+        "entry": 2,
+        "exit": 4,
+        "strategy": 6,
+        "risk": 18,
+        "execution": 20,
+        "total": 69
+      },
+      "passage_hashes": [
+        "951993d1b3c35c7992a903d39fea80d20871e45539151d09bbb7f489a29dbe79",
+        "8c52e1374b6888dc2e46597c3afb1f5d8d5875c4812e71285d9b6e5e65a203ad",
+        "6c13a40db0cd2be4a119500c87a4f3660cefff65534e4712e6606cfac8d084ed",
+        "8cbd628eb2842d4b1c5c5922c9c99d2baeb502d8caa3efa7eac6020dafbc4645",
+        "7594d3139c09c619035197c4939424e8d254a67f65c5ab79b0bf1b8de7abab90",
+        "a071889c880605b3251293188846eb0e92ce60018252c32844df3cb2421b2984",
+        "d5b1d2c74ca5b80693e9897517a88b8a20b72fb311589c09ff627fdca2d5170a",
+        "7b126be38350cb9fc7bd274ca22a964f9f955e95fec5a9ba3e52682fc4c2c624",
+        "33ab28a0a163408bd708d843f83a9b58f90d0a256c996f0d510302033a860347",
+        "3bfe7f57f7ad7ca39f0754874651821a6e29d1fa0bfb9971003f662ebf1224ec"
+      ]
+    },
+    {
+      "source": "books\\the-new-trading-for-a-living-psychology-discipline-trading-tools-and-systems-ris",
+      "file": "books\\the-new-trading-for-a-living-psychology-discipline-trading-tools-and-systems-ris.md",
+      "file_hash": "8ed0b8c56235da5b44b81b0570f8193dc178c141930e38e6ba5cb00c689692aa",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "momentum",
+        "mean_reversion",
+        "breakout"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 24,
+        "risk": 10,
+        "execution": 22,
+        "total": 63
+      },
+      "passage_hashes": [
+        "65edb5738ea8c6f0bf413e564a5d140fad815b58846e658925f4e09c604c84b5",
+        "b57eedffaa64ac5a64eb0b43d2028cdf8de72661ae262d5ec87e7d01ec135e11",
+        "022405af6a99b7edd21b9b8fd4897cf2bd37e6b007ee1b24c2db56f9dd4ebfc5",
+        "eccf0cab8b0b3b925dd2d8cc6882f3e5e444210cbd2d199825262046e84c380a",
+        "064efc874225cf70769ceaa5d613b3e134935dfcbe00b9e021b278e728792940",
+        "c9979e13ef77bdb34dece4ef77ac8d44e340747e8fb0058ca107eca3c5ddb4c3",
+        "164c133b80f5af40a60b16a8e6d897ead213631703a47ded612f835b1c0a0c6b",
+        "0197bd87f153018deebe909d7bd44e7b4438b855652e6261ec32d97225e21863",
+        "fbf94987485c97259faef74ccfd4aad27fb13399d2ecf05d5c87837747908cda",
+        "8d7edf23087ccc248553b10bc541dd09281ac932a6faf3f39315e60765023937"
+      ]
+    },
+    {
+      "source": "books\\the-ultimate-forex-trading-system-unbeatable-strategy-to----unknown----2021----6",
+      "file": "books\\the-ultimate-forex-trading-system-unbeatable-strategy-to----unknown----2021----6.md",
+      "file_hash": "8a82646b340da3541245d723054919830d09cdfb6205d39dfc4beb67018052c9",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum"
+      ],
+      "record_counts": {
+        "entry": 2,
+        "exit": 6,
+        "strategy": 16,
+        "risk": 2,
+        "execution": 0,
+        "total": 31
+      },
+      "passage_hashes": [
+        "157a4d62fb39694b3bdf0864b68a975acf6f309f8dd46323749faf09a56515f3",
+        "93f7a61cf7dcb43ad011ded483123f52627553903cf9f9da4d96b86cdc494d2d",
+        "4383c8bea72f9b88920e24ada71e357508f27414ebf6143d069264831f6cc729",
+        "a27619a9861582863b734dc9cca148342bdc48fa21f71f57736289a89fbb982d",
+        "b7f2724eb127f687854959c1bf6b2717fefc55bcc92a2957e76e025552764c2f",
+        "53731a6db24e838dadeb9f26b96ad9f9e50c6edeb7cdd16c4db96af01ade70ca",
+        "645e1113a07c439022a39a1d051bd9c1eaa9b52a46286c612df87bee7b021e93",
+        "d7365123808b0174a6a3ff4f080359dae4948c1911bfc9cc086cb6a0d47f3b4d",
+        "40228e206e89148a4c2efb02a1225ead228d82890456d8f9e71929babbfd3b2a",
+        "8fd9a19d0fe81b5b3168fa3c12da7edf31a8fd353a5c6a08baea38ccda42705c"
+      ]
+    },
+    {
+      "source": "books\\trade-the-price-action---forex-trading-system-2012---libgen-li",
+      "file": "books\\trade-the-price-action---forex-trading-system-2012---libgen-li.md",
+      "file_hash": "b115e2495f4e5afe4a7729c3f2b15a1dde8a690e6e2f8a166bc64d321fb639d9",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "mean_reversion"
+      ],
+      "record_counts": {
+        "entry": 2,
+        "exit": 0,
+        "strategy": 6,
+        "risk": 0,
+        "execution": 2,
+        "total": 11
+      },
+      "passage_hashes": [
+        "cf8aff357a3873431bdf611c0965875e15930ea18d52c050102c16d51bb29f3f",
+        "c4bcd9c1d5838809a54548642ad3c3c29a6324ad14b085a2a6038bc195cdae78",
+        "32a1c73665824d83a389899734eddc5d90602b9af83fd23086bd397ad06ad3ad",
+        "9e0e0e22132f403c7409cc9f6b6efeb3d199c28aa7c8b11d6088395dc8d22d76",
+        "db236dbea1e8114cbd1a9d6662c1d49001da4868be0da1f872dd154e90075741",
+        "412170d1b9f0e704bed672263eb9c5888f4819306c92b3f49c8cecc3557de810",
+        "9e0e0e22132f403c7409cc9f6b6efeb3d199c28aa7c8b11d6088395dc8d22d76",
+        "c4bcd9c1d5838809a54548642ad3c3c29a6324ad14b085a2a6038bc195cdae78",
+        "32a1c73665824d83a389899734eddc5d90602b9af83fd23086bd397ad06ad3ad",
+        "db236dbea1e8114cbd1a9d6662c1d49001da4868be0da1f872dd154e90075741"
+      ]
+    },
+    {
+      "source": "books\\trade-your-way-to-financial-freedom-2006-mcgraw-hill-companies---libgen-li",
+      "file": "books\\trade-your-way-to-financial-freedom-2006-mcgraw-hill-companies---libgen-li.md",
+      "file_hash": "dcdf6d315b60762d3a0f1750a77988f0a68eeb33dd9f3b86e3ef826118299360",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "spread",
+        "momentum",
+        "breakout",
+        "noise"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 0,
+        "strategy": 10,
+        "risk": 20,
+        "execution": 8,
+        "total": 39
+      },
+      "passage_hashes": [
+        "8bf9dcfcf13b59e619c6381d17b0a363beff792cf7a6b91ff41d4843b36df8e5",
+        "891c7b04a3d3ae49e487bbb62eefb79ce94304669432ad35545a24686e8b4711",
+        "6fdfc6c19b9f1a7a0bbcb0d18c6134fee99edcbf755e924308d5465d7a18919e",
+        "92f2091619ee21e2925e967d5bd2655930c2f419e13f182e0008df498ac519b7",
+        "35d0af75cfbdadb4d8352c96e78b403a5f3c304e6ffb8dfeb2c478f2c8764f20",
+        "0e09ee653933665bca6d008864254dd8271881a73d06977b775904a367787912",
+        "373e09c2e6ace1a06f0076cd8820ad2ff707b2d1ffcaec08c477f77452de65fd",
+        "dda25d9c05e70cdd978f414a19408d7985f1901ee8c52e40891b8abd8e391df6",
+        "7e2f4c6c70f5854d0e535a20559bfbcda6a8b39c21448c2eb76c356a7119c7ab",
+        "df925312a0861e94b636b90ecc74a9ccfe1288a4b1c439daefae31ddfedebb3f"
+      ]
+    },
+    {
+      "source": "books\\trading-and-exchanges-market-microstructure-for-practitioners---full---2002-oxfo",
+      "file": "books\\trading-and-exchanges-market-microstructure-for-practitioners---full---2002-oxfo.md",
+      "file_hash": "3adc820f26d0b1979ba11f6807c7ec79611f45d5132344f07529ad9ac22b8511",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "microstructure",
+        "spread",
+        "adverse_selection",
+        "momentum",
+        "mean_reversion"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 2,
+        "strategy": 0,
+        "risk": 0,
+        "execution": 120,
+        "total": 130
+      },
+      "passage_hashes": [
+        "c51432c2378066c04fd6949f14c7d7fe1a9ac7b0b7c22c6985d568c4de3d2547",
+        "caa9c12ca4c94f842c10c45b3ddda93d767c246c0e2f44b6b332cc81045b6b24",
+        "c426ecc231c8da86a23a9f199907fafaa1148ec050e02301bf7e82653fe77717",
+        "2e0275638a2a29612ca2b65f38130de276b397f3c644de6edde123dce87270bf",
+        "fa4496881bb5dcbfeee0d44cb407ff15456975310729fa66392b9ebce4785d8a",
+        "01c72edda44d7cf157715a7a263cc1b1ba02b1137291ca5dab60a6812c6cb1df",
+        "952a8d4af3b9c277e29e98000969dd72000c4a706849c4a54f67bda01592d717",
+        "e8559878668410145fe4ed1bdf95b6a45dd38f058631d5904fa470a6f4d8664c",
+        "17f154e78470e536415b4722348360e0cab8a22eba499dd816ce9a7ae1821160",
+        "e577d8fe21b4fa1ccea9a5e6034124c8182671e87feb2f5f7e44d4a41f3b4965"
+      ]
+    },
+    {
+      "source": "books\\trading-in-the-zone-2021-wiley-trading---libgen-li",
+      "file": "books\\trading-in-the-zone-2021-wiley-trading---libgen-li.md",
+      "file_hash": "fb3ff2a60087e9cd247ba661ab05614bf8e97b678c96c1bbe224d97683bfd5b6",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "noise"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 4,
+        "strategy": 6,
+        "risk": 4,
+        "execution": 16,
+        "total": 34
+      },
+      "passage_hashes": [
+        "cba2af6a288cd79d6441cd9b6bb7c7203e400c32d8f9def9fa137d9d51412e87",
+        "e05be2d3d5d5c9807a86cc863f3411b13423a10033555f6164d3012875fd3b32",
+        "8e080569cb97d4af0558cce8f8e978b4f9efd0ce7ff642ddc8a77da3e0111bca",
+        "742578ae4191973d17240ab4202f0e480b44f9756c108eb18e59d10d462c4be2",
+        "b396ef2c4d74badb7deec360dad281667bf2d245e7543f7f656781784869dedd",
+        "c35b1db9a42c282a01d18adf2793f64c151e449e8921a915830aee6b02a00007",
+        "f7b43004040927af83c99590d2d6e80bf3884c5fcb936494d1146b6cd9295444",
+        "17ed367b82b7f7446871aaadebd177d1a96537d15e40f478ad7eedffb4cd3dad",
+        "d015cad9ef08b068b1fc656975d143ab24d08397a9d91fd34b0e3c77adeea131",
+        "796db0c6f4e2ce5b79e8fc902f96f654bed85ddda802f605265431008d66d50d"
+      ]
+    },
+    {
+      "source": "books\\trading-price-action-ranges-brooks",
+      "file": "books\\trading-price-action-ranges-brooks.md",
+      "file_hash": "70348b7e3d633c3af83d64b10fe41fd5d3885abcc90e3ce2816bb2e637837f36",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "YES",
+      "topics_matched": [
+        "scalping",
+        "spread",
+        "momentum",
+        "breakout",
+        "failed_breakout",
+        "tail_loss"
+      ],
+      "record_counts": {
+        "entry": 10,
+        "exit": 66,
+        "strategy": 682,
+        "risk": 22,
+        "execution": 172,
+        "total": 1066
+      },
+      "passage_hashes": [
+        "128498eb51b4160004397d81474fba672a4c107fc268a49660f657642a602fce",
+        "15458f2d75515e3aab3c1d663e74b6c93391396bb256e35fb90e1ff316d453ca",
+        "ef2af50c152365963cccee652132335568176f02e4e5912bc4628868ad14127d",
+        "e5253ec5e785142d0314f8ef46ca3b927f6a378536939f34961752b55f188c00",
+        "4d90d42d6d61fd5664b55750760237e722f5c11140cb77b95587e565ce503c78",
+        "93846b18ea8abaef5d8ff7f3f6dad2fd76c9b6477c229be9b014190da4d87557",
+        "88c10e5a2fdfce1b9710e9e68b8b277caf6e8d615a272187e71c5e932d658759",
+        "61f73cce7fe29288a3678ad53d89f35097073ddccd5988f6b9ae8ffdcc9e3334",
+        "04e0ef63bd2b0573d354ee96b01b7c6b30f5509ab69a49918b7954ccdc154810",
+        "adf050f97f6d38e5d7ffa4f0ea7e42ca332f01b528c2d06c6b0a65a5ee2d474a"
+      ]
+    },
+    {
+      "source": "books\\trading-with-intermarket-analysis-a-visual-approach-to-beating-the-financial-mar",
+      "file": "books\\trading-with-intermarket-analysis-a-visual-approach-to-beating-the-financial-mar.md",
+      "file_hash": "340260e0c443a89664f0c4f23925f223225c157a261c77ce2964583fd4dd935a",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum"
+      ],
+      "record_counts": {
+        "entry": 2,
+        "exit": 0,
+        "strategy": 24,
+        "risk": 0,
+        "execution": 14,
+        "total": 47
+      },
+      "passage_hashes": [
+        "d165b6d1965536332b0c3eb7d658b2433358b8030372ef02a4b06014c29d1dd6",
+        "38b087545d8cd063b68df72a6977ad4c0eaf516fd2a743fded19be1320ce7505",
+        "6f3e81e3e62914f5a16d47e951a8e52ba79fce7dfde1d575f5294f32442369c0",
+        "d25e210f31883b9de19eff3415d32b6c2c592c193bd14830b86fa34f1da8700f",
+        "14ac3c8454149463466691e49f226474ac4c00b1643708bebfb3225137f4f1eb",
+        "7c6386b825172084f8a66f48e7e72299c0f1c62335e7061d4357ecb7681cbacd",
+        "e6f1e5961f20553ac8f96faaa65c5110d1abe09197b952288c05a20a0887aa72",
+        "69762e236c9763e7749d4456e0c5f15f10ce7e1847765235c75b140ac73f6d1d",
+        "0ae356c27fc402ed577841e4c064fda7f450088631b422d3a272c94deac79d8f",
+        "2000363f734a863e5e614a3d9e021bd602418c9094d0c6b5160f1a32c08a06ef"
+      ]
+    },
+    {
+      "source": "books\\winning-the-trading-game-why-95-of-traders-lose-and-what-you-must-do-to-2008-wil",
+      "file": "books\\winning-the-trading-game-why-95-of-traders-lose-and-what-you-must-do-to-2008-wil.md",
+      "file_hash": "0c45fe84e4e8364b5b0a02ed7313a1a6667c6241dca480a664a766baf5944b43",
+      "status": "INDEXED",
+      "relevant_to_fast_turnover": "PARTIAL",
+      "topics_matched": [
+        "momentum",
+        "failed_breakout"
+      ],
+      "record_counts": {
+        "entry": 0,
+        "exit": 2,
+        "strategy": 6,
+        "risk": 20,
+        "execution": 26,
+        "total": 61
+      },
+      "passage_hashes": [
+        "70cf543e7d117ba38823230231bffc44a17be375eeddb52ace6d8bcefa79a7eb",
+        "8da12daff903dfa8a35561a11f7d3390b64ab077c603cd83f7b6d42b1a215082",
+        "6fcc4f4ccee3a6def84a4620a66552b33ac9a3ee8000c526e4bc940c68281a33",
+        "4199696ccc7ad636282a9ada36215cb84f5bf985181fdac4894040aaf79fa05f",
+        "0c8a601938cb3d1acdd0efa0a7a2bacc3ff75ded0814cb82299ed9eafb5c8246",
+        "f6a0cb697347b03c323358f92ce2a60b58e3a80617313d038b609dfb47fb6411",
+        "176dbfb54e7287c32e6f4042f7aa127cd4050aef63432caad8c523fe358110b4",
+        "87c92b62b1e5b19bc2d8ac06cc715e8321d3173004faae1938962ad8b534ebba",
+        "cabd6e784faf0730f72102a32f1ee7c3b8885baa6cc597eeab458d169847d0aa",
+        "f8207a782cfd223e8016f6ba49759b7bebb834a02508929f6da1e1a50a70966b"
+      ]
+    }
+  ]
+}

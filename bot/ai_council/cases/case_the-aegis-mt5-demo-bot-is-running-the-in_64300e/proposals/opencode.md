@@ -1,0 +1,1 @@
+Test a volatility-regime filter that suppresses entries when 20-bar ATR is above the 90th percentile of the prior 500 bars. Evaluate it on sealed holdouts net of existing spread and slippage assumptions, requiring a positive improvement in expectancy and no increase in maximum drawdown versus the validated champion. Reject the candidate if either metric fails.

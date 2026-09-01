@@ -1,0 +1,84 @@
+{
+  "change_id": "council_scheduled_cadence_20260824_2233",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-24T22:34:25.786497+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260824_2233",
+    "current_evidence": "Test a tighter validated-state entry filter requiring the trailing 20-bar realized volatility percentile to be below 70 before admitting a signal. Evaluate it only on sealed historical holdouts with existing spread and slippage assumptions, against the current champion. Accept it only if net expecta",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Test a tighter validated-state entry filter requiring the trailing 20-bar realized volatility percentile to be below 70 before admitting a signal. Evaluate it only on sealed historical holdouts with existing spread and slippage assumptions, against the current champion. Accept it only if net expectancy improves by at least 10% without reducing trade count by more than 25%; otherwise reject and record the result.",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/2)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-24T22:33:48.624437+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 2,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Volatility percentile definition, reference distribution, and timing must be specified to prevent lookahead.",
+        "Baseline champion, holdout partitions, and exact cost assumptions are not identified.",
+        "Experiment must be recorded in ExperimentRegistry; no Council component may execute DEMO orders."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "A sealed-holdout, costed research test is appropriate, but the stated falsification criterion references exploration trades and conflicts with the proposal's historical-only evaluation scope.",
+      "requested_revisions": [
+        "Replace exploration-trade falsification with sealed-holdout net expectancy and trade-count criteria.",
+        "Specify causal 20-bar realized-volatility calculation and percentile window/reference universe.",
+        "Name the champion artifact, sealed holdouts, fixed spread/slippage assumptions, and registry record path.",
+        "Confirm the change is research-only and does not modify protected live YAML or broker execution paths."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Explicitly require ExperimentRegistry recording, including failures and full costed metrics.",
+        "Prohibit changes to live YAML, champion artifacts, broker execution paths, and any MT5 order submission.",
+        "Define the complete net-expectancy acceptance formula, evaluation window, statistical requirements, and handling of insufficient samples.",
+        "Clarify that the volatility filter is evaluated only on sealed holdouts with no lookahead and identical spread/slippage assumptions.",
+        "Require baseline test pass counts before and after the experiment.",
+        "The proposed 10% expectancy improvement and 25% trade-count limit need pre-registration and exact comparison methodology."
+      ],
+      "confidence": 0.95,
+      "model": null,
+      "reason": "The proposal is plausibly safe as a sealed, read-only research experiment, but it lacks sufficient operational safeguards and complete acceptance criteria to approve. The affected files could influence runtime behavior, and the stated DEMO risk does not establish that research components cannot submit orders or alter champion/runtime configuration.",
+      "requested_revisions": [
+        "Specify the exact files and ensure they are research-only; exclude execution runners and live configuration.",
+        "Add mandatory ExperimentRegistry registration and honest failure recording.",
+        "State that no champion promotion or runtime deployment occurs unless the governed promotion gates independently pass.",
+        "Add explicit assertions for allow_live=false, mt5_demo, paper_trading_enabled=true, and no order_send calls in research processes.",
+        "Provide complete, non-truncated acceptance and falsification criteria, including minimum sample size and statistical confidence."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

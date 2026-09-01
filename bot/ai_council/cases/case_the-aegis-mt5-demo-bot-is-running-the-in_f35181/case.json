@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-22T18:16:43.253835+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_f35181\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 40.67,
+          "finished_utc": "2026-08-22T18:22:04.052574+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-22T18:21:23.380181+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T18:22:04.054574+00:00",
+        "text": "The \"every market regime\" requirement is unmeasurable as written\u2014regimes are never defined (count, labeling method, lookahead-free construction), letting whoever evaluates redraw boundaries until the verdict fits. There is no statistical power argument: a 30-trade floor per regime with no significance tests or confidence intervals on \"median net expectancy\" cannot distinguish a 0.25R edge from noise, and the conjunctive win-in-every-regime bar all but guarantees rejection on sampling variation alone. Max drawdown is confounded because the stricter gate mechanically trades less, so lower DD reflects reduced exposure rather than better risk control unless normalized per trade; likewise \"falsify if <30 trades\" punishes data sparsity as if it were strategy failure. Finally, \"do not modify code\" contradicts testing a gate whose threshold logic must exist somewhere, and nothing attests that the sealed holdouts were untouched when the 0.25R margin was chosen\u2014without seal-integrity verification, this is silent holdout contamination."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_f35181\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.11,
+          "finished_utc": "2026-08-22T18:21:23.363501+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-22T18:21:11.251047+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-22T18:21:23.363501+00:00",
+        "text": "Daily rebuilding invites repeated-testing and regime-overfitting unless states are evaluated on untouched, time-forward holdouts with multiplicity correction and version-frozen selection rules. The forward criterion is underspecified: \u201cmaterially negative,\u201d the observation window, confidence threshold, and treatment of overlapping/correlated fires are undefined, while \u226550 fires with expectancy merely \u22650 is too weak to establish robustness. Sealing only after failure does not prevent repeatedly adapting to the same demo stream, and the proposal omits rollback/quarantine rules if an artifact consumed by runtime logic admits a harmful state."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-22T18:22:52.465582+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_55b6b5",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_55b6b5 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_f35181",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_f35181\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 189.93,
+        "finished_utc": "2026-08-22T18:20:12.374192+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T18:17:02.441084+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T18:20:12.374192+00:00",
+      "text": "**Proposal:** Pre-register an ExperimentRegistry-tracked study that rebuilds the `validated_states.v2` artifact on a rolling daily cadence from the accumulating reconciled-exit corpus (now 2,518 exits) instead of the current ad-hoc build, leaving every admission gate (min-sample, costed EV, bootstrap p05 > 0) untouched. Motivation from measured evidence: the 2026-08-20 failure audit shows a 92.56% brain skip rate dominated by `no_validated_strategy_model` (23,805 skips) plus 4,255 `state_not_in_validated_set`, with only n_survive=2 states passing despite 43 shortlisted strategies \u2014 the gate is starved, not just strict. Falsifiable prediction: after two weeks of rolling rebuilds, n_survise rises from 2 to \u22654 while every newly admitted state sustains forward demo expectancy \u2265 0 across \u226550 fires net of the assumed 0.3-pip cost; if any admitted state goes materially negative or n_survive stays at 2, the candidate is recorded and sealed, never promoted. This is research-only \u2014 no champion edit, no live YAML change, no order placement."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_f35181\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.21,
+        "finished_utc": "2026-08-22T18:20:44.171034+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T18:20:31.959381+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T18:20:44.173043+00:00",
+      "text": "Test a stricter validated-state entry gate that requires the signal\u2019s estimated net expected value to exceed total modeled spread and slippage costs by at least 0.25R, versus the current champion on identical sealed DEMO holdouts. Register the experiment and reject the candidate unless it improves median net expectancy while maintaining or reducing maximum drawdown across every evaluated market regime. Falsify the candidate if any regime shows lower net expectancy, higher maximum drawdown, or fewer than 30 eligible trades. Do not modify code or promote the champion during this cycle."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_f35181\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.86,
+        "finished_utc": "2026-08-22T18:22:52.430503+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-22T18:22:39.571033+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T18:22:52.431885+00:00",
+      "text": "Pre-register a lookahead-free regime taxonomy, the 0.25R threshold, power analysis, confidence-interval method, and seal-integrity hashes before accessing identical sealed DEMO holdouts. Implement the gate only in isolated research code, register all changes and results, and compare the challenger with the current champion using exposure-normalized drawdown and net expectancy after identical spread/slippage assumptions. Treat regimes below the power-derived trade minimum as inconclusive rather than failures, and require the pooled effect plus sufficiently powered regime effects to meet pre-specified confidence bounds, with multiplicity adjustment, instead of demanding nominal improvement in every regime. Reject the challenger for statistically supported deterioration in any sufficiently powered regime; otherwise classify it as accepted for further validation, rejected, or inconclusive without modifying live configuration or promoting the champion."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_f35181\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 35.48,
+        "finished_utc": "2026-08-22T18:22:39.552096+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T18:22:04.072740+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-22T18:22:39.556835+00:00",
+      "text": "**Proposal (rev 2):** Pre-register an ExperimentRegistry-tracked study that rebuilds `validated_states.v2` on a fixed weekly cadence from the reconciled-exit corpus (n=2,518), with feature set, gates, and selection rules version-frozen in the registry before the first rebuild; every rebuild emits a new immutable artifact version (`v2.YYYYMMDD`) rather than overwriting. Admissions are decided solely on data through a pre-registered cutoff T0, and the post-T0 demo stream is an untouched time-forward holdout evaluated exactly once per state at the end of a pre-specified 30-day window, with multiplicity controlled by Benjamini\u2013Hochberg across all candidate states and fire-level autocorrelation handled by aggregating to one sample per (state, day). A state is admitted only if holdout expectancy exceeds 0 with a bootstrap 95% CI excluding zero across \u2265100 non-overlapping fires net of the assumed 0.3-pip cost \u2014 replacing the weaker \u226550/\u22650 criterion. \"Materially negative\" is defined ex ante as holdout expectancy < \u22120.3 pip/fire or equity drawdown exceeding the incumbent champion's historical p95; either triggers immediate quarantine \u2014 the state is excluded from the next artifact build, the prior artifact version remains pinned for all runtime reads until resolution, and the failure is sealed in `sealed_holdouts.jsonl` alongside the challenger record. To prevent repeated adaptation to the same stream, each state receives at most two pre-registered holdout evaluations ever; any further retest requires a new registry experiment on a holdout segment never previously inspected. Research-only throughout: no champion edit, no live YAML change, no order placement."
+    }
+  },
+  "status": "decided"
+}

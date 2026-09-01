@@ -1,0 +1,3 @@
+window,bars,all_trades,scored_trades,scored_wr,scored_pnl,run_final,run_wr,halt,floor_ok
+last_14d_fresh,1287,13,2,100.0,1.18,105.27,100.0,,True
+prior_14d_fresh,1287,11,3,100.0,1.07,104.09,100.0,,True

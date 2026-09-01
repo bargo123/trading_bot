@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T19:00:34.346494+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_922b7a\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.04,
+          "finished_utc": "2026-08-23T19:02:22.141619+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T19:02:11.100704+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T19:02:22.141619+00:00",
+        "text": "The fixed margin is an arbitrary hyperparameter unless justified and tuned strictly within training folds, creating overfitting risk. \u201cMaterially worsening\u201d drawdown or coverage is unmeasurable without pre-registered thresholds, confidence intervals, and minimum trade counts per regime. Walk-forward testing must use sealed, untouched holdouts and identical cost assumptions; otherwise the claimed challenger advantage is not credible."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_922b7a\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.57,
+          "finished_utc": "2026-08-23T19:02:11.068860+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T19:01:59.503839+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T19:02:11.068860+00:00",
+        "text": "\u201cImproves expectancy\u201d and \u201cdoes not worsen maximum drawdown\u201d lack predefined effect sizes, confidence thresholds, and statistical tests, making acceptance subjective and vulnerable to cherry-picking. The rolling median and ATR window are unspecified and could introduce lookahead or overfit tuning; a single sealed holdout also cannot establish robustness across regimes or repeated research iterations. The proposal omits minimum trade counts, walk-forward/temporal validation, and controls for multiple comparisons, while assuming configured spread/slippage accurately represents execution costs."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T19:02:45.690292+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_209eea",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_209eea for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_922b7a",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_922b7a\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 10.6,
+        "finished_utc": "2026-08-23T19:00:54.567654+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T19:00:43.968532+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T19:00:54.567654+00:00",
+      "text": "Test an Asia-session sell filter that requires ATR-normalized spread below its rolling median before entry. Evaluate it on sealed holdouts net of configured spread and slippage; accept only if it improves expectancy and does not worsen maximum drawdown versus the current validated champion. Record the experiment and retain the candidate unpromoted unless all promotion gates pass."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_922b7a\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 16.61,
+        "finished_utc": "2026-08-23T19:01:32.997408+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T19:01:16.391229+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T19:01:33.005687+00:00",
+      "text": "Test a research-only challenger that raises the validated-state entry threshold by requiring predicted net expectancy to exceed runner spread/slippage costs by a fixed margin. Evaluate it walk-forward against the current champion using net expectancy, drawdown, trade count, and regime coverage. Reject the candidate if it does not improve net expectancy without materially worsening drawdown or coverage; leave the champion unchanged until all promotion gates pass."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_922b7a\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 10.6,
+        "finished_utc": "2026-08-23T19:02:45.665813+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T19:02:35.067086+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T19:02:45.665813+00:00",
+      "text": "Test a research-only challenger that raises the validated-state entry threshold by requiring predicted net expectancy to exceed runner spread/slippage costs plus a pre-registered margin selected only from a bounded grid within each training fold. Evaluate it walk-forward with identical cost assumptions, minimum trade counts per regime, and sealed, untouched holdouts reserved for final assessment. Pre-register non-inferiority thresholds for drawdown and regime coverage, and require confidence intervals showing improved net expectancy without exceeding those limits. Reject the challenger unless all statistical, trade-count, coverage, and promotion gates pass; leave the champion unchanged otherwise."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_922b7a\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.89,
+        "finished_utc": "2026-08-23T19:02:35.051180+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T19:02:22.157524+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T19:02:35.051180+00:00",
+      "text": "Test a pre-registered Asia-session sell filter using a 20-bar trailing ATR and trailing 100-bar median ATR-normalized spread, computed only from bars available at entry. Require at least 100 net-of-cost trades across three chronologically separated sealed holdouts and walk-forward folds; accept only if pooled expectancy improves by at least 0.05R with a one-sided bootstrap 95% lower bound above zero, maximum drawdown is no worse than the champion by 5%, and each regime has non-negative expectancy. Lock all parameters before evaluation, adjust significance using Benjamini-Hochberg across tested variants, and stress costs at 1.0x, 1.5x, and 2.0x configured spread/slippage. Record every variant and result in the experiment registry, retain all candidates unpromoted unless every governed promotion gate passes, and preserve failed candidates and holdout results for audit."
+    }
+  },
+  "status": "decided"
+}

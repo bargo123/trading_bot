@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-26T19:04:30.015178+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1a37b5\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.51,
+          "finished_utc": "2026-08-26T19:06:59.065972+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-26T19:06:46.560708+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T19:06:59.068972+00:00",
+        "text": "This is an error message, not a research proposal, so it provides no hypothesis, methodology, risk controls, or measurable outcome. It cannot be validated and should not influence trading or model-selection decisions until the unsupported model identifier is corrected and a reproducible evaluation is supplied."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1a37b5\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 7.77,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T19:07:06.847671+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-26T19:07:27.293833+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_898ff3",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_898ff3 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_1a37b5",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1a37b5\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.64,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T19:04:46.391265+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1a37b5\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 14.32,
+        "finished_utc": "2026-08-26T19:05:14.255883+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T19:04:59.931888+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T19:05:14.257879+00:00",
+      "text": "Test a stricter validated-state freshness rule: reject entries when the validation snapshot is older than 60 seconds. Compare it against the current gate on sealed DEMO outcomes, net of spread and slippage, requiring a lower adverse-exit rate without reducing net expectancy. Promote nothing unless the improvement is statistically reproducible across at least two non-overlapping holdouts."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1a37b5\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.72,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T19:07:14.586762+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_1a37b5\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.63,
+        "finished_utc": "2026-08-26T19:07:27.247673+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T19:07:14.614359+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T19:07:27.248672+00:00",
+      "text": "Test the stricter 60-second validated-state freshness rule using only supported, authenticated model endpoints. Compare sealed DEMO outcomes net of spread and slippage, requiring a lower adverse-exit rate with no reduction in net expectancy. Promote nothing unless results are statistically reproducible across two non-overlapping holdouts."
+    }
+  },
+  "status": "decided"
+}

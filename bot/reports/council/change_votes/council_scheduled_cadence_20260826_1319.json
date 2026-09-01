@@ -1,0 +1,115 @@
+{
+  "change_id": "council_scheduled_cadence_20260826_1319",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-26T13:21:48.717869+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260826_1319",
+    "current_evidence": "Proposal: Add predicted-versus-realized expected-value calibration to the validated-state gate. Hypothesis: a subset of states currently passing the validated-state gate realizes materially less net EV than predicted (validation overfit or regime drift), so the gate should abstain whenever a state's",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Proposal: Add predicted-versus-realized expected-value calibration to the validated-state gate. Hypothesis: a subset of states currently passing the validated-state gate realizes materially less net EV than predicted (validation overfit or regime drift), so the gate should abstain whenever a state's trailing realized-minus-predicted net EV breaches its historical bootstrap confidence band. Falsifiable test: using already-logged DEMO outcomes in bot/intel/outcome_log.jsonl, bin sealed trades by p",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T13:19:50.709507+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Falsifiable test specification is incomplete/truncated; not currently actionable as registered experiment",
+        "Mechanism claim mismatches design: abstention reduces throughput by construction",
+        "No minimum sealed-sample threshold per state bin; sparse DEMO bins yield either dead-wide or noisy-narrow bootstrap bands",
+        "Lookahead/circularity risk unaddressed: predicted EV must derive from strictly pre-trade information, and realized-minus-predicted calibration must not reuse the same OOS folds already used for promotion gating",
+        "Multiple-comparison inflation across many state bins (false drift triggers); needs FDR control or shrinkage",
+        "Affected paths include bot/intel/ which contains governed artifacts (intelligent_champion.json): proposal must guarantee no new writer path outside the designated promote scripts",
+        "bot/ai_council/ modification scope is undefined; council-code changes warrant separate review",
+        "Breach behavior unspecified: abstention duration, re-entry/reset criteria, hysteresis against flip-flopping",
+        "Interaction with existing remaining-EV and tail-loss controls not specified"
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "The core idea is sound and safety-conservative: predicted-versus-realized net EV calibration with bootstrap-band abstention is a legitimate drift/overfit monitor, it only adds an abstention condition (never removes a gate), and it is DEMO-only using already-logged outcomes. However, the proposal is materially incomplete: the falsifiable test is truncated mid-specification ('bin sealed trades by p...'), baseline evidence is None (PF=None, EV=None), the stated mechanism ('improve exploration/validation throughput') contradicts the design (an abstention gate reduces trade count; it can improve net-EV selectivity, not throughput), and no sample-size, lookahead-control, breach-policy, or governed-write-path details are provided.",
+      "requested_revisions": [
+        "Complete the test spec: exact state bins, trailing window lengths, per-bin minimum sealed-trade counts, bootstrap method and confidence level",
+        "Restate expected mechanism honestly as reduced negative-EV exposure / improved net-EV selectivity with accepted lower trade count",
+        "Default to pass-through (no abstention) when a bin is under-powered; gate activates only above the sample threshold",
+        "Add explicit lookahead controls: predictions timestamped pre-entry, realized outcomes post-close, both net of runner spread/slippage assumptions, calibration data disjoint from promotion OOS folds",
+        "State file-level guarantees: zero writes to intelligent_champion.json and other governed intel artifacts; list ai_council edits separately",
+        "Define breach policy: abstention window, reset condition, and interplay with existing EV/tail-loss gates",
+        "Run phase 0 as measurement-only (log calibration deltas, no gate enforcement) to quantify the effect before enforcement, pre-registered in ExperimentRegistry with numeric falsification thresholds"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "No minimum sealed-trade count, recency window, or multiple-testing control is specified.",
+        "The predicted EV definition and cost/slippage alignment with realized EV are unspecified.",
+        "Historical bootstrap bands may leak information or fail under nonstationary regimes.",
+        "Abstention may reduce exploration/validation throughput, contrary to the stated expected mechanism.",
+        "No bounded rollback trigger or monitoring metrics are defined."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The proposal is safety-compatible for DEMO research, but its calibration method, sample sufficiency, leakage controls, and exact abstention behavior are underspecified. A bootstrap confidence band alone can be unstable across sparse state bins and regime changes.",
+      "requested_revisions": [
+        "Define state identity, prediction timestamp, net realized-EV calculation, and identical cost assumptions.",
+        "Require sealed, time-ordered outcomes; compute bands using only outcomes available before each decision.",
+        "Specify minimum sample sizes, recency weighting/window, confidence level, hysteresis, and treatment of sparse states.",
+        "Run a shadow-mode OOS comparison against the current gate, reporting coverage, abstentions, predicted-versus-realized calibration, and net costed expectancy.",
+        "Add explicit monitoring and rollback thresholds; record the experiment in ExperimentRegistry and prevent any champion promotion unless governed promotion gates pass."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "timed out after 90s",
+      "status": "TIMEOUT",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Proposal text is truncated and does not define the predicted-EV bins or state-level attribution.",
+        "No minimum sample size, bootstrap methodology, multiple-testing control, or treatment of sparse states is specified.",
+        "It is unclear whether the gate change affects runtime execution or only research evaluation.",
+        "No explicit confirmation that all experiments will be recorded in ExperimentRegistry.",
+        "The proposal does not define exact net spread/slippage cost assumptions or an out-of-sample evaluation split.",
+        "Affected intel files could inadvertently influence champion or execution behavior despite the stated lack of champion impact."
+      ],
+      "confidence": 0.96,
+      "model": null,
+      "reason": "The hypothesis is plausible, but the proposal is incomplete and lacks sufficient statistical and operational detail to approve even a DEMO test. The falsifiable test, state definition, calibration method, confidence-band construction, sample-size threshold, and rollback behavior are underspecified.",
+      "requested_revisions": [
+        "Provide the complete proposal and precise state, prediction, outcome, and bin definitions.",
+        "Specify minimum observations per state/bin, bootstrap confidence-band method, confidence level, and multiple-comparison handling.",
+        "Run a preregistered costed retrospective/OOS analysis before changing the validated-state gate, including baseline comparison and power or sample-size justification.",
+        "Clearly isolate the change to research/DEMO validation and prove it cannot submit orders, alter protected YAML, or write intelligent_champion.json.",
+        "Record the experiment, data snapshot, metrics, failures, and decision in ExperimentRegistry.",
+        "Define explicit rollback criteria, including negative costed expectancy, instability, or insufficient sample size."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

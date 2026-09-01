@@ -1,0 +1,355 @@
+{
+  "created_utc": "2026-08-26T08:29:40.524633+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\critiques\\codex--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 61.64,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T08:42:23.541983+00:00",
+        "text": "The 1.5\u00d7 multiplier is an unjustified free parameter: if it was scanned or tuned against the same sealed observations used to judge the challenger, that's in-sample selection, and the proposal never commits to fixing it ex ante plus validating out-of-sample across regimes/sessions rather than one historical path. The promotion claim is unmeasurable as stated \u2014 \"improves net expectancy and drawdown\" specifies no effect size, significance test, or minimum sample, and with up to 10% fewer eligible signals any expectancy delta will be small-N noise while raw max-drawdown comparisons are mechanically biased downward simply because the challenger trades less. The cost term is underspecified: it must state whether \"measured spread-plus-slippage\" uses point-in-time runner assumptions or period averages, since averaging understates precisely the tail-spread episodes this gate exists to avoid, violating the net-of-costs requirement. Finally, promotion cannot be granted on two metrics alone \u2014 the challenger must pass every gate in bot/aegis/research/promote.py, be registered in the ExperimentRegistry, and the sealed set must be verified uncontaminated by any data that informed the current champion's gate."
+      },
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 12.41,
+          "finished_utc": "2026-08-26T08:42:35.979074+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-26T08:42:23.564346+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T08:42:35.981076+00:00",
+        "text": "\u201cMeasured\u201d costs may be stale or regime-dependent, so a fixed 1.5x threshold can overfit the sealed sample unless validated across time splits, symbols, volatility regimes, and independent forward-demo data. \u201cImproves net expectancy and drawdown\u201d is underspecified: require confidence intervals, sufficient trade counts, identical execution assumptions, and explicit treatment of abstention-induced selection bias. The 10% eligible-signal constraint is arbitrary and may mask degraded coverage or tail-risk behavior."
+      },
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\critiques\\codex--by--gemini.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 7.96,
+          "finished_utc": "2026-08-26T08:42:43.971579+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "Google",
+          "returncode": 0,
+          "started_utc": "2026-08-26T08:42:36.007604+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T08:42:43.974580+00:00",
+        "text": "The arbitrary 1.5x multiplier lacks dynamic adaptation to volatility regimes, creating a high risk of overfitting to specific historical noise rather than structural edge. The \"10% signal reduction\" limit is a dangerous constraint that may force the model to prioritize volume over safety, potentially masking toxic flow in low-volatility environments. Furthermore, evaluating net expectancy on sealed historical data ignores the non-linear impact of order-flow absence on subsequent liquidity, making the predicted improvements unmeasurable for live execution."
+      }
+    ],
+    "gemini": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\critiques\\gemini--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 47.2,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T08:40:52.302273+00:00",
+        "text": "The central flaw is circular censoring: winners' MAE is measured under the existing 30-pip stop, so the distribution is truncated by the very parameter being replaced \u2014 any trade whose excursion exceeded 30 pips was already killed and can never appear in the winner sample, biasing the derived threshold low and guaranteeing the candidate manufactures extra stop-outs when replayed. The 95th percentile of a presumably small, single-regime winner set is a high-variance estimate with no confidence interval, no walk-forward/out-of-sample protocol, and no pre-registered numeric pass/fail criteria for \"PF gain vs win-rate decay,\" making the headline claim unmeasurable as written. Cost interaction is ignored: tighter stops mechanically raise stop-out frequency and therefore spread/slippage drag, so the Profit Factor comparison is meaningless unless evaluated net of costs at the runner's assumptions. Finally, replacing a stop formula alters live risk geometry and must go through the governed promotion gates with ExperimentRegistry recording and operator authorization \u2014 not ship as an inline calibration tweak."
+      },
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\critiques\\gemini--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 17.53,
+          "finished_utc": "2026-08-26T08:41:09.851635+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-26T08:40:52.322493+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T08:41:09.854284+00:00",
+        "text": "The winning-trade MAE distribution is selection-biased and may set stops too tight for trades that would recover, especially across changing volatility regimes. Claims about \u201cvalidated price action\u201d and fixing a \u201ccost mirage\u201d are unmeasurable without a preregistered, cost-inclusive holdout comparison against the 30-pip baseline. The proposal also omits walk-forward validation, sample size/regime breakdowns, and safeguards against silently increasing tail-loss or execution risk."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\critiques\\gemini--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.02,
+          "finished_utc": "2026-08-26T08:41:21.890695+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-26T08:41:09.875506+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T08:41:21.894685+00:00",
+        "text": "Calibrating to the 95th-percentile MAE of winners is survivorship/selection bias: it excludes losers and may simply encode the historical regime, instrument, and entry logic rather than a transferable pain threshold. \u201cHighly destructive\u201d SL exits and improved Profit Factor are unmeasurable without defined samples, costs, confidence intervals, out-of-sample or walk-forward validation, and comparison against the existing rule under identical execution assumptions. Tightening SL based on winners can increase premature exits and tail losses, and replacing the live formula or testing through the broker runner without explicit governed approval would violate the protected-config and DEMO-only execution controls."
+      }
+    ],
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 15.18,
+          "finished_utc": "2026-08-26T08:37:02.796485+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-26T08:36:47.621103+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T08:37:02.800733+00:00",
+        "text": "The retrospective comparison is likely underpowered: few historical promotions and correlated market regimes make Fisher p-values and nominal CI coverage unreliable. Each candidate\u2019s own horizon and non-overlapping block definition can be tuned post hoc, creating a new selection bias unless fixed prospectively and tested across regimes. \u201cRealized post-promotion expectancy\u201d is confounded by changing execution, portfolio constraints, and selection rules, so it cannot isolate whether the CI gate caused better outcomes."
+      },
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\critiques\\hermes--by--gemini.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 73.05,
+          "finished_utc": "2026-08-26T08:38:15.871349+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "Google",
+          "returncode": 0,
+          "started_utc": "2026-08-26T08:37:02.825650+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T08:38:15.873350+00:00",
+        "text": "The assumption that historical \"realized outcomes\" provide sufficient sample density for a Fisher exact p < 0.05 is mathematically optimistic and likely unmeasurable given the limited promotion history in `ExperimentRegistry`. Block-bootstrap CIs introduce an arbitrary block-size parameter that is prone to overfitting and can be tuned to selectively exclude valid alpha under the guise of \"sampling noise\" reduction. Additionally, the proposal ignores that a 95% CI is valid only under stationarity, meaning it will systematically fail to protect against the regime shifts that actually cause post-promotion expectancy collapse."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\critiques\\hermes--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.43,
+          "finished_utc": "2026-08-26T08:38:28.323762+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-26T08:38:15.890538+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T08:38:28.327772+00:00",
+        "text": "The proposal risks overfitting the promotion rule to a retrospective comparison on the same sealed holdout, effectively consuming or contaminating the holdout before prospective validation. Its target of Fisher p < 0.05 is underpowered and vulnerable to multiple-comparison and selection effects, while \u201cnominal rate\u201d coverage is not a clear falsifiable benchmark for overlapping, nonstationary trades or data-dependent horizons. It also fails to specify minimum sample sizes, bootstrap methodology, challenger independence, and an untouched forward test, so any apparent improvement could be sampling noise rather than safer promotion."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 36.52,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T08:39:04.863402+00:00",
+        "text": "The proposal burns the sealed holdout as its only decision set: any accept/reject call made directly against the seal \u2014 especially across a stream of such challengers \u2014 is uncorrected multiple testing, so \"improvement\" is as likely noise as edge, and the seal is spent after one look. It specifies no minimum sample size, no significance or bootstrap testing on net expectancy or max drawdown (both extremely noisy point estimates at typical holdout trade counts), and leaves \"validated-state observation\" undefined, so the challenger isn't reproducible as stated. The trade-count and invalidation-rate comparisons are confounded by construction: requiring two consecutive observations mechanically reduces entries, so a large invalidation-rate shift may reflect selection rather than quality, and the 20%-count gate interacts ambiguously with the compound rejection clause (\"worsening drawdown OR count reduction\" vs. joint conditions is not disambiguated). There is no pre-holdout validation stage (in-sample or cross-validated screening) to justify touching the seal at all, and no statement of per-candidate horizon/overlap handling despite that being a known trap in this pipeline."
+      },
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\critiques\\opencode--by--gemini.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 47.86,
+          "finished_utc": "2026-08-26T08:39:52.747603+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "Google",
+          "returncode": 0,
+          "started_utc": "2026-08-26T08:39:04.890359+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T08:39:52.750613+00:00",
+        "text": "The requirement for two consecutive observations introduces significant execution lag, likely causing entry at the tail end of signal validity and increasing exposure to immediate state decay. The arbitrary 20% trade count threshold lacks statistical rigor and risks selecting a filter that overfits the specific temporal volatility of the holdout set. Furthermore, maintaining static slippage assumptions is a safety violation, as delayed entries frequently coincide with the liquidity-thinning periods typical of state-change transitions."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-26T08:45:10.355034+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_734787",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 11,
+      "n_proposals": 4,
+      "n_revisions": 4,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_734787 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_7b4481",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 54.06,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T08:31:03.441837+00:00",
+      "text": "Proposal: Extend the validated-state gate in `bot/aegis/research/promote.py` from a positive point estimate of net OOS expectancy to requiring the lower bound of a 95% block-bootstrap confidence interval (blocked by non-overlapping trades under each candidate's own horizon, consistent with the executable-overlap correction) to be strictly above zero on the sealed holdout, net of runner spread/slippage. This is falsifiable entirely from existing records: rescore every challenger already logged in `ExperimentRegistry` (`bot/research/experiments.sqlite`) and `bot/research/sealed_holdouts.jsonl` under the proposed CI gate offline, then compare realized post-promotion outcomes. Prediction: challengers that passed the current point-estimate gate but would fail the CI gate show a significantly higher rate of negative realized net expectancy after costs than challengers passing both gates (target: Fisher exact p < 0.05), indicating the current gate promotes sampling-noise winners. Refutation condition: if sealed outcomes of point-gate-only promotions fall inside their bootstrap intervals at roughly the nominal rate, the present gate is already statistically adequate and this candidate dies on the record. No code, champion, config, or execution changes are required to run the retrospective; the gate change itself would be proposed for promotion review only if the prediction holds."
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.18,
+        "finished_utc": "2026-08-26T08:31:25.389775+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T08:31:14.213986+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T08:31:25.392776+00:00",
+      "text": "Test a challenger that requires two consecutive validated-state observations before entering, rather than one. Evaluate it on the sealed holdout with identical spread/slippage assumptions, comparing net expectancy, maximum drawdown, trade count, and invalidation rate against the current champion. Reject it unless net expectancy improves without worsening maximum drawdown or reducing trade count by more than 20%."
+    },
+    {
+      "agent": "gemini",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\proposals\\gemini.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 196.6,
+        "finished_utc": "2026-08-26T08:34:52.545539+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "Google",
+        "returncode": 0,
+        "started_utc": "2026-08-26T08:31:35.945496+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T08:34:52.549638+00:00",
+      "text": "Calibrate the intelligent firehose Stop Loss (SL) to the 95th percentile of measured Maximum Adverse Excursion (MAE) observed in the winning population, replacing the current 30-pip formula. Measured evidence from the recent outcome learning cycle identifies SL exits as highly destructive (\u22120.503 average), while Tharp (*Trade Your Way to Financial Freedom*) advocates for stops derived from empirical excursion rather than arbitrary distances. This modification will test whether tightening the risk to the observed 'pain threshold' of successful trades improves the Profit Factor more than it decays the win rate. This research candidate specifically targets the 'cost mirage' identified in recent ML pipeline findings by aligning the risk profile with validated price action behavior."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 14.06,
+        "finished_utc": "2026-08-26T08:35:16.516650+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-26T08:35:02.458008+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T08:35:16.518843+00:00",
+      "text": "Candidate: test a stricter validated-state gate that abstains whenever the predicted edge is less than 1.5\u00d7 the measured spread-plus-slippage cost. Run it as a research-only challenger on sealed historical/demo observations, without changing the champion or placing orders. Promote only if it improves net expectancy and drawdown versus the current gate, with no more than a 10% reduction in eligible signals."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 14.91,
+        "finished_utc": "2026-08-26T08:45:10.318659+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-26T08:44:55.406630+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T08:45:10.321868+00:00",
+      "text": "Candidate: test a pre-specified, volatility- and session-aware validated-state gate that abstains when predicted edge does not exceed a point-in-time runner cost estimate (spread plus slippage, including tail conditions) by a fixed threshold documented before evaluation; do not tune it on the sealed set. Evaluate it as a research-only challenger across time splits, symbols, volatility regimes, sessions, and independent forward-demo shadow observations, using identical execution assumptions and methods that report abstention-induced selection effects and the limits of historical counterfactual liquidity inference. Require a pre-registered minimum trade count and out-of-sample confidence intervals showing a practically meaningful improvement in net expectancy and tail-aware drawdown/risk metrics, with no material degradation in safety or regime coverage; do not impose an arbitrary signal-retention floor. Record the experiment in `ExperimentRegistry`, verify the sealed data are uncontaminated by champion development, and promote only if every gate in `bot/aegis/research/promote.py` passes; otherwise retain the challenger without changing the champion or placing orders."
+    },
+    "gemini": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\revisions\\gemini.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.28,
+        "finished_utc": "2026-08-26T08:44:55.386910+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "Google",
+        "returncode": 0,
+        "started_utc": "2026-08-26T08:44:44.102825+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T08:44:55.388911+00:00",
+      "text": "Register a research experiment to calibrate the intelligent firehose SL using walk-forward MAE distributions from both winners and near-misses, mitigating circular selection bias inherent in the current 30-pip truncation. Performance will be validated out-of-sample with a pre-registered success criterion of a >0.1 Profit Factor improvement against a maximum 5% win-rate decay, calculated strictly net of slippage and spread costs. The analysis will utilize bootstrapping to establish confidence intervals and ensure robustness across varying volatility regimes, specifically targeting the \"cost mirage\" by evaluating the impact of increased stop-out frequency on execution drag. This candidate will follow governed promotion protocols via the ExperimentRegistry, requiring explicit operator authorization before any transition from DEMO-only backtesting to live shadow-testing."
+    },
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 106.89,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T08:44:30.875365+00:00",
+      "text": "Revised proposal: Extend the validated-state gate in `bot/aegis/research/promote.py` to require the lower bound of a 95% stationary-block-bootstrap confidence interval (expected block length fixed from each candidate's own logged trade durations, horizons taken exactly as already recorded in `ExperimentRegistry` \u2014 nothing tuned post hoc) to be strictly above zero on the sealed holdout net of runner spread/slippage, with the retrospective pre-registered before unblinding: a minimum of 40 sealed challenger decisions (below which the test is declared underpowered and abandoned on record), one hypothesis tested via a regime-stratified permutation test rather than Fisher exact, and a single execution of the analysis whose result \u2014 pass or fail \u2014 is written to the registry either way. Because realized post-promotion outcomes are confounded by evolving execution, portfolio, and selection rules, the claim is narrowed from causation to discrimination \u2014 whether the CI lower-bound sign at decision time predicts subsequent negative net expectancy within the already-recorded cohort \u2014 and the stationarity objection is accepted outright: the CI gate guards sampling noise only, so it is proposed strictly as a necessary, not sufficient, condition, complemented by a walk-forward, regime-partitioned check rather than presented as regime-shift protection. To avoid consuming the holdout, the retrospective touches only decisions logged before today and the gate change itself would be adopted solely after a shadow phase in which both gates are scored on new untouched challengers for a pre-committed window (at least 3 months or 20 decisions) while promotion remains governed exclusively by the current point-estimate gate. The switch proceeds only if the shadow phase shows the CI gate would have blocked every subsequently failed promotion while vetoing none that later succeeded; otherwise this candidate dies on the record."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_7b4481\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.18,
+        "finished_utc": "2026-08-26T08:44:44.083070+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T08:44:30.900285+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T08:44:44.085070+00:00",
+      "text": "Define a validated state as two completed, non-overlapping observation intervals meeting the existing state, quote-quality, and freshness gates; screen the pre-registered challenger through walk-forward cross-validation with lag-aware, state-transition slippage. Advance only one pre-specified candidate to the sealed holdout, evaluated once over a fixed horizon with block-bootstrap confidence intervals for net expectancy and drawdown. Accept only if net expectancy improvement is statistically supported, drawdown is non-inferior, and execution-adjusted trade participation remains within a pre-registered bound; report invalidation rates as descriptive selection effects, not an independent quality gate."
+    }
+  },
+  "status": "decided"
+}

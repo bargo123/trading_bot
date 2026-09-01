@@ -1,0 +1,1 @@
+This is not a trading proposal but an unsupported-model error, so it provides no hypothesis, methodology, metrics, or validation evidence to review. Resolve the model configuration before claiming any research or execution capability.

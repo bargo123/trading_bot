@@ -1,0 +1,1 @@
+Evaluate a volatility-adjusted trailing exit against the current champion on the sealed holdout, with identical entry signals and net runner costs. Accept it only if it improves holdout expectancy by at least 0.05R per trade and does not reduce the lower 95% bootstrap confidence bound of profit factor. Otherwise retain the champion unchanged and record the rejected experiment.

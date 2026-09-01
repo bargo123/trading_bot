@@ -1,0 +1,1 @@
+Test a stricter validated-state freshness gate: reject entries when the last validated market-state update is older than 60 seconds. Compare net, cost-adjusted out-of-sample expectancy and maximum drawdown against the current gate on sealed MT5 DEMO replay data. Adopt it only if expectancy improves without worsening drawdown or reducing qualified trade count by more than 20%.

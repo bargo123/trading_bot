@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T20:07:52.234712+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5b5f08\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.39,
+          "finished_utc": "2026-08-23T20:09:27.181718+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T20:09:15.786781+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T20:09:27.188438+00:00",
+        "text": "The proposal assumes analogue matches are genuinely independent without defining or testing independence, inviting correlated historical regimes to masquerade as confirmation. \u201cMaterially\u201d and \u201cdoes not worsen\u201d lack pre-registered effect sizes, confidence intervals, and sample-size requirements, making rejection criteria discretionary. It also omits multiple-testing controls and an explicit frozen holdout protocol, so iterative gate tuning can overfit the sealed holdout despite the stated promotion restraint."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5b5f08\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.04,
+          "finished_utc": "2026-08-23T20:09:15.762347+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T20:09:03.724359+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T20:09:15.762347+00:00",
+        "text": "A single 12-bar horizon risks overfitting, especially if the sealed holdout is queried repeatedly; the holdout must remain untouched until the specification is frozen. \u201cImproves net expectancy\u201d lacks a statistical uncertainty threshold and minimum trade/sample-size requirement, while maximum drawdown and losing-streak comparisons are highly noisy. The proposal also does not require walk-forward or regime-stratified validation, nor explicitly verify that exit features use only information available at the decision time."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T20:09:57.879724+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_f759e3",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_f759e3 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_5b5f08",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5b5f08\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.16,
+        "finished_utc": "2026-08-23T20:08:14.340746+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T20:08:03.179260+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T20:08:14.350282+00:00",
+      "text": "Test whether a time-based exit at 12 completed M5 bars improves net expectancy versus the current exit logic on the sealed holdout. Require identical entries, validated-state gating, and configured spread/slippage; accept only if net expectancy improves with no increase in maximum drawdown or losing-streak length. Record the experiment and retain the incumbent if any gate fails."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5b5f08\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.39,
+        "finished_utc": "2026-08-23T20:08:38.432019+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T20:08:27.037137+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T20:08:38.432019+00:00",
+      "text": "Test a stricter validated-state gate that requires positive expected value after spread/slippage plus at least two independent analogue matches. The hypothesis is that this reduces false-positive signals without materially reducing net expectancy on a sealed holdout. Promote nothing; accept the candidate only if holdout net expectancy improves and drawdown does not worsen."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5b5f08\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 18.9,
+        "finished_utc": "2026-08-23T20:09:57.846197+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T20:09:38.943719+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T20:09:57.846197+00:00",
+      "text": "Test one pre-registered validated-state gate requiring positive net expected value after spread/slippage and at least two analogue matches from distinct, non-overlapping source windows and regime clusters, with pairwise outcome correlation below a specified threshold; independence will be assessed using block-level correlations and a permutation test. Tune no gate parameters on the sealed holdout: use a development set for all iteration, freeze the final rule and holdout before evaluation, and apply Holm correction across any development-set variants. Evaluate only after at least 200 independent holdout signals, accepting the candidate only if net expectancy improves by at least 0.10R per trade with a two-sided 95% bootstrap confidence interval excluding zero, while maximum drawdown\u2019s 95% interval does not exceed baseline by more than 5% relative. Promote nothing regardless of the result; otherwise reject and retain the full preregistered record."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_5b5f08\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.73,
+        "finished_utc": "2026-08-23T20:09:38.927156+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T20:09:27.198397+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T20:09:38.927156+00:00",
+      "text": "Freeze the exit specification before a single sealed-holdout evaluation: test predeclared 8-, 12-, and 16-completed-M5-bar horizons through walk-forward, regime-stratified validation using identical entries, validated-state gating, configured costs, and only decision-time-available features. Require a predeclared minimum trade count and a confidence-bound improvement in net expectancy over the incumbent, with no material degradation in drawdown or losing-streak metrics under bootstrap uncertainty. Query the sealed holdout once only after these criteria and the selected horizon are fixed. Record the experiment and retain the incumbent unless every gate passes."
+    }
+  },
+  "status": "decided"
+}

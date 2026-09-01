@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal, so it provides no hypothesis, methodology, metrics, or validation plan to review. It also gives no evidence that the selected model is available or approved, making the claimed configuration operationally unverifiable.

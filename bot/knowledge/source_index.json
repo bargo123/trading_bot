@@ -1,0 +1,335 @@
+{
+  "built_utc": "2026-08-21T18:20:55.826217+00:00",
+  "corpus_version": "cc243170a00ab5d0d354338b6fd4d24109646dcee8a408d291e9311182044ce7",
+  "counts_by_status": {
+    "INDEXED": 52,
+    "PARTIALLY_INDEXED": 2
+  },
+  "files": [
+    {
+      "file": "books\\a-complete-guide-to-volume-price-analysis-coulling.md",
+      "file_hash": "ce93f7a83c6e0608ca2988df048c022dd7bc59efa7e8bbee74f99173d94ebffd",
+      "status": "INDEXED",
+      "words": 72326
+    },
+    {
+      "file": "books\\advances-in-financial-machine-learning-prado-2018.md",
+      "file_hash": "50a0c4b8538f7ff7567d632e9ab95021781f30cb09f35060c9eb504eadb1f2fd",
+      "status": "INDEXED",
+      "words": 100311
+    },
+    {
+      "file": "books\\algorithmic-trading-and-dma-johnson-2010.md",
+      "file_hash": "825945a238fa9a03287cab27f9b682a42979bd84473e993ae7e4404e5b42f344",
+      "status": "INDEXED",
+      "words": 207534
+    },
+    {
+      "file": "books\\algorithmic-trading-winning-strategies-chan-2013.md",
+      "file_hash": "a8f5666e0530bb6a770fa37b02751b6802aa66c3fbe729961ed54789dbb382af",
+      "status": "INDEXED",
+      "words": 66734
+    },
+    {
+      "file": "books\\beat-the-forex-dealer-an-insider-s-look-into-trading-today-s-foreign-exchange-ma.md",
+      "file_hash": "016c4251763f56ee6c0283e8522904c1e8c61dab700852ec509054fb3e1c8218",
+      "status": "INDEXED",
+      "words": 58707
+    },
+    {
+      "file": "books\\beyond-candlesticks-new-japanese-charting-techniques-revealed-wiley-finance-1994.md",
+      "file_hash": "858ed9f64a3bcb20d362801992e79873503a87af3bdcbf14ff7de554429decbb",
+      "status": "INDEXED",
+      "words": 58928
+    },
+    {
+      "file": "books\\building-winning-algorithmic-trading-systems-website-a-trader-s-journey-from-dat.md",
+      "file_hash": "c45210cb20249cd0ead427b9c14f22866a65764d80af705711e53f8277c06412",
+      "status": "INDEXED",
+      "words": 73853
+    },
+    {
+      "file": "books\\developing-high-frequency-trading-systems.md",
+      "file_hash": "1139155ebf6c396c45a9aabd0d6aa3571d43b3c3b21eb1af4d07c545f3a69aa3",
+      "status": "INDEXED",
+      "words": 90464
+    },
+    {
+      "file": "books\\elliott-wave-principle-frost-prechter-2005.md",
+      "file_hash": "072a7d8995c501fad4ff593530611bb4409d1e150dfa4d71653e914a19215e60",
+      "status": "INDEXED",
+      "words": 52867
+    },
+    {
+      "file": "books\\encyclopedia-of-chart-patterns-2005-john-wiley-sons-inc---libgen-li.md",
+      "file_hash": "d10b043b296c92c097efe360b876dcb123288aac4e1f0bad812dc84a2e755a26",
+      "status": "INDEXED",
+      "words": 300490
+    },
+    {
+      "file": "books\\evidence-based-technical-analysis-applying-the-scientific-method-and-statistical.md",
+      "file_hash": "da63d05d614209475e45a592702b17c50faa3b2fb39560172da774b6c5fa9ced",
+      "status": "INDEXED",
+      "words": 173970
+    },
+    {
+      "file": "books\\following-the-trend-diversified-managed-futures-trading-wiley-trading-2023-wiley.md",
+      "file_hash": "b6f41d0e32b64e06585ad15bfa0f124482f21e465f3e4f2bb3c065651647dc91",
+      "status": "INDEXED",
+      "words": 86933
+    },
+    {
+      "file": "books\\forex-patterns-probabilities-trading-strategies-for-trending-range-bound-markets.md",
+      "file_hash": "5886c6379221be90cb758cdb1bfcf68412cca94a6d5f0b45dfcfbf3a5a97061d",
+      "status": "INDEXED",
+      "words": 61753
+    },
+    {
+      "file": "books\\forex-strategy-the-price-in-time---libgen-li.md",
+      "file_hash": "818d3602266c1575051f2169d082ee0cc71c92a7ad6651ffcf1a955d9da823c3",
+      "status": "INDEXED",
+      "words": 15879
+    },
+    {
+      "file": "books\\getting-started-in-technical-analysis-1999-wiley---libgen-li.md",
+      "file_hash": "5d396afeacf6211ff2f77293cda7657e589f52625cb5a3b9c3283e64d9b29115",
+      "status": "INDEXED",
+      "words": 67530
+    },
+    {
+      "file": "books\\hands-on-machine-learning-for-algorithmic-trading-jansen.md",
+      "file_hash": "ef518f214f407e70f51ec2f46b2cf23743168a19ea7f9aac03eec0f37c72b3f2",
+      "status": "INDEXED",
+      "words": 125106
+    },
+    {
+      "file": "books\\high-frequency-trading-a-practical-guide-aldridge.md",
+      "file_hash": "06363123bad9391ef80516e7497d0a9f7faa171ff009e1087a6eaac093633e5a",
+      "status": "INDEXED",
+      "words": 107452
+    },
+    {
+      "file": "books\\how-to-day-trade-for-a-living-a-beginner-s-guide-to-trading-tools-and-tactics-mo.md",
+      "file_hash": "67faa7ac4cb3265868056e45758dc8d71fea5f65ae11312a62a80adde7041b5c",
+      "status": "INDEXED",
+      "words": 75041
+    },
+    {
+      "file": "books\\how-to-make-profits-in-commodities-gann-1976.md",
+      "file_hash": "6133739f0c67f403cb15cb8cb15cb1e0e8e113704b7bed26c8fb0c6ca33a7e56",
+      "status": "INDEXED",
+      "words": 84223
+    },
+    {
+      "file": "books\\inside-the-black-box-narang.md",
+      "file_hash": "f2e59bf84e8b5ca99742545cd3c54452fbceb71471bb395e08d4175f077a973f",
+      "status": "INDEXED",
+      "words": 123802
+    },
+    {
+      "file": "books\\market-structure.md",
+      "file_hash": "6287ef3c50888d7ede78f4c6f4a6f1f5f55f343638303eabbea709aba6753e96",
+      "status": "PARTIALLY_INDEXED",
+      "words": 153
+    },
+    {
+      "file": "books\\modelling-asset-prices-for-algorithmic-and-high-frequency-trading-cartea-jaimungal.md",
+      "file_hash": "9a21edb83192e11ebec3c5230dd1f8813af300f0255e14184c9dac78545e2f58",
+      "status": "INDEXED",
+      "words": 14055
+    },
+    {
+      "file": "books\\price-action-breakdown-damir-2016.md",
+      "file_hash": "e1fdb522bb0cfbe3f5f039406c0a39efb18a1d240d658d772f998d2881de6a3a",
+      "status": "INDEXED",
+      "words": 23821
+    },
+    {
+      "file": "books\\profitable-forex-trading-using-high-and-low-risk-strategies-2024---annas-arch-37.md",
+      "file_hash": "e367d66220a77421e2015c458a153701240e95a601d09119063b1e052cc9ea21",
+      "status": "INDEXED",
+      "words": 44937
+    },
+    {
+      "file": "books\\pyramiding-full-text-extracted.md",
+      "file_hash": "4027a6115c1215108419902f4d3808333e63de9937a19683ec8b0e080e55833a",
+      "status": "INDEXED",
+      "words": 1682
+    },
+    {
+      "file": "books\\quantitative-trading-how-to-build-your-own-algorithmic-trading-business-2008-wil.md",
+      "file_hash": "e7bcd249e180bbb65f18ef1d46f46861116d8a4be872fd610b5c0ab831416208",
+      "status": "INDEXED",
+      "words": 56322
+    },
+    {
+      "file": "books\\quantum-finance-van-der-post.md",
+      "file_hash": "b40c872a1ef1f11a95aec551257c110c62ea725b701321e97ab84123c439979a",
+      "status": "INDEXED",
+      "words": 50453
+    },
+    {
+      "file": "books\\quantum-trading-using-principles-of-modern-physics-oreste.md",
+      "file_hash": "be8546ff9093bcfe30da5227ba9ade05ca9291fe35e49f6d0a148de26683eb8f",
+      "status": "INDEXED",
+      "words": 79654
+    },
+    {
+      "file": "books\\reminiscences-of-a-stock-operator-2012-john-wiley-sons---libgen-li.md",
+      "file_hash": "216cbcd60c343b0c46aeebf9ad7c24df2500dbfd9e5b391c064ae3b88542ff9d",
+      "status": "INDEXED",
+      "words": 134166
+    },
+    {
+      "file": "books\\sample-author.md",
+      "file_hash": "0cc0902e70baf89a2a6f37946d190c73ffed063ddaafe68203d3d7c4221a7e5c",
+      "status": "PARTIALLY_INDEXED",
+      "words": 192
+    },
+    {
+      "file": "books\\steidlmayer-on-markets-trading-with-market-profile-2003-john-wiley-sons---libgen.md",
+      "file_hash": "fae15b642382a9aa2ff32bb4d605c47588945552fb1d0a061d30bf89ee1857dc",
+      "status": "INDEXED",
+      "words": 60703
+    },
+    {
+      "file": "books\\stock-market-wizards-interviews-with-america-s-top-stock-traders-2001-harperbusi.md",
+      "file_hash": "040a37df581f4e92d84c13e81c7017aeefc26695045a288368edd9d55de7ca07",
+      "status": "INDEXED",
+      "words": 116416
+    },
+    {
+      "file": "books\\stock-trading-investing-using-volume-price-analysis-coulling.md",
+      "file_hash": "7a169f637ed0e7769324d2e46817359291ce8b7f665f3797cf41e53ebc9f7291",
+      "status": "INDEXED",
+      "words": 56981
+    },
+    {
+      "file": "books\\systematic-trading-a-unique-new-method-for-designing-trading-and-investing-syste.md",
+      "file_hash": "6860eb6bbb63aa38399e9bc07c7199391ca91fa9223cbfbd0270be2d19a6f487",
+      "status": "INDEXED",
+      "words": 90473
+    },
+    {
+      "file": "books\\technical-analysis-of-stock-trends-eleventh-edition-2018-crc-press---libgen-li.md",
+      "file_hash": "e2502bfd59813c7d5f4e301c1a729f4483a2b15921377dfb64645f8d0d4256c6",
+      "status": "INDEXED",
+      "words": 241349
+    },
+    {
+      "file": "books\\the-1-hour-trade-anderson.md",
+      "file_hash": "ccf4dcf9dd305787848d96f7c1510346bed6ef654b84e96194814f125fd5c454",
+      "status": "INDEXED",
+      "words": 12929
+    },
+    {
+      "file": "books\\the-10xroi-trading-system----thomas-lr-thomas-lr----2014----109595d6293932cffaa6.md",
+      "file_hash": "022e992728b54ffbafa4bf8be046015556722491b93b02c6e8dc2bf56d5117db",
+      "status": "INDEXED",
+      "words": 8429
+    },
+    {
+      "file": "books\\the-art-and-science-of-technical-analysis-market-structure-price-action-and-trad.md",
+      "file_hash": "aa11fd1f1a94914c73e3d25c6ab3f235a8260281658608ed5dfaad82b332af0a",
+      "status": "INDEXED",
+      "words": 172606
+    },
+    {
+      "file": "books\\the-definitive-guide-to-point-and-figure-2005---libgen-li.md",
+      "file_hash": "61dc709b6c344b6807da9272aa2037709e07c3522bf2b55e4d42d9cafc6c8dc1",
+      "status": "INDEXED",
+      "words": 130139
+    },
+    {
+      "file": "books\\the-disciplined-trader-developing-winning-attitudes-1990-prentice-hall-press---l.md",
+      "file_hash": "7464707fce419e0865962fdc5938cea77867dfe01eb331ccc5bb6d6fe6e10655",
+      "status": "INDEXED",
+      "words": 78993
+    },
+    {
+      "file": "books\\the-holy-grail-forex-trading-system-foreign-exchange-day-trading-was-this-the-ul.md",
+      "file_hash": "eb61914a27b5ad0bb7586db31f810497590f049e81ba30a8c6c28dcb9ae65d11",
+      "status": "INDEXED",
+      "words": 22438
+    },
+    {
+      "file": "books\\the-man-who-solved-the-market-zuckerman-2019.md",
+      "file_hash": "6ad79c197bdb4d3c1924331a268a73647e089b099055290ed349200d087b27b5",
+      "status": "INDEXED",
+      "words": 99868
+    },
+    {
+      "file": "books\\the-mental-game-of-trading-a-system-for-solving-problems-with-greed-fear-anger-c-5dfe4c06.md",
+      "file_hash": "6a9b2e5da0c8cdb63214526df0ae9cd148667c051b3a89b35e787282e0898547",
+      "status": "INDEXED",
+      "words": 103546
+    },
+    {
+      "file": "books\\the-mental-game-of-trading-a-system-for-solving-problems-with-greed-fear-anger-c.md",
+      "file_hash": "657c90c7c7bdbfc69541292ce7132586def0d6e7ef1e51ef80231fd207249d50",
+      "status": "INDEXED",
+      "words": 103546
+    },
+    {
+      "file": "books\\the-new-market-wizards-conversations-with-america-s-top-traders.md",
+      "file_hash": "ef7298f82b3ed56d19b1d87089ef1357e20cc50610c3d1254c2ee2125b8b4d47",
+      "status": "INDEXED",
+      "words": 152385
+    },
+    {
+      "file": "books\\the-new-trading-for-a-living-psychology-discipline-trading-tools-and-systems-ris.md",
+      "file_hash": "8ed0b8c56235da5b44b81b0570f8193dc178c141930e38e6ba5cb00c689692aa",
+      "status": "INDEXED",
+      "words": 115090
+    },
+    {
+      "file": "books\\the-ultimate-forex-trading-system-unbeatable-strategy-to----unknown----2021----6.md",
+      "file_hash": "8a82646b340da3541245d723054919830d09cdfb6205d39dfc4beb67018052c9",
+      "status": "INDEXED",
+      "words": 12238
+    },
+    {
+      "file": "books\\trade-the-price-action---forex-trading-system-2012---libgen-li.md",
+      "file_hash": "b115e2495f4e5afe4a7729c3f2b15a1dde8a690e6e2f8a166bc64d321fb639d9",
+      "status": "INDEXED",
+      "words": 4787
+    },
+    {
+      "file": "books\\trade-your-way-to-financial-freedom-2006-mcgraw-hill-companies---libgen-li.md",
+      "file_hash": "dcdf6d315b60762d3a0f1750a77988f0a68eeb33dd9f3b86e3ef826118299360",
+      "status": "INDEXED",
+      "words": 107720
+    },
+    {
+      "file": "books\\trading-and-exchanges-market-microstructure-for-practitioners---full---2002-oxfo.md",
+      "file_hash": "3adc820f26d0b1979ba11f6807c7ec79611f45d5132344f07529ad9ac22b8511",
+      "status": "INDEXED",
+      "words": 312127
+    },
+    {
+      "file": "books\\trading-in-the-zone-2021-wiley-trading---libgen-li.md",
+      "file_hash": "fb3ff2a60087e9cd247ba661ab05614bf8e97b678c96c1bbe224d97683bfd5b6",
+      "status": "INDEXED",
+      "words": 73174
+    },
+    {
+      "file": "books\\trading-price-action-ranges-brooks.md",
+      "file_hash": "70348b7e3d633c3af83d64b10fe41fd5d3885abcc90e3ce2816bb2e637837f36",
+      "status": "INDEXED",
+      "words": 235717
+    },
+    {
+      "file": "books\\trading-with-intermarket-analysis-a-visual-approach-to-beating-the-financial-mar.md",
+      "file_hash": "340260e0c443a89664f0c4f23925f223225c157a261c77ce2964583fd4dd935a",
+      "status": "INDEXED",
+      "words": 73393
+    },
+    {
+      "file": "books\\winning-the-trading-game-why-95-of-traders-lose-and-what-you-must-do-to-2008-wil.md",
+      "file_hash": "0c45fe84e4e8364b5b0a02ed7313a1a6667c6241dca480a664a766baf5944b43",
+      "status": "INDEXED",
+      "words": 99701
+    }
+  ],
+  "schema": "book_source_index.v1"
+}

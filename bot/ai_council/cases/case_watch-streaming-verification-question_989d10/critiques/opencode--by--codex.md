@@ -1,0 +1,1 @@
+Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria.

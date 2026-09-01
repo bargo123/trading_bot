@@ -1,0 +1,1 @@
+This is an error message, not a research proposal: it defines no hypothesis, data, validation method, or measurable performance claim. The unsupported preview model must be replaced with an approved, available model and the integration tested before it can inform any Council decision.

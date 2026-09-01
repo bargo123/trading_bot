@@ -1,0 +1,68 @@
+# IBKR paper — REAL firehose: fast open/close on 5s, size big enough to clear ~$4 RT fees
+engine: ibkr
+mode: ib_paper
+allow_live: false
+ib_host: 127.0.0.1
+ib_port: 4002
+ib_client_id: 7
+# Observation-only baseline. Order-sending variants are the explicit
+# config_ib_paper_eurusd_active.yaml / _measured_1h.yaml / _hale_forced.yaml files.
+paper_trading_enabled: false
+
+symbol: EURUSD
+timeframe: 5s
+lookback_days: 1
+lookback_seconds: 3600
+poll_seconds: 2
+dry_run: true
+# 20k EUR ≈ $2/pip → 3-pip TP ≈ +$6 before fees (~+$2 net) — actual firehose pace
+order_quantity: 20000
+
+starting_equity: 100
+signal_mode: firehose
+algo: firehose
+ema_fast: 20
+ema_slow: 60
+volman_ema: 20
+firehose_pip_size: 0.0001
+# Classic firehose targets + spray every bar (IB tape is flat right now)
+firehose_tp_pips: 3
+firehose_sl_pips: 5
+firehose_every_bar: false
+max_hold_seconds: 0
+volman_pip_size: 0.0001
+atr_period: 14
+adx_period: 14
+adx_trend_threshold: 99
+adx_range_max: 99
+donchian_period: 20
+bb_period: 20
+bb_std: 1.8
+rsi_period: 14
+rsi_oversold: 30
+rsi_overbought: 70
+atr_sl_mult: 2.0
+atr_tp_mult: 0.5
+atr_trail_mult: 2.0
+min_rr: 0.01
+min_atr_pct: 0.0
+cost_buffer: 0.3
+spread_bps: 0.5
+slippage_bps: 0.2
+session_start_utc: 0
+session_end_utc: 24
+
+risk_percent: 1
+high_risk_mode: traditional
+high_risk_safe: true
+allow_unsafe_high_risk: false
+hr_risk_max_cap: 2
+hr_equity_floor_frac: 0.5
+hr_max_consecutive_losses: 5
+max_daily_loss_percent: 5
+max_total_drawdown_percent: 15
+max_positions: 1
+pyramid_enabled: false
+kill_switch: false
+ntz_max_trades_day: 0
+test_name: ib_paper_eurusd

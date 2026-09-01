@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal, so it contains no testable hypothesis, validation plan, or measurable trading claim. It also provides no evidence that substituting a preview/free model would preserve council reliability, abstention behavior, or read-only safety constraints.

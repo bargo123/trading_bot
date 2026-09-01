@@ -1,0 +1,1 @@
+Test a validated-state freshness gate that abstains when the latest validated evidence is older than 60 seconds at order evaluation. Compare it with the current gate on sealed historical replay, net of configured spread and slippage. Advance only if it reduces adverse-entry rate by at least 10% without reducing net expectancy or trade count by more than 5%; otherwise reject it.

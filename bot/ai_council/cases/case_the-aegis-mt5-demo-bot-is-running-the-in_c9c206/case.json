@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-21T18:42:32.691146+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c9c206\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 32.49,
+          "finished_utc": "2026-08-21T18:47:40.668682+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-21T18:47:08.182626+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-21T18:47:40.668682+00:00",
+        "text": "This proposal replays a holdout already consumed by the incumbent champion, so any challenger tuned to pass it is doing textbook selection bias on a spent dataset \u2014 there's no fresh out-of-sample segment, walk-forward, or multiplicity correction despite presumably many such challengers. The acceptance criteria are statistically hollow: a 10% *relative* expectancy gain on as few as ~30 trades is noise without confidence intervals or bootstrap, and \"drawdown does not worsen\" is confounded since a higher threshold mechanically trades less, flattering DD while gutting sample size. \"Positive net expected value after measured spread and slippage\" is unmeasurable as written \u2014 measured over which regime, and applied point-in-time or with hindsight (lookahead risk)? Finally, it never commits to registering the experiment in the ExperimentRegistry *before* execution or to routing acceptance through every gate in `bot/aegis/research/promote.py`, both of which are non-negotiable."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c9c206\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.49,
+          "finished_utc": "2026-08-21T18:47:08.171778+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-sol",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-21T18:46:56.681345+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-21T18:47:08.171778+00:00",
+        "text": "The causal claim that \u201closs geometry, not signal quality\u201d is unsupported: a high win rate with poor payoff can still arise from weak or regime-dependent entries, and counterfactual exits cannot recover unobserved intrabar execution from a reconciled close log. Testing multiple stop/time-stop variants on the same 2,517 trades invites selection overfitting unless variants are preregistered, walk-forward folds are temporally purged, and the \u2265200-trade holdout is untouched until final evaluation with uncertainty bounds and regime stability checks. The ~55% win-rate floor and book-memory note count are arbitrary, weakly measurable justifications; the real gate should include statistically credible net expectancy/PF, drawdown and tail-loss constraints, plus explicit confirmation that spread, slippage, gaps, and stop-fill mechanics are modeled without lookahead."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-21T18:48:50.359664+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_bc8034",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_bc8034 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_c9c206",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c9c206\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 190.1,
+        "finished_utc": "2026-08-21T18:45:55.889840+00:00",
+        "mode": "REAL",
+        "model": "opencode/x-preview-f-free",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T18:42:45.788837+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T18:45:55.891850+00:00",
+      "text": "Proposal: The reconciled demo exit log (outcome_learning.json, n=2,517) shows the firehose's failure mode is loss geometry, not signal quality \u2014 win_rate is 67.5% but payoff_ratio is 0.34 (avg_win +0.060 vs avg_loss \u22120.177), SL closes average \u22120.547 versus +0.107 for TP, so aggregate expectancy is \u22120.012 (PF 0.77). Next-cycle candidate: register an experiment that replays all closed positions counterfactually through exit_research with tightened stop geometry (SL capped at 1.0\u00d7 and 0.5\u00d7 current distance, plus a 24-bar time-stop), net of runner spread/slippage and split walk-forward. Falsifiable hypothesis: at least one variant flips out-of-sample aggregate expectancy from \u22120.012 to > 0 over \u2265 200 held-out trades without dropping win_rate below ~55%. If no variant clears that bar on holdout, record the rejection in the registry and seal it \u2014 no champion change, no live config touched. This also echoes the corpus theme (e.g., *The Universal Principles of Successful Trading*-style invalidation discipline): only 9 of 108 book-memory notes even define an invalidation level, so entry-time invalidation placement is the systematic gap to test."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c9c206\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.15,
+        "finished_utc": "2026-08-21T18:46:32.564583+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-21T18:46:19.415007+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T18:46:32.564583+00:00",
+      "text": "Test a challenger that raises the validated-state entry threshold to require a positive net expected value after measured spread and slippage. Replay the same sealed holdout used by the current champion and compare net expectancy, maximum drawdown, and trade count against the registered baseline. Accept the candidate only if net expectancy improves by at least 10%, maximum drawdown does not worsen, and at least 30 trades remain; otherwise reject and record the result. Keep the champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c9c206\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.47,
+        "finished_utc": "2026-08-21T18:48:50.343716+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-sol",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-21T18:48:37.869868+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-21T18:48:50.343716+00:00",
+      "text": "Pre-register the challenger, threshold rule, point-in-time cost model, fresh untouched out-of-sample segments, and multiplicity-adjusted acceptance tests in `ExperimentRegistry` before execution, using only spread and slippage estimates available at each decision time within the applicable market regime. Evaluate the frozen candidate through walk-forward testing and a sealed holdout never used for tuning or prior champion selection, reporting net expectancy with bootstrap confidence intervals, trade count, exposure, and drawdown normalized for exposure. Accept only if the multiplicity-adjusted lower confidence bound for the net expectancy improvement exceeds zero, the absolute improvement meets the pre-registered economic threshold, exposure-adjusted drawdown does not worsen, and the pre-registered minimum effective sample size is met. Route any acceptance through every gate in `bot/aegis/research/promote.py`; otherwise reject and record the complete result, leaving the champion unchanged."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_c9c206\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 57.16,
+        "finished_utc": "2026-08-21T18:48:37.838331+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T18:47:40.680635+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-21T18:48:37.838331+00:00",
+      "text": "Proposal (revised): The reconciled demo exit log (outcome_learning.json, n=2,517) shows win_rate 67.5% against payoff_ratio 0.34 (SL closes \u22120.547 vs TP +0.107; aggregate expectancy \u22120.012, PF 0.77); we recast \"loss geometry, not signal quality\" from a conclusion into a competing-hypotheses design \u2014 a preregistered experiment replays closed positions counterfactually through exit_research under three fixed arms (SL at 1.0\u00d7 and 0.5\u00d7 current distance plus a 24-bar time-stop) against a randomized-entry control, since close-log replay cannot recover unobserved intrabar fills and stop mechanics are therefore modeled adversarially (any bar touching SL fills beyond it) net of runner spread, slippage, and gap handling with strictly point-in-time features. All variants are entered in ExperimentRegistry before any metric is computed; walk-forward folds are temporally purged with an embargo buffer longer than the label horizon, and the \u2265200-trade holdout is evaluated exactly once, at final validation. The pass gate replaces the arbitrary win-rate floor with statistically credible criteria: holdout net expectancy whose bootstrap 95% CI excludes zero under a permutation null, PF with CI lower bound above 1.0, max drawdown and CVaR no worse than baseline beyond a pre-stated tolerance, and expectancy-sign stability across at least three regime partitions. If no arm clears every gate, the rejection is recorded in the registry and the challenger sealed \u2014 no champion change, no live config touched. The book-memory observation (9 of 108 notes defining an invalidation level) is retained purely as motivation for the hypothesis, not as evidence."
+    }
+  },
+  "status": "decided"
+}

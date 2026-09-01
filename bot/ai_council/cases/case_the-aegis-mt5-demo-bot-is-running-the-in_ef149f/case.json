@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T05:30:27.930795+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ef149f\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 28.76,
+          "finished_utc": "2026-08-23T05:37:57.519881+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T05:37:28.762446+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T05:37:57.519881+00:00",
+        "text": "The acceptance criteria are unfalsifiable as written: \"statistically supported,\" \"materially,\" and \"no deterioration\" name no test, threshold, or equivalence margin for coverage, drawdown, or calibration (which metric \u2014 Brier, reliability slope?), inviting post-hoc judgment calls. Requiring two consecutive evaluations introduces signal lag whose fill-timing shift must be modeled separately from the gating effect, and per-trade expectancy can improve purely by shrinking trade count while aggregate net PnL falls \u2014 the objective is never pinned down. There is no mention of purged walk-forward validation before touching the sealed holdout, nor any multiple-comparison control despite repeated challenger testing on the same holdout, which quietly converts it into a tuning set. Finally, \"accept the candidate\" omits any commitment to the governed promotion path (`research_promote_champion.py` gates + ExperimentRegistry record), which is exactly how untracked overrides slip through."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ef149f\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 14.24,
+          "finished_utc": "2026-08-23T05:37:28.746680+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T05:37:14.504410+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T05:37:28.746680+00:00",
+        "text": "The 0.06-unit cap is circular and likely overfit: it is derived from the same historical outcome distribution, ignores volatility, instrument, regime, gaps, and execution slippage, and may not generalize. The proposed gates are arbitrary and insufficient: trades are serially correlated, the 2,518 exits are not independent, and there is no walk-forward, regime-stratified, cost-sensitivity, or untouched final-holdout validation against simpler stop baselines. \u201cMaximum loss\u201d is also unmeasurable without proving order/EA enforcement under gaps and slippage, so demo-only status does not establish that the risk constraint is actually safe."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T05:39:01.681875+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_6d5122",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_6d5122 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_ef149f",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ef149f\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 324.61,
+        "finished_utc": "2026-08-23T05:36:10.131344+00:00",
+        "mode": "REAL",
+        "model": "opencode/x-preview-f-free",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T05:30:45.525652+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T05:36:10.133354+00:00",
+      "text": "Run a sealed-holdout exit challenger this cycle that keeps entries and TP unchanged but caps every trade's maximum loss at 1\u00d7 the validated-state average win (~0.06 demo units), replacing the dominant quick_win/never_green/gave_back flatten paths. Measured basis: outcome_learning.md (2,518 exits) shows win_rate 0.675 yet expectancy \u22120.0122 because payoff_ratio is 0.341 (avg_win 0.060 vs avg_loss \u22120.177) \u2014 each average loss erases 2.93 wins and the tail loss erases ~20 \u2014 while tp closes run +0.107 expectancy versus manual flattens at \u22120.0134 (PF 0.64, n=1,928). Falsifiable gate: on the sealed holdout, net-of-costs expectancy must flip positive (> +0.005/trade) with win_rate \u2265 0.60 and bootstrap_p05_validate > 0 under all existing promote.py gates; if any gate fails, register the rejection in ExperimentRegistry and leave the champion untouched. This tests the loss-geometry/R-multiple principle from *Trade Your Way to Financial Freedom* (2006) and fixed-stop discipline from *The New Trading for a Living*. Research-only, demo-only, no live YAML or allow_live changes."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ef149f\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.71,
+        "finished_utc": "2026-08-23T05:36:49.222413+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T05:36:36.515193+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T05:36:49.222413+00:00",
+      "text": "Test a stricter validated-state gate that requires the state to remain valid for two consecutive evaluations before emitting an intel signal. The hypothesis is that this reduces stale-transition signals and improves net expectancy after spread/slippage costs without materially lowering coverage. Accept the candidate only if it beats the current gate on the sealed holdout with statistically supported net expectancy and no deterioration in drawdown or calibration; otherwise retain the current champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ef149f\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 19.43,
+        "finished_utc": "2026-08-23T05:39:01.650448+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T05:38:42.222202+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T05:39:01.660062+00:00",
+      "text": "Test a frozen two-consecutive-evaluation validated-state gate using purged walk-forward validation, explicitly modeling the resulting signal and fill-timing delay in a separate replay. The primary objective is aggregate net PnL after spread/slippage; accept only if the candidate\u2019s paired block-bootstrap 95% CI for the PnL difference versus the current gate is wholly above zero, with coverage no more than 2 percentage points lower, maximum drawdown no more than 5% higher, Brier score no more than 0.01 worse, and reliability slope remaining within 0.9\u20131.1. All thresholds, metrics, and the candidate-selection procedure must be preregistered in the ExperimentRegistry; challengers may iterate on walk-forward data, but the sealed holdout is evaluated once on the single frozen candidate (or under Holm correction for a preregistered challenger family). Promotion, if every gate passes, must occur only through `research_promote_champion.py`; otherwise retain the current champion and record the rejection and metrics."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_ef149f\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 44.65,
+        "finished_utc": "2026-08-23T05:38:42.190190+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T05:37:57.537886+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T05:38:42.190190+00:00",
+      "text": "Run a sealed-holdout exit challenger that keeps entries and TP unchanged but replaces quick_win/never_green/gave_back flattens with an entry-time, volatility-scaled stop: max loss = k \u00d7 per-instrument ATR(N) measured at entry (k \u2208 {0.5, 1, 2} swept for sensitivity), calibrated so the median simulated risk \u2248 1\u00d7 validated avg_win \u2014 replacing the circular constant-0.06 cap with a parameter derived solely from pre-entry features, never outcome labels. Validation uses walk-forward folds with purge and embargo (acknowledging serial correlation among the 2,518 exits), stratified across regimes, net of runner spread/slippage plus a stressed-cost band, and benchmarks against two simpler baselines: the uncapped champion and a naive fixed-stop rule. Because MT5 access is read-only and demo fills cannot prove enforcement, treat \"maximum loss\" strictly as a simulation assumption: score each capped exit at achievable fill prices, flag gap-through bars where price breaches the level intra-bar, and report worst-case realized loss instead of claiming the constraint is enforceable. Promotion requires all existing promote.py gates on validation folds plus a single untouched final holdout (opened exactly once, after all other gates pass) showing expectancy > +0.005/trade, win_rate \u2265 0.60, and bootstrap_p05_validate > 0; any failure is recorded as a rejection in ExperimentRegistry with the challenger archived and the champion untouched. Any future move beyond research would separately require demonstrated order/EA enforcement of the stop under gaps and slippage, which this cycle does not attempt. Research-only, demo-only; no live YAML or allow_live changes."
+    }
+  },
+  "status": "decided"
+}

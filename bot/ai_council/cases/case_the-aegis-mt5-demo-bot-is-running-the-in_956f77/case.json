@@ -1,0 +1,114 @@
+{
+  "created_utc": "2026-08-28T03:29:34.868310+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_956f77\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 20.42,
+          "finished_utc": "2026-08-28T03:32:14.715550+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-28T03:31:54.290649+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T03:32:14.721087+00:00",
+        "text": "This is an error message, not a research proposal: it contains no hypothesis, methodology, metrics, or validation plan. It is unmeasurable and cannot support strategy changes, execution decisions, or any safety-sensitive action."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_956f77\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 12.2,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T03:32:26.939318+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-28T03:33:11.888194+00:00",
+    "decision": "no_change",
+    "evidence": {
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 1,
+      "reason": "NO_ROBUST_CANDIDATE"
+    },
+    "rationale": "REAL: none of the proposals is a falsifiable, measurable candidate"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_956f77",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_956f77\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 13.69,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T03:30:03.266730+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_956f77\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 22.73,
+        "finished_utc": "2026-08-28T03:30:49.676837+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T03:30:26.948589+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T03:30:49.680844+00:00",
+      "text": "Test a tighter validated-state entry gate requiring at least 30 recent validated outcomes per symbol-direction before permitting a trade. Compare it against the current gate on sealed holdouts with identical spread and slippage assumptions. Accept it only if net expectancy improves by at least 10% while maximum drawdown and trade count do not worsen by more than 5%; otherwise reject and record the result."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_956f77\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 11.81,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T03:32:38.772545+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    }
+  },
+  "status": "decided"
+}

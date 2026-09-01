@@ -1,0 +1,1 @@
+Run a registered, sealed-holdout ablation that requires a minimum analogue-similarity threshold before intelligent-firehose signals pass the validated-state gate. Compare net expectancy, drawdown, and trade count against the current gate under identical DEMO costs; retain it only if holdout net expectancy improves without increasing maximum drawdown.

@@ -1,0 +1,74 @@
+{
+  "claude": {
+    "agent": "claude",
+    "cli": "native-exe",
+    "duration_s": 11.36,
+    "error": null,
+    "model": null,
+    "probed_utc": "2026-08-25T02:07:39.994212+00:00",
+    "provider": "Anthropic",
+    "returncode": 0,
+    "status": "AVAILABLE",
+    "tool_version": null
+  },
+  "codex": {
+    "agent": "codex",
+    "cli": "node-script",
+    "duration_s": 8.82,
+    "error": null,
+    "model": "gpt-5.6-luna",
+    "probed_utc": "2026-08-26T16:12:36.285616+00:00",
+    "provider": "OpenAI",
+    "returncode": 0,
+    "status": "AVAILABLE",
+    "tool_version": null
+  },
+  "cursor": {
+    "agent": "cursor",
+    "cli": null,
+    "duration_s": 95.17,
+    "error": "timed out after 90s",
+    "model": null,
+    "probed_utc": "2026-08-28T22:07:29.618861+00:00",
+    "provider": "cursor",
+    "returncode": null,
+    "status": "TIMEOUT",
+    "tool_version": null
+  },
+  "gemini": {
+    "agent": "gemini",
+    "cli": "node-script",
+    "duration_s": 38.97,
+    "error": null,
+    "model": null,
+    "probed_utc": "2026-08-28T22:05:47.919979+00:00",
+    "provider": "Google",
+    "returncode": 0,
+    "status": "AVAILABLE",
+    "tool_version": null
+  },
+  "hermes": {
+    "agent": "hermes",
+    "cli": null,
+    "duration_s": 18.38,
+    "error": null,
+    "model": "x-preview-f-free",
+    "probed_utc": "2026-08-28T22:04:31.345696+00:00",
+    "provider": "Nous Portal free",
+    "returncode": 0,
+    "status": "AVAILABLE",
+    "tool_version": null
+  },
+  "opencode": {
+    "agent": "opencode",
+    "cli": "native-exe",
+    "duration_s": 15.13,
+    "error": null,
+    "model": "gpt-5.6-terra-fast",
+    "probed_utc": "2026-08-28T22:04:55.366098+00:00",
+    "provider": "opencode",
+    "returncode": 0,
+    "status": "AVAILABLE",
+    "tool_version": null
+  }
+}

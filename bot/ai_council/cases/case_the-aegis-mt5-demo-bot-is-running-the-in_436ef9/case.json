@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-22T19:27:45.873563+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-22T19:31:08.462808+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_e37e65",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_e37e65 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_436ef9",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_436ef9\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 113.99,
+        "finished_utc": "2026-08-22T19:29:55.311483+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-22T19:28:01.322571+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-22T19:29:55.311483+00:00",
+      "text": "Proposal: register a \"gate starvation\" audit as the next cycle's experiment. Measured evidence: firehose_throughput.json (2026-08-22) shows a 79% skip rate with all 16,261 skips caused by `state_not_in_validated_set`, because the freshly rebuilt `bot/intel/validated_states.json` has n_survive=0 with an empty states list, whereas the 2026-08-20 artifact (intelligent_firehose_failure_audit.md) held 2 survivors led by `{regime: range, session: asia, side: sell}` at expectancy_validate +3.15, PF 2.78 (n=237). Hypothesis: the asia/range/sell edge still exists in recent demo exits and today's zero-survivor rebuild is a window/threshold artifact, not genuine decay. Falsifiable test: re-validate only the two previously surviving states against outcome rows logged after 2026-08-20, net of cost_pips_assumed, requiring bootstrap p05 > 0 with n \u2265 100; pre-register that a pass restores those states via `research_ml_pipeline.write_validated_states` (the governed path, champion untouched), while a fail confirms true edge decay and validates keeping the empty set so the gate keeps skipping everything."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

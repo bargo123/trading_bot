@@ -1,0 +1,18 @@
+{
+  "estimated_cost_usd": 0.0,
+  "cost_status": "unknown",
+  "cost_source": "none",
+  "input_tokens": 23662,
+  "output_tokens": 319,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0,
+  "reasoning_tokens": 70,
+  "total_tokens": 23981,
+  "api_calls": 1,
+  "model": "x-preview-f-free",
+  "provider": "opencode-free",
+  "session_id": "20260825_050702_bc0ee4",
+  "completed": true,
+  "failed": false,
+  "service_tier": null
+}

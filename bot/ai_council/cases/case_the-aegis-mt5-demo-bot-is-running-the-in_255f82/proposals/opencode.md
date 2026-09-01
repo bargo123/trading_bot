@@ -1,0 +1,1 @@
+Test whether requiring two consecutive validated-state confirmations before entry reduces false starts. Compare it against the current single-confirmation rule on sealed MT5 DEMO historical/replay data, net of existing spread and slippage assumptions. Accept only if net expectancy improves and trade count remains at least 70% of baseline; otherwise reject it.

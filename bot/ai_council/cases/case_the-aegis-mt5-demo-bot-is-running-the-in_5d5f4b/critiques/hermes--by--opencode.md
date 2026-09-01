@@ -1,0 +1,1 @@
+This is an error message, not a research proposal: it contains no hypothesis, methodology, metrics, or validation plan. It makes no measurable trading claim and cannot be assessed for overfitting, safety, or expected-value impact.

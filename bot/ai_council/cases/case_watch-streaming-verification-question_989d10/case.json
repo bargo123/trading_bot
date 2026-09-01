@@ -1,0 +1,211 @@
+{
+  "created_utc": "2026-08-20T21:52:33.780708+00:00",
+  "critiques": {
+    "claude": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\claude--by--opencode.md",
+        "submitted_utc": "2026-08-20T21:52:33.813295+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\claude--by--gemini.md",
+        "submitted_utc": "2026-08-20T21:52:33.814080+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\claude--by--codex.md",
+        "submitted_utc": "2026-08-20T21:52:33.817616+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\claude--by--cursor.md",
+        "submitted_utc": "2026-08-20T21:52:33.817616+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\codex--by--opencode.md",
+        "submitted_utc": "2026-08-20T21:52:33.821072+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "claude",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\codex--by--claude.md",
+        "submitted_utc": "2026-08-20T21:52:33.829933+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\codex--by--gemini.md",
+        "submitted_utc": "2026-08-20T21:52:33.830684+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\codex--by--cursor.md",
+        "submitted_utc": "2026-08-20T21:52:33.830684+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "cursor": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\cursor--by--opencode.md",
+        "submitted_utc": "2026-08-20T21:52:33.830684+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "claude",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\cursor--by--claude.md",
+        "submitted_utc": "2026-08-20T21:52:33.830684+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\cursor--by--gemini.md",
+        "submitted_utc": "2026-08-20T21:52:33.830684+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\cursor--by--codex.md",
+        "submitted_utc": "2026-08-20T21:52:33.830684+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "gemini": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\gemini--by--opencode.md",
+        "submitted_utc": "2026-08-20T21:52:33.821072+00:00",
+        "text": "Review by opencode: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "claude",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\gemini--by--claude.md",
+        "submitted_utc": "2026-08-20T21:52:33.821072+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\gemini--by--codex.md",
+        "submitted_utc": "2026-08-20T21:52:33.821072+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\gemini--by--cursor.md",
+        "submitted_utc": "2026-08-20T21:52:33.821072+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "claude",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\opencode--by--claude.md",
+        "submitted_utc": "2026-08-20T21:52:33.797394+00:00",
+        "text": "Review by claude: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "gemini",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\opencode--by--gemini.md",
+        "submitted_utc": "2026-08-20T21:52:33.797394+00:00",
+        "text": "Review by gemini: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\opencode--by--codex.md",
+        "submitted_utc": "2026-08-20T21:52:33.797394+00:00",
+        "text": "Review by codex: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      },
+      {
+        "agent": "cursor",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\critiques\\opencode--by--cursor.md",
+        "submitted_utc": "2026-08-20T21:52:33.797394+00:00",
+        "text": "Review by cursor: the proposal lacks a concrete measurement window and does not state the rejection threshold; require a predefined validation sample and pre-registered accept/reject criteria."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-20T21:52:33.853689+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "mode": "DRY_RUN",
+      "n_critiques": 20,
+      "n_proposals": 5,
+      "n_revisions": 5,
+      "reason": "DRY_RUN_SIMULATION"
+    },
+    "rationale": "DRY_RUN: simulated round; no challenger registered because simulated text can never count as research"
+  },
+  "id": "watch-streaming-verification-question_989d10",
+  "mode": "DRY_RUN",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\proposals\\opencode.md",
+      "submitted_utc": "2026-08-20T21:52:33.796607+00:00",
+      "text": "Local deterministic proposal by opencode: treat 'Watch streaming verification question?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "claude",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\proposals\\claude.md",
+      "submitted_utc": "2026-08-20T21:52:33.797394+00:00",
+      "text": "Local deterministic proposal by claude: treat 'Watch streaming verification question?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "gemini",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\proposals\\gemini.md",
+      "submitted_utc": "2026-08-20T21:52:33.797394+00:00",
+      "text": "Local deterministic proposal by gemini: treat 'Watch streaming verification question?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\proposals\\codex.md",
+      "submitted_utc": "2026-08-20T21:52:33.797394+00:00",
+      "text": "Local deterministic proposal by codex: treat 'Watch streaming verification question?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    {
+      "agent": "cursor",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\proposals\\cursor.md",
+      "submitted_utc": "2026-08-20T21:52:33.797394+00:00",
+      "text": "Local deterministic proposal by cursor: treat 'Watch streaming verification question?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    }
+  ],
+  "question": "Watch streaming verification question?",
+  "revisions": {
+    "claude": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\revisions\\claude.md",
+      "revised_utc": "2026-08-20T21:52:33.847381+00:00",
+      "text": "revised: Local deterministic proposal by claude: treat 'Watch streaming verification question?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\revisions\\codex.md",
+      "revised_utc": "2026-08-20T21:52:33.847381+00:00",
+      "text": "revised: Local deterministic proposal by codex: treat 'Watch streaming verification question?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    "cursor": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\revisions\\cursor.md",
+      "revised_utc": "2026-08-20T21:52:33.851885+00:00",
+      "text": "revised: Local deterministic proposal by cursor: treat 'Watch streaming verification question?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    "gemini": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\revisions\\gemini.md",
+      "revised_utc": "2026-08-20T21:52:33.847381+00:00",
+      "text": "revised: Local deterministic proposal by gemini: treat 'Watch streaming verification question?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_watch-streaming-verification-question_989d10\\revisions\\opencode.md",
+      "revised_utc": "2026-08-20T21:52:33.830684+00:00",
+      "text": "revised: Local deterministic proposal by opencode: treat 'Watch streaming verification question?' as a falsifiable rule candidate; before any live change, run an OOS validation window on the analogue index and require bootstrap_p05 > 0 and positive expectancy before promotion. No live-money changes."
+    }
+  },
+  "status": "decided"
+}

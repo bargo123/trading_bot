@@ -1,0 +1,36 @@
+trades,win_rate,profit_factor,max_dd_pct,expectancy_r,net_pnl,final_equity,halt,error,id,family,liveable,score
+10,40.0,1.211,0.72,0.045,22.0,10022.0,max_consecutive_losses (4),,ensemble,algo,True,1022.44
+10,40.0,1.211,0.72,0.045,22.0,10022.0,max_consecutive_losses (4),,ensemble_optimal,algo,True,1022.44
+12,33.33,1.077,1.18,0.019,10.88,10010.88,max_consecutive_losses (4),,bb_squeeze,catalog,False,1017.48
+12,50.0,0.837,0.63,-0.021,-12.56,9987.44,max_consecutive_losses (4),,aegis_regime,algo,True,2.5
+10,50.0,0.663,0.45,-0.043,-21.45,9978.55,max_consecutive_losses (4),,stoch_mr,catalog,False,0.72
+11,45.45,0.36,0.71,-0.111,-61.02,9938.98,max_consecutive_losses (4),,trend_pullback,algo,True,-4.46
+40,47.5,0.709,3.27,-0.164,-327.31,9672.69,max_consecutive_losses (4),,aziz_orb,algo,True,-7.93
+41,46.34,0.661,3.65,-0.179,-365.42,9634.58,max_consecutive_losses (4),,steidl_ib_break,algo,True,-9.29
+62,58.06,0.377,4.55,-0.142,-431.18,9568.82,max_consecutive_losses (4),,squeeze_bo,algo,True,-9.77
+13,30.77,0.485,1.69,-0.259,-168.68,9831.32,max_consecutive_losses (4),,macd_cross,catalog,False,-12.22
+28,46.43,0.594,3.43,-0.244,-339.3,9660.7,max_consecutive_losses (4),,fabris_ntz,algo,True,-12.66
+13,23.08,0.307,1.67,-0.258,-166.88,9833.12,max_consecutive_losses (4),,donch20,catalog,False,-13.04
+11,27.27,0.486,1.58,-0.287,-158.0,9842.0,max_consecutive_losses (4),,elder_impulse,catalog,False,-13.5
+68,41.18,0.542,8.27,-0.225,-743.72,9256.28,max_consecutive_losses (4),,book_optimal,algo,True,-16.81
+14,28.57,0.089,3.25,-0.44,-303.94,9696.06,max_consecutive_losses (4),,scalper_2h,algo,True,-24.8
+13,23.08,0.04,3.27,-0.499,-319.73,9680.27,max_consecutive_losses (4),,bb_mr,catalog,False,-28.02
+17,29.41,0.305,6.06,-0.673,-560.0,9440.0,max_consecutive_losses (4),,cafb,algo,True,-38.19
+8,37.5,1.239,1.91,0.169,64.81,10064.81,max_consecutive_losses (4),,steidl_ib_fade,algo,True,-1000000000.0
+1,100.0,inf,0.0,0.309,15.46,10015.46,,,hw_runner,algo,True,-1000000000.0
+5,20.0,1.479,0.2,0.039,9.76,10009.76,max_consecutive_losses (4),,donch55,catalog,False,-1000000000.0
+0,0.0,0.0,0.0,0.0,0.0,10000.0,,,hw_range,algo,True,-1000000000.0
+0,0.0,0.0,0.0,0.0,0.0,10000.0,,,volman_scalp,algo,True,-1000000000.0
+4,0.0,0.0,0.22,-0.112,-22.32,9977.68,max_consecutive_losses (4),,aegis_range_hw,catalog,False,-1000000000.0
+9,33.33,0.266,0.53,-0.09,-40.26,9959.74,max_consecutive_losses (4),,pulse_scalp,algo,True,-1000000000.0
+5,20.0,0.274,0.74,-0.217,-54.17,9945.83,max_consecutive_losses (4),,chan_bb_scalp,algo,True,-1000000000.0
+4,0.0,0.0,0.62,-0.311,-62.24,9937.76,max_consecutive_losses (4),,atr_breakout,catalog,False,-1000000000.0
+5,20.0,0.1,0.71,-0.256,-64.04,9935.96,max_consecutive_losses (4),,breakout_adx,algo,True,-1000000000.0
+4,0.0,0.0,0.75,-0.375,-74.84,9925.16,max_consecutive_losses (4),,rsi_pure,catalog,False,-1000000000.0
+4,0.0,0.0,0.78,-0.39,-77.75,9922.25,max_consecutive_losses (4),,ema_cross,catalog,False,-1000000000.0
+8,25.0,0.169,1.0,-0.221,-88.05,9911.95,max_consecutive_losses (4),,rsi_cross,algo,True,-1000000000.0
+4,0.0,0.0,1.72,-0.865,-172.02,9827.98,max_consecutive_losses (4),,thomas_10r,algo,True,-1000000000.0
+8,12.5,0.059,1.78,-0.449,-178.49,9821.51,max_consecutive_losses (4),,aziz_vwap,algo,True,-1000000000.0
+7,28.57,0.309,3.34,-0.836,-290.51,9709.49,max_consecutive_losses (4),,firehose_every_bar,algo,True,-1000000000.0
+6,16.67,0.158,3.45,-1.162,-344.54,9655.46,max_consecutive_losses (4),,firehose,algo,True,-1000000000.0
+7,14.29,0.073,4.42,-1.285,-441.66,9558.34,max_consecutive_losses (4),,pa_select,algo,True,-1000000000.0

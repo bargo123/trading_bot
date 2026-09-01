@@ -1,0 +1,1 @@
+This is an API compatibility error, not a research proposal, so it makes no measurable trading claim or testable hypothesis. It provides no validation plan, data, risk controls, or evidence that the specified model is supported; resolve the provider/model configuration before Council evaluation.

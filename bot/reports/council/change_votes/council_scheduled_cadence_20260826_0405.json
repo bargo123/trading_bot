@@ -1,0 +1,107 @@
+{
+  "change_id": "council_scheduled_cadence_20260826_0405",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-26T04:07:35.042146+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260826_0405",
+    "current_evidence": "Candidate H1: the validated-state gate may be rejecting profitable challengers because the uniform executable-overlap window truncates strategies whose edge matures later than the standard horizon. Test: replay the most recent sealed holdout challengers (bot/research/sealed_holdouts.jsonl, registry ",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Candidate H1: the validated-state gate may be rejecting profitable challengers because the uniform executable-overlap window truncates strategies whose edge matures later than the standard horizon. Test: replay the most recent sealed holdout challengers (bot/research/sealed_holdouts.jsonl, registry in bot/research/experiments.sqlite) using each candidate's own target horizon \u2014 now measurable thanks to the per-candidate-horizon economics already exposed in the latest research reports \u2014 and compar",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (2/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T04:05:49.658437+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 1,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 2
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Proposal text is truncated mid-sentence ('current_evidence' and 'proposed_change' end at 'compar'); the comparison methodology is therefore not fully specified",
+        "Per-candidate horizons create horizon-selection bias: if the window is chosen where profit materializes, that is label leakage. Each candidate's horizon must be fixed from its pre-registered stated design, never tuned post hoc on holdout performance",
+        "Replaying sealed holdouts consumes their sealing property; repeated replays inflate false discovery across the challenger pool. Cap replay count and log every run in ExperimentRegistry",
+        "A positive result must not loosen the validated-state gate directly; any gate redesign still requires fresh forward OOS validation through the standard promote.py gates",
+        "affected_files lists bot/intel/ and bot/ai_council/ (runtime surfaces) but the work is research-side; runtime gate logic should remain untouched until the research conclusion is accepted",
+        "Outcomes must be net of the runner's spread/slippage assumptions across the full extended executable window, matching AGENTS.md rule 6"
+      ],
+      "confidence": 0.62,
+      "model": "x-preview-f-free",
+      "reason": "Historical replay of sealed holdouts with per-candidate horizons is a cheap, read-only research experiment with clean rollback and no broker interaction; it directly tests a plausible gate-truncation hypothesis and the per-candidate-horizon economics it depends on were recently exposed in research reports. Safe to test provided horizon selection cannot peek at outcomes.",
+      "requested_revisions": [
+        "Provide the complete untruncated comparison specification before implementation",
+        "Pre-register each candidate's horizon (source: strategy spec/registry metadata, not realized PnL) in the experiment record prior to scoring",
+        "Record every holdout replay as a distinct ExperimentRegistry entry with an explicit multiple-testing note",
+        "Scope code changes to research modules/scripts first; bot/intel/ and bot/ai_council/ changes gated on a separate approved proposal",
+        "Report split primary/test/sealed economics separately per candidate, net of costs, with negative costed expectancy triggering the stated falsification"
+      ],
+      "vote": "APPROVE_FOR_TEST"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "Define each candidate horizon using only pre-holdout metadata; do not infer it from sealed-holdout outcomes.",
+        "Compare against the existing uniform-window baseline on identical sealed samples, net of spread/slippage assumptions.",
+        "Specify minimum sample size, multiple-testing controls, acceptance thresholds, and treatment of insufficient trade counts.",
+        "Keep results experiment-registered and do not alter champion promotion or MT5 execution behavior."
+      ],
+      "confidence": 0.88,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "Candidate-specific horizons are a valid research hypothesis, but the proposal is truncated and lacks a pre-registered, leakage-safe comparison protocol. Horizon selection can introduce post-hoc optimization and invalidate sealed-holdout conclusions.",
+      "requested_revisions": [
+        "Provide the complete replay design, including the exact candidate-horizon source and cutoff timestamps.",
+        "Pre-register OOS metrics: costed expectancy, profit factor, drawdown/tail loss, trade count, and confidence intervals.",
+        "State a falsification rule relative to the baseline, not only negative expectancy.",
+        "Confirm that sealed holdouts remain read-only and that any successful result proceeds through existing governed promotion gates."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Per-candidate horizons may introduce holdout overfitting or inconsistent comparisons.",
+        "No sample sizes, costed expectancy, confidence intervals, or acceptance thresholds are provided.",
+        "The proposal does not specify how horizon selection is fixed without using holdout outcomes.",
+        "Champion-promotion and validated-state gates must remain governed and unchanged unless explicitly authorized.",
+        "The exact affected files and behavior changes are unspecified.",
+        "DEMO-only operation must be verified with allow_live=false, mode=mt5_demo, paper_trading_enabled=true, and a single execution owner."
+      ],
+      "confidence": 0.97,
+      "model": null,
+      "reason": "The hypothesis is testable, but the proposal lacks a concrete implementation diff, baseline versus candidate metrics, and a reproducible replay protocol. Its claim of no safety impact is unsubstantiated because the affected intel/council paths must be proven unable to execute broker orders or alter champion state.",
+      "requested_revisions": [
+        "Provide the exact code/config diff and identify all modified gates and call paths.",
+        "Define a preregistered replay protocol, fixed horizon-selection rule, baseline comparator, minimum sample size, and costed statistical acceptance criteria.",
+        "Demonstrate that sealed holdouts remain untouched for selection and that no champion promotion occurs during the test.",
+        "Add tests proving AI Council, intel, and research processes cannot call mt5.order_send() or modify broker positions.",
+        "Report baseline test pass counts and required exploration-lifecycle/OOS validation results before and after the experiment."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

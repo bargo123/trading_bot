@@ -1,0 +1,105 @@
+{
+  "change_id": "council_scheduled_cadence_20260825_2158",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-25T22:00:01.322498+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260825_2158",
+    "current_evidence": "Test a spread-timing recovery rule instead of pure abstention: for candidates rejected by the current soft spread-volatility gate (signals arising when rolling spread volatility exceeds its ~80th percentile), re-enter the signal one bar later and accept only if realized spread at the delayed fill ha",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Test a spread-timing recovery rule instead of pure abstention: for candidates rejected by the current soft spread-volatility gate (signals arising when rolling spread volatility exceeds its ~80th percentile), re-enter the signal one bar later and accept only if realized spread at the delayed fill has reverted below the rolling median. Falsifiable prediction: on the sealed holdout set, this recovers at least 30% of soft-gate-rejected candidates while holding mean execution cost within the runner'",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/3)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-25T21:58:21.277184+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 0,
+    "counted": 3,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "Truncated acceptance criteria: the spread-reversion predicate and the runner cost bound are incomplete, making the falsifiable prediction untestable as specified",
+        "Lookahead risk: 'realized spread at the delayed fill' must be conditioned on spread observable at order-submission time (current quote vs rolling median), not on post-trade realized costs, or the test peeks at the label",
+        "Threshold/delay parameters (~80th percentile, 1-bar lag) appear chosen post hoc from the same regime that generated the rejections; multiple-testing risk unless validated strictly on the sealed holdout with the experiment registered beforehand",
+        "No minimum sample-size floor stated for the >=30% recovery-rate claim; high-percentile rejection buckets may be too sparse on the holdout to support it",
+        "Delayed entry changes the trade's price context by one bar; without specifying entry/stop/target recomputation, recovered-candidate performance conflates spread-timing effect with price-drift effect"
+      ],
+      "confidence": 0.72,
+      "model": "x-preview-f-free",
+      "reason": "The core idea is sound and safety-compatible: converting soft-gate abstentions into a one-bar-delayed conditional re-entry is a legitimate research question, it targets exploration/OOS validation only, keeps champion promotion untouched, and carries no live exposure. However, the proposal as submitted is materially incomplete: both 'current_evidence' and 'proposed_change' truncate mid-sentence ('...delayed fill ha', '...within the runner''), so the exact re-entry predicate and the cost bound in the falsifiable prediction cannot be evaluated as written. Additional unspecified details (lookahead-safe conditioning, minimum holdout sample size, whether stops/targets are recomputed at t+1) determine whether the >=30% recovery claim would even be meaningful.",
+      "requested_revisions": [
+        "Resubmit with the complete re-entry rule and the full cost bound ('within the runner's ...' finished explicitly)",
+        "State that the delayed-fill acceptance check uses only quote-side information available at submission time; document this as the anti-lookahead guarantee",
+        "Pre-register a minimum holdout sample size (and the exact metric definitions) for the >=30% recovery claim via ExperimentRegistry before any run",
+        "Specify whether entry, stop, and target are recomputed at t+1, and report recovered-candidate net expectancy against both the pure-abstention baseline and the original ungated entries under identical runner spread/slippage assumptions",
+        "Confirm scope: all artifacts stay research-only (bot/research/, bot/reports/research/); no writes to bot/intel/intelligent_champion.json outside the governed promote path; no MT5 mutation from research components"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "The stated mean execution-cost limit is incomplete.",
+        "'Realized spread at delayed fill' must be defined as information available before order submission, not post-fill data.",
+        "Recovery rate alone can favor low-quality signals; require net expectancy, tail loss, and trade-count confidence gates.",
+        "Affected runtime paths could accidentally alter execution behavior before governed promotion."
+      ],
+      "confidence": 0.9,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The idea is suitable for sealed-holdout research, but the proposal truncates the execution-cost bound and lacks enough operational detail to verify no lookahead or execution-policy bypass occurs.",
+      "requested_revisions": [
+        "Specify the exact cost bound, spread source, bar timing, and no-lookahead implementation.",
+        "Define preregistered sealed-holdout metrics: recovery rate, net PF/EV after costs, drawdown/tail loss, sample minimums, and confidence intervals.",
+        "Keep the change research-only and prevent champion or MT5 DEMO execution changes unless existing promotion and execution gates independently approve them.",
+        "Record the experiment and failed or negative results in ExperimentRegistry."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "reason": "quota/rate-limit blocked",
+      "status": "UNAVAILABLE_QUOTA",
+      "vote": null
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "Falsifiable prediction is incomplete and does not define the runner cost limit.",
+        "No sample-size or minimum-event threshold is specified for the claimed 30% recovery rate.",
+        "Delayed-fill construction, timing, and prevention of lookahead bias are unspecified.",
+        "No explicit confirmation that AI Council and research components cannot place MT5 orders.",
+        "The stated falsification criterion is vague and does not define statistical or economic thresholds."
+      ],
+      "confidence": 0.96,
+      "model": null,
+      "reason": "The idea is suitable for research testing, but the proposal lacks sufficiently precise, auditable acceptance criteria and appears truncated. It should remain strictly offline/research-only until validated.",
+      "requested_revisions": [
+        "Complete the falsifiable prediction and specify the exact maximum mean execution-cost increase permitted.",
+        "Define the sealed-holdout protocol, delayed-fill timestamp, spread measurements, and lookahead protections.",
+        "Specify minimum rejected-candidate count, confidence intervals or uncertainty bounds, and the pass/fail rule for recovering at least 30%.",
+        "State explicitly that this is an offline experiment with no mt5.order_send calls and no champion promotion.",
+        "Define negative costed expectancy, required transaction-cost assumptions, and rollback conditions precisely."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

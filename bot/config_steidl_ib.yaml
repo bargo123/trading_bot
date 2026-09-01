@@ -1,0 +1,45 @@
+# Steidlmayer IB break — Market Profile Initial Balance go-with
+symbol: BTC-USD
+timeframe: 15m
+lookback_days: 45
+signal_mode: steidl_ib_break
+algo: steidl_ib_break
+
+starting_equity: 10000
+ema_fast: 20
+ema_slow: 50
+atr_period: 14
+bb_period: 20
+bb_std: 2.0
+rsi_period: 14
+adx_period: 14
+adx_trend_threshold: 25
+donchian_period: 20
+
+spread_bps: 2.0
+slippage_bps: 1.0
+min_atr_pct: 0.0
+cost_buffer: 1.5
+min_rr: 1.5
+orb_bars: 2
+ib_bars: 4
+ib_max_atr: 3.0
+allow_responsive_ib: false
+
+risk_percent: 1.0
+atr_sl_mult: 1.5
+atr_tp_mult: 2.5
+atr_trail_mult: 2.5
+rsi_oversold: 30
+rsi_overbought: 70
+adx_range_max: 25
+adx_min: 20
+
+max_daily_loss_percent: 6.0
+max_total_drawdown_percent: 20.0
+max_positions: 1
+kill_switch: false
+session_start_utc: 0
+session_end_utc: 24
+mode: paper
+poll_seconds: 60

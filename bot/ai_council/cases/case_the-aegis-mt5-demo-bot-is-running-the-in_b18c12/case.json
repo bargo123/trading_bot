@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-24T16:42:57.049337+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_b18c12\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 11.68,
+          "finished_utc": "2026-08-24T16:44:46.554687+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-24T16:44:34.876445+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T16:44:46.556687+00:00",
+        "text": "The threshold is research-defined, inviting post-hoc tuning unless it is fixed before any sealed-holdout evaluation. \u201cStatistically robust\u201d is unmeasurable without a prespecified test, confidence level, sample-size requirement, and treatment of fewer trades. The proposal also omits calibration validation on data separate from both tuning and the sealed holdout, so confidence improvements may be illusory."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_b18c12\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 12.62,
+          "finished_utc": "2026-08-24T16:44:34.842548+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-24T16:44:22.217874+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-24T16:44:34.857446+00:00",
+        "text": "\u201cIndependent\u201d is undefined and likely false, so the two-signal rule can introduce hidden correlation and selection bias; repeated testing on sealed holdouts also risks overfitting unless holdouts remain untouched until a pre-registered, powered evaluation. A 10% expectancy gain with unchanged maximum drawdown is not sufficient without confidence intervals, trade-count/exposure analysis, regime-sliced validation, and multiple-testing control. The proposal also omits mandatory ExperimentRegistry recording and explicit champion-promotion governance, creating a process-compliance and safety gap."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-24T16:45:18.908692+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_b3286a",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_b3286a for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_b18c12",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_b18c12\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.0,
+        "finished_utc": "2026-08-24T16:43:23.488913+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T16:43:11.493795+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T16:43:23.490913+00:00",
+      "text": "Test whether requiring two independent firehose signals before entry improves net expectancy versus the current single-signal baseline on sealed historical holdouts. Keep all existing cost assumptions and validated-state gates unchanged. Accept only if net expectancy improves by at least 10% with no increase in maximum drawdown; otherwise reject and retain the current champion."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_b18c12\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.97,
+        "finished_utc": "2026-08-24T16:43:55.621946+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T16:43:43.653198+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-24T16:43:55.623949+00:00",
+      "text": "Test a stricter validated-state gate that abstains unless the model\u2019s calibrated confidence exceeds a research-defined threshold. On a sealed, untouched holdout, compare it with the current gate using net expectancy, hit rate, drawdown, and trade count after spread/slippage. Adopt the candidate only if expectancy improves without worsening drawdown and the result is statistically robust; otherwise reject it and retain the current champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_b18c12\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 20.19,
+        "finished_utc": "2026-08-24T16:45:18.892694+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-24T16:44:58.699092+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T16:45:18.894694+00:00",
+      "text": "Before opening the sealed holdout, preregister the confidence threshold, calibration procedure, minimum sample size, metrics, and decision rules; no threshold tuning is permitted thereafter. Validate calibration on an independent dataset used for neither threshold tuning nor holdout evaluation, using prespecified calibration-error and reliability criteria. On the untouched holdout, compare the fixed candidate and current gates after spread/slippage using net expectancy, hit rate, drawdown, and trade count, with a prespecified chronological block-bootstrap test, 95% confidence intervals, and a minimum required trade count for each gate. Adopt only if the candidate\u2019s expectancy improvement is statistically significant, its drawdown does not worsen within the prespecified bound, and it meets the sample-size requirement; otherwise reject it and retain the current champion."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_b18c12\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.1,
+        "finished_utc": "2026-08-24T16:44:58.682092+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-24T16:44:46.578691+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-24T16:44:58.684090+00:00",
+      "text": "Pre-register signal-independence criteria, sample size, and a single sealed-holdout evaluation; define independence using non-overlapping inputs and bounded historical correlation. Record the experiment, hypotheses, and results in `ExperimentRegistry`, retaining sealed holdouts untouched until the powered evaluation. Compare net-of-cost expectancy with confidence intervals, trade count, exposure, regime-sliced performance, drawdown, and multiple-testing-adjusted significance. Promote only through existing governed champion gates if the two-signal rule achieves a statistically supported at-least-10% expectancy gain without worsened drawdown; otherwise reject and retain the current champion."
+    }
+  },
+  "status": "decided"
+}

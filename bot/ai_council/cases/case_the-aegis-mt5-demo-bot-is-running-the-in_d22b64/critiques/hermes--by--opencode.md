@@ -1,0 +1,1 @@
+The proposal contains no strategy, hypothesis, metrics, or validation plan, so it cannot be assessed for edge, costs, or overfitting. A transient provider outage is operational telemetry, not research evidence; retries, fallback behavior, and failure recording should be specified before any downstream use.

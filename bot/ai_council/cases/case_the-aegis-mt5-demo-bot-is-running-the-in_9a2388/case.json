@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T00:00:35.469583+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_9a2388\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 27.73,
+          "finished_utc": "2026-08-23T00:03:32.202006+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T00:03:04.473527+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T00:03:32.217881+00:00",
+        "text": "Raising the gate by 20% while exempting the incumbent champion from meeting it is incoherent governance\u2014you're holding challengers to a standard the champion may already fail, with no stated rule for what happens then. The acceptance criteria are unmeasurable as written: no cost model specified for \"net loss,\" no named risk-adjusted metric or evaluation window, no minimum holdout sample size or significance test, so noise on a thin sealed set can pass or reject arbitrarily. There is also no protection against holdout reuse\u2014repeatedly evaluating tweaked challengers against one sealed set until one clears is textbook overfitting-by-selection, and the 15% coverage tolerance looks like a hand-tuned fudge factor rather than a pre-registered bound. Finally, nothing here mentions registering the experiment in `ExperimentRegistry`, running the full `promote.py` gate suite via the sanctioned promotion scripts, or governing the fact that modifying the gate itself is an infrastructure change, not merely a challenger test."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_9a2388\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 11.49,
+          "finished_utc": "2026-08-23T00:03:04.456780+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T00:02:52.961888+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T00:03:04.456780+00:00",
+        "text": "The \u201cvalidated states\u201d and exit subsets may be selected from the same `outcome_log.jsonl`, creating severe selection and lookahead risk; no independent time-split, embargoed holdout, or untouched replication set is specified. \u201cRoughly unchanged trade count,\u201d \u201cexisting take-profit target logic,\u201d and \u201ccost adjustment\u201d are not operationally defined, while bootstrap p05 > 0 ignores multiple testing and dependence among fires. The proposal also does not require reconciliation against partial fills, missing/censored outcomes, regime drift, or a pre-registered minimum effect size, so the reported aggregate lift could be an overfit artifact despite the stated promotion safeguards."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T00:04:46.417327+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_065d66",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_065d66 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_9a2388",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_9a2388\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 61.78,
+        "finished_utc": "2026-08-23T00:01:54.236230+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T00:00:52.454951+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T00:01:54.238238+00:00",
+      "text": "Run a registered exit-research experiment (offline, sealed-holdout replay of `outcome_log.jsonl`, logged in `ExperimentRegistry`) that tests replacing the manual/quick-win flatten rule with the existing take-profit target logic on fires inside the two validated states, because current measured evidence shows manual closes carry essentially all the losses (n=1928, expectancy \u22120.0134, net \u221225.9) while tp closes earn +0.1069/trade (+47.8 net), and the book-wide payoff ratio is 0.341 against a breakeven win-rate of 0.746 versus a realized 0.675. Hypothesis: TP-governed exits flip aggregate holdout expectancy above zero with bootstrap p05 > 0 and lift payoff ratio above 0.5 at roughly unchanged trade count, net of runner spread/slippage assumptions. Falsifier: if holdout expectancy stays \u2264 0 or the win-rate shortfall persists after cost adjustment, the challenger is recorded as rejected in the registry and sealed-holdout ledger and never promoted. No code or champion changes outside the governed promote gates; demo-only throughout."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_9a2388\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 12.22,
+        "finished_utc": "2026-08-23T00:02:29.070214+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T00:02:16.850383+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T00:02:29.070214+00:00",
+      "text": "Test a research-only challenger that raises the validated-state gate\u2019s minimum net expected value by 20% while leaving the current champion unchanged. Promote it only if, on a sealed holdout, it reduces net loss and drawdown without lowering risk-adjusted return or coverage by more than 15% versus the current gate. If these conditions fail, reject and retain the current champion."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_9a2388\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 19.46,
+        "finished_utc": "2026-08-23T00:04:46.371343+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T00:04:26.909839+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T00:04:46.376418+00:00",
+      "text": "Register the research-only gate change and challenger in `ExperimentRegistry`, pre-registering the fixed evaluation window, runner spread/slippage/fee model, minimum 200 independent holdout outcomes, annualized Sharpe as the risk-adjusted metric, and a paired-bootstrap 95% confidence test. The incumbent and challenger must both satisfy the same absolute safety floors; if the incumbent fails the proposed 20%-higher threshold, the existing gate and champion remain in force unless separately re-approved through infrastructure governance. Evaluate the challenger once on the sealed holdout, with no reuse or iterative tuning, and accept it only if it significantly reduces net loss and maximum drawdown while Sharpe and coverage remain within the pre-registered 15% bounds. Any promotion must pass the complete `promote.py` gate suite through the sanctioned promotion script; otherwise record the rejection and retain the current champion."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_9a2388\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 54.66,
+        "finished_utc": "2026-08-23T00:04:26.892697+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T00:03:32.235309+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T00:04:26.902360+00:00",
+      "text": "Revised design: `outcome_log.jsonl` is partitioned once, by fire open-time, into a discovery window (where the two states and TP parameters are fixed) and an embargoed holdout starting at least two weeks after the last discovery fire, with a further untouched replication set kept sealed until the holdout result is registered; all replay stays offline and read-only. Operationally: \"existing take-profit target logic\" means the runner's shipped TP module at current parameters anchored to each fire's recorded entry price; \"cost adjustment\" means subtracting each fire's logged spread-plus-slippage from gross PnL before any statistic; \"roughly unchanged trade count\" means per-state holdout fire count within \u00b15% of discovery-period count, with partial fills and censored/still-open outcomes excluded from headline numbers but reported separately and a minimum 95% outcome-reconciliation rate required per state. Inference uses a day-blocked bootstrap (respecting within-day dependence among fires) with Holm correction across three pre-registered endpoints \u2014 holdout net expectancy > 0, payoff ratio > 0.5, trade-count stability \u2014 tested against a pre-registered minimum effect size of net expectancy \u2265 +0.03/trade, not the full in-sample +0.1069. Regime drift is screened by comparing discovery versus holdout feature distributions (PSI < 0.25 per state), and any breach voids the run rather than being tuned away. If any gate fails, the challenger is recorded as rejected in `ExperimentRegistry` and `sealed_holdouts.jsonl` and never promoted; no code or champion changes occur outside the governed promote gates, demo-only throughout."
+    }
+  },
+  "status": "decided"
+}

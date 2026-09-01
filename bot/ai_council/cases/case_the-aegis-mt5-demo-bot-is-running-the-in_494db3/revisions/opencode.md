@@ -1,0 +1,1 @@
+Test a stricter validated-state confidence calibration gate using a supported model endpoint. Compare it with the current gate on sealed MT5 DEMO outcomes, net of modeled spread and slippage. Promote only if it reduces tail loss without exceeding predefined limits for net expectancy or trade-count-adjusted performance.

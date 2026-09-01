@@ -1,0 +1,119 @@
+{
+  "change_id": "council_scheduled_cadence_20260826_0845",
+  "degraded_real_council": false,
+  "final_decision": "REVISE_AND_RESUBMIT",
+  "finished_utc": "2026-08-26T08:50:36.489650+00:00",
+  "pack": {
+    "affected_files": "bot/intel/, bot/ai_council/",
+    "change_id": "council_scheduled_cadence_20260826_0845",
+    "current_evidence": "Proposal: Extend the validated-state gate in `bot/aegis/research/promote.py` from a positive point estimate of net OOS expectancy to requiring the lower bound of a 95% block-bootstrap confidence interval (blocked by non-overlapping trades under each candidate's own horizon, consistent with the execu",
+    "expected_mechanism": "improve exploration/validation throughput",
+    "falsification_criteria": "negative costed expectancy after exploration trades",
+    "problem": "AEGIS research trigger: scheduled_cadence. Current PF=None, EV=None",
+    "proposed_change": "Proposal: Extend the validated-state gate in `bot/aegis/research/promote.py` from a positive point estimate of net OOS expectancy to requiring the lower bound of a 95% block-bootstrap confidence interval (blocked by non-overlapping trades under each candidate's own horizon, consistent with the executable-overlap correction) to be strictly above zero on the sealed holdout, net of runner spread/slippage. This is falsifiable entirely from existing records: rescore every challenger already logged in",
+    "risks": "unvalidated idea; tiny DEMO risk only",
+    "rollback": "revert experiment; no champion impact",
+    "safety_impact": "none (DEMO only, no live exposure)",
+    "tests": "exploration lifecycle + OOS validation"
+  },
+  "rationale": "plurality requested revisions (3/4)",
+  "safety_violation": null,
+  "schema": "council_change_vote.v1",
+  "started_utc": "2026-08-26T08:45:10.380220+00:00",
+  "totals": {
+    "abstain": 0,
+    "approve_for_test": 1,
+    "counted": 4,
+    "reject": 0,
+    "revise_and_resubmit": 3
+  },
+  "votes": [
+    {
+      "agent": "hermes",
+      "concerns": [
+        "affected_files cites bot/intel/ and bot/ai_council/, but the actual modification target is bot/aegis/research/promote.py; the manifest does not match the change",
+        "expected_mechanism 'improve exploration/validation throughput' contradicts the effect: a stricter CI-bound gate reduces promotion throughput; it improves selectivity/precision, not volume",
+        "rescoring every previously logged challenger against the same sealed holdout creates multiplicity/data-snooping pressure; nominal 95% coverage degrades under repeated reuse unless explicitly controlled",
+        "no minimum effective trade count or power statement: with sparse holdout trades the CI lower bound will rarely clear zero, risking silent champion starvation",
+        "block length, bootstrap replicate count, and RNG seed policy are unspecified, so the gate is not reproducible as written",
+        "undefined whether the CI condition is conjunctive with existing promote.py gates, and whether retrospective rescoring can demote already-recorded challengers or applies prospectively only",
+        "tests field is vague: no named unit tests for the bootstrap scorer, no edge cases (zero trades, degenerate return series), no suite-green commitment"
+      ],
+      "confidence": 0.74,
+      "model": "x-preview-f-free",
+      "reason": "Directionally sound and safety-aligned: replacing a positive point estimate of net OOS expectancy with a 95% block-bootstrap CI lower bound strictly above zero, on the sealed holdout, net of runner spread/slippage, with blocks respecting each candidate's own horizon, only tightens champion promotion. It touches no execution path, no protected trading YAML, and requires no MT5 mutation, and it is falsifiable from existing records. However, the proposal contains internal inconsistencies (wrong affected_files, contradictory mechanism claim) and unresolved statistical-design gaps (holdout reuse multiplicity, unspecified block length/replicates/sample floor) that must be fixed before implementation.",
+      "requested_revisions": [
+        "Correct affected_files to include bot/aegis/research/promote.py plus any report/registry writers actually touched",
+        "Restate expected_mechanism accurately as stricter validation selectivity / fewer false-positive champion promotions",
+        "Specify multiplicity control for sealed-holdout reuse: one-pass consumption per challenger, deflated/reality-check thresholding, or a fresh sealed segment policy",
+        "Define block length selection rule, replicate count, fixed seed policy, and a minimum effective sample size below which the gate abstains rather than passes or fails",
+        "State explicitly that the new condition is conjunctive with all existing promote.py gates and that promotion continues to flow only through the two sanctioned promotion scripts",
+        "Add named pytest cases covering scorer determinism, horizon-based overlap blocking, cost netting, and empty/degenerate inputs; confirm the full suite passes before merge",
+        "Record the retrospective rescoring sweep in ExperimentRegistry entries per the mandatory experiment-recording rule"
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "opencode",
+      "concerns": [
+        "`bot/aegis/research/promote.py` is the stated target but is absent from `affected_files`.",
+        "Block-bootstrap methodology, block definition, resample count, confidence construction, RNG seed, and minimum effective sample size are unspecified.",
+        "A stricter validation gate is unlikely to improve validation throughput; it may reduce promotions while improving confidence.",
+        "Rescoring logged challengers requires confirmation that sealed-holdout records contain horizon, costs, and non-overlap inputs without label leakage."
+      ],
+      "confidence": 0.91,
+      "model": "gpt-5.6-terra-fast",
+      "reason": "The stricter sealed-holdout lower-confidence-bound gate is safety-positive, but the proposal lacks a reproducible statistical specification and names affected files that omit the implementation target.",
+      "requested_revisions": [
+        "Specify the exact bootstrap algorithm, candidate-specific blocking rule, one-sided/two-sided 95% criterion, deterministic seed, resample count, and minimum independent-block threshold.",
+        "Add `bot/aegis/research/promote.py` and focused promotion/OOS tests to affected files and test scope.",
+        "Define fail-closed behavior when data are insufficient or the confidence interval cannot be computed.",
+        "Clarify the success metric as improved promotion reliability rather than validation throughput."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "gemini",
+      "concerns": [
+        "The 'affected_files' list in the proposal (bot/intel/, bot/ai_council/) appears incomplete as it excludes the primary implementation targets: 'bot/aegis/research/promote.py' and potentially 'bot/aegis/research/stress.py'.",
+        "The proposal mentions 'scheduled_cadence' as the trigger, which is standard but provides little context on whether current promotion rates are considered too high or too low."
+      ],
+      "confidence": 0.95,
+      "model": null,
+      "reason": "The proposed shift from a point-estimate gate (PF > 1) to a 95% block-bootstrap confidence interval lower bound (p05 > 0) on sealed holdout data is a standard robustness improvement in systematic trading. It significantly reduces the probability of Type I errors (false discoveries) during the promotion phase by ensuring that expectancy is statistically significant net of dependencies and costs. The use of block-bootstrap, specifically accounting for trade horizon overlap, is appropriate for time-series data where returns may exhibit autocorrelation. This change enhances the rigor of the promotion process without introducing live risk.",
+      "requested_revisions": [
+        "Include 'bot/aegis/research/promote.py' and 'bot/aegis/research/stress.py' in the affected files list.",
+        "Explicitly define the block-bootstrap implementation details (e.g., block size logic) to ensure it correctly maps to the 'non-overlapping trades' constraint mentioned."
+      ],
+      "vote": "APPROVE_FOR_TEST"
+    },
+    {
+      "agent": "codex",
+      "concerns": [
+        "No complete specification of the block-bootstrap method, block-length selection, resampling count, or minimum sealed-holdout sample size.",
+        "Unclear handling of candidates with too few non-overlapping trades or undefined expectancy/intervals.",
+        "Affected-files declaration omits bot/aegis/research/promote.py and may omit tests and registry/report artifacts.",
+        "The claim of no safety impact is inaccurate because the validated-state gate controls champion promotion, even if no direct broker execution changes.",
+        "No evidence is provided from rescoring existing challengers, including expected rejection/promotion outcomes and regression behavior."
+      ],
+      "confidence": 0.97,
+      "model": null,
+      "reason": "The proposed statistical gate is directionally safety-improving, but the submission lacks sufficient implementation and validation detail for approval. It also inconsistently lists affected files while proposing a change to bot/aegis/research/promote.py, and its impact on governed champion promotion is understated.",
+      "requested_revisions": [
+        "Provide the exact implementation and test-file scope, including promote.py.",
+        "Define deterministic bootstrap parameters, block construction using each candidate horizon, confidence-bound calculation, and minimum-trade requirements.",
+        "Specify fail-closed behavior for insufficient, malformed, or undefined holdout data.",
+        "Run and report baseline versus revised lifecycle/OOS tests and record the experiment in ExperimentRegistry.",
+        "Rescore all existing challengers and attach net spread/slippage-adjusted results, confidence intervals, and promotion decisions before resubmission.",
+        "Explicitly verify that no live configuration, broker execution path, or champion artifact is modified outside the governed promotion flow."
+      ],
+      "vote": "REVISE_AND_RESUBMIT"
+    },
+    {
+      "agent": "cursor",
+      "reason": "OUTPUT_DRAIN_TIMEOUT",
+      "status": "ERROR",
+      "vote": null
+    }
+  ]
+}

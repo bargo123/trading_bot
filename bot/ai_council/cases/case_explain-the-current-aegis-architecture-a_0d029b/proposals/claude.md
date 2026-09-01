@@ -1,0 +1,1 @@
+The case question didn't come through — the prompt ends at "Case question:" with no content. Paste the question and I'll return the 3-6 sentence proposal.

@@ -1,0 +1,91 @@
+# Observation-only MT5 demo candidate. This profile must not submit broker orders.
+# Exit geometry is intentionally absent; Phase 3 must provide tested exits before
+# any demo mutation can be considered.
+engine: mt5
+mode: mt5_demo
+allow_live: false
+dry_run: true
+paper_trading_enabled: true
+mt5_path: C:\Program Files\MetaTrader 5\terminal64.exe
+mt5_magic: 260816
+mt5_deviation: 20
+mt5_max_lots: 0.1
+
+symbol: GBPUSD
+symbols:
+- EURUSD
+- GBPUSD
+- USDJPY
+- USDCHF
+- AUDUSD
+- NZDUSD
+- USDCAD
+- EURJPY
+- GBPJPY
+- AUDJPY
+- CADJPY
+- NZDJPY
+- EURGBP
+- EURAUD
+- EURCHF
+- EURCAD
+- EURNZD
+- GBPAUD
+- GBPCAD
+- GBPCHF
+- GBPNZD
+- AUDCAD
+- AUDCHF
+- AUDNZD
+- CADCHF
+- AUDSGD
+timeframe: 1m
+lookback_days: 1
+poll_seconds: 1
+order_quantity: 0.01
+starting_equity: 100
+
+signal_mode: firehose
+algo: firehose
+firehose_every_bar: false
+firehose_book_filter: true
+firehose_chart_read: true
+firehose_min_chart_score: 1
+firehose_skip_doji: true
+firehose_require_body: true
+firehose_min_er: 0.35
+firehose_min_range_pips: 1.0
+firehose_vpa_filter: true
+firehose_brooks_range: true
+firehose_damir_structure: true
+firehose_jansen_filter: true
+jansen_score_min: 0.15
+jansen_z_bars: 50
+firehose_harris_jump: true
+harris_jump_atr: 1.8
+er_period: 10
+htf_ema_period: 100
+firehose_pip_size: 0.0001
+jpy_pip_size: 0.01
+# Canonical 0.3; strict shadow schema caps this conservative gate at 0.5 pips.
+max_spread_pips: 0.3
+spread_bps_floor: 0.2
+
+position_sizing_mode: risk
+risk_percent: 0.25
+max_daily_loss_percent: 2
+max_total_drawdown_percent: 10
+max_consecutive_losses: 3
+max_positions: 8
+max_per_symbol: 1
+max_currency_direction_positions: 2
+firehose_stack: false
+oms_pretrade: true
+max_quote_age_s: 5
+max_future_quote_skew_s: 0.25
+no_money_reject_limit: 3
+no_money_window_s: 300
+execution_backoff_s: 900
+kill_switch: false
+
+test_name: mt5_demo_selective_shadow

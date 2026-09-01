@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-23T04:25:45.904668+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fd03e5\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 28.55,
+          "finished_utc": "2026-08-23T04:28:57.661045+00:00",
+          "mode": "REAL",
+          "model": null,
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-23T04:28:29.115526+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T04:28:57.661045+00:00",
+        "text": "The 1.5\u00d7 cost multiplier, 10% expectancy bar, and 0.05 PF tolerance are three unpre-registered free parameters with no stated derivation \u2014 tune them post hoc against the same splits and this is a filter-fit-to-backtest machine, so fix and freeze them before any evaluation and register the run in `ExperimentRegistry` (which the proposal never mentions). \"Predicted edge < 1.5\u00d7 modeled cost\" is unmeasurable as written: it never specifies the source and calibration status of the edge prediction or whether \"modeled\" cost means the runner's spread/slippage assumptions or empirically realized fills, and aggregate net-expectancy improvement can mask catastrophic single-fold regressions \u2014 require per-fold significance (e.g., bootstrap CI excluding zero) plus a minimum trade count per bucket. Repeatedly hitting the sealed holdout with successive challengers erodes its seal; there's no multiple-testing accounting or statement that promotion runs only through the governed `promote.py` gates rather than this ad-hoc \"accept\" clause. Finally, +25% is a single arbitrary stress point \u2014 sweep at least 1.25\u20133\u00d7 cost, since a filter whose edge evaporates at 2\u00d7 cost is curve-fit to today's spread."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fd03e5\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 13.1,
+          "finished_utc": "2026-08-23T04:28:29.094095+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-23T04:28:15.995477+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-23T04:28:29.094095+00:00",
+        "text": "The proposal risks overfitting by targeting `quick_win`/`never_green` and \u201cvalidated states\u201d selected from the same 2,518 exits, with no time-based split, purge/embargo, regime coverage, or multiple-testing correction. Its \u201cmost closes\u201d claim is internally unclear because 1,383 + 1,288 exceeds the sample size, and it omits uncertainty around payoff estimates, execution costs, anchor selection, and whether the sealed holdout was untouched during design. It also does not demonstrate isolation from immutable live YAML/runtime paths, so \u201cno promotion\u201d alone is insufficient evidence that the challenger cannot affect live trading."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-23T04:29:42.565353+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_343267",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_343267 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_fd03e5",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fd03e5\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 71.8,
+        "finished_utc": "2026-08-23T04:27:13.805608+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T04:26:02.009304+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T04:27:13.816448+00:00",
+      "text": "Proposal: Run an exit-geometry challenger against the measured payoff asymmetry \u2014 across the 2,518 reconciled demo exits (outcome_learning.json) win rate is 67.5% yet expectancy is \u22120.0122 and PF 0.77 because payoff ratio is only 0.34 (avg win 0.060 vs avg loss \u22120.177); by close reason, `tp` exits earn +0.107 each while `manual` flattens (n=1928, PF 0.64) and `sl` hits (\u22120.547 each) destroy the edge, and the failure audit attributes most closes to `quick_win` (1383) and `never_green` (1288). Concretely: build an exit_research candidate for the two validated states (asia/range/sell among others) that suppresses the quick-win early flatten and holds to the existing TP anchor unless an ATR-based invalidation or a fixed time-stop fires, registered in ExperimentRegistry and evaluated net of runner spread/slippage on the sealed holdout. Falsifiable pass criterion: holdout expectancy_validate > +0.00 (vs current \u22120.012 baseline), bootstrap_p05 > 0, and PF > 1.0; any failure is recorded honestly and no promotion occurs through the governed promote gates. This follows Van Tharp's *Trade Your Way to Financial Freedom* (2006) from the corpus, which scores 20 risk-topic hits and frames expectancy as win-rate \u00d7 average win minus loss-rate \u00d7 average loss \u2014 exactly the term our exits are currently flipping negative."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fd03e5\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.53,
+        "finished_utc": "2026-08-23T04:27:49.576681+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T04:27:36.049067+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-23T04:27:49.578693+00:00",
+      "text": "Test a research-only challenger that rejects validated-state signals when their predicted edge is less than 1.5\u00d7 modeled round-trip spread/slippage cost. Evaluate it with identical walk-forward splits and the sealed holdout, including a +25% cost-stress run. Accept the candidate only if net expectancy improves by at least 10% without reducing profit factor by more than 0.05; otherwise retain the current champion unchanged."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fd03e5\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 14.54,
+        "finished_utc": "2026-08-23T04:29:42.531899+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-23T04:29:27.994748+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T04:29:42.531899+00:00",
+      "text": "Test one pre-registered, research-only challenger with all thresholds frozen before evaluation: reject validated-state signals when a pre-existing, out-of-sample-calibrated edge model predicts edge below 1.5\u00d7 the runner\u2019s modeled round-trip spread/slippage cost. Record the hypothesis, derivation, calibration status, splits, and run in `ExperimentRegistry`; evaluate on identical walk-forward splits and one sealed-holdout pass, with costs swept from 1.25\u00d7 to 3\u00d7. Require at least the minimum pre-specified trade count in every evaluation bucket and bootstrap confidence intervals excluding zero for net-expectancy improvement in every fold, while meeting the aggregate \u226510% expectancy gain and no more than 0.05 profit-factor decline. Account for all registered challenger tests in the multiple-testing procedure, and permit promotion only through the governed `promote.py` gates; otherwise retain the current champion unchanged."
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fd03e5\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 30.31,
+        "finished_utc": "2026-08-23T04:29:27.978783+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-23T04:28:57.673145+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-23T04:29:27.978783+00:00",
+      "text": "**Revised proposal:** Build an exit-geometry challenger in `exit_research` for the previously validated states, but fit and tune it only on an earlier time-based development slice of the 2,518 exits, separated from the sealed holdout by a purge/embargo gap \u2014 the holdout stays untouched during design, verifiable via ExperimentRegistry timestamps \u2014 and report all expectancy/payoff estimates with bootstrap CIs given the modest per-bucket sample sizes. Correcting my earlier claim: `quick_win` (1,383) and `never_green` (1,288) are overlapping multi-label audit tags, not disjoint close counts, so they are restated as tag frequencies rather than shares of exits. To guard against overfitting, the candidate is evaluated across *all* state/regime buckets (not only those selected as validated) and the anchor/time-stop parameter grid carries a Bonferroni-style correction across the tests actually run. Pass criteria remain net of runner spread/slippage and are stress-tested at 1\u00d7 and 2\u00d7 assumed costs: holdout `expectancy_validate > +0.00` (vs \u22120.012 baseline), `bootstrap_p05 > 0`, and PF > 1.0. Isolation is structural, not just procedural \u2014 the challenger code and artifacts live exclusively under `bot/aegis/research/` and `bot/research/`, read/write no live YAML or runtime intel paths, and reach `intel/intelligent_champion.json` only through the governed `promote.py` gates; failures are recorded honestly in the registry with no promotion."
+    }
+  },
+  "status": "decided"
+}

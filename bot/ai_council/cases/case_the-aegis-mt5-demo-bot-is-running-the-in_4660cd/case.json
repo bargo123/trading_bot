@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-08-21T10:09:39.020757+00:00",
+  "critiques": {},
+  "decision": {
+    "decided_utc": "2026-08-21T10:14:25.191947+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_1b7201",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 0,
+      "n_proposals": 1,
+      "n_revisions": 0,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_1b7201 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_4660cd",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_4660cd\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 228.49,
+        "finished_utc": "2026-08-21T10:13:37.294635+00:00",
+        "mode": "REAL",
+        "model": "opencode/x-preview-f-free",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-21T10:09:48.801605+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-21T10:13:37.294635+00:00",
+      "text": "Proposal: Target the exit geometry, not entry selection. Measured evidence from `outcome_learning.md` (2,471 reconciled demo exits): win rate is 67.8% yet net expectancy is \u22120.011 and PF 0.77 because average loss (\u22120.161) is ~3\u00d7 average win (+0.054, payoff ratio 0.33); \"manual\" closes dominate (n=1916, PF 0.60) while TP closes earn +0.10 expectancy, and the ML gate confirms entries aren't the bottleneck (model-taken holdout expectancy still \u22120.36 despite +0.83 relative improvement, `ml_advances=false`). Concrete next-cycle experiment: first fix `exit_research`'s ingestion (it currently reports n_rows=0 despite 2,471 logged exits), then use it to compare the current fixed-TP exit against a widened-TP / time-stop variant (e.g., TP at 2\u00d7 current distance or hold-to-horizon H) on the same features, scored net of measured per-symbol costs (EURUSD 0.7 pips p75 \u2026 EURCHF 7.2) on a sealed holdout via the standard promote gates. Falsifiable prediction: the widened exit lifts net holdout expectancy from \u22120.011 to \u2265 +0.02 per trade with win rate \u2265 50%; if it fails any gate, record the rejection in the registry and leave the champion untouched."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {},
+  "status": "decided"
+}

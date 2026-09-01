@@ -1,0 +1,10 @@
+{
+  "symbol": "EURUSD=X",
+  "requested_interval": "1m",
+  "actual_interval": "1m",
+  "requested_lookback_days": 7,
+  "rows": 9889,
+  "start_utc": "2026-07-29 23:00:00+00:00",
+  "end_utc": "2026-08-07 21:29:00+00:00",
+  "fetched_utc": "2026-08-09 18:43:58.964469+00:00"
+}

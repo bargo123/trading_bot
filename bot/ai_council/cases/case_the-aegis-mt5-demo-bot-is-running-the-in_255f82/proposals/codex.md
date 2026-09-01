@@ -1,0 +1,1 @@
+Test a stricter validated-state gate requiring two consecutive, timestamp-consistent quote validations before DEMO entry. Compare it with the current gate on the next sealed holdout, measuring net expectancy, invalidation rate, fill quality, and trade count. Promote only if expectancy and invalidation-adjusted drawdown improve without worsening execution-cost-adjusted returns.

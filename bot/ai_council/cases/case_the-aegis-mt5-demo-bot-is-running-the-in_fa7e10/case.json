@@ -1,0 +1,235 @@
+{
+  "created_utc": "2026-08-26T16:10:09.801734+00:00",
+  "critiques": {
+    "codex": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\critiques\\codex--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 7.5,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T16:15:12.626733+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      },
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\critiques\\codex--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 10.74,
+          "finished_utc": "2026-08-26T16:15:23.389324+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-26T16:15:12.644363+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T16:15:23.391873+00:00",
+        "text": "Two consecutive scans may merely delay entries and overfit to the chosen scan cadence; test robustness across cadences and market regimes. \u201cFalse entry\u201d and opportunity loss need pre-registered, executable definitions, including exit horizon and cost model. The sealed holdout must remain untouched until thresholds and comparison methodology are fixed."
+      }
+    ],
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 14.84,
+          "finished_utc": "2026-08-26T16:14:36.068030+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-26T16:14:21.232422+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T16:14:36.072576+00:00",
+        "text": "This is an error message, not a trading proposal: it contains no hypothesis, signal definition, validation plan, or measurable performance claim. No safety or execution assessment is possible until the unsupported model dependency is replaced and the intended strategy is specified."
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\critiques\\hermes--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 10.44,
+          "finished_utc": "2026-08-26T16:14:46.532072+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-26T16:14:36.090162+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T16:14:46.536071+00:00",
+        "text": "This is not a testable strategy proposal but an opaque API error, so it provides no hypothesis, data, metrics, or executable decision rule to evaluate. It also omits root-cause diagnosis and recovery safeguards\u2014such as model availability checks, fallback behavior, and fail-closed handling\u2014creating a risk of silently skipped research or uncontrolled substitution."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 7.55,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T16:14:54.207992+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      },
+      {
+        "agent": "codex",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\critiques\\opencode--by--codex.md",
+        "meta": {
+          "cli_class": "node-script",
+          "duration_s": 10.89,
+          "finished_utc": "2026-08-26T16:15:05.120745+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-luna",
+          "provider": "OpenAI",
+          "returncode": 0,
+          "started_utc": "2026-08-26T16:14:54.229058+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-26T16:15:05.123769+00:00",
+        "text": "The threshold of 30 is arbitrary and may overfit to the tested symbols/windows, while conflating sample quantity with regime quality and liquidity. \u201cDrawdown decreases\u201d and \u201cexpectancy improves by at least 10%\u201d lack statistical uncertainty, power, horizon, and multiple-comparison controls, so repeated sealed-window tuning could still leak information. The proposal also omits an explicit DEMO-only/config-governance check and confirmation that the test cannot alter live execution or bypass existing risk and broker gates."
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-26T16:15:54.246584+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_60665d",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 6,
+      "n_proposals": 3,
+      "n_revisions": 3,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_60665d for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_fa7e10",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.99,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T16:10:29.863424+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.17,
+        "finished_utc": "2026-08-26T16:10:57.260892+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T16:10:44.095552+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T16:10:57.264407+00:00",
+      "text": "Test whether requiring a minimum validated-state sample size of 30 before enabling a symbol improves net, cost-adjusted expectancy versus the current gate. Evaluate on sealed historical windows with identical spread/slippage assumptions and reject the change unless drawdown decreases and net expectancy improves by at least 10%. Record the experiment and retain the incumbent champion unless all promotion gates pass."
+    },
+    {
+      "agent": "codex",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\proposals\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 13.15,
+        "finished_utc": "2026-08-26T16:12:50.102445+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-luna",
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-26T16:12:36.954794+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-26T16:12:50.105451+00:00",
+      "text": "Test a research-only variant that requires the validated-state gate to remain true for two consecutive scans before entry. Compare it with the current gate on net expectancy, false-entry rate, and opportunity loss after spread/slippage across a sealed holdout. Promote nothing: reject the candidate unless false entries fall by at least 15% without reducing net expectancy or trade count by more than 10%."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "codex": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\revisions\\codex.md",
+      "meta": {
+        "cli_class": "node-script",
+        "duration_s": 11.51,
+        "finished_utc": "2026-08-26T16:15:54.190506+00:00",
+        "mode": "REAL",
+        "model": null,
+        "provider": "OpenAI",
+        "returncode": 0,
+        "started_utc": "2026-08-26T16:15:42.681096+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T16:15:54.194646+00:00",
+      "text": "Test a research-only two-consecutive-scan validated-state gate against the current gate across pre-registered scan cadences and representative market regimes. Before opening the sealed holdout, define a false entry as an entry whose fixed 30-minute post-entry mark-to-market return is negative after the runner\u2019s documented spread and slippage costs, and opportunity loss as the net positive return captured by the current gate but missed or materially delayed by the candidate over the same horizon and cost model. Freeze the comparison methodology, thresholds, cadence set, regime labels, and analysis code before accessing the sealed holdout, then evaluate net expectancy, false-entry rate, opportunity loss, and trade count. Reject the candidate unless false entries decrease by at least 15% without net expectancy falling or trade count declining by more than 10% across the aggregate holdout and without failing any pre-specified cadence or regime robustness check; promote nothing."
+    },
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.58,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T16:15:30.986012+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_fa7e10\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 11.64,
+        "finished_utc": "2026-08-26T16:15:42.651560+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-26T16:15:31.008374+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-26T16:15:42.654584+00:00",
+      "text": "Test pre-registered validated-state thresholds, including 30, across sealed historical windows stratified by regime and liquidity under identical cost assumptions. Require adequate power, confidence intervals, fixed horizons, and multiple-comparison correction; reject candidates unless they show statistically supported lower drawdown and at least 10% higher net expectancy on untouched holdouts. Register all trials and retain the incumbent unless every promotion gate passes. The work is read-only, DEMO-only, and cannot modify execution configuration or bypass existing risk, broker, or promotion controls."
+    }
+  },
+  "status": "decided"
+}

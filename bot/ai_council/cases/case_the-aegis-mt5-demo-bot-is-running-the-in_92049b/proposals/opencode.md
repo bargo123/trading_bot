@@ -1,0 +1,1 @@
+Test whether requiring two consecutive validated-state confirmations before entry reduces false starts. Compare against the current gate on sealed DEMO outcome logs, net of spread and slippage, with identical signals and risk limits. Adopt only if it lowers adverse-excursion rate by at least 15% without reducing net expectancy by more than 5%.

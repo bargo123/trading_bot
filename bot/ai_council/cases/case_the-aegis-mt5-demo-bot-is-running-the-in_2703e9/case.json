@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-08-28T17:25:24.831324+00:00",
+  "critiques": {
+    "hermes": [
+      {
+        "agent": "opencode",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2703e9\\critiques\\hermes--by--opencode.md",
+        "meta": {
+          "cli_class": "native-exe",
+          "duration_s": 15.0,
+          "finished_utc": "2026-08-28T17:27:13.547173+00:00",
+          "mode": "REAL",
+          "model": "gpt-5.6-terra-fast",
+          "provider": "opencode",
+          "returncode": 0,
+          "started_utc": "2026-08-28T17:26:58.551196+00:00",
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T17:27:13.550173+00:00",
+        "text": "This is an error message, not a research proposal: it defines no hypothesis, data, methodology, or measurable outcome. It provides no validation plan and cannot support a strategy, model, or safety decision."
+      }
+    ],
+    "opencode": [
+      {
+        "agent": "hermes",
+        "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2703e9\\critiques\\opencode--by--hermes.md",
+        "meta": {
+          "cli_class": null,
+          "duration_s": 7.75,
+          "finished_utc": null,
+          "mode": "REAL",
+          "model": "x-preview-f-free",
+          "provider": "configured",
+          "returncode": 0,
+          "started_utc": null,
+          "tool_version": null
+        },
+        "submitted_utc": "2026-08-28T17:27:21.307950+00:00",
+        "text": "HTTP 401: Model x-preview-f-free is not supported"
+      }
+    ]
+  },
+  "decision": {
+    "decided_utc": "2026-08-28T17:27:41.969658+00:00",
+    "decision": "defer_validation",
+    "evidence": {
+      "challenger_id": "council_the-aegis-mt5-demo-bot-is-running-the-in_da33f9",
+      "challenger_log": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\intel\\experiments.jsonl",
+      "mode": "REAL",
+      "n_critiques": 2,
+      "n_proposals": 2,
+      "n_revisions": 2,
+      "reason": "CHALLENGER_CREATED"
+    },
+    "rationale": "REAL: falsifiable candidate registered as challenger council_the-aegis-mt5-demo-bot-is-running-the-in_da33f9 for the validation pipeline"
+  },
+  "id": "the-aegis-mt5-demo-bot-is-running-the-in_2703e9",
+  "mode": "REAL",
+  "phase": "decision",
+  "proposals": [
+    {
+      "agent": "hermes",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2703e9\\proposals\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 7.94,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T17:25:41.862691+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    {
+      "agent": "opencode",
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2703e9\\proposals\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 13.02,
+        "finished_utc": "2026-08-28T17:26:09.803318+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T17:25:56.788049+00:00",
+        "tool_version": null
+      },
+      "submitted_utc": "2026-08-28T17:26:09.806323+00:00",
+      "text": "Run a sealed-holdout experiment adding a minimum validated-state persistence requirement of two consecutive scans before entry. Compare net expectancy after spread/slippage, max drawdown, and trade count against the current gate over the same MT5 DEMO outcome window. Reject the candidate unless it improves net expectancy without increasing max drawdown or reducing qualifying trades by more than 20%."
+    }
+  ],
+  "question": "The AEGIS MT5 DEMO bot is running the intelligent firehose with the validated-state gate. Given the current measured evidence, identify ONE concrete, falsifiable improvement candidate for the next research cycle. Do not modify code or the champion. Cite book corpus passages if relevant.",
+  "revisions": {
+    "hermes": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2703e9\\revisions\\hermes.md",
+      "meta": {
+        "cli_class": null,
+        "duration_s": 8.06,
+        "finished_utc": null,
+        "mode": "REAL",
+        "model": "x-preview-f-free",
+        "provider": "configured",
+        "returncode": 0,
+        "started_utc": null,
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T17:27:29.370448+00:00",
+      "text": "HTTP 401: Model x-preview-f-free is not supported"
+    },
+    "opencode": {
+      "file": "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\ai_council\\cases\\case_the-aegis-mt5-demo-bot-is-running-the-in_2703e9\\revisions\\opencode.md",
+      "meta": {
+        "cli_class": "native-exe",
+        "duration_s": 12.55,
+        "finished_utc": "2026-08-28T17:27:41.941077+00:00",
+        "mode": "REAL",
+        "model": "gpt-5.6-terra-fast",
+        "provider": "opencode",
+        "returncode": 0,
+        "started_utc": "2026-08-28T17:27:29.392170+00:00",
+        "tool_version": null
+      },
+      "revised_utc": "2026-08-28T17:27:41.944590+00:00",
+      "text": "Run the sealed-holdout experiment using a supported configured model, with a deterministic local fallback if model access fails. Add a two-consecutive-scan validated-state persistence requirement before entry, then compare net expectancy after spread/slippage, maximum drawdown, and trade count against the current gate over the same MT5 DEMO outcome window. Reject the candidate unless it improves net expectancy without increasing maximum drawdown or reducing qualifying trades by more than 20%, and record any model-access failure in the experiment registry."
+    }
+  },
+  "status": "decided"
+}

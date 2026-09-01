@@ -1,0 +1,1126 @@
+﻿{
+    "report":  "external_dependency_manifest",
+    "generated_at_utc":  "2026-08-31T01:47:23.2902419Z",
+    "status":  "COMPLETED_WITH_EXPLICIT_RESULTS",
+    "root":  ".external",
+    "source_root":  ".external/src",
+    "venv_root":  ".external/venvs",
+    "execution_policy":  "External repositories are read-only research/reference inputs and cannot mutate broker state.",
+    "tools":  {
+                  "prerequisites":  {
+                                        "status":  "SKIPPED"
+                                    }
+              },
+    "repositories":  [
+                         {
+                             "name":  "OpenAlice",
+                             "url":  "https://github.com/TraderAlice/OpenAlice.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\OpenAlice",
+                             "role":  "read-only control-plane reference",
+                             "declared_license":  "AGPL-3.0",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "299a5f86e9d441f7007aaef1d0c7ed99107e7e25",
+                             "branch":  "master",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  "0.90.2",
+                             "upstream_test_paths":  [
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "awesome-systematic-trading",
+                             "url":  "https://github.com/paperswithbacktest/awesome-systematic-trading.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\awesome-systematic-trading",
+                             "role":  "source catalog",
+                             "declared_license":  "inspect repository",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "d9c98521c76662d5eae03ab97a4fc721d010dde3",
+                             "branch":  "main",
+                             "dirty":  false,
+                             "license_file":  null,
+                             "package_version":  null,
+                             "upstream_test_paths":  [
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "qlib",
+                             "url":  "https://github.com/microsoft/qlib.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\qlib",
+                             "role":  "isolated offline research",
+                             "declared_license":  "MIT",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "79633dd9506ea689e5400dea0197717b5b3d74b7",
+                             "branch":  "main",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  null,
+                             "upstream_test_paths":  [
+                                                         "tests",
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "ordersim",
+                             "url":  "https://github.com/tradingexpert/ordersim.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\ordersim",
+                             "role":  "isolated execution replay",
+                             "declared_license":  "MIT",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "0cd832a0842e46b74959e29f2a1e5a6154212044",
+                             "branch":  "main",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  "0.1.3",
+                             "upstream_test_paths":  [
+                                                         "tests",
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "hftbacktest",
+                             "url":  "https://github.com/nkaz001/hftbacktest.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\hftbacktest",
+                             "role":  "isolated tick and latency replay",
+                             "declared_license":  "MIT",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "5f3ec40b2afb764e0fea112f941ed85523ef4e88",
+                             "branch":  "master",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  null,
+                             "upstream_test_paths":  [
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "oos-lab",
+                             "url":  "https://github.com/OutOfSampleLab/oos-lab.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\oos-lab",
+                             "role":  "isolated validation",
+                             "declared_license":  "MIT",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "d09ba123d28fcc5145380303d872d36946d534fd",
+                             "branch":  "main",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  "0.4.0",
+                             "upstream_test_paths":  [
+                                                         "tests"
+                                                     ]
+                         },
+                         {
+                             "name":  "Keystone",
+                             "url":  "https://github.com/pancakes9798/Keystone.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\Keystone",
+                             "role":  "methodology reference",
+                             "declared_license":  "proprietary; do not redistribute",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "dea0160ffa14ebc8533af6fca5b6e54d2ec1360c",
+                             "branch":  "main",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  "0.1.0",
+                             "upstream_test_paths":  [
+                                                         "tests",
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "algorithmic-trading-research-framework",
+                             "url":  "https://github.com/WenhuangL/algorithmic-trading-research-framework.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\algorithmic-trading-research-framework",
+                             "role":  "research integrity reference",
+                             "declared_license":  "MIT",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "431a20daa256058b5c89d2478dfeb86d64bcb4f0",
+                             "branch":  "main",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  null,
+                             "upstream_test_paths":  [
+                                                         "tests",
+                                                         "pytest.ini",
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "samvid-trading-core",
+                             "url":  "https://github.com/AshishTalpada/samvid-trading-core.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\samvid-trading-core",
+                             "role":  "event and reconciliation reference",
+                             "declared_license":  "MIT",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "0f40e76cadadf857cebba65303fb4154afc40b0a",
+                             "branch":  "main",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  "1.0.0",
+                             "upstream_test_paths":  [
+                                                         "tests",
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "Vibe-Trading",
+                             "url":  "https://github.com/HKUDS/Vibe-Trading.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\Vibe-Trading",
+                             "role":  "MT5 preflight reference; PR 481",
+                             "declared_license":  "inspect repository",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "e24cad4f3319181546f18d26a35680e6c70be2c4",
+                             "branch":  "pr-481",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  "0.1.11",
+                             "upstream_test_paths":  [
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "metatrader5-mcp-server",
+                             "url":  "https://github.com/wwplay1978/metatrader5-mcp-server.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\metatrader5-mcp-server",
+                             "role":  "read-only MT5 diagnostics reference",
+                             "declared_license":  "inspect repository",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "11153466a5010a26d6c1e88c43a31cfe2d9eeee0",
+                             "branch":  "main",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  "0.5.1",
+                             "upstream_test_paths":  [
+                                                         "tests",
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "nautilus_trader",
+                             "url":  "https://github.com/nautechsystems/nautilus_trader.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\nautilus_trader",
+                             "role":  "isolated event-engine parity reference",
+                             "declared_license":  "inspect repository",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "45dc7d83c3db4360a84bfb3da5d205b400dee669",
+                             "branch":  "develop",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  null,
+                             "upstream_test_paths":  [
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "Lean",
+                             "url":  "https://github.com/QuantConnect/Lean.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\Lean",
+                             "role":  "isolated replay reference",
+                             "declared_license":  "inspect repository",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "b692bf4788e8b54fc23bdcb5659666bf055ce89f",
+                             "branch":  "master",
+                             "dirty":  false,
+                             "license_file":  "LICENSE",
+                             "package_version":  null,
+                             "upstream_test_paths":  [
+                                                         "tests",
+                                                         ".github\\workflows"
+                                                     ]
+                         },
+                         {
+                             "name":  "abides",
+                             "url":  "https://github.com/abides-sim/abides.git",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\abides",
+                             "role":  "synthetic stress reference",
+                             "declared_license":  "inspect repository",
+                             "status":  "EXISTING_PRESERVED",
+                             "commit":  "c4bf157678928934417aba6073eb0651aeaf6d15",
+                             "branch":  "master",
+                             "dirty":  true,
+                             "license_file":  "LICENSE.txt",
+                             "package_version":  null,
+                             "upstream_test_paths":  [
+                                                         "tests"
+                                                     ]
+                         }
+                     ],
+    "environments":  [
+                         {
+                             "name":  "qlib",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\qlib",
+                             "status":  "EXISTING_PRESERVED",
+                             "python":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\qlib\\Scripts\\python.exe"
+                         },
+                         {
+                             "name":  "ordersim",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\ordersim",
+                             "status":  "EXISTING_PRESERVED",
+                             "python":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\ordersim\\Scripts\\python.exe"
+                         },
+                         {
+                             "name":  "hftbacktest",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\hftbacktest",
+                             "status":  "EXISTING_PRESERVED",
+                             "python":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\hftbacktest\\Scripts\\python.exe"
+                         },
+                         {
+                             "name":  "oos-lab",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab",
+                             "status":  "EXISTING_PRESERVED",
+                             "python":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Scripts\\python.exe"
+                         },
+                         {
+                             "name":  "keystone",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\keystone",
+                             "status":  "EXISTING_PRESERVED",
+                             "python":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\keystone\\Scripts\\python.exe"
+                         },
+                         {
+                             "name":  "research-framework",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\research-framework",
+                             "status":  "EXISTING_PRESERVED",
+                             "python":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\research-framework\\Scripts\\python.exe"
+                         },
+                         {
+                             "name":  "samvid",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\samvid",
+                             "status":  "EXISTING_PRESERVED",
+                             "python":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\samvid\\Scripts\\python.exe"
+                         },
+                         {
+                             "name":  "mt5-mcp",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\mt5-mcp",
+                             "status":  "EXISTING_PRESERVED",
+                             "python":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\mt5-mcp\\Scripts\\python.exe"
+                         },
+                         {
+                             "name":  "nautilus",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\nautilus",
+                             "status":  "EXISTING_PRESERVED",
+                             "python":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\nautilus\\Scripts\\python.exe"
+                         },
+                         {
+                             "name":  "lean",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\lean",
+                             "status":  "EXISTING_PRESERVED",
+                             "python":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\lean\\Scripts\\python.exe"
+                         },
+                         {
+                             "name":  "abides",
+                             "path":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\abides-py311",
+                             "status":  "EXISTING_PRESERVED",
+                             "python":  "C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\abides-py311\\Scripts\\python.exe"
+                         }
+                     ],
+    "install_checks":  [
+                           {
+                               "name":  "OpenAlice pnpm install",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "Scope: all 16 workspace projects",
+                                                   "Already up to date",
+                                                   "Done in 801ms using pnpm v11.19.0"
+                                               ]
+                           },
+                           {
+                               "name":  "OpenAlice tests",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "[guardian] Connector recovery attempt 1 in 895ms",
+                                                   "[alice] [connector] Inbox file request failed: fetch failed",
+                                                   "[guardian] restarting connector",
+                                                   "[alice] [connector] Inbox file request failed: fetch failed",
+                                                   "[connector] [connector] bootstrap @ 2026-08-31T01:41:33.967Z",
+                                                   "[connector] [connector] listening on http://127.0.0.1:47334",
+                                                   "[guardian] connector back online",
+                                                   "✓ Connector recovered after an unexpected process crash",
+                                                   "✅ HARD checks passed — all three children spawned and bound.",
+                                                   "— SOFT checks (logged, do not affect exit code) —",
+                                                   "[guardian] restarting uta",
+                                                   "[uta] [uta] bootstrap @ 2026-08-31T01:41:39.268Z",
+                                                   "[uta] [uta] snapshot scheduler started (every 15m)",
+                                                   "[uta] [uta] order-sync poller started (10s pending lane; external-order observation every 15m)",
+                                                   "[uta] [uta] listening on http://127.0.0.1:47333",
+                                                   "[guardian] uta back online",
+                                                   "✓ UTA restarted cleanly (startedAt changed)",
+                                                   "— teardown orphan check —",
+                                                   "✓ Clean teardown — no orphaned ports",
+                                                   "✅ Smoke complete (HARD checks passed)."
+                                               ]
+                           },
+                           {
+                               "name":  "OpenAlice dev smoke",
+                               "status":  "COMPLETED_BOUNDED_SMOKE",
+                               "exit_code":  null,
+                               "ran_for_seconds":  15,
+                               "process_tree_stopped":  true,
+                               "output_tail":  [
+                                                   "[alice] {\"ts\":\"2026-08-31T01:41:54.155Z\",\"level\":\"info\",\"msg\":\"workspace_catalog.loaded\",\"scope\":\"workspace-catalog\",\"path\":\"C:\\\\Users\\\\Zaid barghouthi\\\\.openalice\\\\workspaces\\\\state\\\\workspace-catalog.json\",\"count\":0}",
+                                                   "[alice] {\"ts\":\"2026-08-31T01:41:54.174Z\",\"level\":\"info\",\"msg\":\"templates.loaded\",\"scope\":\"templates\",\"dir\":\"C:\\\\Users\\\\Zaid barghouthi\\\\Desktop\\\\trading_bot\\\\.external\\\\src\\\\OpenAlice\\\\src\\\\workspaces\\\\templates\",\"names\":[\"auto-prediction\",\"auto-quant-v2\",\"chat\"]}",
+                                                   "[alice] {\"ts\":\"2026-08-31T01:41:54.176Z\",\"level\":\"info\",\"msg\":\"schedule.scanner_started\",\"scope\":\"schedule\",\"intervalMs\":60000}",
+                                                   "[alice] [market-data-compat] mounted on /api/market-data-v1 (186 entries)",
+                                                   "[alice] plugin started: webui",
+                                                   "[alice] engine: started",
+                                                   "[alice] [broker-packs] automatic reconciliation skipped: source development runtime",
+                                                   "[alice] web plugin listening on http://127.0.0.1:47331",
+                                                   "[guardian] Alice ready",
+                                                   "[vite] ",
+                                                   "[vite]   VITE v7.3.6  ready in 779 ms",
+                                                   "[vite] ",
+                                                   "[vite]   ➜  Local:   http://127.0.0.1:5173/",
+                                                   "$ tsx scripts/guardian/dev.ts",
+                                                   "[alice] uta: disabled by trading mode lite — continuing without trading carrier",
+                                                   "[alice] serveStatic: root path \u0027C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\OpenAlice\\ui\\dist\u0027 is not found, are you sure it\u0027s correct?",
+                                                   "[alice] serveStatic: root path \u0027C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\OpenAlice\\ui\\dist\u0027 is not found, are you sure it\u0027s correct?",
+                                                   "(node:2384) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.",
+                                                   "(Use `node --trace-deprecation ...` to show where the warning was created)",
+                                                   "[vite] $ vite"
+                                               ]
+                           },
+                           {
+                               "name":  "awesome-systematic-trading catalog inspection",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "SOURCE_LINKS=634",
+                                                   "d9c98521c76662d5eae03ab97a4fc721d010dde3"
+                                               ]
+                           },
+                           {
+                               "name":  "Qlib install",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "Requirement already satisfied: pywin32\u003e=304 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from docker\u003c8,\u003e=4.0.0-\u003emlflow-\u003epyqlib) (312)",
+                                                   "Requirement already satisfied: typing-inspection\u003e=0.4.2 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from fastapi\u003c1-\u003emlflow-skinny==3.15.2-\u003emlflow-\u003epyqlib) (0.4.4)",
+                                                   "Requirement already satisfied: annotated-doc\u003e=0.0.2 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from fastapi\u003c1-\u003emlflow-skinny==3.15.2-\u003emlflow-\u003epyqlib) (0.0.5)",
+                                                   "Requirement already satisfied: blinker\u003e=1.9.0 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from Flask\u003c4-\u003emlflow-\u003epyqlib) (1.9.0)",
+                                                   "Requirement already satisfied: itsdangerous\u003e=2.2.0 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from Flask\u003c4-\u003emlflow-\u003epyqlib) (2.2.0)",
+                                                   "Requirement already satisfied: werkzeug\u003e=3.1.0 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from Flask\u003c4-\u003emlflow-\u003epyqlib) (3.1.8)",
+                                                   "Requirement already satisfied: gitdb\u003c5,\u003e=4.0.1 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from gitpython\u003c4,\u003e=3.1.9-\u003emlflow-skinny==3.15.2-\u003emlflow-\u003epyqlib) (4.0.12)",
+                                                   "Requirement already satisfied: smmap\u003c6,\u003e=3.0.1 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from gitdb\u003c5,\u003e=4.0.1-\u003egitpython\u003c4,\u003e=3.1.9-\u003emlflow-skinny==3.15.2-\u003emlflow-\u003epyqlib) (5.0.3)",
+                                                   "Requirement already satisfied: pyasn1-modules\u003e=0.2.1 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from google-auth~=2.0-\u003edatabricks-sdk\u003c1,\u003e=0.20.0-\u003emlflow-skinny==3.15.2-\u003emlflow-\u003epyqlib) (0.4.2)",
+                                                   "Requirement already satisfied: graphql-core\u003c3.3,\u003e=3.1 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from graphene\u003c4-\u003emlflow-\u003epyqlib) (3.2.12)",
+                                                   "Requirement already satisfied: graphql-relay\u003c3.3,\u003e=3.1 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from graphene\u003c4-\u003emlflow-\u003epyqlib) (3.2.0)",
+                                                   "Requirement already satisfied: zipp\u003e=3.20 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from importlib_metadata!=4.7.0,\u003c10,\u003e=3.7.0-\u003emlflow-skinny==3.15.2-\u003emlflow-\u003epyqlib) (4.1.0)",
+                                                   "Requirement already satisfied: opentelemetry-semantic-conventions==0.65b0 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from opentelemetry-sdk\u003c3,\u003e=1.9.0-\u003emlflow-skinny==3.15.2-\u003emlflow-\u003epyqlib) (0.65b0)",
+                                                   "Requirement already satisfied: annotated-types\u003e=0.6.0 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from pydantic\u003c3,\u003e=2.0.0-\u003emlflow-skinny==3.15.2-\u003emlflow-\u003epyqlib) (0.8.0)",
+                                                   "Requirement already satisfied: pydantic-core==2.46.5 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from pydantic\u003c3,\u003e=2.0.0-\u003emlflow-skinny==3.15.2-\u003emlflow-\u003epyqlib) (2.46.5)",
+                                                   "Requirement already satisfied: threadpoolctl\u003e=3.5.0 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from scikit-learn\u003c2-\u003emlflow-\u003epyqlib) (3.6.0)",
+                                                   "Requirement already satisfied: prettytable\u003e=3.9 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from skops\u003c1-\u003emlflow-\u003epyqlib) (3.18.0)",
+                                                   "Requirement already satisfied: greenlet\u003e=1 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from sqlalchemy\u003c3,\u003e=1.4.0-\u003emlflow-\u003epyqlib) (3.5.5)",
+                                                   "Requirement already satisfied: pyasn1\u003c0.7.0,\u003e=0.6.1 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from pyasn1-modules\u003e=0.2.1-\u003egoogle-auth~=2.0-\u003edatabricks-sdk\u003c1,\u003e=0.20.0-\u003emlflow-skinny==3.15.2-\u003emlflow-\u003epyqlib) (0.6.4)",
+                                                   "Requirement already satisfied: dnspython\u003c3.0.0,\u003e=2.6.1 in .\\.external\\venvs\\qlib\\Lib\\site-packages (from pymongo-\u003epyqlib) (2.8.0)"
+                                               ]
+                           },
+                           {
+                               "name":  "Qlib import",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  "0.9.7"
+                           },
+                           {
+                               "name":  "Qlib pip check",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  "No broken requirements found."
+                           },
+                           {
+                               "name":  "ordersim install",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "Requirement already satisfied: nh3\u003e=0.2.14 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\ordersim\\Lib\\site-packages (from readme-renderer\u003e=35.0-\u003etwine\u003e=6-\u003eordersim==0.1.3) (0.3.7)",
+                                                   "Requirement already satisfied: docutils\u003e=0.21.2 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\ordersim\\Lib\\site-packages (from readme-renderer\u003e=35.0-\u003etwine\u003e=6-\u003eordersim==0.1.3) (0.23)",
+                                                   "Requirement already satisfied: charset_normalizer\u003c4,\u003e=2 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\ordersim\\Lib\\site-packages (from requests\u003e=2.20-\u003etwine\u003e=6-\u003eordersim==0.1.3) (3.5.1)",
+                                                   "Requirement already satisfied: idna\u003c4,\u003e=2.5 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\ordersim\\Lib\\site-packages (from requests\u003e=2.20-\u003etwine\u003e=6-\u003eordersim==0.1.3) (3.19)",
+                                                   "Requirement already satisfied: certifi\u003e=2023.5.7 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\ordersim\\Lib\\site-packages (from requests\u003e=2.20-\u003etwine\u003e=6-\u003eordersim==0.1.3) (2026.7.22)",
+                                                   "Requirement already satisfied: markdown-it-py\u003e=2.2.0 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\ordersim\\Lib\\site-packages (from rich\u003e=14.3.3-\u003etwine\u003e=6-\u003eordersim==0.1.3) (4.2.0)",
+                                                   "Requirement already satisfied: mdurl~=0.1 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\ordersim\\Lib\\site-packages (from markdown-it-py\u003e=2.2.0-\u003erich\u003e=14.3.3-\u003etwine\u003e=6-\u003eordersim==0.1.3) (0.1.2)",
+                                                   "Requirement already satisfied: more-itertools in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\ordersim\\Lib\\site-packages (from jaraco.classes-\u003ekeyring\u003e=21.2.0-\u003etwine\u003e=6-\u003eordersim==0.1.3) (11.1.0)",
+                                                   "Building wheels for collected packages: ordersim",
+                                                   "  Building editable for ordersim (pyproject.toml): started",
+                                                   "  Building editable for ordersim (pyproject.toml): finished with status \u0027done\u0027",
+                                                   "  Created wheel for ordersim: filename=ordersim-0.1.3-0.editable-cp312-cp312-win_amd64.whl size=8655 sha256=2684dddef687d4f75d0eaeb76364bb09043d19959fcb126dc028d9f624d40a2b",
+                                                   "  Stored in directory: C:\\Users\\Zaid barghouthi\\AppData\\Local\\Temp\\pip-ephem-wheel-cache-qd1etr72\\wheels\\63\\20\\ec\\9cd4505c8479c2406f3322fe69c87b54a05023dc7b4e68d658",
+                                                   "Successfully built ordersim",
+                                                   "Installing collected packages: ordersim",
+                                                   "  Attempting uninstall: ordersim",
+                                                   "    Found existing installation: ordersim 0.1.3",
+                                                   "    Uninstalling ordersim-0.1.3:",
+                                                   "      Successfully uninstalled ordersim-0.1.3",
+                                                   "Successfully installed ordersim-0.1.3"
+                                               ]
+                           },
+                           {
+                               "name":  "ordersim tests",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "src\\ordersim\\gateway.py                                      12      0      0      0   100%",
+                                                   "src\\ordersim\\latency.py                                     125      0     20      0   100%",
+                                                   "src\\ordersim\\recording.py                                    61      0      8      0   100%",
+                                                   "src\\ordersim\\replay\\__init__.py                               4      0      0      0   100%",
+                                                   "src\\ordersim\\replay\\boundary.py                              35      0     14      0   100%",
+                                                   "src\\ordersim\\replay\\compiled_events.py                       32      0      2      0   100%",
+                                                   "src\\ordersim\\replay\\simulator.py                            128      0     16      0   100%",
+                                                   "src\\ordersim\\sim\\__init__.py                                  4      0      0      0   100%",
+                                                   "src\\ordersim\\sim\\cpp_matching_engine.py                      74      2      4      0    97%   200-201",
+                                                   "src\\ordersim\\sim\\execution.py                                22      0      2      0   100%",
+                                                   "src\\ordersim\\sim\\matching_engine.py                         251      9     72     11    94%   188, 271-\u003e273, 275, 325, 373, 387, 407, 435, 436-\u003e429, 438, 462",
+                                                   "src\\ordersim\\specs.py                                        29      0     10      0   100%",
+                                                   "src\\ordersim\\testing\\__init__.py                              2      0      0      0   100%",
+                                                   "src\\ordersim\\testing\\equivalence.py                          61      0     14      0   100%",
+                                                   "src\\ordersim\\types.py                                        60      0      8      0   100%",
+                                                   "src\\ordersim\\valuation.py                                    35      0     10      0   100%",
+                                                   "-----------------------------------------------------------------------------------------------------",
+                                                   "TOTAL                                                      2701     27    686     32    98%",
+                                                   "Required test coverage of 95% reached. Total coverage: 98.26%",
+                                                   "265 passed in 3.65s"
+                                               ]
+                           },
+                           {
+                               "name":  "hftbacktest install",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "Requirement already satisfied: markdown in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (3.10.3)",
+                                                   "Requirement already satisfied: markdown-it-py in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (4.2.0)",
+                                                   "Requirement already satisfied: mdit-py-plugins in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (0.6.1)",
+                                                   "Requirement already satisfied: nh3 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (0.3.7)",
+                                                   "Requirement already satisfied: panel-material-ui\u003e=0.10.0 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (0.14.2)",
+                                                   "Requirement already satisfied: requests in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (2.34.2)",
+                                                   "Requirement already satisfied: tqdm in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (4.70.0)",
+                                                   "Requirement already satisfied: typing-extensions in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (4.16.0)",
+                                                   "Requirement already satisfied: six\u003e=1.5 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from python-dateutil\u003e=2.8.2-\u003eholoviews-\u003ehftbacktest) (1.17.0)",
+                                                   "Requirement already satisfied: mdurl~=0.1 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from markdown-it-py-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (0.1.2)",
+                                                   "Requirement already satisfied: cycler\u003e=0.10 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from matplotlib-\u003ehftbacktest) (0.12.1)",
+                                                   "Requirement already satisfied: fonttools\u003e=4.28.2 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from matplotlib-\u003ehftbacktest) (4.63.0)",
+                                                   "Requirement already satisfied: kiwisolver\u003e=1.3.1 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from matplotlib-\u003ehftbacktest) (1.5.1)",
+                                                   "Requirement already satisfied: pyparsing\u003e=3 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from matplotlib-\u003ehftbacktest) (3.3.2)",
+                                                   "Requirement already satisfied: polars-runtime-32==1.44.1 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from polars-\u003ehftbacktest) (1.44.1)",
+                                                   "Requirement already satisfied: charset_normalizer\u003c4,\u003e=2 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from requests-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (3.5.1)",
+                                                   "Requirement already satisfied: idna\u003c4,\u003e=2.5 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from requests-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (3.19)",
+                                                   "Requirement already satisfied: urllib3\u003c3,\u003e=1.26 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from requests-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (2.7.0)",
+                                                   "Requirement already satisfied: certifi\u003e=2023.5.7 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from requests-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (2026.7.22)",
+                                                   "Requirement already satisfied: colorama in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from tqdm-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (0.4.6)"
+                                               ]
+                           },
+                           {
+                               "name":  "hftbacktest import",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  "imported"
+                           },
+                           {
+                               "name":  "hftbacktest synthetic example",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  "BacktestAsset"
+                           },
+                           {
+                               "name":  "research-framework install",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "Requirement already satisfied: typing-inspection\u003e=0.4.2 in c:\\users\\zaid barghouthi\\desktop\\trading_bot\\.external\\venvs\\research-framework\\lib\\site-packages (from pydantic\u003c3.0.0,\u003e=2.0.3-\u003ealpaca-py==0.43.5-\u003e-r C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\algorithmic-trading-research-framework\\requirements-lock.txt (line 3)) (0.4.4)",
+                                                   "Requirement already satisfied: six\u003e=1.5 in c:\\users\\zaid barghouthi\\desktop\\trading_bot\\.external\\venvs\\research-framework\\lib\\site-packages (from python-dateutil\u003e=2.8.2-\u003epandas==3.0.3-\u003e-r C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\algorithmic-trading-research-framework\\requirements-lock.txt (line 4)) (1.17.0)",
+                                                   "Requirement already satisfied: attrs\u003e=23.2.0 in c:\\users\\zaid barghouthi\\desktop\\trading_bot\\.external\\venvs\\research-framework\\lib\\site-packages (from trio\u003c1.0,\u003e=0.31.0-\u003eselenium==4.46.0-\u003e-r C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\algorithmic-trading-research-framework\\requirements-lock.txt (line 12)) (26.1.0)",
+                                                   "Requirement already satisfied: sortedcontainers in c:\\users\\zaid barghouthi\\desktop\\trading_bot\\.external\\venvs\\research-framework\\lib\\site-packages (from trio\u003c1.0,\u003e=0.31.0-\u003eselenium==4.46.0-\u003e-r C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\algorithmic-trading-research-framework\\requirements-lock.txt (line 12)) (2.4.0)",
+                                                   "Requirement already satisfied: outcome in c:\\users\\zaid barghouthi\\desktop\\trading_bot\\.external\\venvs\\research-framework\\lib\\site-packages (from trio\u003c1.0,\u003e=0.31.0-\u003eselenium==4.46.0-\u003e-r C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\algorithmic-trading-research-framework\\requirements-lock.txt (line 12)) (1.3.0.post0)",
+                                                   "Requirement already satisfied: sniffio\u003e=1.3.0 in c:\\users\\zaid barghouthi\\desktop\\trading_bot\\.external\\venvs\\research-framework\\lib\\site-packages (from trio\u003c1.0,\u003e=0.31.0-\u003eselenium==4.46.0-\u003e-r C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\algorithmic-trading-research-framework\\requirements-lock.txt (line 12)) (1.3.1)",
+                                                   "Requirement already satisfied: wsproto\u003e=0.14 in c:\\users\\zaid barghouthi\\desktop\\trading_bot\\.external\\venvs\\research-framework\\lib\\site-packages (from trio-websocket\u003c1.0,\u003e=0.12.2-\u003eselenium==4.46.0-\u003e-r C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\algorithmic-trading-research-framework\\requirements-lock.txt (line 12)) (1.3.2)",
+                                                   "Requirement already satisfied: pysocks!=1.5.7,\u003c2.0,\u003e=1.5.6 in c:\\users\\zaid barghouthi\\desktop\\trading_bot\\.external\\venvs\\research-framework\\lib\\site-packages (from urllib3[socks]\u003c3.0,\u003e=2.6.3-\u003eselenium==4.46.0-\u003e-r C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\algorithmic-trading-research-framework\\requirements-lock.txt (line 12)) (1.7.1)",
+                                                   "Requirement already satisfied: pycparser in c:\\users\\zaid barghouthi\\desktop\\trading_bot\\.external\\venvs\\research-framework\\lib\\site-packages (from cffi\u003e=2.0.0-\u003ecurl_cffi\u003e=0.15-\u003eyfinance==1.5.1-\u003e-r C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\algorithmic-trading-research-framework\\requirements-lock.txt (line 6)) (3.0)",
+                                                   "Requirement already satisfied: h11\u003c1,\u003e=0.16.0 in c:\\users\\zaid barghouthi\\desktop\\trading_bot\\.external\\venvs\\research-framework\\lib\\site-packages (from wsproto\u003e=0.14-\u003etrio-websocket\u003c1.0,\u003e=0.12.2-\u003eselenium==4.46.0-\u003e-r C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\src\\algorithmic-trading-research-framework\\requirements-lock.txt (line 12)) (0.16.0)",
+                                                   "python.exe : ",
+                                                   "At C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\scripts\\setup_external_research_stack.ps1:684 char:17",
+                                                   "+                 \u0026 $frameworkPython -m pip install -r $lock -r $dev",
+                                                   "+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+                                                   "    + CategoryInfo          : NotSpecified: (:String) [], RemoteException",
+                                                   "    + FullyQualifiedErrorId : NativeCommandError",
+                                                   " ",
+                                                   "[notice] A new release of pip is available: 25.0.1 -\u003e 26.2.1",
+                                                   "[notice] To update, run: C:\\Users\\Zaid ",
+                                                   "barghouthi\\Desktop\\trading_bot\\.external\\venvs\\research-framework\\Scripts\\python.exe -m pip install --upgrade pip"
+                                               ]
+                           },
+                           {
+                               "name":  "research-framework tests",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "........................................................................ [ 23%]",
+                                                   "........................................................................ [ 47%]",
+                                                   "........................................................................ [ 71%]",
+                                                   "........................................................................ [ 95%]",
+                                                   "..............                                                           [100%]",
+                                                   "============================== warnings summary ===============================",
+                                                   "..\\..\\venvs\\research-framework\\Lib\\site-packages\\websockets\\legacy\\__init__.py:6",
+                                                   "  C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\research-framework\\Lib\\site-packages\\websockets\\legacy\\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions",
+                                                   "    warnings.warn(  # deprecated in 14.0 - 2024-11-09",
+                                                   "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+                                                   "302 passed, 1 warning in 39.65s"
+                                               ]
+                           },
+                           {
+                               "name":  "research-framework public release check",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  "Audited 353 candidate files: 0 error(s), 0 warning(s)."
+                           },
+                           {
+                               "name":  "oos-lab install",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "Requirement already satisfied: pip in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (26.2.1)",
+                                                   "Requirement already satisfied: oos-lab in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (0.4.0)",
+                                                   "Requirement already satisfied: numpy\u003e=1.24 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from oos-lab) (2.5.2)",
+                                                   "Requirement already satisfied: scipy\u003e=1.10 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from oos-lab) (1.18.1)"
+                                               ]
+                           },
+                           {
+                               "name":  "oos-lab tests",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "Requirement already satisfied: pytest in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (9.1.1)",
+                                                   "Requirement already satisfied: colorama\u003e=0.4 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from pytest) (0.4.6)",
+                                                   "Requirement already satisfied: iniconfig\u003e=1.0.1 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from pytest) (2.3.0)",
+                                                   "Requirement already satisfied: packaging\u003e=22 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from pytest) (26.3)",
+                                                   "Requirement already satisfied: pluggy\u003c2,\u003e=1.5 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from pytest) (1.6.0)",
+                                                   "Requirement already satisfied: pygments\u003e=2.7.2 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from pytest) (2.21.0)",
+                                                   "........................................................                 [100%]",
+                                                   "56 passed in 1.81s"
+                                               ]
+                           },
+                           {
+                               "name":  "oos-lab pip check",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  "No broken requirements found."
+                           },
+                           {
+                               "name":  "Keystone sync",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "uv : Resolved 120 packages in 2ms",
+                                                   "At C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\scripts\\setup_external_research_stack.ps1:734 char:17",
+                                                   "+                 uv sync --locked",
+                                                   "+                 ~~~~~~~~~~~~~~~~",
+                                                   "    + CategoryInfo          : NotSpecified: (Resolved 120 packages in 2ms:String) [], RemoteException",
+                                                   "    + FullyQualifiedErrorId : NativeCommandError",
+                                                   " ",
+                                                   "Checked 87 packages in 23ms"
+                                               ]
+                           },
+                           {
+                               "name":  "Keystone tests",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "TORCH_PRELOAD 2.11.0+cpu",
+                                                   "........................................................................ [ 11%]",
+                                                   "........................................................................ [ 23%]",
+                                                   "........................................................................ [ 35%]",
+                                                   "........................................................................ [ 46%]",
+                                                   "........................................................................ [ 58%]",
+                                                   "........................................................................ [ 70%]",
+                                                   "........................................................................ [ 81%]",
+                                                   "........................................................................ [ 93%]",
+                                                   ".......................................                                  [100%]",
+                                                   "615 passed in 88.24s (0:01:28)"
+                                               ]
+                           },
+                           {
+                               "name":  "samvid sync",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "uv : Resolved 198 packages in 2ms",
+                                                   "At C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\bot\\scripts\\setup_external_research_stack.ps1:758 char:17",
+                                                   "+                 uv sync --locked",
+                                                   "+                 ~~~~~~~~~~~~~~~~",
+                                                   "    + CategoryInfo          : NotSpecified: (Resolved 198 packages in 2ms:String) [], RemoteException",
+                                                   "    + FullyQualifiedErrorId : NativeCommandError",
+                                                   " ",
+                                                   "Uninstalled 1 package in 205ms",
+                                                   " - pip==26.2.1"
+                                               ]
+                           },
+                           {
+                               "name":  "samvid tests",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "........................................................................ [  5%]",
+                                                   "........................................................................ [ 11%]",
+                                                   "........................................................................ [ 16%]",
+                                                   "........................................................................ [ 22%]",
+                                                   "........................................................................ [ 27%]",
+                                                   "........................................................................ [ 33%]",
+                                                   "........................................................................ [ 38%]",
+                                                   "........................................................................ [ 44%]",
+                                                   "........................................................................ [ 49%]",
+                                                   "........................................................................ [ 55%]",
+                                                   "........................................................................ [ 60%]",
+                                                   "........................................................................ [ 66%]",
+                                                   "........................................................................ [ 71%]",
+                                                   "........................................................................ [ 77%]",
+                                                   "........................................................................ [ 82%]",
+                                                   "........................................................................ [ 88%]",
+                                                   "........................................................................ [ 93%]",
+                                                   "........................................................................ [ 99%]",
+                                                   ".........                                                                [100%]"
+                                               ]
+                           },
+                           {
+                               "name":  "samvid ruff",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  "All checks passed!"
+                           },
+                           {
+                               "name":  "samvid compile",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  {
+
+                                               }
+                           },
+                           {
+                               "name":  "Vibe-Trading PR 481 inspection",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  "e24cad4f3319181546f18d26a35680e6c70be2c4"
+                           },
+                           {
+                               "name":  "mt5-mcp install",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "Requirement already satisfied: six\u003e=1.5 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\mt5-mcp\\Lib\\site-packages (from python-dateutil\u003e=2.8.2-\u003epandas\u003e=2.2.3-\u003emetatrader5-mcp-server==0.5.1) (1.17.0)",
+                                                   "Requirement already satisfied: shellingham\u003e=1.3.0 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\mt5-mcp\\Lib\\site-packages (from typer\u003e=0.16.0-\u003emcp[cli]\u003e=1.6.0-\u003emetatrader5-mcp-server==0.5.1) (1.5.4)",
+                                                   "Requirement already satisfied: rich\u003e=13.8.0 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\mt5-mcp\\Lib\\site-packages (from typer\u003e=0.16.0-\u003emcp[cli]\u003e=1.6.0-\u003emetatrader5-mcp-server==0.5.1) (15.0.0)",
+                                                   "Requirement already satisfied: markdown-it-py\u003e=2.2.0 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\mt5-mcp\\Lib\\site-packages (from rich\u003e=13.8.0-\u003etyper\u003e=0.16.0-\u003emcp[cli]\u003e=1.6.0-\u003emetatrader5-mcp-server==0.5.1) (4.2.0)",
+                                                   "Requirement already satisfied: mdurl~=0.1 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\mt5-mcp\\Lib\\site-packages (from markdown-it-py\u003e=2.2.0-\u003erich\u003e=13.8.0-\u003etyper\u003e=0.16.0-\u003emcp[cli]\u003e=1.6.0-\u003emetatrader5-mcp-server==0.5.1) (0.1.2)",
+                                                   "Requirement already satisfied: httptools\u003e=0.8.0 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\mt5-mcp\\Lib\\site-packages (from uvicorn[standard]\u003e=0.34.1-\u003emetatrader5-mcp-server==0.5.1) (0.8.0)",
+                                                   "Requirement already satisfied: pyyaml\u003e=5.1 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\mt5-mcp\\Lib\\site-packages (from uvicorn[standard]\u003e=0.34.1-\u003emetatrader5-mcp-server==0.5.1) (6.0.3)",
+                                                   "Requirement already satisfied: watchfiles\u003e=0.20 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\mt5-mcp\\Lib\\site-packages (from uvicorn[standard]\u003e=0.34.1-\u003emetatrader5-mcp-server==0.5.1) (1.2.0)",
+                                                   "Building wheels for collected packages: metatrader5-mcp-server",
+                                                   "  Building editable for metatrader5-mcp-server (pyproject.toml): started",
+                                                   "  Building editable for metatrader5-mcp-server (pyproject.toml): finished with status \u0027done\u0027",
+                                                   "  Created wheel for metatrader5-mcp-server: filename=metatrader5_mcp_server-0.5.1-0.editable-py3-none-any.whl size=6041 sha256=323880db247a1ef8139068bc6442661209b6af18062d8fa342351ced6d80d4aa",
+                                                   "  Stored in directory: C:\\Users\\Zaid barghouthi\\AppData\\Local\\Temp\\pip-ephem-wheel-cache-5tcl0his\\wheels\\d2\\91\\82\\08017e96c89cfe84eb4accb8a5e0a31b90e52b4b5a638e5fee",
+                                                   "Successfully built metatrader5-mcp-server",
+                                                   "Installing collected packages: metatrader5-mcp-server",
+                                                   "  Attempting uninstall: metatrader5-mcp-server",
+                                                   "    Found existing installation: metatrader5-mcp-server 0.5.1",
+                                                   "    Uninstalling metatrader5-mcp-server-0.5.1:",
+                                                   "      Successfully uninstalled metatrader5-mcp-server-0.5.1",
+                                                   "Successfully installed metatrader5-mcp-server-0.5.1"
+                                               ]
+                           },
+                           {
+                               "name":  "mt5-mcp tests",
+                               "status":  "BLOCKED",
+                               "exit_code":  1,
+                               "output_tail":  [
+                                                   "        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+                                                   "E       assert 404 == 422",
+                                                   "E        +  where 404 = \u003cResponse [404 Not Found]\u003e.status_code",
+                                                   "tests\\test_orders_route.py:168: AssertionError",
+                                                   "=========================== short test summary info ===========================",
+                                                   "FAILED tests/test_accounts_route.py::test_account_info - TypeError: stub_life...",
+                                                   "FAILED tests/test_history_route.py::test_history_deals - TypeError: stub_life...",
+                                                   "FAILED tests/test_history_route.py::test_history_orders - TypeError: stub_lif...",
+                                                   "FAILED tests/test_orders_route.py::test_place_market_order_api_missing_fields",
+                                                   "ERROR tests/test_market_route.py::test_get_symbol_info_success - ImportError:...",
+                                                   "ERROR tests/test_market_route.py::test_get_symbol_info_not_found - ImportErro...",
+                                                   "ERROR tests/test_market_route.py::test_get_symbol_info_connection_error - Imp...",
+                                                   "ERROR tests/test_market_route.py::test_get_candles_by_date_success - ImportEr...",
+                                                   "ERROR tests/test_market_route.py::test_get_candles_by_date_no_data - ImportEr...",
+                                                   "ERROR tests/test_market_route.py::test_get_candles_by_date_value_error - Impo...",
+                                                   "ERROR tests/test_market_route.py::test_get_candles_by_date_connection_error",
+                                                   "ERROR tests/test_orders_route.py::test_place_market_order_api_with_sl_tp - Im...",
+                                                   "ERROR tests/test_orders_route.py::test_place_market_order_api_no_sl_tp - Impo...",
+                                                   "ERROR tests/test_orders_route.py::test_place_market_order_api_invalid_type - ...",
+                                                   "4 failed, 39 skipped, 10 errors in 3.32s"
+                                               ]
+                           },
+                           {
+                               "name":  "NautilusTrader install",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "Requirement already satisfied: pip in .\\.external\\venvs\\nautilus\\Lib\\site-packages (26.2.1)",
+                                                   "Requirement already satisfied: nautilus_trader in .\\.external\\venvs\\nautilus\\Lib\\site-packages (1.231.0)",
+                                                   "Requirement already satisfied: click\u003c9.0.0,\u003e=8.4.1 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from nautilus_trader) (8.5.0)",
+                                                   "Requirement already satisfied: fsspec==2026.2.0 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from nautilus_trader) (2026.2.0)",
+                                                   "Requirement already satisfied: msgspec\u003c1.0.0,\u003e=0.21.1 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from nautilus_trader) (0.21.1)",
+                                                   "Requirement already satisfied: numpy\u003e=1.26.4 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from nautilus_trader) (2.5.2)",
+                                                   "Requirement already satisfied: pandas\u003c4.0.0,\u003e=2.3.3 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from nautilus_trader) (3.0.5)",
+                                                   "Requirement already satisfied: portion\u003e=2.6.1 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from nautilus_trader) (2.6.2)",
+                                                   "Requirement already satisfied: pyarrow\u003e=25.0.0 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from nautilus_trader) (25.0.1)",
+                                                   "Requirement already satisfied: pytz\u003e=2026.2 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from nautilus_trader) (2026.3.post1)",
+                                                   "Requirement already satisfied: tqdm\u003c5.0.0,\u003e=4.68.4 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from nautilus_trader) (4.70.0)",
+                                                   "Requirement already satisfied: tzdata\u003e=2026.3 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from nautilus_trader) (2026.3)",
+                                                   "Requirement already satisfied: python-dateutil\u003e=2.8.2 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from pandas\u003c4.0.0,\u003e=2.3.3-\u003enautilus_trader) (2.9.0.post0)",
+                                                   "Requirement already satisfied: colorama in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from tqdm\u003c5.0.0,\u003e=4.68.4-\u003enautilus_trader) (0.4.6)",
+                                                   "Requirement already satisfied: sortedcontainers~=2.4 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from portion\u003e=2.6.1-\u003enautilus_trader) (2.4.0)",
+                                                   "Requirement already satisfied: six\u003e=1.5 in .\\.external\\venvs\\nautilus\\Lib\\site-packages (from python-dateutil\u003e=2.8.2-\u003epandas\u003c4.0.0,\u003e=2.3.3-\u003enautilus_trader) (1.17.0)"
+                                               ]
+                           },
+                           {
+                               "name":  "NautilusTrader import",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  "1.231.0"
+                           },
+                           {
+                               "name":  "NautilusTrader pip check",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  "No broken requirements found."
+                           },
+                           {
+                               "name":  "LEAN install",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "Requirement already satisfied: pydantic-core==2.46.5 in .\\.external\\venvs\\lean\\Lib\\site-packages (from pydantic\u003e=2.0.0-\u003elean) (2.46.5)",
+                                                   "Requirement already satisfied: typing-extensions\u003e=4.14.1 in .\\.external\\venvs\\lean\\Lib\\site-packages (from pydantic\u003e=2.0.0-\u003elean) (4.16.0)",
+                                                   "Requirement already satisfied: typing-inspection\u003e=0.4.2 in .\\.external\\venvs\\lean\\Lib\\site-packages (from pydantic\u003e=2.0.0-\u003elean) (0.4.4)",
+                                                   "Requirement already satisfied: six\u003e=1.5 in .\\.external\\venvs\\lean\\Lib\\site-packages (from python-dateutil\u003e=2.8.2-\u003elean) (1.17.0)",
+                                                   "Requirement already satisfied: pandas in .\\.external\\venvs\\lean\\Lib\\site-packages (from quantconnect-stubs\u003e=18039-\u003elean) (3.0.5)",
+                                                   "Requirement already satisfied: matplotlib in .\\.external\\venvs\\lean\\Lib\\site-packages (from quantconnect-stubs\u003e=18039-\u003elean) (3.11.1)",
+                                                   "Requirement already satisfied: charset_normalizer\u003c4,\u003e=2 in .\\.external\\venvs\\lean\\Lib\\site-packages (from requests\u003e=2.27.1-\u003elean) (3.5.1)",
+                                                   "Requirement already satisfied: idna\u003c4,\u003e=2.5 in .\\.external\\venvs\\lean\\Lib\\site-packages (from requests\u003e=2.27.1-\u003elean) (3.19)",
+                                                   "Requirement already satisfied: certifi\u003e=2023.5.7 in .\\.external\\venvs\\lean\\Lib\\site-packages (from requests\u003e=2.27.1-\u003elean) (2026.7.22)",
+                                                   "Requirement already satisfied: markdown-it-py\u003e=2.2.0 in .\\.external\\venvs\\lean\\Lib\\site-packages (from rich\u003e=9.10.0-\u003elean) (4.2.0)",
+                                                   "Requirement already satisfied: pygments\u003c3.0.0,\u003e=2.13.0 in .\\.external\\venvs\\lean\\Lib\\site-packages (from rich\u003e=9.10.0-\u003elean) (2.21.0)",
+                                                   "Requirement already satisfied: mdurl~=0.1 in .\\.external\\venvs\\lean\\Lib\\site-packages (from markdown-it-py\u003e=2.2.0-\u003erich\u003e=9.10.0-\u003elean) (0.1.2)",
+                                                   "Requirement already satisfied: contourpy\u003e=1.0.1 in .\\.external\\venvs\\lean\\Lib\\site-packages (from matplotlib-\u003equantconnect-stubs\u003e=18039-\u003elean) (1.3.3)",
+                                                   "Requirement already satisfied: cycler\u003e=0.10 in .\\.external\\venvs\\lean\\Lib\\site-packages (from matplotlib-\u003equantconnect-stubs\u003e=18039-\u003elean) (0.12.1)",
+                                                   "Requirement already satisfied: fonttools\u003e=4.28.2 in .\\.external\\venvs\\lean\\Lib\\site-packages (from matplotlib-\u003equantconnect-stubs\u003e=18039-\u003elean) (4.63.0)",
+                                                   "Requirement already satisfied: kiwisolver\u003e=1.3.1 in .\\.external\\venvs\\lean\\Lib\\site-packages (from matplotlib-\u003equantconnect-stubs\u003e=18039-\u003elean) (1.5.1)",
+                                                   "Requirement already satisfied: numpy\u003e=1.25 in .\\.external\\venvs\\lean\\Lib\\site-packages (from matplotlib-\u003equantconnect-stubs\u003e=18039-\u003elean) (2.5.2)",
+                                                   "Requirement already satisfied: pillow\u003e=9 in .\\.external\\venvs\\lean\\Lib\\site-packages (from matplotlib-\u003equantconnect-stubs\u003e=18039-\u003elean) (12.3.0)",
+                                                   "Requirement already satisfied: pyparsing\u003e=3 in .\\.external\\venvs\\lean\\Lib\\site-packages (from matplotlib-\u003equantconnect-stubs\u003e=18039-\u003elean) (3.3.2)",
+                                                   "Requirement already satisfied: tzdata in .\\.external\\venvs\\lean\\Lib\\site-packages (from pandas-\u003equantconnect-stubs\u003e=18039-\u003elean) (2026.3)"
+                                               ]
+                           },
+                           {
+                               "name":  "LEAN help",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "  create-project  Alias for \u0027project-create\u0027",
+                                                   "  data            Download or generate data for local use.",
+                                                   "  decrypt         Decrypt your local project using the specified...",
+                                                   "  delete-project  Alias for \u0027project-delete\u0027",
+                                                   "  encrypt         Encrypt your local project using the specified...",
+                                                   "  gui             Work with the local GUI.",
+                                                   "  init            Scaffold a Lean configuration file and data directory.",
+                                                   "  library         Manage custom libraries in a project.",
+                                                   "  live            Interact with the local machine.",
+                                                   "  login           Log in with a QuantConnect account.",
+                                                   "  logout          Log out and remove stored credentials.",
+                                                   "  logs            Display the most recent backtest/live/optimization logs.",
+                                                   "  object-store    Interact with the Organization\u0027s Local Object Store.",
+                                                   "  optimize        Optimize a project\u0027s parameters locally using Docker.",
+                                                   "  private-cloud   Interact with a QuantConnect private cloud.",
+                                                   "  project-create  Create a new project containing starter code.",
+                                                   "  project-delete  Delete a project locally and in the cloud if it exists.",
+                                                   "  report          Generate a report of a backtest.",
+                                                   "  research        Run a Jupyter Lab environment locally using Docker.",
+                                                   "  whoami          Display who is logged in."
+                                               ]
+                           },
+                           {
+                               "name":  "ABIDES install",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "Requirement already satisfied: tqdm in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\abides-py311\\Lib\\site-packages (from abides==1.0.0) (4.70.0)",
+                                                   "Requirement already satisfied: psutil in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\abides-py311\\Lib\\site-packages (from abides==1.0.0) (7.2.2)",
+                                                   "Requirement already satisfied: typish\u003e=1.9.2 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\abides-py311\\Lib\\site-packages (from jsons-\u003eabides==1.0.0) (1.9.3)",
+                                                   "Requirement already satisfied: contourpy\u003e=1.0.1 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\abides-py311\\Lib\\site-packages (from matplotlib-\u003eabides==1.0.0) (1.3.2)",
+                                                   "Requirement already satisfied: fonttools\u003e=4.22.0 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\abides-py311\\Lib\\site-packages (from matplotlib-\u003eabides==1.0.0) (4.63.0)",
+                                                   "Requirement already satisfied: packaging\u003e=20.0 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\abides-py311\\Lib\\site-packages (from matplotlib-\u003eabides==1.0.0) (26.3)",
+                                                   "Requirement already satisfied: pillow\u003e=6.2.0 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\abides-py311\\Lib\\site-packages (from matplotlib-\u003eabides==1.0.0) (12.3.0)",
+                                                   "Requirement already satisfied: colorama in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\abides-py311\\Lib\\site-packages (from tqdm-\u003eabides==1.0.0) (0.4.6)",
+                                                   "Building wheels for collected packages: abides",
+                                                   "  Building editable for abides (pyproject.toml): started",
+                                                   "  Building editable for abides (pyproject.toml): finished with status \u0027done\u0027",
+                                                   "  Created wheel for abides: filename=abides-1.0.0-0.editable-py3-none-any.whl size=4514 sha256=2ce43750331e568918e3f6d27f8fe0e6a0193a24dcf320a62f785eb67cd98b5a",
+                                                   "  Stored in directory: C:\\Users\\Zaid barghouthi\\AppData\\Local\\Temp\\pip-ephem-wheel-cache-q1d4zv6o\\wheels\\9f\\56\\7a\\20229c24ad1fd3c7c50cb12cec8fe67917c878939278c85735",
+                                                   "Successfully built abides",
+                                                   "Installing collected packages: abides",
+                                                   "  Attempting uninstall: abides",
+                                                   "    Found existing installation: abides 1.0.0",
+                                                   "    Uninstalling abides-1.0.0:",
+                                                   "      Successfully uninstalled abides-1.0.0",
+                                                   "Successfully installed abides-1.0.0"
+                                               ]
+                           },
+                           {
+                               "name":  "ABIDES synthetic simulation",
+                               "status":  "COMPLETED",
+                               "exit_code":  0,
+                               "output_tail":  [
+                                                   "ABIDES_LATENCY_STRESS_OK samples=1000 min_ns=1050 max_ns=4194 disconnect=-1"
+                                               ]
+                           }
+                       ],
+    "test_results":  [
+                         {
+                             "name":  "OpenAlice tests",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  [
+                                                 "[guardian] Connector recovery attempt 1 in 895ms",
+                                                 "[alice] [connector] Inbox file request failed: fetch failed",
+                                                 "[guardian] restarting connector",
+                                                 "[alice] [connector] Inbox file request failed: fetch failed",
+                                                 "[connector] [connector] bootstrap @ 2026-08-31T01:41:33.967Z",
+                                                 "[connector] [connector] listening on http://127.0.0.1:47334",
+                                                 "[guardian] connector back online",
+                                                 "✓ Connector recovered after an unexpected process crash",
+                                                 "✅ HARD checks passed — all three children spawned and bound.",
+                                                 "— SOFT checks (logged, do not affect exit code) —",
+                                                 "[guardian] restarting uta",
+                                                 "[uta] [uta] bootstrap @ 2026-08-31T01:41:39.268Z",
+                                                 "[uta] [uta] snapshot scheduler started (every 15m)",
+                                                 "[uta] [uta] order-sync poller started (10s pending lane; external-order observation every 15m)",
+                                                 "[uta] [uta] listening on http://127.0.0.1:47333",
+                                                 "[guardian] uta back online",
+                                                 "✓ UTA restarted cleanly (startedAt changed)",
+                                                 "— teardown orphan check —",
+                                                 "✓ Clean teardown — no orphaned ports",
+                                                 "✅ Smoke complete (HARD checks passed)."
+                                             ]
+                         },
+                         {
+                             "name":  "Qlib import",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  "0.9.7"
+                         },
+                         {
+                             "name":  "Qlib pip check",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  "No broken requirements found."
+                         },
+                         {
+                             "name":  "ordersim tests",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  [
+                                                 "src\\ordersim\\gateway.py                                      12      0      0      0   100%",
+                                                 "src\\ordersim\\latency.py                                     125      0     20      0   100%",
+                                                 "src\\ordersim\\recording.py                                    61      0      8      0   100%",
+                                                 "src\\ordersim\\replay\\__init__.py                               4      0      0      0   100%",
+                                                 "src\\ordersim\\replay\\boundary.py                              35      0     14      0   100%",
+                                                 "src\\ordersim\\replay\\compiled_events.py                       32      0      2      0   100%",
+                                                 "src\\ordersim\\replay\\simulator.py                            128      0     16      0   100%",
+                                                 "src\\ordersim\\sim\\__init__.py                                  4      0      0      0   100%",
+                                                 "src\\ordersim\\sim\\cpp_matching_engine.py                      74      2      4      0    97%   200-201",
+                                                 "src\\ordersim\\sim\\execution.py                                22      0      2      0   100%",
+                                                 "src\\ordersim\\sim\\matching_engine.py                         251      9     72     11    94%   188, 271-\u003e273, 275, 325, 373, 387, 407, 435, 436-\u003e429, 438, 462",
+                                                 "src\\ordersim\\specs.py                                        29      0     10      0   100%",
+                                                 "src\\ordersim\\testing\\__init__.py                              2      0      0      0   100%",
+                                                 "src\\ordersim\\testing\\equivalence.py                          61      0     14      0   100%",
+                                                 "src\\ordersim\\types.py                                        60      0      8      0   100%",
+                                                 "src\\ordersim\\valuation.py                                    35      0     10      0   100%",
+                                                 "-----------------------------------------------------------------------------------------------------",
+                                                 "TOTAL                                                      2701     27    686     32    98%",
+                                                 "Required test coverage of 95% reached. Total coverage: 98.26%",
+                                                 "265 passed in 3.65s"
+                                             ]
+                         },
+                         {
+                             "name":  "hftbacktest install",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  [
+                                                 "Requirement already satisfied: markdown in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (3.10.3)",
+                                                 "Requirement already satisfied: markdown-it-py in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (4.2.0)",
+                                                 "Requirement already satisfied: mdit-py-plugins in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (0.6.1)",
+                                                 "Requirement already satisfied: nh3 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (0.3.7)",
+                                                 "Requirement already satisfied: panel-material-ui\u003e=0.10.0 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (0.14.2)",
+                                                 "Requirement already satisfied: requests in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (2.34.2)",
+                                                 "Requirement already satisfied: tqdm in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (4.70.0)",
+                                                 "Requirement already satisfied: typing-extensions in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from panel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (4.16.0)",
+                                                 "Requirement already satisfied: six\u003e=1.5 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from python-dateutil\u003e=2.8.2-\u003eholoviews-\u003ehftbacktest) (1.17.0)",
+                                                 "Requirement already satisfied: mdurl~=0.1 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from markdown-it-py-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (0.1.2)",
+                                                 "Requirement already satisfied: cycler\u003e=0.10 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from matplotlib-\u003ehftbacktest) (0.12.1)",
+                                                 "Requirement already satisfied: fonttools\u003e=4.28.2 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from matplotlib-\u003ehftbacktest) (4.63.0)",
+                                                 "Requirement already satisfied: kiwisolver\u003e=1.3.1 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from matplotlib-\u003ehftbacktest) (1.5.1)",
+                                                 "Requirement already satisfied: pyparsing\u003e=3 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from matplotlib-\u003ehftbacktest) (3.3.2)",
+                                                 "Requirement already satisfied: polars-runtime-32==1.44.1 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from polars-\u003ehftbacktest) (1.44.1)",
+                                                 "Requirement already satisfied: charset_normalizer\u003c4,\u003e=2 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from requests-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (3.5.1)",
+                                                 "Requirement already satisfied: idna\u003c4,\u003e=2.5 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from requests-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (3.19)",
+                                                 "Requirement already satisfied: urllib3\u003c3,\u003e=1.26 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from requests-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (2.7.0)",
+                                                 "Requirement already satisfied: certifi\u003e=2023.5.7 in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from requests-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (2026.7.22)",
+                                                 "Requirement already satisfied: colorama in .\\.external\\venvs\\hftbacktest\\Lib\\site-packages (from tqdm-\u003epanel\u003e=1.0-\u003eholoviews-\u003ehftbacktest) (0.4.6)"
+                                             ]
+                         },
+                         {
+                             "name":  "hftbacktest import",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  "imported"
+                         },
+                         {
+                             "name":  "hftbacktest synthetic example",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  "BacktestAsset"
+                         },
+                         {
+                             "name":  "research-framework tests",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  [
+                                                 "........................................................................ [ 23%]",
+                                                 "........................................................................ [ 47%]",
+                                                 "........................................................................ [ 71%]",
+                                                 "........................................................................ [ 95%]",
+                                                 "..............                                                           [100%]",
+                                                 "============================== warnings summary ===============================",
+                                                 "..\\..\\venvs\\research-framework\\Lib\\site-packages\\websockets\\legacy\\__init__.py:6",
+                                                 "  C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\research-framework\\Lib\\site-packages\\websockets\\legacy\\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions",
+                                                 "    warnings.warn(  # deprecated in 14.0 - 2024-11-09",
+                                                 "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+                                                 "302 passed, 1 warning in 39.65s"
+                                             ]
+                         },
+                         {
+                             "name":  "research-framework public release check",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  "Audited 353 candidate files: 0 error(s), 0 warning(s)."
+                         },
+                         {
+                             "name":  "oos-lab tests",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  [
+                                                 "Requirement already satisfied: pytest in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (9.1.1)",
+                                                 "Requirement already satisfied: colorama\u003e=0.4 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from pytest) (0.4.6)",
+                                                 "Requirement already satisfied: iniconfig\u003e=1.0.1 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from pytest) (2.3.0)",
+                                                 "Requirement already satisfied: packaging\u003e=22 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from pytest) (26.3)",
+                                                 "Requirement already satisfied: pluggy\u003c2,\u003e=1.5 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from pytest) (1.6.0)",
+                                                 "Requirement already satisfied: pygments\u003e=2.7.2 in C:\\Users\\Zaid barghouthi\\Desktop\\trading_bot\\.external\\venvs\\oos-lab\\Lib\\site-packages (from pytest) (2.21.0)",
+                                                 "........................................................                 [100%]",
+                                                 "56 passed in 1.81s"
+                                             ]
+                         },
+                         {
+                             "name":  "oos-lab pip check",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  "No broken requirements found."
+                         },
+                         {
+                             "name":  "Keystone tests",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  [
+                                                 "TORCH_PRELOAD 2.11.0+cpu",
+                                                 "........................................................................ [ 11%]",
+                                                 "........................................................................ [ 23%]",
+                                                 "........................................................................ [ 35%]",
+                                                 "........................................................................ [ 46%]",
+                                                 "........................................................................ [ 58%]",
+                                                 "........................................................................ [ 70%]",
+                                                 "........................................................................ [ 81%]",
+                                                 "........................................................................ [ 93%]",
+                                                 ".......................................                                  [100%]",
+                                                 "615 passed in 88.24s (0:01:28)"
+                                             ]
+                         },
+                         {
+                             "name":  "samvid tests",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  [
+                                                 "........................................................................ [  5%]",
+                                                 "........................................................................ [ 11%]",
+                                                 "........................................................................ [ 16%]",
+                                                 "........................................................................ [ 22%]",
+                                                 "........................................................................ [ 27%]",
+                                                 "........................................................................ [ 33%]",
+                                                 "........................................................................ [ 38%]",
+                                                 "........................................................................ [ 44%]",
+                                                 "........................................................................ [ 49%]",
+                                                 "........................................................................ [ 55%]",
+                                                 "........................................................................ [ 60%]",
+                                                 "........................................................................ [ 66%]",
+                                                 "........................................................................ [ 71%]",
+                                                 "........................................................................ [ 77%]",
+                                                 "........................................................................ [ 82%]",
+                                                 "........................................................................ [ 88%]",
+                                                 "........................................................................ [ 93%]",
+                                                 "........................................................................ [ 99%]",
+                                                 ".........                                                                [100%]"
+                                             ]
+                         },
+                         {
+                             "name":  "mt5-mcp tests",
+                             "status":  "BLOCKED",
+                             "exit_code":  1,
+                             "output_tail":  [
+                                                 "        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+                                                 "E       assert 404 == 422",
+                                                 "E        +  where 404 = \u003cResponse [404 Not Found]\u003e.status_code",
+                                                 "tests\\test_orders_route.py:168: AssertionError",
+                                                 "=========================== short test summary info ===========================",
+                                                 "FAILED tests/test_accounts_route.py::test_account_info - TypeError: stub_life...",
+                                                 "FAILED tests/test_history_route.py::test_history_deals - TypeError: stub_life...",
+                                                 "FAILED tests/test_history_route.py::test_history_orders - TypeError: stub_lif...",
+                                                 "FAILED tests/test_orders_route.py::test_place_market_order_api_missing_fields",
+                                                 "ERROR tests/test_market_route.py::test_get_symbol_info_success - ImportError:...",
+                                                 "ERROR tests/test_market_route.py::test_get_symbol_info_not_found - ImportErro...",
+                                                 "ERROR tests/test_market_route.py::test_get_symbol_info_connection_error - Imp...",
+                                                 "ERROR tests/test_market_route.py::test_get_candles_by_date_success - ImportEr...",
+                                                 "ERROR tests/test_market_route.py::test_get_candles_by_date_no_data - ImportEr...",
+                                                 "ERROR tests/test_market_route.py::test_get_candles_by_date_value_error - Impo...",
+                                                 "ERROR tests/test_market_route.py::test_get_candles_by_date_connection_error",
+                                                 "ERROR tests/test_orders_route.py::test_place_market_order_api_with_sl_tp - Im...",
+                                                 "ERROR tests/test_orders_route.py::test_place_market_order_api_no_sl_tp - Impo...",
+                                                 "ERROR tests/test_orders_route.py::test_place_market_order_api_invalid_type - ...",
+                                                 "4 failed, 39 skipped, 10 errors in 3.32s"
+                                             ]
+                         },
+                         {
+                             "name":  "NautilusTrader import",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  "1.231.0"
+                         },
+                         {
+                             "name":  "NautilusTrader pip check",
+                             "status":  "COMPLETED",
+                             "exit_code":  0,
+                             "output_tail":  "No broken requirements found."
+                         }
+                     ],
+    "install_policy":  {
+                           "rerunnable":  true,
+                           "existing_directories_preserved":  true,
+                           "credentials_modified":  false,
+                           "external_trading_runtimes_started":  false,
+                           "skipped_installs":  false,
+                           "skipped_upstream_tests":  false,
+                           "skipped_repository_clone":  true,
+                           "install_docker_requested":  false
+                       }
+}
